@@ -1,0 +1,11 @@
+{
+    "metal-enable-logging": true,
+    "plugin-logging": true,
+    "include-dependencies": true,
+    "verbose-logging": true,
+    "logging-prefix": "🔨",
+//    "dependency-path-suffix": "include",
+    "include-paths": ["include"],
+    "output": "default.metallib",
+
+}
