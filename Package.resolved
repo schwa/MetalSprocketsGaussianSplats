@@ -1,31 +1,13 @@
 {
-  "originHash" : "6718402a011a7483437a2b9a55b0f3f2de5c22132457fff4c8e493f501bcb0ef",
+  "originHash" : "733c0a1f671cdabc008cae9543b91398e93b3122d3739d3f8de00c35e6d584db",
   "pins" : [
-    {
-      "identity" : "everything",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/Everything",
-      "state" : {
-        "branch" : "jwight/ultraviolence-imports",
-        "revision" : "4a5feb529d6e0af6a89ddf28f2dbae85306d4399"
-      }
-    },
     {
       "identity" : "geometrylite3d",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GeometryLite3D",
       "state" : {
-        "branch" : "main",
+        "branch" : "0.1.0",
         "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7"
-      }
-    },
-    {
-      "identity" : "interaction3d",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/Interaction3D",
-      "state" : {
-        "branch" : "main",
-        "revision" : "6d4e58ad0d45d67e26c7efee57995a3865159287"
       }
     },
     {
@@ -42,17 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
-        "branch" : "main",
-        "revision" : "aa85a487a660138dd4a439ab0ff8eba9ab71d92a"
-      }
-    },
-    {
-      "identity" : "swift-algorithms",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-algorithms",
-      "state" : {
-        "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
-        "version" : "1.2.1"
+        "branch" : "0.1.0",
+        "revision" : "8cc9ccf92f571dae310662f9b44ea7f46dface1d"
       }
     },
     {
