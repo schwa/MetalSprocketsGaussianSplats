@@ -1,6 +1,11 @@
 import Foundation
 import Compression
 import simd
+import UniformTypeIdentifiers
+
+public extension UTType {
+    static let spz = UTType(filenameExtension: "spz")!
+}
 
 // MARK: - SPZSplat
 

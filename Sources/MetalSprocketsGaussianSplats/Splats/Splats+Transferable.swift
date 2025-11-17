@@ -8,6 +8,14 @@ extension Array: @retroactive Transferable where Element == Antimatter15Splat {
                 buffer.withMemoryRebound(to: Antimatter15Splat.self, Array.init)
             }
         }
+        DataRepresentation(importedContentType: .spz) { data in
+            let reader = try SPZReader(data: data)
+            var splats: [Antimatter15Splat] = []
+            try reader.read { spzSplat in
+                splats.append(Antimatter15Splat(spzSplat))
+            }
+            return splats
+        }
         DataRepresentation(importedContentType: .json) { data in
             try JSONDecoder().decode([GenericSplat].self, from: data)
                 .map(Antimatter15Splat.init)

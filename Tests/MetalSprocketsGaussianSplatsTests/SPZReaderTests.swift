@@ -201,4 +201,33 @@ struct SPZReaderTests {
             _ = try SPZReader(data: emptyData)
         }
     }
+
+    @Test("Convert SPZSplat to Antimatter15Splat")
+    func testSPZToAntimatter15Conversion() throws {
+        let url = Self.samplesURL.appendingPathComponent("hornedlizard.spz")
+
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            print("Skipping test - sample file not found")
+            return
+        }
+
+        let reader = try SPZReader(url: url)
+        var converted: [Antimatter15Splat] = []
+        let maxConvert = 100
+
+        try reader.read { splat in
+            guard converted.count < maxConvert else { return }
+            let antimatter15 = Antimatter15Splat(splat)
+            converted.append(antimatter15)
+        }
+
+        #expect(converted.count == maxConvert)
+
+        let first = converted[0]
+        #expect(first.position.x.isFinite)
+        #expect(first.scale.x.isFinite)
+        #expect(first.color.x > 0 || first.color.x == 0)
+
+        print("Successfully converted \(converted.count) SPZSplats to Antimatter15Splats")
+    }
 }
