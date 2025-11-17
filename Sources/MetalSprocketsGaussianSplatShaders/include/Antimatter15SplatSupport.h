@@ -17,7 +17,7 @@ struct BoundingBox {
 
 #import <metal_stdlib>
 
-namespace GaussianSplatSupport {
+namespace Antimatter15SplatSupport {
     using namespace metal;
 
     struct CovarianceResult {

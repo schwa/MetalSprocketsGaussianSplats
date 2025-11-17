@@ -1,14 +1,14 @@
 #import "GaussianSplatShaders.h"
-#import "GaussianSplatSupport.h"
+#import "Antimatter15SplatSupport.h"
 
 #import <metal_logging>
 #import <metal_stdlib>
 #import <metal_uniform>
 
 using namespace metal;
-using namespace GaussianSplatSupport;
+using namespace Antimatter15SplatSupport;
 
-namespace GaussianSplatAntimatter15RenderShaders {
+namespace Antimatter15SplatRenderShader {
 
     constant int debug_mode [[function_constant(2)]];
 
@@ -134,4 +134,4 @@ namespace GaussianSplatAntimatter15RenderShaders {
     }
 
 
-}; // namespace GaussianSplatAntimatter15RenderShaders
+}; // namespace Antimatter15SplatRenderShader

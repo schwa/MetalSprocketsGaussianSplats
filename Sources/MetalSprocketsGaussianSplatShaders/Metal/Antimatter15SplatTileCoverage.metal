@@ -1,14 +1,14 @@
 #import "GaussianSplatShaders.h"
-#import "GaussianSplatSupport.h"
+#import "Antimatter15SplatSupport.h"
 
 #import <metal_logging>
 #import <metal_stdlib>
 #import <metal_uniform>
 
 using namespace metal;
-using namespace GaussianSplatSupport;
+using namespace Antimatter15SplatSupport;
 
-namespace GaussianSplatDebug {
+namespace Antimatter15SplatTileCoverage {
 
     // MARK: - Compute Shader
 

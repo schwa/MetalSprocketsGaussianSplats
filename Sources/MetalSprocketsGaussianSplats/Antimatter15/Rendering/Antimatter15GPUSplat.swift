@@ -2,8 +2,8 @@
 import simd
 import MetalSprocketsGaussianSplatShaders
 
-// `struct GPUSplat` defined in GaussianSplatShaders package.
-// struct GPUSplat {
+// `struct Antimatter15GPUSplat` defined in GaussianSplatShaders package.
+// struct Antimatter15GPUSplat {
 //     simd_float3 position; // 12
 //     // padding            // 4
 //     simd_half2 u1;        // 4
@@ -15,10 +15,10 @@ import MetalSprocketsGaussianSplatShaders
 //
 // };
 
-extension GPUSplat: @unchecked @retroactive Sendable {
+extension Antimatter15GPUSplat: @unchecked @retroactive Sendable {
 }
 
-extension GPUSplat: @retroactive Equatable {
+extension Antimatter15GPUSplat: @retroactive Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.position == rhs.position
             && lhs.color == rhs.color
@@ -28,13 +28,13 @@ extension GPUSplat: @retroactive Equatable {
     }
 }
 
-extension GPUSplat: @retroactive CustomDebugStringConvertible {
+extension Antimatter15GPUSplat: @retroactive CustomDebugStringConvertible {
     public var debugDescription: String {
-        "GPUSplat(position: [\(position.x), \(position.y), \(position.z)], u1: [\(u1.x), \(u1.y)], u2: [\(u2.x), \(u2.y)], u3: [\(u3.x), \(u3.y)], color: [\(color.x), \(color.y), \(color.z), \(color.w)])"
+        "Antimatter15GPUSplat(position: [\(position.x), \(position.y), \(position.z)], u1: [\(u1.x), \(u1.y)], u2: [\(u2.x), \(u2.y)], u3: [\(u3.x), \(u3.y)], color: [\(color.x), \(color.y), \(color.z), \(color.w)])"
     }
 }
 
-extension GPUSplat: SortableSplatProtocol {
+extension Antimatter15GPUSplat: SortableSplatProtocol {
     public var floatPosition: SIMD3<Float> {
         SIMD3<Float>(position)
     }

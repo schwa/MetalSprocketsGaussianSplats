@@ -5,8 +5,8 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-public struct TileCountComputePass: Element {
-    var splatCloud: SplatCloud<GPUSplat>
+public struct Antimatter15TileCountComputePass: Element {
+    var splatCloud: SplatCloud<Antimatter15GPUSplat>
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
@@ -19,7 +19,7 @@ public struct TileCountComputePass: Element {
     var computeKernel: ComputeKernel
 
     public init(
-        splatCloud: SplatCloud<GPUSplat>,
+        splatCloud: SplatCloud<Antimatter15GPUSplat>,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
@@ -39,7 +39,7 @@ public struct TileCountComputePass: Element {
         self.tileBuffer = tileBuffer
         self.maxCountBuffer = maxCountBuffer
 
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("GaussianSplatDebug")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("Antimatter15SplatTileCoverage")
         self.computeKernel = try shaderLibrary.function(named: "compute_tile_overlaps", type: ComputeKernel.self)
     }
 

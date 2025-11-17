@@ -5,7 +5,7 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-public struct TileHeatMapRenderPipeline: Element {
+public struct Antimatter15TileHeatMapRenderPipeline: Element {
     var tileGridSize: SIMD2<UInt32>
     var tileCounts: TypedMTLBuffer<UInt32>
     var maxCountBuffer: TypedMTLBuffer<UInt32>
@@ -22,7 +22,7 @@ public struct TileHeatMapRenderPipeline: Element {
         self.tileCounts = tileCounts
         self.maxCountBuffer = maxCountBuffer
 
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("GaussianSplatDebug")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("Antimatter15SplatTileCoverage")
 
         self.vertexShader = try shaderLibrary.function(named: "tile_heatmap_vertex", type: VertexShader.self)
         self.fragmentShader = try shaderLibrary.function(named: "tile_heatmap_fragment", type: FragmentShader.self)

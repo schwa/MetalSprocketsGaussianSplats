@@ -5,7 +5,7 @@ import MetalSprocketsSupport
 import UniformTypeIdentifiers
 
 public extension UTType {
-    // An buffer of Antimatter15Splat in little endian format.
+    // A buffer of Antimatter15Splat in little endian format.
     static let antimatter15Splat = UTType(filenameExtension: "splat")!
 }
 
@@ -24,7 +24,7 @@ public struct Antimatter15Splat: Equatable, Sendable {
     }
 }
 
-public extension GPUSplat {
+public extension Antimatter15GPUSplat {
     init(_ splat: Antimatter15Splat) {
         // Extract position
         let position = splat.position
@@ -70,8 +70,8 @@ public extension GPUSplat {
         let u2 = simd_half2(Float16(sigma[2]), Float16(sigma[3]))
         let u3 = simd_half2(Float16(sigma[4]), Float16(sigma[5]))
 
-        // Construct and return the GPUSplat
-        self = GPUSplat(
+        // Construct and return the Antimatter15GPUSplat
+        self = Antimatter15GPUSplat(
             position: SIMD3<Float>(position),
             u1: u1,
             u2: u2,

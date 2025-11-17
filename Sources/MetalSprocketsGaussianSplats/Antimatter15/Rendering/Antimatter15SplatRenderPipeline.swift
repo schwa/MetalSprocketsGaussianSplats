@@ -5,21 +5,21 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-public struct GaussianSplatRenderPipeline: Element {
+public struct Antimatter15SplatRenderPipeline: Element {
     public enum DebugMode: Int32, CaseIterable {
         case off = 0
         case wireframe = 1
         case filled = 2
     }
 
-    var splatCloud: SplatCloud<GPUSplat>
+    var splatCloud: SplatCloud<Antimatter15GPUSplat>
 
     @MSState
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
     @MSState
-    private var sortManager: AsyncSortManager<GPUSplat>?
+    private var sortManager: AsyncSortManager<Antimatter15GPUSplat>?
 
     var vertexDescriptor: MTLVertexDescriptor
     var projectionMatrix: simd_float4x4
@@ -28,7 +28,7 @@ public struct GaussianSplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var debugMode: DebugMode
 
-    public init(splatCloud: SplatCloud<GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe) throws {
+    public init(splatCloud: SplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.projectionMatrix[1][1] *= -1
@@ -38,7 +38,7 @@ public struct GaussianSplatRenderPipeline: Element {
         self.drawableSize = drawableSize
         self.debugMode = debugMode
 
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("GaussianSplatAntimatter15RenderShaders")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("Antimatter15SplatRenderShader")
 
         // Initial shader setup
         var fragmentConstants = FunctionConstants()
@@ -88,7 +88,7 @@ public struct GaussianSplatRenderPipeline: Element {
             .onChange(of: debugMode) {
                 do {
                     // Update shaders with new constants when debugMode changes
-                    let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("GaussianSplatAntimatter15RenderShaders")
+                    let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("Antimatter15SplatRenderShader")
                     var fragmentConstants = FunctionConstants()
                     fragmentConstants["debug_mode"] = .int32(debugMode.rawValue)
                     vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self)

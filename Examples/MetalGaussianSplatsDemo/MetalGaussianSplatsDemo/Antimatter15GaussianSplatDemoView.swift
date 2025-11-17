@@ -11,9 +11,9 @@ import Metal
 import MetalSprocketsUI
 import UniformTypeIdentifiers
 
-public struct GaussianSplatDemoView: View {
+public struct Antimatter15GaussianSplatDemoView: View {
     @State
-    private var splatCloud: SplatCloud<GPUSplat>?
+    private var splatCloud: SplatCloud<Antimatter15GPUSplat>?
 
     @State
     private var projection: any ProjectionProtocol = PerspectiveProjection()
@@ -34,7 +34,7 @@ public struct GaussianSplatDemoView: View {
     private var rotationZ: Float = 0
 
     @State
-    private var debugMode: GaussianSplatRenderPipeline.DebugMode = .off
+    private var debugMode: Antimatter15SplatRenderPipeline.DebugMode = .off
 
     @State
     private var selectedSplatFile: String = "centered_lastchance"
@@ -84,14 +84,14 @@ public struct GaussianSplatDemoView: View {
                             let tileGridSize = SIMD2<UInt32>(gridWidth, gridHeight)
 
                             try RenderPass {
-                                try GaussianSplatRenderPipeline(splatCloud: splatCloud, projectionMatrix: projectionMatrix, modelMatrix: modelMatrix, cameraMatrix: cameraMatrix, drawableSize: drawableSizeFloat, debugMode: debugMode)
+                                try Antimatter15SplatRenderPipeline(splatCloud: splatCloud, projectionMatrix: projectionMatrix, modelMatrix: modelMatrix, cameraMatrix: cameraMatrix, drawableSize: drawableSizeFloat, debugMode: debugMode)
                             }
                             if let currentTileBuffer, let maxCountBuffer {
-                                try TileCountComputePass(splatCloud: splatCloud, projectionMatrix: projectionMatrix, modelMatrix: modelMatrix, cameraMatrix: cameraMatrix, drawableSize: drawableSizeFloat, tileSize: tileSize, tileBuffer: currentTileBuffer, maxCountBuffer: maxCountBuffer)
+                                try Antimatter15TileCountComputePass(splatCloud: splatCloud, projectionMatrix: projectionMatrix, modelMatrix: modelMatrix, cameraMatrix: cameraMatrix, drawableSize: drawableSizeFloat, tileSize: tileSize, tileBuffer: currentTileBuffer, maxCountBuffer: maxCountBuffer)
 
                                 if showTileOverlay {
                                     try RenderPass {
-                                        try TileHeatMapRenderPipeline(tileGridSize: tileGridSize, tileCounts: currentTileBuffer, maxCountBuffer: maxCountBuffer)
+                                        try Antimatter15TileHeatMapRenderPipeline(tileGridSize: tileGridSize, tileCounts: currentTileBuffer, maxCountBuffer: maxCountBuffer)
                                     }
                                 }
                             }
@@ -158,15 +158,15 @@ public struct GaussianSplatDemoView: View {
         }
     }
 
-    func load(url: URL) async throws -> SplatCloud<GPUSplat> {
+    func load(url: URL) async throws -> SplatCloud<Antimatter15GPUSplat> {
         let antimatterSplats = try await [Antimatter15Splat](importing: url, contentType: nil)
-        let gpuSplats = antimatterSplats.map(GPUSplat.init)
+        let gpuSplats = antimatterSplats.map(Antimatter15GPUSplat.init)
         let device = MTLCreateSystemDefaultDevice()!
         return try SplatCloud(device: device, splats: gpuSplats, cameraMatrix: cameraMatrix, modelMatrix: .identity)
     }
 
     func process(splats: [Antimatter15Splat]) {
-        let splats = splats.map(GPUSplat.init)
+        let splats = splats.map(Antimatter15GPUSplat.init)
         let device = _MTLCreateSystemDefaultDevice()
         splatCloud = try! SplatCloud(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: .identity)
     }
@@ -226,9 +226,9 @@ public struct GaussianSplatDemoView: View {
         }
 
         Picker("Debug Mode", selection: $debugMode) {
-            Text("Off").tag(GaussianSplatRenderPipeline.DebugMode.off)
-            Text("Wireframe").tag(GaussianSplatRenderPipeline.DebugMode.wireframe)
-            Text("Filled").tag(GaussianSplatRenderPipeline.DebugMode.filled)
+            Text("Off").tag(Antimatter15SplatRenderPipeline.DebugMode.off)
+            Text("Wireframe").tag(Antimatter15SplatRenderPipeline.DebugMode.wireframe)
+            Text("Filled").tag(Antimatter15SplatRenderPipeline.DebugMode.filled)
         }
 
         Picker("Splat File", selection: $selectedSplatFile) {
