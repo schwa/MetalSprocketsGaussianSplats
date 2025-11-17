@@ -42,5 +42,10 @@ let package = Package(
             ],
 
         ),
+        .testTarget(
+            name: "MetalSprocketsGaussianSplatsTests",
+            dependencies: ["MetalSprocketsGaussianSplats"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )
