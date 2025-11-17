@@ -33,9 +33,7 @@ struct ContentView: View {
             case .antimatter15:
                 Antimatter15GaussianSplatDemoView()
             case .spark:
-                Text("Spark renderer coming soon...")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
+                SparkGaussianSplatDemoView()
             }
         } else {
             Text("Select a renderer")

@@ -35,6 +35,7 @@ public struct SparkSplatView<Splat: SortableSplatProtocol>: View {
                 )
             }
         }
+        .metalColorPixelFormat(.bgra8Unorm_srgb)
     }
 
 }
