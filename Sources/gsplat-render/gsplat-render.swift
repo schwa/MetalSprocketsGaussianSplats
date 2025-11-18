@@ -1,0 +1,369 @@
+@preconcurrency import ArgumentParser
+import Foundation
+import Metal
+import MetalSprockets
+import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatShaders
+import MetalSprocketsSupport
+import GeometryLite3D
+import ImageIO
+import simd
+import AppKit
+
+@main
+struct GaussianSplatRenderer: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "gsplat-render",
+        abstract: "Render Gaussian splat files to PNG images"
+    )
+
+    @Option(help: "Background color in RGBA format (e.g., 0,0,0,1 for black)")
+    var background: String = "0,0,0,1"
+
+    @Option(help: "Width of the output image")
+    var width: Int = 1024
+
+    @Option(help: "Height of the output image")
+    var height: Int = 768
+
+    @Option(help: "Output PNG file path")
+    var output: String = "output.png"
+
+    @Option(help: "Model position in x,y,z format (e.g., 0,0,0)")
+    var modelPosition: String?
+
+    @Option(help: "Camera position in x,y,z format (e.g., 0,0,1.5)")
+    var cameraPosition: String?
+
+    @Option(help: "Camera look-at target in x,y,z format (e.g., 0,0,0)")
+    var cameraLookat: String?
+
+    @Option(help: "Camera rotation as quaternion (x,y,z,w) or 3x3 matrix (9 values comma-separated)")
+    var cameraRotation: String?
+
+    @Option(help: "Projection field of view in degrees")
+    var projectionFov: Double?
+
+    @Option(help: "Camera near clipping plane")
+    var near: Float = 0.1
+
+    @Option(help: "Camera far clipping plane")
+    var far: Float = 100.0
+
+    @Option(help: "Path to splat file (.splat, .ply, .spz) to render")
+    var splat: String?
+
+    @Option(help: "Path to JSON configuration file")
+    var config: String?
+
+    @Flag(help: "Enable Metal frame capture for debugging in Xcode")
+    var capture: Bool = false
+
+    @MainActor
+    mutating func run() async throws {
+        print("Starting render...")
+
+        // Load config from file if specified, otherwise use command-line args
+        let renderConfig: RenderConfig
+        if let configPath = config {
+            print("Loading configuration from: \(configPath)")
+            renderConfig = try RenderConfig.load(from: configPath)
+        } else {
+            // Build config from command-line arguments
+            guard let splatPath = splat else {
+                throw ValidationError("Must specify a splat file with --splat or use --config")
+            }
+
+            let bgComponents = try parseRGBA(background)
+            renderConfig = RenderConfig(
+                background: [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w],
+                width: width,
+                height: height,
+                output: output,
+                modelPosition: try modelPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
+                cameraPosition: try cameraPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
+                cameraLookat: try cameraLookat.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
+                cameraRotation: cameraRotation?.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) },
+                projectionFov: projectionFov,
+                near: near,
+                far: far,
+                splat: splatPath
+            )
+        }
+
+        // Use renderConfig for everything below
+        let bgColor = renderConfig.getBackground()
+        let splatPath = renderConfig.splat
+
+        // Load the splat file
+        let splatURL = URL(fileURLWithPath: splatPath)
+        guard FileManager.default.fileExists(atPath: splatPath) else {
+            throw ValidationError("Splat file not found: \(splatPath)")
+        }
+
+        // Determine file type and load splats
+        let fileExtension = splatURL.pathExtension.lowercased()
+
+        print("Loading splat file: \(splatPath)")
+
+        // Load splats based on file type
+        #if os(iOS) || (os(macOS) && !arch(x86_64))
+        let antimatter15Splats: [Antimatter15Splat]
+
+        switch fileExtension {
+        case "spz":
+            let reader = try SPZReader(url: splatURL)
+            print("Loaded SPZ file: \(reader.pointCount) splats, version \(reader.version), SH degree \(reader.shDegree)")
+            var tempSplats: [Antimatter15Splat] = []
+            try reader.read { spzSplat in
+                tempSplats.append(Antimatter15Splat(spzSplat))
+            }
+            antimatter15Splats = tempSplats
+
+        case "ply":
+            let data = try Data(contentsOf: splatURL)
+            let reader = try PLYReader(data: data)
+            print("Loaded PLY file: \(reader.recordCount) records")
+            var tempSplats: [Antimatter15Splat] = []
+            try reader.read { record in
+                if let splat = Antimatter15Splat(plyRecord: record) {
+                    tempSplats.append(splat)
+                }
+            }
+            antimatter15Splats = tempSplats
+
+        case "splat":
+            // Antimatter15 .splat format - raw binary, 32 bytes per splat
+            let data = try Data(contentsOf: splatURL)
+            antimatter15Splats = data.withUnsafeBytes { buffer in
+                buffer.withMemoryRebound(to: Antimatter15Splat.self, Array.init)
+            }
+            print("Loaded SPLAT file: \(antimatter15Splats.count) splats")
+
+        default:
+            throw ValidationError("Unsupported file format: .\(fileExtension)")
+        }
+
+        print("Converting \(antimatter15Splats.count) splats...")
+        print("Converted to Antimatter15 format")
+
+        let gpuSplats = antimatter15Splats.map { Antimatter15GPUSplat($0) }
+        print("Converted to GPU format")
+
+        // Setup Metal device
+        let device = _MTLCreateSystemDefaultDevice()
+        print("Created Metal device")
+
+        // Create splat cloud
+        let modelMatrix = try parseModelMatrix(from: renderConfig)
+        let cameraMatrix = try parseCameraMatrix(from: renderConfig)
+        print("Parsed matrices")
+        print("Model matrix:")
+        print("  [\(modelMatrix.columns.0)]")
+        print("  [\(modelMatrix.columns.1)]")
+        print("  [\(modelMatrix.columns.2)]")
+        print("  [\(modelMatrix.columns.3)]")
+        print("Camera matrix:")
+        print("  [\(cameraMatrix.columns.0)]")
+        print("  [\(cameraMatrix.columns.1)]")
+        print("  [\(cameraMatrix.columns.2)]")
+        print("  [\(cameraMatrix.columns.3)]")
+
+        let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
+        print("Created splat buffer")
+
+        let splatCloud = try SplatCloud<Antimatter15GPUSplat>(
+            device: device,
+            splats: splatBuffer,
+            cameraMatrix: cameraMatrix,
+            modelMatrix: modelMatrix
+        )
+        print("Created splat cloud")
+
+        print("Rendering \(renderConfig.width)x\(renderConfig.height) image...")
+
+        // Create projection
+        let projection = try createProjection(from: renderConfig)
+        let aspectRatio = Float(renderConfig.width) / Float(renderConfig.height)
+        let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
+        print("Projection matrix (aspect: \(aspectRatio)):")
+        print("  [\(projectionMatrix.columns.0)]")
+        print("  [\(projectionMatrix.columns.1)]")
+        print("  [\(projectionMatrix.columns.2)]")
+        print("  [\(projectionMatrix.columns.3)]")
+
+        // Setup offscreen renderer
+        let size = CGSize(width: renderConfig.width, height: renderConfig.height)
+        let renderer = try OffscreenRenderer(size: size)
+
+        // Update clear color
+        renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: Double(bgColor.x),
+            green: Double(bgColor.y),
+            blue: Double(bgColor.z),
+            alpha: Double(bgColor.w)
+        )
+
+        // Create render content
+        print("Creating Antimatter15SplatRenderPipeline with \(splatCloud.count) splats")
+        print("  drawable size: \(SIMD2<Float>(Float(size.width), Float(size.height)))")
+
+        let renderContent = try RenderPass {
+            let aspectRatio = Float(size.width) / Float(size.height)
+            let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
+            try Antimatter15SplatRenderPipeline(
+                splatCloud: splatCloud,
+                projectionMatrix: projectionMatrix,
+                modelMatrix: modelMatrix,
+                cameraMatrix: cameraMatrix,
+                drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
+                debugMode: .off
+            )
+        }
+
+        // Render with Metal capture
+        print("About to render...")
+        let captureManager = MTLCaptureManager.shared()
+        let rendering = try captureManager.with(enabled: capture) {
+            try renderer.render(renderContent)
+        }
+        print("Rendering complete")
+
+        // Save to PNG
+        let cgImage = try rendering.cgImage
+
+        // Make output path absolute if it's relative
+        var outputPath = renderConfig.output
+        if !outputPath.hasPrefix("/") {
+            outputPath = FileManager.default.currentDirectoryPath + "/" + outputPath
+        }
+
+        // Ensure parent directory exists
+        let outputURL = URL(fileURLWithPath: outputPath)
+        if let parentDir = outputURL.deletingLastPathComponent().path as String? {
+            try FileManager.default.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
+        }
+
+        guard let destination = CGImageDestinationCreateWithURL(outputURL as CFURL, "public.png" as CFString, 1, nil) else {
+            throw ValidationError("Failed to create image destination")
+        }
+
+        CGImageDestinationAddImage(destination, cgImage, nil)
+
+        guard CGImageDestinationFinalize(destination) else {
+            throw ValidationError("Failed to write image to \(renderConfig.output)")
+        }
+
+        print("Successfully rendered to: \(renderConfig.output)")
+
+        // Reveal the image in Finder
+        NSWorkspace.shared.selectFile(outputPath, inFileViewerRootedAtPath: "")
+
+        #else
+        throw ValidationError("This tool requires Apple Silicon (ARM64) on macOS")
+        #endif
+    }
+
+    // MARK: - Helper Functions
+
+    func parseRGBA(_ string: String) throws -> SIMD4<Float> {
+        let components = string.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
+        guard components.count == 4 else {
+            throw ValidationError("Background color must be in RGBA format (4 comma-separated values)")
+        }
+        return SIMD4<Float>(components[0], components[1], components[2], components[3])
+    }
+
+    func parseXYZ(_ string: String) throws -> SIMD3<Float> {
+        let components = string.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
+        guard components.count == 3 else {
+            throw ValidationError("Position must be in x,y,z format (3 comma-separated values)")
+        }
+        return SIMD3<Float>(components[0], components[1], components[2])
+    }
+
+    func parseModelMatrix(from config: RenderConfig) throws -> simd_float4x4 {
+        if let position = config.getModelPosition() {
+            return simd_float4x4(translation: position)
+        }
+        return .identity
+    }
+
+    func parseCameraMatrix(from config: RenderConfig) throws -> simd_float4x4 {
+        // Priority: rotation > lookat > position
+        if let rotation = config.getCameraRotation() {
+            return try parseCameraRotationMatrix(rotation, config: config)
+        }
+
+        if let target = config.getCameraLookat() {
+            let position = config.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
+            return LookAt(position: position, target: target, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
+        }
+
+        if let position = config.getCameraPosition() {
+            // Simple translation
+            return simd_float4x4(translation: position)
+        }
+
+        // Default camera at (0, 0, 1.5) looking at origin
+        return LookAt(position: SIMD3<Float>(0, 0, 1.5), target: SIMD3<Float>(0, 0, 0), up: SIMD3<Float>(0, 1, 0)).cameraMatrix
+    }
+
+    func parseCameraRotationMatrix(_ components: [Float], config: RenderConfig) throws -> simd_float4x4 {
+        if components.count == 4 {
+            // Quaternion (x, y, z, w)
+            let quat = simd_quatf(ix: components[0], iy: components[1], iz: components[2], r: components[3])
+            let rotationMatrix = simd_float4x4(quat)
+
+            // Apply position if specified
+            if let position = config.getCameraPosition() {
+                var matrix = rotationMatrix
+                matrix.columns.3 = SIMD4<Float>(position.x, position.y, position.z, 1)
+                return matrix
+            }
+            return rotationMatrix
+
+        } else if components.count == 9 {
+            // 3x3 rotation matrix
+            let matrix = simd_float4x4(
+                SIMD4<Float>(components[0], components[1], components[2], 0),
+                SIMD4<Float>(components[3], components[4], components[5], 0),
+                SIMD4<Float>(components[6], components[7], components[8], 0),
+                SIMD4<Float>(0, 0, 0, 1)
+            )
+
+            // Apply position if specified
+            if let position = config.getCameraPosition() {
+                var finalMatrix = matrix
+                finalMatrix.columns.3 = SIMD4<Float>(position.x, position.y, position.z, 1)
+                return finalMatrix
+            }
+            return matrix
+
+        } else {
+            throw ValidationError("Camera rotation must be either 4 values (quaternion x,y,z,w) or 9 values (3x3 matrix)")
+        }
+    }
+
+    func createProjection(from config: RenderConfig) throws -> any ProjectionProtocol {
+        let angleOfView = config.projectionFov.map { AngleF.degrees(Float($0)) } ?? AngleF.degrees(60)
+        let projection = PerspectiveProjection(
+            verticalAngleOfView: angleOfView,
+            depthMode: .standard(zClip: config.near...config.far)
+        )
+        return projection
+    }
+}
+
+// MARK: - Matrix Extensions
+
+extension simd_float4x4 {
+    init(translation: SIMD3<Float>) {
+        self.init(
+            SIMD4<Float>(1, 0, 0, 0),
+            SIMD4<Float>(0, 1, 0, 0),
+            SIMD4<Float>(0, 0, 1, 0),
+            SIMD4<Float>(translation.x, translation.y, translation.z, 1)
+        )
+    }
+}

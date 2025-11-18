@@ -1,0 +1,12 @@
+{
+  "background": [0.1, 0.1, 0.15, 1.0],
+  "cameraLookat": [0, 0, 0],
+  "cameraPosition": [0, 0, 1.5],
+  "far": 100,
+  "height": 768,
+  "near": 0.1,
+  "output": "tmp/butterfly.png",
+  "projectionFov": 60,
+  "splat": "/Users/schwa/Projects/Splats/butterfly.spz",
+  "width": 1024
+}

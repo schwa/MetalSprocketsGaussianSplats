@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GeometryLite3D",
       "state" : {
-        "branch" : "0.1.0",
-        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7"
+        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7",
+        "version" : "0.1.0"
       }
     },
     {
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
-        "branch" : "0.1.0",
-        "revision" : "8cc9ccf92f571dae310662f9b44ea7f46dface1d"
+        "branch" : "main",
+        "revision" : "849e33a6f5761869479f85f8ddbde2c32422af65"
       }
     },
     {
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
         "version" : "1.2.1"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "cdd0ef3755280949551dc26dee5de9ddeda89f54",
+        "version" : "1.6.2"
       }
     },
     {
