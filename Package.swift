@@ -14,13 +14,19 @@ let package = Package(
             name: "MetalSprocketsGaussianSplats",
             targets: ["MetalSprocketsGaussianSplats"]
         ),
+        .executable(
+            name: "gsplat-render",
+            targets: ["gsplat-render"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-collections", from: "1.2.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
         .package(url: "https://github.com/schwa/MetalCompilerPlugin", from: "0.1.4"),
-        .package(url: "https://github.com/schwa/MetalSprockets", branch: "0.1.0"),
-        .package(url: "https://github.com/schwa/GeometryLite3D", branch: "0.1.0"),
+//        .package(url: "https://github.com/schwa/MetalSprockets", from: "0.1.0"),
+        .package(url: "https://github.com/schwa/MetalSprockets", branch: "main"),
+        .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
     ],
     targets: [
         .target(
@@ -41,6 +47,15 @@ let package = Package(
                 .plugin(name: "MetalCompilerPlugin", package: "MetalCompilerPlugin")
             ],
 
+        ),
+        .executableTarget(
+            name: "gsplat-render",
+            dependencies: [
+                "MetalSprocketsGaussianSplats",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "MetalSprockets", package: "MetalSprockets"),
+                .product(name: "GeometryLite3D", package: "GeometryLite3D"),
+            ]
         ),
         .testTarget(
             name: "MetalSprocketsGaussianSplatsTests",

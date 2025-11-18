@@ -1,13 +1,13 @@
 {
-  "originHash" : "733c0a1f671cdabc008cae9543b91398e93b3122d3739d3f8de00c35e6d584db",
+  "originHash" : "3f1ec751f4a75ba1784ced70893e1e6a66ae0590039cc57df70849f7b3d101a8",
   "pins" : [
     {
       "identity" : "geometrylite3d",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GeometryLite3D",
       "state" : {
-        "branch" : "0.1.0",
-        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7"
+        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7",
+        "version" : "0.1.0"
       }
     },
     {
@@ -24,8 +24,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
-        "branch" : "0.1.0",
-        "revision" : "8cc9ccf92f571dae310662f9b44ea7f46dface1d"
+        "branch" : "main",
+        "revision" : "7e7f67894582b80e9ba5613565c417d663f040fb"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "cdd0ef3755280949551dc26dee5de9ddeda89f54",
+        "version" : "1.6.2"
       }
     },
     {
