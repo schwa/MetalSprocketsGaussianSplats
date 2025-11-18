@@ -1,4 +1,9 @@
 import Foundation
+import UniformTypeIdentifiers
+
+public extension UTType {
+    static let ply = UTType(filenameExtension: "ply")!
+}
 
 public struct PLYReader {
     public enum Format {
@@ -422,6 +427,20 @@ public extension PLYReader.PropertyValue {
         case .double:
             guard let v = Double(string) else { return nil }
             self = .double(v)
+        }
+    }
+
+    var floatValue: Float? {
+        switch self {
+        case .char(let v): return Float(v)
+        case .uchar(let v): return Float(v)
+        case .short(let v): return Float(v)
+        case .ushort(let v): return Float(v)
+        case .int(let v): return Float(v)
+        case .uint(let v): return Float(v)
+        case .float(let v): return v
+        case .double(let v): return Float(v)
+        case .list: return nil
         }
     }
 }

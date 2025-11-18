@@ -20,6 +20,16 @@ extension Array: @retroactive Transferable where Element == Antimatter15Splat {
             try JSONDecoder().decode([GenericSplat].self, from: data)
                 .map(Antimatter15Splat.init)
         }
+        DataRepresentation(importedContentType: .ply) { data in
+            let reader = try PLYReader(data: data)
+            var splats: [Antimatter15Splat] = []
+            try reader.read { record in
+                if let splat = Antimatter15Splat(plyRecord: record) {
+                    splats.append(splat)
+                }
+            }
+            return splats
+        }
     }
 }
 #endif // os(iOS) || (os(macOS) && !arch(x86_64))

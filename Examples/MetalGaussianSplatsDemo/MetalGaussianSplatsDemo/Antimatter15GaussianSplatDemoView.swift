@@ -119,7 +119,7 @@ public struct Antimatter15GaussianSplatDemoView: View {
         .toolbar {
             toolbar
         }
-        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.antimatter15Splat, .spz, .json]) { result in
+        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.antimatter15Splat, .spz, .ply, .json]) { result in
             Task {
                 switch result {
                 case .success(let url):
