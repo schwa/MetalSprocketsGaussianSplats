@@ -31,7 +31,9 @@ public struct SparkSplatView<Splat: SortableSplatProtocol>: View {
                     projectionMatrix: projectionMatrix,
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
-                    drawableSize: SIMD2<Float>(drawableSize)
+                    drawableSize: SIMD2<Float>(drawableSize),
+                    shCoefficients: nil,
+                    shDegree: 0
                 )
             }
         }

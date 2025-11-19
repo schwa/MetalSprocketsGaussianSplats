@@ -10,3 +10,5 @@ render-all: build
     .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH1.png" --renderer "Spark" --label --sh-degree 1
     .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH0.png" --renderer "Spark" --label --sh-degree 0
     .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Antimatter15.png" --renderer "Antimatter15" --label
+
+    spark-screenshot --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_SparkJS.png" --label
