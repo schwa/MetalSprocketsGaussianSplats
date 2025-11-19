@@ -91,7 +91,7 @@ public struct SparkGPUSplat {
     private static func floatToHalf(_ f: Float) -> UInt16 {
         let bits = f.bitPattern
         let sign = (bits >> 16) & 0x8000
-        var exponent = Int((bits >> 23) & 0xFF) - 127 + 15
+        let exponent = Int((bits >> 23) & 0xFF) - 127 + 15
         let mantissa = (bits >> 13) & 0x3FF
 
         // Handle special cases
@@ -227,8 +227,6 @@ public struct SparkGPUSplat {
         // Unfold if needed
         if z < 0 {
             let t = max(-z, 0.0)
-            let signX: Float = f.x >= 0 ? 1 : -1
-            let signY: Float = f.y >= 0 ? 1 : -1
             f.x += (f.x >= 0 ? -t : t)
             f.y += (f.y >= 0 ? -t : t)
         }
