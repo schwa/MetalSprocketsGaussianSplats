@@ -20,9 +20,11 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
 
-    public init(splatCloud: SplatCloud<Splat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>) throws {
+    public init(splatCloud: SplatCloud<Splat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true) throws {
         self.splatCloud = splatCloud
-        self.projectionMatrix = projectionMatrix
+        var flippedProjection = projectionMatrix
+        flippedProjection[1][1] *= -1
+        self.projectionMatrix = flippedProjection
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
@@ -31,7 +33,7 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("SparkSplatRenderShader")
 
         var fragmentConstants = FunctionConstants()
-        fragmentConstants["convert_srgb_to_linear"] = .bool(true)
+        fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
 
         self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self)
         self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
