@@ -29,6 +29,92 @@ namespace SparkSplatRenderShader {
     // Function constants
     constant bool convert_srgb_to_linear [[function_constant(0)]];
 
+    // Spherical Harmonics constants
+    constant float SH_C0 = 0.28209479177387814;
+    constant float SH_C1 = 0.4886025119029199;
+    constant float SH_C2_0 = 1.0925484305920792;
+    constant float SH_C2_1 = 0.31539156525252005;
+    constant float SH_C2_2 = 0.5462742152960396;
+    constant float SH_C3_0 = 0.5900435899266435;
+    constant float SH_C3_1 = 2.890611442640554;
+    constant float SH_C3_2 = 0.4570457994644658;
+    constant float SH_C3_3 = 0.3731763325901154;
+
+    // Evaluate spherical harmonics for view-dependent color
+    // coefficients layout: [coeff0_r, coeff0_g, coeff0_b, coeff1_r, ...]
+    inline float3 evaluateSH(
+        float3 viewDir,
+        device const float* coefficients,
+        uint splatIndex,
+        uint shDegree
+    ) {
+        float3 result = float3(0.0);
+
+        if (shDegree == 0 || coefficients == nullptr) {
+            return result;
+        }
+
+        float x = viewDir.x;
+        float y = viewDir.y;
+        float z = viewDir.z;
+
+        // Determine floats per splat based on degree
+        uint floatsPerSplat = 0;
+        if (shDegree == 1) floatsPerSplat = 9;      // 3 coeffs * 3 channels
+        else if (shDegree == 2) floatsPerSplat = 24; // 8 coeffs * 3 channels
+        else if (shDegree == 3) floatsPerSplat = 45; // 15 coeffs * 3 channels
+
+        uint offset = splatIndex * floatsPerSplat;
+
+        // Degree 1: 3 basis functions
+        float basis1_0 = SH_C1 * y;
+        float basis1_1 = SH_C1 * z;
+        float basis1_2 = SH_C1 * x;
+
+        result += basis1_0 * float3(coefficients[offset + 0], coefficients[offset + 1], coefficients[offset + 2]);
+        result += basis1_1 * float3(coefficients[offset + 3], coefficients[offset + 4], coefficients[offset + 5]);
+        result += basis1_2 * float3(coefficients[offset + 6], coefficients[offset + 7], coefficients[offset + 8]);
+
+        if (shDegree < 2) return result;
+
+        // Degree 2: 5 basis functions
+        float xx = x * x, yy = y * y, zz = z * z;
+        float xy = x * y, yz = y * z, xz = x * z;
+
+        float basis2_0 = SH_C2_0 * xy;
+        float basis2_1 = SH_C2_0 * yz;
+        float basis2_2 = SH_C2_1 * (3.0 * zz - 1.0);
+        float basis2_3 = SH_C2_0 * xz;
+        float basis2_4 = SH_C2_2 * (xx - yy);
+
+        result += basis2_0 * float3(coefficients[offset + 9], coefficients[offset + 10], coefficients[offset + 11]);
+        result += basis2_1 * float3(coefficients[offset + 12], coefficients[offset + 13], coefficients[offset + 14]);
+        result += basis2_2 * float3(coefficients[offset + 15], coefficients[offset + 16], coefficients[offset + 17]);
+        result += basis2_3 * float3(coefficients[offset + 18], coefficients[offset + 19], coefficients[offset + 20]);
+        result += basis2_4 * float3(coefficients[offset + 21], coefficients[offset + 22], coefficients[offset + 23]);
+
+        if (shDegree < 3) return result;
+
+        // Degree 3: 7 basis functions
+        float basis3_0 = SH_C3_0 * y * (3.0 * xx - yy);
+        float basis3_1 = SH_C3_1 * xy * z;
+        float basis3_2 = SH_C3_2 * y * (5.0 * zz - 1.0);
+        float basis3_3 = SH_C3_3 * z * (5.0 * zz - 3.0);
+        float basis3_4 = SH_C3_2 * x * (5.0 * zz - 1.0);
+        float basis3_5 = SH_C3_1 * z * (xx - yy);
+        float basis3_6 = SH_C3_0 * x * (xx - 3.0 * yy);
+
+        result += basis3_0 * float3(coefficients[offset + 24], coefficients[offset + 25], coefficients[offset + 26]);
+        result += basis3_1 * float3(coefficients[offset + 27], coefficients[offset + 28], coefficients[offset + 29]);
+        result += basis3_2 * float3(coefficients[offset + 30], coefficients[offset + 31], coefficients[offset + 32]);
+        result += basis3_3 * float3(coefficients[offset + 33], coefficients[offset + 34], coefficients[offset + 35]);
+        result += basis3_4 * float3(coefficients[offset + 36], coefficients[offset + 37], coefficients[offset + 38]);
+        result += basis3_5 * float3(coefficients[offset + 39], coefficients[offset + 40], coefficients[offset + 41]);
+        result += basis3_6 * float3(coefficients[offset + 42], coefficients[offset + 43], coefficients[offset + 44]);
+
+        return result;
+    }
+
     // MARK: - Vertex Shader
 
     [[vertex]] VertexOut vertex_main(
@@ -40,7 +126,10 @@ namespace SparkSplatRenderShader {
         constant float4x4 &viewMatrix [[buffer(5)]],
         constant float4x4 &projectionMatrix [[buffer(6)]],
         constant float2 &drawableSize [[buffer(8)]],
-        constant float &scale [[buffer(9)]]
+        constant float &scale [[buffer(9)]],
+        constant float3 &cameraPosition [[buffer(10)]],
+        constant uint &shDegree [[buffer(11)]],
+        device const float *shCoefficients [[buffer(12)]]
     ) {
         VertexOut out;
         // Default to outside frustum so it's discarded if we return early
@@ -70,6 +159,13 @@ namespace SparkSplatRenderShader {
 
         // Transform center to world space
         float4 worldCenter = modelMatrix * float4(center, 1.0);
+
+        // Evaluate spherical harmonics for view-dependent color
+        if (shDegree > 0 && shCoefficients != nullptr) {
+            float3 viewDir = normalize(worldCenter.xyz - cameraPosition);
+            float3 shColor = evaluateSH(viewDir, shCoefficients, splatIndex, shDegree);
+            rgba.rgb = clamp(rgba.rgb + shColor, 0.0, 1.0);
+        }
 
         // Transform to view space
         float4 viewCenter4 = viewMatrix * worldCenter;

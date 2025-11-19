@@ -128,6 +128,48 @@ public extension SparkGPUSplat {
     }
 }
 
+// MARK: - Spherical Harmonics Extraction
+
+public extension Array where Element == SPZSplat {
+    /// Extract spherical harmonics coefficients from SPZ splats into a flat Float array
+    /// Returns nil if no SH data is present, or (coefficients, degree) tuple
+    /// Layout: [splat0_coeff0_r, splat0_coeff0_g, splat0_coeff0_b, splat0_coeff1_r, ...splat1_coeff0_r, ...]
+    func extractSphericalHarmonics() -> (coefficients: [Float], degree: UInt8)? {
+        guard let firstSH = first?.sphericalHarmonics, !firstSH.isEmpty else {
+            return nil
+        }
+
+        let coeffCount = firstSH.count
+        let degree: UInt8 = switch coeffCount {
+        case 3: 1   // 3 coefficients for degree 1
+        case 8: 2   // 8 coefficients for degree 2
+        case 15: 3  // 15 coefficients for degree 3
+        default: 0
+        }
+
+        guard degree > 0 else { return nil }
+
+        let floatsPerSplat = coeffCount * 3  // RGB channels
+        var result = [Float]()
+        result.reserveCapacity(count * floatsPerSplat)
+
+        for splat in self {
+            guard let sh = splat.sphericalHarmonics, sh.count == coeffCount else {
+                // Pad with zeros if SH missing
+                result.append(contentsOf: [Float](repeating: 0, count: floatsPerSplat))
+                continue
+            }
+
+            // Flatten: for each coefficient, append RGB values
+            for coeff in sh {
+                result.append(contentsOf: coeff)
+            }
+        }
+
+        return (result, degree)
+    }
+}
+
 // MARK: - Helper Extensions
 
 private extension Float {

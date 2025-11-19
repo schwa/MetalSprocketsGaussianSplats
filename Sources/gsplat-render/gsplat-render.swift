@@ -69,6 +69,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Render settings label on top of the image")
     var label: Bool = false
 
+    @Option(help: "Override SH degree (0=off, 1-3=use specified degree)")
+    var shDegree: Int?
+
     @MainActor
     mutating func run() async throws {
         print("Starting render...")
@@ -151,15 +154,19 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         // Load splats based on file type
         #if os(iOS) || (os(macOS) && !arch(x86_64))
         let antimatter15Splats: [Antimatter15Splat]
+        var spzSplats: [SPZSplat]? = nil  // Keep SPZ splats for SH extraction
 
         switch fileExtension {
         case "spz":
             let reader = try SPZReader(url: splatURL)
             print("Loaded SPZ file: \(reader.pointCount) splats, version \(reader.version), SH degree \(reader.shDegree)")
+            var tempSPZSplats: [SPZSplat] = []
             var tempSplats: [Antimatter15Splat] = []
             try reader.read { spzSplat in
+                tempSPZSplats.append(spzSplat)
                 tempSplats.append(Antimatter15Splat(spzSplat))
             }
+            spzSplats = tempSPZSplats
             antimatter15Splats = tempSplats
 
         case "ply":
@@ -218,9 +225,29 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         // Convert to appropriate GPU format
         let antimatter15SplatCloud: SplatCloud<Antimatter15GPUSplat>?
         let sparkSplatCloud: SplatCloud<SparkGPUSplat>?
+        var shCoefficientsBuffer: TypedMTLBuffer<Float>? = nil
+        var effectiveSHDegree: UInt8 = 0
 
         if useSparkRenderer {
-            let gpuSplats = antimatter15Splats.map { SparkGPUSplat($0) }
+            // For Spark, prefer to convert directly from SPZ if available (preserves SH)
+            let gpuSplats: [SparkGPUSplat]
+            if let spz = spzSplats {
+                gpuSplats = spz.map { SparkGPUSplat($0) }
+                // Extract spherical harmonics
+                if let (shCoeffs, degree) = spz.extractSphericalHarmonics() {
+                    // Apply override if specified
+                    let finalDegree = shDegree.map { UInt8(min(max($0, 0), Int(degree))) } ?? degree
+                    if finalDegree > 0 {
+                        effectiveSHDegree = finalDegree
+                        shCoefficientsBuffer = try device.makeTypedBuffer(values: shCoeffs, options: [])
+                        print("Using SH: degree \(finalDegree) (file has degree \(degree)), \(shCoeffs.count) floats")
+                    } else {
+                        print("SH disabled (file has degree \(degree))")
+                    }
+                }
+            } else {
+                gpuSplats = antimatter15Splats.map { SparkGPUSplat($0) }
+            }
             print("Converted to Spark GPU format")
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
             sparkSplatCloud = try SplatCloud<SparkGPUSplat>(
@@ -287,7 +314,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                    convertSRGBToLinear: useSrgbToLinear
+                    convertSRGBToLinear: useSrgbToLinear,
+                    shCoefficients: shCoefficientsBuffer,
+                    shDegree: effectiveSHDegree
                 )
             }
             rendering = try captureManager.with(enabled: capture) {

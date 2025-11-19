@@ -12,6 +12,10 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
     var cameraMatrix: simd_float4x4
     var drawableSize: SIMD2<Float>
 
+    // Spherical harmonics (optional)
+    var shCoefficients: TypedMTLBuffer<Float>?
+    var shDegree: UInt8
+
     @MSState
     private var sortManager: AsyncSortManager<Splat>?
     @MSState
@@ -20,7 +24,7 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
 
-    public init(splatCloud: SplatCloud<Splat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true) throws {
+    public init(splatCloud: SplatCloud<Splat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) throws {
         self.splatCloud = splatCloud
         var flippedProjection = projectionMatrix
         flippedProjection[1][1] *= -1
@@ -28,6 +32,8 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
+        self.shCoefficients = shCoefficients
+        self.shDegree = shDegree
 
         // Load Spark shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("SparkSplatRenderShader")
@@ -48,12 +54,18 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
 
     public var body: some Element {
         get throws {
+            let shBuffer = shCoefficients
+            let degree = shDegree
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     let vertices: [SIMD2<Float>] = [
                         [-1, -1], [-1, 1], [1, -1], [1, 1]
                     ]
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
+                    // Set SH buffer if available (buffer index 12 matches shader)
+                    if let buffer = shBuffer {
+                        commandEncoder.setVertexBuffer(buffer.unsafeMTLBuffer, offset: 0, index: 12)
+                    }
                     commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
                 }
                 .parameter("packedSplats", buffer: splatCloud.splats.unsafeMTLBuffer)
@@ -63,6 +75,8 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
                 .parameter("projectionMatrix", value: projectionMatrix)
                 .parameter("drawableSize", value: drawableSize)
                 .parameter("scale", value: Float(2.0))
+                .parameter("cameraPosition", value: SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z))
+                .parameter("shDegree", value: UInt32(degree))
             }
             .vertexDescriptor(vertexDescriptor)
             .renderPipelineDescriptorModifier { renderPipelineDescriptor in
