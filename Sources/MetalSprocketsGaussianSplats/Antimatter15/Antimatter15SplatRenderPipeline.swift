@@ -31,8 +31,6 @@ public struct Antimatter15SplatRenderPipeline: Element {
     public init(splatCloud: SplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
-        self.projectionMatrix[1][1] *= -1
-
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize

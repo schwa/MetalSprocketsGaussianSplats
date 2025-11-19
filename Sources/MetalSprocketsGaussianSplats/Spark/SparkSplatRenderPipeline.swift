@@ -26,9 +26,7 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
 
     public init(splatCloud: SplatCloud<Splat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) throws {
         self.splatCloud = splatCloud
-        var flippedProjection = projectionMatrix
-        flippedProjection[1][1] *= -1
-        self.projectionMatrix = flippedProjection
+        self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
