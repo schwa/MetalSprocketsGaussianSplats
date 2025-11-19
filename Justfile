@@ -1,10 +1,12 @@
 list:
     @just --list
 
-render CONFIG OUTPUT RENDERER *ARGS:
-    swift run --configuration release gsplat-render --config "{{ CONFIG }}" --output "{{ OUTPUT }}" --renderer "{{ RENDERER }}" --label {{ ARGS }}
+build:
+    swift build --configuration release
 
-render-all:
-    just render "Samples/butterfly-wings-closed.json" "tmp/butterfly-wings-closed_Spark.png" "Spark"
-    just render "Samples/butterfly-wings-closed.json" "tmp/butterfly-wings-closed_Spark_SH0.png" "Spark" "--sh-degree 0"
-    just render "Samples/butterfly-wings-closed.json" "tmp/butterfly-wings-closed_Antimatter15.png" "Antimatter15"
+render-all: build
+    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH3.png" --renderer "Spark" --label
+    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH2.png" --renderer "Spark" --label --sh-degree 2
+    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH1.png" --renderer "Spark" --label --sh-degree 1
+    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH0.png" --renderer "Spark" --label --sh-degree 0
+    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Antimatter15.png" --renderer "Antimatter15" --label

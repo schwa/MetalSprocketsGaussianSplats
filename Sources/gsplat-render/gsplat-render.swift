@@ -72,14 +72,14 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Option(help: "Override SH degree (0=off, 1-3=use specified degree)")
     var shDegree: Int?
 
+    @Flag(help: "Reveal output file in Finder after rendering")
+    var reveal: Bool = false
+
     @MainActor
     mutating func run() async throws {
-        print("Starting render...")
-
         // Load config from file if specified, otherwise use command-line args
         var renderConfig: RenderConfig
         if let configPath = config {
-            print("Loading configuration from: \(configPath)")
             renderConfig = try RenderConfig.load(from: configPath)
 
             // CLI flags override config values
@@ -149,8 +149,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         // Determine file type and load splats
         let fileExtension = splatURL.pathExtension.lowercased()
 
-        print("Loading splat file: \(splatPath)")
-
         // Load splats based on file type
         #if os(iOS) || (os(macOS) && !arch(x86_64))
         let antimatter15Splats: [Antimatter15Splat]
@@ -159,7 +157,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         switch fileExtension {
         case "spz":
             let reader = try SPZReader(url: splatURL)
-            print("Loaded SPZ file: \(reader.pointCount) splats, version \(reader.version), SH degree \(reader.shDegree)")
             var tempSPZSplats: [SPZSplat] = []
             var tempSplats: [Antimatter15Splat] = []
             try reader.read { spzSplat in
@@ -172,7 +169,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         case "ply":
             let data = try Data(contentsOf: splatURL)
             let reader = try PLYReader(data: data)
-            print("Loaded PLY file: \(reader.recordCount) records")
             var tempSplats: [Antimatter15Splat] = []
             try reader.read { record in
                 if let splat = Antimatter15Splat(plyRecord: record) {
@@ -187,40 +183,21 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             antimatter15Splats = data.withUnsafeBytes { buffer in
                 buffer.withMemoryRebound(to: Antimatter15Splat.self, Array.init)
             }
-            print("Loaded SPLAT file: \(antimatter15Splats.count) splats")
 
         default:
             throw ValidationError("Unsupported file format: .\(fileExtension)")
         }
 
-        print("Converting \(antimatter15Splats.count) splats...")
-
         // Setup Metal device
         let device = _MTLCreateSystemDefaultDevice()
-        print("Created Metal device")
 
         // Create splat cloud
         let modelMatrix = try parseModelMatrix(from: renderConfig)
         let cameraMatrix = try parseCameraMatrix(from: renderConfig)
-        print("Parsed matrices")
-        print("Model matrix:")
-        print("  [\(modelMatrix.columns.0)]")
-        print("  [\(modelMatrix.columns.1)]")
-        print("  [\(modelMatrix.columns.2)]")
-        print("  [\(modelMatrix.columns.3)]")
-        print("Camera matrix:")
-        print("  [\(cameraMatrix.columns.0)]")
-        print("  [\(cameraMatrix.columns.1)]")
-        print("  [\(cameraMatrix.columns.2)]")
-        print("  [\(cameraMatrix.columns.3)]")
 
         // Determine which renderer to use
         let useSparkRenderer = (renderConfig.renderer ?? "antimatter15").lowercased() == "spark"
         let useSrgbToLinear = renderConfig.srgbToLinear ?? false
-        print("Using renderer: \(useSparkRenderer ? "Spark" : "Antimatter15")")
-        if useSparkRenderer {
-            print("  sRGB to linear: \(useSrgbToLinear)")
-        }
 
         // Convert to appropriate GPU format
         let antimatter15SplatCloud: SplatCloud<Antimatter15GPUSplat>?
@@ -240,15 +217,11 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     if finalDegree > 0 {
                         effectiveSHDegree = finalDegree
                         shCoefficientsBuffer = try device.makeTypedBuffer(values: shCoeffs, options: [])
-                        print("Using SH: degree \(finalDegree) (file has degree \(degree)), \(shCoeffs.count) floats")
-                    } else {
-                        print("SH disabled (file has degree \(degree))")
                     }
                 }
             } else {
                 gpuSplats = antimatter15Splats.map { SparkGPUSplat($0) }
             }
-            print("Converted to Spark GPU format")
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
             sparkSplatCloud = try SplatCloud<SparkGPUSplat>(
                 device: device,
@@ -259,7 +232,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             antimatter15SplatCloud = nil
         } else {
             let gpuSplats = antimatter15Splats.map { Antimatter15GPUSplat($0) }
-            print("Converted to Antimatter15 GPU format")
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
             antimatter15SplatCloud = try SplatCloud<Antimatter15GPUSplat>(
                 device: device,
@@ -269,19 +241,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             )
             sparkSplatCloud = nil
         }
-        print("Created splat cloud")
-
-        print("Rendering \(renderConfig.width)x\(renderConfig.height) image...")
 
         // Create projection
         let projection = try createProjection(from: renderConfig)
-        let aspectRatio = Float(renderConfig.width) / Float(renderConfig.height)
-        let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
-        print("Projection matrix (aspect: \(aspectRatio)):")
-        print("  [\(projectionMatrix.columns.0)]")
-        print("  [\(projectionMatrix.columns.1)]")
-        print("  [\(projectionMatrix.columns.2)]")
-        print("  [\(projectionMatrix.columns.3)]")
 
         // Setup offscreen renderer
         let size = CGSize(width: renderConfig.width, height: renderConfig.height)
@@ -297,11 +259,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
         // Create render content
         let splatCount = useSparkRenderer ? sparkSplatCloud!.count : antimatter15SplatCloud!.count
-        print("Creating \(useSparkRenderer ? "Spark" : "Antimatter15")SplatRenderPipeline with \(splatCount) splats")
-        print("  drawable size: \(SIMD2<Float>(Float(size.width), Float(size.height)))")
 
         // Render with Metal capture
-        print("About to render...")
         let captureManager = MTLCaptureManager.shared()
         let rendering: OffscreenRenderer.Rendering
         if useSparkRenderer {
@@ -339,7 +298,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 try renderer.render(renderContent)
             }
         }
-        print("Rendering complete")
 
         // Save to PNG
         var cgImage = try rendering.cgImage
@@ -350,8 +308,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             let camPos = renderConfig.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
             let modelPos = renderConfig.getModelPosition() ?? SIMD3<Float>(0, 0, 0)
 
+            let shInfo = useSparkRenderer ? " | SH: \(effectiveSHDegree > 0 ? "deg \(effectiveSHDegree)" : "off")" : ""
             let labelText = """
-            Renderer: \(useSparkRenderer ? "Spark" : "Antimatter15") | sRGB→Linear: \(useSrgbToLinear)
+            Renderer: \(useSparkRenderer ? "Spark" : "Antimatter15") | sRGB→Linear: \(useSrgbToLinear)\(shInfo)
             Size: \(renderConfig.width)x\(renderConfig.height) | FOV: \(fovStr)
             Splats: \(splatCount) | Near/Far: \(renderConfig.near)/\(renderConfig.far)
             Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
@@ -398,10 +357,10 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             throw ValidationError("Failed to write image to \(renderConfig.output)")
         }
 
-        print("Successfully rendered to: \(renderConfig.output)")
-
-        // Reveal the image in Finder
-        NSWorkspace.shared.selectFile(outputPath, inFileViewerRootedAtPath: "")
+        // Reveal the image in Finder if requested
+        if reveal {
+            NSWorkspace.shared.selectFile(outputPath, inFileViewerRootedAtPath: "")
+        }
 
         #else
         throw ValidationError("This tool requires Apple Silicon (ARM64) on macOS")
