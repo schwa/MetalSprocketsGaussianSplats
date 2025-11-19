@@ -39,6 +39,12 @@ struct RenderConfig: Codable {
     /// Path to splat file (.splat, .ply, .spz) to render
     var splat: String
 
+    /// Renderer to use: "antimatter15" or "spark"
+    var renderer: String?
+
+    /// Convert sRGB to linear in fragment shader (for Spark renderer)
+    var srgbToLinear: Bool?
+
     // MARK: - Helpers
 
     func getBackground() -> SIMD4<Float> {

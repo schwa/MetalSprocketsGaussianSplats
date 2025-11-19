@@ -9,6 +9,7 @@ import GeometryLite3D
 import ImageIO
 import simd
 import AppKit
+import SwiftUI
 
 @main
 struct GaussianSplatRenderer: AsyncParsableCommand {
@@ -59,15 +60,54 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Enable Metal frame capture for debugging in Xcode")
     var capture: Bool = false
 
+    @Option(help: "Renderer to use: antimatter15 or spark")
+    var renderer: String = "antimatter15"
+
+    @Flag(help: "Convert sRGB to linear in fragment shader (for Spark renderer)")
+    var srgbToLinear: Bool = false
+
+    @Flag(help: "Render settings label on top of the image")
+    var label: Bool = false
+
     @MainActor
     mutating func run() async throws {
         print("Starting render...")
 
         // Load config from file if specified, otherwise use command-line args
-        let renderConfig: RenderConfig
+        var renderConfig: RenderConfig
         if let configPath = config {
             print("Loading configuration from: \(configPath)")
             renderConfig = try RenderConfig.load(from: configPath)
+
+            // CLI flags override config values
+            if background != "0,0,0,1" {
+                let bgComponents = try parseRGBA(background)
+                renderConfig.background = [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w]
+            }
+            if width != 1024 { renderConfig.width = width }
+            if height != 768 { renderConfig.height = height }
+            if output != "output.png" { renderConfig.output = output }
+            if let pos = modelPosition {
+                let v = try parseXYZ(pos)
+                renderConfig.modelPosition = [v.x, v.y, v.z]
+            }
+            if let pos = cameraPosition {
+                let v = try parseXYZ(pos)
+                renderConfig.cameraPosition = [v.x, v.y, v.z]
+            }
+            if let lookat = cameraLookat {
+                let v = try parseXYZ(lookat)
+                renderConfig.cameraLookat = [v.x, v.y, v.z]
+            }
+            if let rot = cameraRotation {
+                renderConfig.cameraRotation = rot.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
+            }
+            if let fov = projectionFov { renderConfig.projectionFov = fov }
+            if near != 0.1 { renderConfig.near = near }
+            if far != 100.0 { renderConfig.far = far }
+            if let s = splat { renderConfig.splat = s }
+            if renderer != "antimatter15" { renderConfig.renderer = renderer }
+            if srgbToLinear { renderConfig.srgbToLinear = true }
         } else {
             // Build config from command-line arguments
             guard let splatPath = splat else {
@@ -87,7 +127,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 projectionFov: projectionFov,
                 near: near,
                 far: far,
-                splat: splatPath
+                splat: splatPath,
+                renderer: renderer,
+                srgbToLinear: srgbToLinear
             )
         }
 
@@ -145,10 +187,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         }
 
         print("Converting \(antimatter15Splats.count) splats...")
-        print("Converted to Antimatter15 format")
-
-        let gpuSplats = antimatter15Splats.map { Antimatter15GPUSplat($0) }
-        print("Converted to GPU format")
 
         // Setup Metal device
         let device = _MTLCreateSystemDefaultDevice()
@@ -169,15 +207,41 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         print("  [\(cameraMatrix.columns.2)]")
         print("  [\(cameraMatrix.columns.3)]")
 
-        let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-        print("Created splat buffer")
+        // Determine which renderer to use
+        let useSparkRenderer = (renderConfig.renderer ?? "antimatter15").lowercased() == "spark"
+        let useSrgbToLinear = renderConfig.srgbToLinear ?? false
+        print("Using renderer: \(useSparkRenderer ? "Spark" : "Antimatter15")")
+        if useSparkRenderer {
+            print("  sRGB to linear: \(useSrgbToLinear)")
+        }
 
-        let splatCloud = try SplatCloud<Antimatter15GPUSplat>(
-            device: device,
-            splats: splatBuffer,
-            cameraMatrix: cameraMatrix,
-            modelMatrix: modelMatrix
-        )
+        // Convert to appropriate GPU format
+        let antimatter15SplatCloud: SplatCloud<Antimatter15GPUSplat>?
+        let sparkSplatCloud: SplatCloud<SparkGPUSplat>?
+
+        if useSparkRenderer {
+            let gpuSplats = antimatter15Splats.map { SparkGPUSplat($0) }
+            print("Converted to Spark GPU format")
+            let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
+            sparkSplatCloud = try SplatCloud<SparkGPUSplat>(
+                device: device,
+                splats: splatBuffer,
+                cameraMatrix: cameraMatrix,
+                modelMatrix: modelMatrix
+            )
+            antimatter15SplatCloud = nil
+        } else {
+            let gpuSplats = antimatter15Splats.map { Antimatter15GPUSplat($0) }
+            print("Converted to Antimatter15 GPU format")
+            let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
+            antimatter15SplatCloud = try SplatCloud<Antimatter15GPUSplat>(
+                device: device,
+                splats: splatBuffer,
+                cameraMatrix: cameraMatrix,
+                modelMatrix: modelMatrix
+            )
+            sparkSplatCloud = nil
+        }
         print("Created splat cloud")
 
         print("Rendering \(renderConfig.width)x\(renderConfig.height) image...")
@@ -205,32 +269,83 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         )
 
         // Create render content
-        print("Creating Antimatter15SplatRenderPipeline with \(splatCloud.count) splats")
+        let splatCount = useSparkRenderer ? sparkSplatCloud!.count : antimatter15SplatCloud!.count
+        print("Creating \(useSparkRenderer ? "Spark" : "Antimatter15")SplatRenderPipeline with \(splatCount) splats")
         print("  drawable size: \(SIMD2<Float>(Float(size.width), Float(size.height)))")
-
-        let renderContent = try RenderPass {
-            let aspectRatio = Float(size.width) / Float(size.height)
-            let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
-            try Antimatter15SplatRenderPipeline(
-                splatCloud: splatCloud,
-                projectionMatrix: projectionMatrix,
-                modelMatrix: modelMatrix,
-                cameraMatrix: cameraMatrix,
-                drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                debugMode: .off
-            )
-        }
 
         // Render with Metal capture
         print("About to render...")
         let captureManager = MTLCaptureManager.shared()
-        let rendering = try captureManager.with(enabled: capture) {
-            try renderer.render(renderContent)
+        let rendering: OffscreenRenderer.Rendering
+        if useSparkRenderer {
+            let renderContent = try RenderPass {
+                let aspectRatio = Float(size.width) / Float(size.height)
+                let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
+                try SparkSplatRenderPipeline(
+                    splatCloud: sparkSplatCloud!,
+                    projectionMatrix: projectionMatrix,
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrix,
+                    drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
+                    convertSRGBToLinear: useSrgbToLinear
+                )
+            }
+            rendering = try captureManager.with(enabled: capture) {
+                try renderer.render(renderContent)
+            }
+        } else {
+            let renderContent = try RenderPass {
+                let aspectRatio = Float(size.width) / Float(size.height)
+                let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
+                try Antimatter15SplatRenderPipeline(
+                    splatCloud: antimatter15SplatCloud!,
+                    projectionMatrix: projectionMatrix,
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrix,
+                    drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
+                    debugMode: .off
+                )
+            }
+            rendering = try captureManager.with(enabled: capture) {
+                try renderer.render(renderContent)
+            }
         }
         print("Rendering complete")
 
         // Save to PNG
-        let cgImage = try rendering.cgImage
+        var cgImage = try rendering.cgImage
+
+        // Add label overlay if requested
+        if label {
+            let fovStr = renderConfig.projectionFov.map { String(format: "%.1f°", $0) } ?? "60°"
+            let camPos = renderConfig.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
+            let modelPos = renderConfig.getModelPosition() ?? SIMD3<Float>(0, 0, 0)
+
+            let labelText = """
+            Renderer: \(useSparkRenderer ? "Spark" : "Antimatter15") | sRGB→Linear: \(useSrgbToLinear)
+            Size: \(renderConfig.width)x\(renderConfig.height) | FOV: \(fovStr)
+            Splats: \(splatCount) | Near/Far: \(renderConfig.near)/\(renderConfig.far)
+            Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
+            Model: (\(String(format: "%.2f", modelPos.x)), \(String(format: "%.2f", modelPos.y)), \(String(format: "%.2f", modelPos.z)))
+            """
+
+            let labelView = ZStack(alignment: .bottomLeading) {
+                Image(decorative: cgImage, scale: 1.0)
+                Text(labelText)
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(8)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(4)
+                    .padding(10)
+            }
+
+            let renderer = ImageRenderer(content: labelView)
+            renderer.scale = 1.0
+            if let labeledImage = renderer.cgImage {
+                cgImage = labeledImage
+            }
+        }
 
         // Make output path absolute if it's relative
         var outputPath = renderConfig.output
