@@ -36,10 +36,13 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
         // Load Spark shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("SparkSplatRenderShader")
 
+        var vertexConstants = FunctionConstants()
+        vertexConstants["use_sh"] = .bool(shCoefficients != nil)
+
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
 
-        self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self)
+        self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
         self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
 
         // Setup vertex descriptor
@@ -60,8 +63,10 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
                         [-1, -1], [-1, 1], [1, -1], [1, 1]
                     ]
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                    // Set SH buffer if available (buffer index 12 matches shader)
+                    // Set SH buffer and degree if available (buffer indices 11, 12 match shader)
                     if let buffer = shBuffer {
+                        var shDegreeValue = UInt32(degree)
+                        commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
                         commandEncoder.setVertexBuffer(buffer.unsafeMTLBuffer, offset: 0, index: 12)
                     }
                     commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
@@ -74,7 +79,6 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
                 .parameter("drawableSize", value: drawableSize)
                 .parameter("scale", value: Float(2.0))
                 .parameter("cameraPosition", value: SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z))
-                .parameter("shDegree", value: UInt32(degree))
             }
             .vertexDescriptor(vertexDescriptor)
             .renderPipelineDescriptorModifier { renderPipelineDescriptor in

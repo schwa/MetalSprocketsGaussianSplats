@@ -28,6 +28,7 @@ namespace SparkSplatRenderShader {
 
     // Function constants
     constant bool convert_srgb_to_linear [[function_constant(0)]];
+    constant bool use_sh [[function_constant(1)]];
 
     // Spherical Harmonics constants
     constant float SH_C0 = 0.28209479177387814;
@@ -128,8 +129,8 @@ namespace SparkSplatRenderShader {
         constant float2 &drawableSize [[buffer(8)]],
         constant float &scale [[buffer(9)]],
         constant float3 &cameraPosition [[buffer(10)]],
-        constant uint &shDegree [[buffer(11)]],
-        device const float *shCoefficients [[buffer(12)]]
+        constant uint &shDegree [[buffer(11), function_constant(use_sh)]],
+        device const float *shCoefficients [[buffer(12), function_constant(use_sh)]]
     ) {
         VertexOut out;
         // Default to outside frustum so it's discarded if we return early
@@ -161,7 +162,7 @@ namespace SparkSplatRenderShader {
         float4 worldCenter = modelMatrix * float4(center, 1.0);
 
         // Evaluate spherical harmonics for view-dependent color
-        if (shDegree > 0 && shCoefficients != nullptr) {
+        if (use_sh && shDegree > 0 && shCoefficients != nullptr) {
             float3 viewDir = normalize(worldCenter.xyz - cameraPosition);
             float3 shColor = evaluateSH(viewDir, shCoefficients, splatIndex, shDegree);
             rgba.rgb = clamp(rgba.rgb + shColor, 0.0, 1.0);
