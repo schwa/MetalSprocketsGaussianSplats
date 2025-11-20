@@ -3,6 +3,8 @@
 #import "Antimatter15SplatSupport.h"
 #import "SparkSplatRenderShader.h"
 #import "SparkSplatSupport.h"
+#import "SOGSplatSupport.h"
+#import "GenericSplat.h"
 
 #ifdef __OBJC__
 #import <Foundation/Foundation.h>

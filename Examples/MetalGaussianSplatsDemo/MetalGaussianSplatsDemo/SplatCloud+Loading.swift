@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 
 public extension SplatCloud where Splat == Antimatter15GPUSplat {
     /// Combo init - dispatches based on file extension
+    @MainActor
     convenience init(url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
         switch url.pathExtension.lowercased() {
         case "spz":
@@ -25,6 +26,9 @@ public extension SplatCloud where Splat == Antimatter15GPUSplat {
 
         case "json":
             try await self.init(jsonURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
+        case "sog":
+            try self.init(sogURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
 
         default:
             throw NSError(domain: "SplatCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported file format: \(url.pathExtension)"])
@@ -58,12 +62,23 @@ public extension SplatCloud where Splat == Antimatter15GPUSplat {
         let gpuSplats = antimatterSplats.map(Antimatter15GPUSplat.init)
         try self.init(device: device, splats: gpuSplats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
+
+    @MainActor
+    convenience init(sogURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
+        let device = MTLCreateSystemDefaultDevice()!
+        let resources = try SOGLoader.load(url: url, device: device)
+        let converter = try SOGToGenericSplatConverter(device: device)
+        let genericSplats = try converter.convert(resources)
+        let gpuSplats = genericSplats.map(Antimatter15GPUSplat.init)
+        try self.init(device: device, splats: gpuSplats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+    }
 }
 
 // MARK: - SparkGPUSplat Loading
 
 public extension SplatCloud where Splat == SparkGPUSplat {
     /// Combo init - dispatches based on file extension
+    @MainActor
     convenience init(url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
         switch url.pathExtension.lowercased() {
         case "spz":
@@ -77,6 +92,9 @@ public extension SplatCloud where Splat == SparkGPUSplat {
 
         case "json":
             try await self.init(jsonURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
+        case "sog":
+            try self.init(sogURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
 
         default:
             throw NSError(domain: "SplatCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported file format: \(url.pathExtension)"])
@@ -158,6 +176,16 @@ public extension SplatCloud where Splat == SparkGPUSplat {
         // Load JSON via Antimatter15Splat and convert
         let antimatterSplats = try await [Antimatter15Splat](importing: url, contentType: .json)
         let splats = antimatterSplats.map { SparkGPUSplat($0) }
+        try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+    }
+
+    @MainActor
+    convenience init(sogURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
+        let device = _MTLCreateSystemDefaultDevice()
+        let resources = try SOGLoader.load(url: url, device: device)
+        let converter = try SOGToGenericSplatConverter(device: device)
+        let genericSplats = try converter.convert(resources)
+        let splats = genericSplats.map(SparkGPUSplat.init)
         try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
 }

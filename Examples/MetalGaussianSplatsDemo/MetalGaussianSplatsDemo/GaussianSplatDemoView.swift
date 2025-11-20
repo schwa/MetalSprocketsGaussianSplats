@@ -136,7 +136,7 @@ public struct GaussianSplatDemoView: View {
 
     private func scanFolder(_ url: URL) {
         let fileManager = FileManager.default
-        let extensions = ["ply", "splat", "spz"]
+        let extensions = ["ply", "splat", "spz", "sog"]
 
         do {
             let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
