@@ -35,6 +35,7 @@ public struct GaussianSplatDemoView: View {
     @State private var rotationX: Float = Float.pi
     @State private var rotationY: Float = 0
     @State private var rotationZ: Float = 0
+    @State private var splatCount: Int?
 
     public init() {}
 
@@ -74,6 +75,22 @@ public struct GaussianSplatDemoView: View {
                         )
                     }
                 }
+                .overlay(alignment: .bottomLeading) {
+                    let camPos = SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z)
+                    let modelPos = SIMD3<Float>(modelMatrix.columns.3.x, modelMatrix.columns.3.y, modelMatrix.columns.3.z)
+                    let fileName = splatURL?.lastPathComponent ?? "No file"
+
+                    Text("""
+                    Renderer: \(rendererType.rawValue)
+                    File: \(fileName)
+                    Splats: \(splatCount.map { $0.formatted() } ?? "—")
+                    Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
+                    Model: (\(String(format: "%.2f", modelPos.x)), \(String(format: "%.2f", modelPos.y)), \(String(format: "%.2f", modelPos.z)))
+                    """)
+                    .padding(8)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .padding()
+                }
             }
             .toolbar {
                 toolbar
@@ -93,6 +110,13 @@ public struct GaussianSplatDemoView: View {
                 splatURL = Bundle.main.url(forResource: "centered_lastchance", withExtension: "splat")
             }
             restoreFolderFromBookmark()
+        }
+        .onChange(of: splatURL, initial: true) {
+            if let url = splatURL {
+                splatCount = try? SplatCloud<SparkGPUSplat>.splatCount(from: url)
+            } else {
+                splatCount = nil
+            }
         }
     }
 

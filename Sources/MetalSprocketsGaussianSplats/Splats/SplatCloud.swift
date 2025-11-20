@@ -38,6 +38,34 @@ public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Spla
     public var count: Int {
         splats.count
     }
+
+    /// Quickly get the splat count from a URL without fully loading the file
+    public static func splatCount(from url: URL) throws -> Int {
+        let ext = url.pathExtension.lowercased()
+
+        switch ext {
+        case "spz":
+            // SPZ files need decompression to read header
+            let reader = try SPZReader(url: url)
+            return Int(reader.pointCount)
+
+        case "ply":
+            // PLY files have count in ASCII header
+            let reader = try PLYReader(url: url)
+            return reader.recordCount
+
+        case "splat":
+            // .splat files: each splat is 32 bytes
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            guard let fileSize = attributes[.size] as? Int else {
+                throw NSError(domain: "SplatCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: "Cannot get file size"])
+            }
+            return fileSize / 32
+
+        default:
+            throw NSError(domain: "SplatCloud", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unsupported file extension: \(ext)"])
+        }
+    }
 }
 
 // MARK: -
