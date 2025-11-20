@@ -1,5 +1,7 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
+import Interaction3D
+import Metal
 import simd
 import SwiftUI
 import MetalSprocketsGaussianSplats
@@ -14,11 +16,20 @@ struct SparkRendererView: View {
     let modelMatrix: simd_float4x4
 
     @State private var splatCloud: SplatCloud<SparkGPUSplat>?
+    @State private var shCoefficients: TypedMTLBuffer<Float>?
+    @State private var shDegree: UInt8 = 0
 
     var body: some View {
         ZStack {
             if let splatCloud {
-                SparkSplatView(splatCloud: splatCloud, projection: projection, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+                SparkSplatView(
+                    splatCloud: splatCloud,
+                    projection: projection,
+                    cameraMatrix: cameraMatrix,
+                    modelMatrix: modelMatrix,
+                    shCoefficients: shCoefficients,
+                    shDegree: shDegree
+                )
             }
         }
         .onChange(of: url, initial: true) {
@@ -30,7 +41,18 @@ struct SparkRendererView: View {
 
     private func loadSplatCloud() async {
         guard let url else { return }
-        splatCloud = try! await SplatCloud(url: url, cameraMatrix: cameraMatrix)
+
+        // Use loadWithSH for SPZ files to get SH data
+        if url.pathExtension.lowercased() == "spz" {
+            let result = try! SplatCloud<SparkGPUSplat>.loadWithSH(url: url, cameraMatrix: cameraMatrix)
+            splatCloud = result.splatCloud
+            shCoefficients = result.shCoefficients
+            shDegree = result.shDegree
+        } else {
+            splatCloud = try! await SplatCloud(url: url, cameraMatrix: cameraMatrix)
+            shCoefficients = nil
+            shDegree = 0
+        }
     }
 }
 

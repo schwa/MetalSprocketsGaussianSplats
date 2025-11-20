@@ -86,6 +86,36 @@ public extension SplatCloud where Splat == SparkGPUSplat {
         try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
 
+    /// Load SPZ file and extract spherical harmonics if available
+    static func loadWithSH(url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws -> (splatCloud: SplatCloud<SparkGPUSplat>, shCoefficients: TypedMTLBuffer<Float>?, shDegree: UInt8) {
+        let device = _MTLCreateSystemDefaultDevice()
+        let reader = try SPZReader(url: url)
+
+        var spzSplats: [SPZSplat] = []
+        var gpuSplats: [SparkGPUSplat] = []
+        spzSplats.reserveCapacity(Int(reader.pointCount))
+        gpuSplats.reserveCapacity(Int(reader.pointCount))
+
+        try reader.read { spzSplat in
+            spzSplats.append(spzSplat)
+            // Load with 0.282 scale (usingSH: false) for correct colors when SH is off
+            gpuSplats.append(SparkGPUSplat(spzSplat, usingSH: false))
+        }
+
+        let splatCloud = try SplatCloud(device: device, splats: gpuSplats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
+        // Extract SH coefficients if available
+        var shCoefficients: TypedMTLBuffer<Float>?
+        var shDegree: UInt8 = 0
+
+        if let (coeffs, degree) = spzSplats.extractSphericalHarmonics() {
+            shCoefficients = try device.makeTypedBuffer(values: coeffs, options: [])
+            shDegree = degree
+        }
+
+        return (splatCloud, shCoefficients, shDegree)
+    }
+
     convenience init(splatURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
         let device = _MTLCreateSystemDefaultDevice()
         let data = try Data(contentsOf: url)

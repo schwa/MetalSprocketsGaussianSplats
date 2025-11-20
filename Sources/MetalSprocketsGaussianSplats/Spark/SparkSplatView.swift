@@ -1,6 +1,7 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
 internal import os
+import Metal
 import SwiftUI
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
@@ -14,12 +15,27 @@ public struct SparkSplatView<Splat: SortableSplatProtocol>: View {
     private var projection: any ProjectionProtocol
     private var cameraMatrix: simd_float4x4
     private var modelMatrix: simd_float4x4
+    private var shCoefficients: TypedMTLBuffer<Float>?
+    private var shDegree: UInt8
 
-    public init(splatCloud: SplatCloud<Splat>, projection: any ProjectionProtocol, cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4 = .identity) {
+    @State private var enableSH: Bool
+
+    public init(
+        splatCloud: SplatCloud<Splat>,
+        projection: any ProjectionProtocol,
+        cameraMatrix: simd_float4x4,
+        modelMatrix: simd_float4x4 = .identity,
+        shCoefficients: TypedMTLBuffer<Float>? = nil,
+        shDegree: UInt8 = 0
+    ) {
         self.splatCloud = splatCloud
         self.projection = projection
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
+        self.shCoefficients = shCoefficients
+        self.shDegree = shDegree
+        // Default to OFF (colors are loaded with 0.282 scale for correct display)
+        self._enableSH = State(initialValue: false)
     }
 
     public var body: some View {
@@ -32,13 +48,45 @@ public struct SparkSplatView<Splat: SortableSplatProtocol>: View {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(drawableSize),
-                    shCoefficients: nil,
-                    shDegree: 0
+                    // Always pass buffer to keep function constant stable, toggle via shDegree
+                    shCoefficients: shCoefficients,
+                    shDegree: enableSH ? shDegree : 0
                 )
             }
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
+        .overlay(alignment: .topLeading) {
+            if shCoefficients != nil {
+                VStack(alignment: .leading) {
+                    Toggle("Spherical Harmonics", isOn: $enableSH)
+                }
+                .padding()
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .padding()
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            VStack(alignment: .leading) {
+                Text("SH Info")
+                    .font(.headline)
+                if let shCoefficients {
+                    Text("Degree: \(shDegree)")
+                    Text("Buffer count: \(shCoefficients.count)")
+                    Text("Enabled: \(enableSH ? "Yes" : "No")")
+                    // Show first few values to verify data
+                    if !shCoefficients.isEmpty {
+                        let ptr = shCoefficients.unsafeMTLBuffer.contents().assumingMemoryBound(to: Float.self)
+                        let sample = (0..<min(3, shCoefficients.count)).map { ptr[$0] }
+                        Text("Sample: \(sample.map { String(format: "%.3f", $0) }.joined(separator: ", "))")
+                    }
+                } else {
+                    Text("No SH data")
+                }
+            }
+            .padding()
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .padding()
+        }
     }
-
 }
 #endif

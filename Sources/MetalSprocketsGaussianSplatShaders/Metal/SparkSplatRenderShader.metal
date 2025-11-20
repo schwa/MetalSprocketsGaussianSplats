@@ -162,6 +162,7 @@ namespace SparkSplatRenderShader {
         float4 worldCenter = modelMatrix * float4(center, 1.0);
 
         // Evaluate spherical harmonics for view-dependent color
+        // Check shDegree > 0 as runtime toggle (0 = disabled)
         if (use_sh && shDegree > 0 && shCoefficients != nullptr) {
             float3 viewDir = normalize(worldCenter.xyz - cameraPosition);
             float3 shColor = evaluateSH(viewDir, shCoefficients, splatIndex, shDegree);
