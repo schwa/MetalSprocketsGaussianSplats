@@ -25,6 +25,10 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
     // Camera tracking for blend factor
     @State private var previousCameraMatrix: simd_float4x4?
 
+    // Blend factor controls
+    @State private var stationaryBlend: Float = 0.1
+    @State private var movingBlend: Float = 0.5
+
     // Compute shader for blending
     @State private var blendFunction: ComputeKernel?
 
@@ -55,6 +59,30 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
         }
         .onChange(of: cameraMatrix) { oldValue, _ in
             previousCameraMatrix = oldValue
+        }
+        .overlay(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Temporal Accumulation")
+                    .font(.headline)
+
+                HStack {
+                    Text("Stationary:")
+                    Slider(value: $stationaryBlend, in: 0.01...0.5)
+                    Text("\(stationaryBlend, format: .number.precision(.fractionLength(2)))")
+                        .frame(width: 40)
+                }
+
+                HStack {
+                    Text("Moving:")
+                    Slider(value: $movingBlend, in: 0.1...1.0)
+                    Text("\(movingBlend, format: .number.precision(.fractionLength(2)))")
+                        .frame(width: 40)
+                }
+            }
+            .padding()
+            .frame(maxWidth: 250)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .padding()
         }
     }
 
@@ -157,13 +185,13 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
 
         let totalDelta = positionDelta + rotationDelta * 0.5
 
-        // Soft reset: higher blend factor when camera moves
-        if totalDelta > 0.1 {
-            return 0.8  // Fast blend for significant movement
-        } else if totalDelta > 0.01 {
-            return 0.3  // Medium blend for small movement
+        // Interpolate between stationary and moving blend based on movement
+        if totalDelta > 0.01 {
+            // Clamp and interpolate for smooth transition
+            let t = min(1.0, totalDelta / 0.1)
+            return stationaryBlend + t * (movingBlend - stationaryBlend)
         } else {
-            return 0.1  // Slow accumulation when stationary
+            return stationaryBlend
         }
     }
 
