@@ -14,6 +14,7 @@ import UniformTypeIdentifiers
 enum RendererType: String, CaseIterable, Identifiable {
     case antimatter15 = "Antimatter15"
     case spark = "Spark"
+    case stochastic = "Stochastic (Experimental)"
 
     var id: String { rawValue }
 }
@@ -64,6 +65,13 @@ public struct GaussianSplatDemoView: View {
                             cameraMatrix: cameraMatrix,
                             modelMatrix: modelMatrix
                         )
+                    case .stochastic:
+                        StochasticRendererView(
+                            url: splatURL,
+                            projection: projection,
+                            cameraMatrix: cameraMatrix,
+                            modelMatrix: modelMatrix
+                        )
                     }
                 }
             }
@@ -107,7 +115,7 @@ public struct GaussianSplatDemoView: View {
                 extensions.contains(file.pathExtension.lowercased())
             }.sorted { $0.lastPathComponent < $1.lastPathComponent }
         } catch {
-            fatalError("Failed to scan folder: \(error)")
+            print("Missing folder")
         }
     }
 

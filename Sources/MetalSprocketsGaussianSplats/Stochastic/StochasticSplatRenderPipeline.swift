@@ -1,0 +1,105 @@
+#if os(iOS) || (os(macOS) && !arch(x86_64))
+import Foundation
+import Metal
+import MetalSprockets
+import MetalSprocketsGaussianSplatShaders
+import MetalSprocketsSupport
+
+public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
+    var splatCloud: SplatCloud<Splat>
+    var projectionMatrix: simd_float4x4
+    var modelMatrix: simd_float4x4
+    var cameraMatrix: simd_float4x4
+    var drawableSize: SIMD2<Float>
+    var frameTime: UInt32
+
+    // Spherical harmonics (optional)
+    var shCoefficients: TypedMTLBuffer<Float>?
+    var shDegree: UInt8
+
+    @MSState
+    var vertexShader: VertexShader
+    @MSState
+    var fragmentShader: FragmentShader
+    var vertexDescriptor: MTLVertexDescriptor
+
+    public init(
+        splatCloud: SplatCloud<Splat>,
+        projectionMatrix: simd_float4x4,
+        modelMatrix: simd_float4x4,
+        cameraMatrix: simd_float4x4,
+        drawableSize: SIMD2<Float>,
+        frameTime: UInt32 = 0,
+        convertSRGBToLinear: Bool = true,
+        shCoefficients: TypedMTLBuffer<Float>? = nil,
+        shDegree: UInt8 = 0
+    ) throws {
+        self.splatCloud = splatCloud
+        self.projectionMatrix = projectionMatrix
+        self.modelMatrix = modelMatrix
+        self.cameraMatrix = cameraMatrix
+        self.drawableSize = drawableSize
+        self.frameTime = frameTime
+        self.shCoefficients = shCoefficients
+        self.shDegree = shDegree
+
+        // Load Stochastic shaders
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("StochasticSplatRenderShader")
+
+        var vertexConstants = FunctionConstants()
+        vertexConstants["use_sh"] = .bool(shCoefficients != nil)
+
+        var fragmentConstants = FunctionConstants()
+        fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
+
+        self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
+        self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
+
+        // Setup vertex descriptor
+        let vertexDescriptor = MTLVertexDescriptor()
+        vertexDescriptor.attributes[0].format = .float2
+        vertexDescriptor.attributes[0].offset = 0
+        vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
+        self.vertexDescriptor = vertexDescriptor
+    }
+
+    public var body: some Element {
+        get throws {
+            let shBuffer = shCoefficients
+            let degree = shDegree
+            var time = frameTime
+            try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
+                Draw { commandEncoder in
+                    let vertices: [SIMD2<Float>] = [
+                        [-1, -1], [-1, 1], [1, -1], [1, 1]
+                    ]
+                    commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
+                    // Set time uniform for fragment shader hash
+                    commandEncoder.setFragmentBytes(&time, length: MemoryLayout<UInt32>.size, index: 0)
+                    // Set SH buffer and degree if available
+                    if let buffer = shBuffer {
+                        var shDegreeValue = UInt32(degree)
+                        commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
+                        commandEncoder.setVertexBuffer(buffer.unsafeMTLBuffer, offset: 0, index: 12)
+                    }
+                    commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
+                }
+                .parameter("packedSplats", buffer: splatCloud.splats.unsafeMTLBuffer)
+                .parameter("modelMatrix", value: modelMatrix)
+                .parameter("viewMatrix", value: cameraMatrix.inverse)
+                .parameter("projectionMatrix", value: projectionMatrix)
+                .parameter("drawableSize", value: drawableSize)
+                .parameter("scale", value: Float(2.0))
+                .parameter("cameraPosition", value: SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z))
+            }
+            .vertexDescriptor(vertexDescriptor)
+            .renderPipelineDescriptorModifier { renderPipelineDescriptor in
+                // Disable blending - stochastic rendering uses depth buffer
+                renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = false
+            }
+            .depthCompare(function: .less, enabled: true)
+        }
+    }
+}
+
+#endif
