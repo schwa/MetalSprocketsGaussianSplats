@@ -33,7 +33,10 @@ public extension SparkGPUSplat {
     }
 
     /// Initialize a SparkGPUSplat from an SPZSplat
-    init(_ splat: SPZSplat) {
+    /// - Parameters:
+    ///   - splat: The SPZ splat to convert
+    ///   - usingSH: If true, uses 0.15 scale (SH will adjust colors). If false, uses SH_C0 for correct colors without SH.
+    init(_ splat: SPZSplat, usingSH: Bool = false) {
         // Convert position directly (SPZ uses RUB coordinate system)
         let position = splat.position
 
@@ -45,8 +48,10 @@ public extension SparkGPUSplat {
         )
 
         // Convert color from SH coefficient space to linear RGB [0,1]
-        // SPZ stores: (value - 0.5) / 0.15, so we reverse: value = splat.color * 0.15 + 0.5
-        let normalizedColor = splat.color * 0.15 + 0.5
+        // With SH: use 0.15 (SH will adjust colors to proper range)
+        // Without SH: use SH_C0 to get correct colors directly
+        let colorScale: Float = usingSH ? 0.15 : 0.28209479177387814
+        let normalizedColor = splat.color * colorScale + 0.5
         let rgb = normalizedColor.clamped(to: 0...1) * 255
 
         // Convert alpha from logit space to probability using sigmoid
