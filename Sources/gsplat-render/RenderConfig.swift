@@ -7,7 +7,7 @@ struct RenderConfig: Codable {
     var background: [Float] = [0, 0, 0, 1]
 
     /// Width of the output image
-    var width: Int = 1024
+    var width: Int = 1_024
 
     /// Height of the output image
     var height: Int = 768
@@ -55,17 +55,23 @@ struct RenderConfig: Codable {
     }
 
     func getModelPosition() -> SIMD3<Float>? {
-        guard let pos = modelPosition, pos.count == 3 else { return nil }
+        guard let pos = modelPosition, pos.count == 3 else {
+            return nil
+        }
         return SIMD3<Float>(pos[0], pos[1], pos[2])
     }
 
     func getCameraPosition() -> SIMD3<Float>? {
-        guard let pos = cameraPosition, pos.count == 3 else { return nil }
+        guard let pos = cameraPosition, pos.count == 3 else {
+            return nil
+        }
         return SIMD3<Float>(pos[0], pos[1], pos[2])
     }
 
     func getCameraLookat() -> SIMD3<Float>? {
-        guard let lookat = cameraLookat, lookat.count == 3 else { return nil }
+        guard let lookat = cameraLookat, lookat.count == 3 else {
+            return nil
+        }
         return SIMD3<Float>(lookat[0], lookat[1], lookat[2])
     }
 
@@ -82,9 +88,9 @@ struct RenderConfig: Codable {
     }
 
     /// Load configuration from JSON file
-    static func load(from path: String) throws -> RenderConfig {
+    static func load(from path: String) throws -> Self {
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         let decoder = JSONDecoder()
-        return try decoder.decode(RenderConfig.self, from: data)
+        return try decoder.decode(Self.self, from: data)
     }
 }

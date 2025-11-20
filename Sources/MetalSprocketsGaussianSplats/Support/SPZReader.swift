@@ -1,5 +1,5 @@
-import Foundation
 import Compression
+import Foundation
 import simd
 import UniformTypeIdentifiers
 
@@ -242,18 +242,16 @@ public struct SPZReader {
         var sumSquares: Float = 0
         var tempComp = comp
 
-        for i in (0...3).reversed() {
-            if i != iLargest {
-                let mag = tempComp & cMask
-                let negbit = (tempComp >> 9) & 0x1
-                tempComp = tempComp >> 10
+        for i in (0...3).reversed() where i != iLargest {
+            let mag = tempComp & cMask
+            let negbit = (tempComp >> 9) & 0x1
+            tempComp = tempComp >> 10
 
-                rotation[i] = sqrt1_2 * Float(mag) / Float(cMask)
-                if negbit == 1 {
-                    rotation[i] = -rotation[i]
-                }
-                sumSquares += rotation[i] * rotation[i]
+            rotation[i] = sqrt1_2 * Float(mag) / Float(cMask)
+            if negbit == 1 {
+                rotation[i] = -rotation[i]
             }
+            sumSquares += rotation[i] * rotation[i]
         }
 
         rotation[iLargest] = sqrt(1.0 - sumSquares)
@@ -280,17 +278,24 @@ public struct SPZReader {
     // MARK: - Helper Functions
 
     private func invSigmoid(_ x: Float) -> Float {
-        guard x > 0 && x < 1 else { return x }
+        guard x > 0, x < 1 else {
+            return x
+        }
         return log(x / (1.0 - x))
     }
 
     private func shCoefficients(for degree: UInt8) -> Int {
         switch degree {
-        case 0: return 0
-        case 1: return 3
-        case 2: return 8
-        case 3: return 15
-        default: return 0
+        case 0:
+            return 0
+        case 1:
+            return 3
+        case 2:
+            return 8
+        case 3:
+            return 15
+        default:
+            return 0
         }
     }
 
@@ -299,7 +304,7 @@ public struct SPZReader {
             throw SPZError.decompressionFailed
         }
 
-        guard data[0] == 0x1f && data[1] == 0x8b else {
+        guard data[0] == 0x1f, data[1] == 0x8b else {
             throw SPZError.decompressionFailed
         }
 
@@ -313,14 +318,14 @@ public struct SPZReader {
         }
 
         if (flags & 0x08) != 0 {
-            while headerSize < data.count && data[headerSize] != 0 {
+            while headerSize < data.count, data[headerSize] != 0 {
                 headerSize += 1
             }
             headerSize += 1
         }
 
         if (flags & 0x10) != 0 {
-            while headerSize < data.count && data[headerSize] != 0 {
+            while headerSize < data.count, data[headerSize] != 0 {
                 headerSize += 1
             }
             headerSize += 1
@@ -336,7 +341,7 @@ public struct SPZReader {
 
         let compressedData = data.subdata(in: headerSize..<(data.count - 8))
 
-        let decompressed = try compressedData.withUnsafeBytes { (inputPtr: UnsafeRawBufferPointer) -> Data in
+        return try compressedData.withUnsafeBytes { (inputPtr: UnsafeRawBufferPointer) -> Data in
             guard let inputAddress = inputPtr.baseAddress else {
                 throw SPZError.decompressionFailed
             }
@@ -347,7 +352,9 @@ public struct SPZReader {
             var decompressedSize = 0
             repeat {
                 decompressedSize = outputData.withUnsafeMutableBytes { (outputPtr: UnsafeMutableRawBufferPointer) -> Int in
-                    guard let outputAddress = outputPtr.baseAddress else { return 0 }
+                    guard let outputAddress = outputPtr.baseAddress else {
+                        return 0
+                    }
 
                     return compression_decode_buffer(
                         outputAddress,
@@ -374,8 +381,6 @@ public struct SPZReader {
             outputData.count = decompressedSize
             return outputData
         }
-
-        return decompressed
     }
 }
 

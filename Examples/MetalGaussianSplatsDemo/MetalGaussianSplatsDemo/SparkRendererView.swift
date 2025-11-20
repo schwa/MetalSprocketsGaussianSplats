@@ -2,12 +2,11 @@
 import GeometryLite3D
 import Interaction3D
 import Metal
-import simd
-import SwiftUI
 import MetalSprocketsGaussianSplats
 import MetalSprocketsSupport
-import Interaction3D
 import MetalSprocketsUI
+import simd
+import SwiftUI
 
 struct SparkRendererView: View {
     let url: URL?
@@ -40,7 +39,9 @@ struct SparkRendererView: View {
     }
 
     private func loadSplatCloud() async {
-        guard let url else { return }
+        guard let url else {
+            return
+        }
 
         // Use loadWithSH for SPZ files to get SH data
         if url.pathExtension.lowercased() == "spz" {

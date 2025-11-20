@@ -1,6 +1,6 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
-import simd
 import MetalSprocketsGaussianSplatShaders
+import simd
 
 // `struct Antimatter15GPUSplat` defined in GaussianSplatShaders package.
 // struct Antimatter15GPUSplat {

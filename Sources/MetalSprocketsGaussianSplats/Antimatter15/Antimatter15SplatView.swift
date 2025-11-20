@@ -1,11 +1,11 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
-internal import os
-import SwiftUI
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSprocketsUI
+internal import os
+import SwiftUI
 
 let logger: Logger? = Logger(subsystem: "gaussian-splats", category: "gaussian-splats")
 
@@ -32,6 +32,5 @@ public struct Antimatter15SplatView: View {
             }
         }
     }
-
 }
 #endif

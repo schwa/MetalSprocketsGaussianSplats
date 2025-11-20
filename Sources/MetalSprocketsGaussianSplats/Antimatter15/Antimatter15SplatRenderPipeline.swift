@@ -91,8 +91,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
                     fragmentConstants["debug_mode"] = .int32(debugMode.rawValue)
                     vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self)
                     fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
-                }
-                catch {
+                } catch {
                     fatalError("Failed to update shaders: \(error)")
                 }
             }

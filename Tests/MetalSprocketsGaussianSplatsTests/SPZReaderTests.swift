@@ -1,10 +1,9 @@
-import Testing
 import Foundation
 @testable import MetalSprocketsGaussianSplats
+import Testing
 
 @Suite("SPZReader Tests")
 struct SPZReaderTests {
-
     // MARK: - Test Fixtures
 
     static let samplesURL = URL(fileURLWithPath: #filePath)
@@ -103,7 +102,9 @@ struct SPZReaderTests {
         let maxSamples = 100
 
         try reader.read { splat in
-            guard sampleCount < maxSamples else { return }
+            guard sampleCount < maxSamples else {
+                return
+            }
 
             // Position should be reasonable (not NaN or infinite)
             #expect(!splat.position.x.isNaN && !splat.position.x.isInfinite)
@@ -125,8 +126,7 @@ struct SPZReaderTests {
 
             // Rotation quaternion should be normalized (approximately)
             let rotVec = splat.rotation.vector
-            let length = sqrt(rotVec.x * rotVec.x + rotVec.y * rotVec.y +
-                            rotVec.z * rotVec.z + rotVec.w * rotVec.w)
+            let length = sqrt(rotVec.x * rotVec.x + rotVec.y * rotVec.y + rotVec.z * rotVec.z + rotVec.w * rotVec.w)
             #expect(abs(length - 1.0) < 0.01, "Quaternion should be normalized")
 
             sampleCount += 1
@@ -164,10 +164,14 @@ struct SPZReaderTests {
             if let sh = splat.sphericalHarmonics {
                 let expectedCoeffs: Int
                 switch reader.shDegree {
-                case 1: expectedCoeffs = 3
-                case 2: expectedCoeffs = 8
-                case 3: expectedCoeffs = 15
-                default: expectedCoeffs = 0
+                case 1:
+                    expectedCoeffs = 3
+                case 2:
+                    expectedCoeffs = 8
+                case 3:
+                    expectedCoeffs = 15
+                default:
+                    expectedCoeffs = 0
                 }
 
                 #expect(sh.count == expectedCoeffs)
@@ -216,7 +220,9 @@ struct SPZReaderTests {
         let maxConvert = 100
 
         try reader.read { splat in
-            guard converted.count < maxConvert else { return }
+            guard converted.count < maxConvert else {
+                return
+            }
             let antimatter15 = Antimatter15Splat(splat)
             converted.append(antimatter15)
         }

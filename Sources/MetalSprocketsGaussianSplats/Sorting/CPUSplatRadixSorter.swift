@@ -1,9 +1,9 @@
 internal import AsyncAlgorithms
 @preconcurrency import Metal
-internal import os
-import simd
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
+internal import os
+import simd
 
 private let signposter: OSSignposter = .init(subsystem: "io.schwa.MetalSprockets-examples", category: OSLog.Category.pointsOfInterest)
 

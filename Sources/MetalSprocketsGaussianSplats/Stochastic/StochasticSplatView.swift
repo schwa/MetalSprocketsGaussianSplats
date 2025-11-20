@@ -1,13 +1,13 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
-internal import os
 import Metal
 import MetalKit
-import SwiftUI
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSprocketsUI
+internal import os
+import SwiftUI
 
 private let stochasticLogger: Logger? = Logger(subsystem: "stochastic-splats", category: "stochastic-splats")
 
@@ -253,8 +253,8 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
 
         // Also check rotation change (simplified - just compare matrix elements)
         let rotationDelta = abs(cameraMatrix[0][0] - previous[0][0]) +
-                           abs(cameraMatrix[1][1] - previous[1][1]) +
-                           abs(cameraMatrix[2][2] - previous[2][2])
+            abs(cameraMatrix[1][1] - previous[1][1]) +
+            abs(cameraMatrix[2][2] - previous[2][2])
 
         let totalDelta = positionDelta + rotationDelta * 0.5
 
@@ -263,13 +263,14 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
             // Clamp and interpolate for smooth transition
             let t = min(1.0, totalDelta / 0.1)
             return stationaryBlend + t * (movingBlend - stationaryBlend)
-        } else {
-            return stationaryBlend
         }
+        return stationaryBlend
     }
 
     private func createTextures(size: CGSize) {
-        guard size.width > 0, size.height > 0 else { return }
+        guard size.width > 0, size.height > 0 else {
+            return
+        }
 
         let device = _MTLCreateSystemDefaultDevice()
         let width = Int(size.width)

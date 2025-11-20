@@ -9,7 +9,7 @@ public struct Pool<T>: @unchecked Sendable {
     }
 
     public func acquire() -> T {
-        return elements.withLockUnchecked { elements in
+        elements.withLockUnchecked { elements in
             guard !elements.isEmpty else {
                 fatalError("Pool exhausted: no more elements available to acquire.")
             }

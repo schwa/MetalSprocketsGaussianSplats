@@ -1,7 +1,7 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
-import simd
-import MetalSprocketsSupport
 import GeometryLite3D
+import MetalSprocketsSupport
+import simd
 
 public extension Antimatter15Splat {
     init(_ splat: SPZSplat) {

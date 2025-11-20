@@ -7,8 +7,8 @@ only_rules:
   - accessibility_label_for_image
   - accessibility_trait_for_button
   - anonymous_argument_in_multiline_closure
-#  - array_init # 1 violations
-  - async_without_await # 2 violations (fixable)
+  - array_init
+  - async_without_await
   - attribute_name_spacing
 #  - attributes # 42 violations
   - balanced_xctest_lifecycle
@@ -28,7 +28,7 @@ only_rules:
   - comment_spacing
   - compiler_protocol_init
   - computed_accessors_order
-#  - conditional_returns_on_newline # 20 violations
+  - conditional_returns_on_newline # 20 violations
   - contains_over_filter_count
   - contains_over_filter_is_empty
   - contains_over_first_not_nil
@@ -39,7 +39,7 @@ only_rules:
   - custom_rules
 #  - cyclomatic_complexity # 6 violations
   - deployment_target
-  - direct_return # 2 violations (fixable)
+  - direct_return
   - discarded_notification_center_observer
   - discouraged_assert
   - discouraged_direct_init
@@ -78,10 +78,10 @@ only_rules:
   - final_test_case
   - first_where
   - flatmap_over_map_reduce
-#  - for_where # 3 violations
+  - for_where # 3 violations
   - force_cast
-#  - force_try # 6 violations
-#  - force_unwrapping # 13 violations
+  - force_try
+  - force_unwrapping
 #  - function_body_length # 5 violations
 #  - function_default_parameter_at_end # 2 violations
   - function_name_whitespace
@@ -91,12 +91,12 @@ only_rules:
   - identical_operands
 #  - identifier_name # 136 violations
   - implicit_getter
-  - implicit_optional_initialization # 2 violations (fixable)
-  - implicit_return # 4 violations (fixable)
+  - implicit_optional_initialization
+  - implicit_return
   - implicitly_unwrapped_optional
   - inclusive_language
   - incompatible_concurrency_annotation
-#  - indentation_width # 13 violations
+  - indentation_width # 13 violations
   - invalid_swiftlint_command
   - is_disjoint
   - joined_default_parameter
@@ -107,7 +107,7 @@ only_rules:
   - legacy_constant
   - legacy_constructor
   - legacy_hashing
-#  - legacy_multiple # 1 violations
+  - legacy_multiple # 1 violations
   - legacy_nsgeometry_functions
   - legacy_objc_type
   - legacy_random
@@ -141,11 +141,11 @@ only_rules:
   - nslocalizedstring_key
   - nslocalizedstring_require_bundle
   - nsobject_prefer_isequal
-  - number_separator # 7 violations (fixable)
+  - number_separator
   - object_literal
 #  - one_declaration_per_file # 9 violations
   - opening_brace
-  - operator_usage_whitespace # 3 violations (fixable)
+  - operator_usage_whitespace
   - optional_data_string_conversion
   - optional_enum_case_matching
   - orphaned_doc_comment
@@ -154,10 +154,10 @@ only_rules:
   - pattern_matching_keywords
   - period_spacing
   - prefer_asset_symbols
-  - prefer_condition_list # 4 violations (fixable)
-  - prefer_key_path # 1 violations (fixable)
+  - prefer_condition_list
+  - prefer_key_path
   - prefer_nimble
-  - prefer_self_in_static_references # 3 violations (fixable)
+  - prefer_self_in_static_references
   - prefer_self_type_over_type_of_self
   - prefer_type_checking
   - prefer_zero_over_explicit_init
@@ -166,7 +166,7 @@ only_rules:
   - private_outlet
   - private_over_fileprivate
   - private_subject
-  - private_swiftui_state # 4 violations (fixable)
+  - private_swiftui_state
   - private_unit_test
   - prohibited_interface_builder
   - prohibited_super_call
@@ -180,13 +180,13 @@ only_rules:
   - redundant_discardable_let
   - redundant_nil_coalescing
   - redundant_objc_attribute
-  - redundant_self_in_closure # 2 violations (fixable)
+  - redundant_self_in_closure
   - redundant_sendable
   - redundant_set_access_control
   - redundant_string_enum_value
   - redundant_type_annotation
   - redundant_void_return
-#  - required_deinit # 2 violations
+# - required_deinit
   - required_enum_case
   - return_arrow_whitespace
   - return_value_from_void_function
@@ -194,27 +194,27 @@ only_rules:
   - self_in_property_initialization
   - shorthand_argument
   - shorthand_operator
-  - shorthand_optional_binding # 1 violations (fixable)
+  - shorthand_optional_binding
   - single_test_class
 #  - sorted_enum_cases # 11 violations
   - sorted_first_last
-  - sorted_imports # 23 violations (fixable)
-  - statement_position # 3 violations (fixable)
+  - sorted_imports
+  - statement_position
   - static_operator
   - static_over_final_class
   - strict_fileprivate
   - strong_iboutlet
   - superfluous_disable_command
-  - superfluous_else # 5 violations (fixable)
+  - superfluous_else
   - switch_case_alignment
-#  - switch_case_on_newline # 42 violations
+  - switch_case_on_newline # 42 violations
   - syntactic_sugar
   - test_case_accessibility
 #  - todo # 3 violations
   - toggle_bool
   - trailing_closure
-  - trailing_comma # 6 violations (fixable)
-  - trailing_newline # 1 violations (fixable)
+  - trailing_comma
+  - trailing_newline
   - trailing_semicolon
   - trailing_whitespace
 #  - type_body_length # 3 violations
@@ -236,15 +236,15 @@ only_rules:
   - unused_enumerated
   - unused_import
   - unused_optional_binding
-  - unused_parameter # 1 violations (fixable)
+  - unused_parameter
   - unused_setter_value
   - valid_ibinspectable
   - vertical_parameter_alignment
   - vertical_parameter_alignment_on_call
-  - vertical_whitespace # 2 violations (fixable)
-  - vertical_whitespace_between_cases # 22 violations (fixable)
-  - vertical_whitespace_closing_braces # 5 violations (fixable)
-  - vertical_whitespace_opening_braces # 2 violations (fixable)
+  - vertical_whitespace
+#  - vertical_whitespace_between_cases
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
   - void_function_in_ternary
   - void_return
   - weak_delegate

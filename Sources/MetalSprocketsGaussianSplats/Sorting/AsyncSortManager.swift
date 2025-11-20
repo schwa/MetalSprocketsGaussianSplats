@@ -1,8 +1,8 @@
 internal import AsyncAlgorithms
 @preconcurrency import Metal
+import MetalSprocketsGaussianSplatShaders
 internal import os
 import simd
-import MetalSprocketsGaussianSplatShaders
 
 internal actor AsyncSortManager <Splat> where Splat: SortableSplatProtocol {
     private var splatCloud: SplatCloud<Splat>
@@ -18,11 +18,9 @@ internal actor AsyncSortManager <Splat> where Splat: SortableSplatProtocol {
         Task(priority: .high) {
             do {
                 try await self.startSorting()
-            }
-            catch is CancellationError {
+            } catch is CancellationError {
                 // This line intentionally left blank.
-            }
-            catch {
+            } catch {
                 logger?.log("Failed to sort splats: \(error)")
             }
         }

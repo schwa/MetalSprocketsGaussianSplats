@@ -16,12 +16,16 @@ public extension SplatCloud where Splat == Antimatter15GPUSplat {
         switch url.pathExtension.lowercased() {
         case "spz":
             try await self.init(spzURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
         case "splat":
             try await self.init(splatURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
         case "ply":
             try await self.init(plyURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
         case "json":
             try await self.init(jsonURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
         default:
             throw NSError(domain: "SplatCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported file format: \(url.pathExtension)"])
         }
@@ -63,19 +67,23 @@ public extension SplatCloud where Splat == SparkGPUSplat {
     convenience init(url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
         switch url.pathExtension.lowercased() {
         case "spz":
-            try await self.init(spzURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+            try self.init(spzURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
         case "splat":
-            try await self.init(splatURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+            try self.init(splatURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
         case "ply":
-            try await self.init(plyURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+            try self.init(plyURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
         case "json":
             try await self.init(jsonURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
         default:
             throw NSError(domain: "SplatCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported file format: \(url.pathExtension)"])
         }
     }
 
-    convenience init(spzURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
+    convenience init(spzURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = _MTLCreateSystemDefaultDevice()
         let reader = try SPZReader(url: url)
         var splats: [SparkGPUSplat] = []
@@ -116,7 +124,7 @@ public extension SplatCloud where Splat == SparkGPUSplat {
         return (splatCloud, shCoefficients, shDegree)
     }
 
-    convenience init(splatURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
+    convenience init(splatURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = _MTLCreateSystemDefaultDevice()
         let data = try Data(contentsOf: url)
         let splatSize = MemoryLayout<Antimatter15Splat>.size
@@ -132,7 +140,7 @@ public extension SplatCloud where Splat == SparkGPUSplat {
         try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
 
-    convenience init(plyURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
+    convenience init(plyURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = _MTLCreateSystemDefaultDevice()
         let reader = try PLYReader(url: url)
         var splats: [SparkGPUSplat] = []

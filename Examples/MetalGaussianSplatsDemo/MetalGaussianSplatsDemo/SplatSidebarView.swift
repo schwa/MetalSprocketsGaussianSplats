@@ -1,7 +1,7 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
+import MetalSprocketsGaussianSplats
 import SwiftUI
 import UniformTypeIdentifiers
-import MetalSprocketsGaussianSplats
 
 struct SplatSidebarView: View {
     @Binding var splatURL: URL?
@@ -37,7 +37,6 @@ struct SplatSidebarView: View {
                         scanFolder(url)
                     }
                 }
-
             }
 
             Section("Download") {
@@ -88,7 +87,8 @@ struct SplatSidebarView: View {
             let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
             folderSplatFiles = contents.filter { file in
                 extensions.contains(file.pathExtension.lowercased())
-            }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
         } catch {
             fatalError("Failed to scan folder: \(error)")
         }

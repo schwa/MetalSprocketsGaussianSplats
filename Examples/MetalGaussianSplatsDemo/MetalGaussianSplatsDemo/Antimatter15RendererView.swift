@@ -1,13 +1,13 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
-import SwiftUI
+import Interaction3D
+import Metal
+import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
-import MetalSprockets
-import Interaction3D
-import Metal
 import MetalSprocketsUI
+import SwiftUI
 
 struct Antimatter15RendererView: View {
     let url: URL?
@@ -50,8 +50,8 @@ struct Antimatter15RendererView: View {
                         }
                     }
                     .onCommandBufferCompleted { _ in
-                        let oldBuffer = self.currentTileBuffer
-                        self.currentTileBuffer = bufferPool.acquire()
+                        let oldBuffer = currentTileBuffer
+                        currentTileBuffer = bufferPool.acquire()
                         if let oldBuffer {
                             process(buffer: oldBuffer)
                             bufferPool.release(oldBuffer)
@@ -87,7 +87,9 @@ struct Antimatter15RendererView: View {
             try! createTileCountBuffers()
         }
         .onChange(of: drawableSize) {
-            guard drawableSize != .zero else { return }
+            guard drawableSize != .zero else {
+                return
+            }
             try! createTileCountBuffers()
         }
         .task {
@@ -101,7 +103,9 @@ struct Antimatter15RendererView: View {
     }
 
     private func loadSplatCloud() async {
-        guard let url else { return }
+        guard let url else {
+            return
+        }
         splatCloud = try! await SplatCloud(url: url, cameraMatrix: cameraMatrix)
     }
 
@@ -112,7 +116,9 @@ struct Antimatter15RendererView: View {
         let gridHeight = UInt32(ceil(drawableSizeFloat.y / Float(tileSize)))
         let capacity = Int(gridWidth * gridHeight)
 
-        guard capacity > 0 else { return }
+        guard capacity > 0 else {
+            return
+        }
 
         let zeros = Array(repeating: UInt32(0), count: capacity)
         let bufferA = try device.makeTypedBuffer(values: zeros, options: .storageModeShared).labeled("Buffer A")
@@ -127,7 +133,7 @@ struct Antimatter15RendererView: View {
         let gridWidth = UInt32(ceil(drawableSizeFloat.x / Float(tileSize)))
         let gridHeight = UInt32(ceil(drawableSizeFloat.y / Float(tileSize)))
         let gridSize = SIMD2<UInt32>(gridWidth, gridHeight)
-        let counts = buffer.map { $0 }
+        let counts = buffer.map(\.self)
         tileStats = TileStats(counts: counts, gridSize: gridSize)
     }
 }

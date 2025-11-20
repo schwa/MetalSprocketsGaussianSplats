@@ -1,11 +1,11 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
-import simd
-import SwiftUI
+import Interaction3D
 import MetalSprocketsGaussianSplats
 import MetalSprocketsSupport
-import Interaction3D
 import MetalSprocketsUI
+import simd
+import SwiftUI
 
 struct StochasticRendererView: View {
     let url: URL?
@@ -29,7 +29,9 @@ struct StochasticRendererView: View {
     }
 
     private func loadSplatCloud() async {
-        guard let url else { return }
+        guard let url else {
+            return
+        }
         splatCloud = try! await SplatCloud(url: url, cameraMatrix: cameraMatrix)
     }
 }

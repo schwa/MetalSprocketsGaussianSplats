@@ -1,14 +1,14 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
-internal import os
-import SwiftUI
+import Interaction3D
+import Metal
+import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
-import MetalSprockets
-import Interaction3D
-import Metal
 import MetalSprocketsUI
+internal import os
+import SwiftUI
 import UniformTypeIdentifiers
 
 enum RendererType: String, CaseIterable, Identifiable {
@@ -32,12 +32,14 @@ public struct GaussianSplatDemoView: View {
     @State private var projection: any ProjectionProtocol = PerspectiveProjection()
     @State private var cameraMatrix: simd_float4x4 = .init(translation: [0, 0.5, 1.5])
     @State private var modelMatrix: simd_float4x4 = .identity
-    @State private var rotationX: Float = Float.pi
+    @State private var rotationX = Float.pi
     @State private var rotationY: Float = 0
     @State private var rotationZ: Float = 0
     @State private var splatCount: Int?
 
-    public init() {}
+    public init() {
+        // This line intentionally left blank.
+    }
 
     public var body: some View {
         NavigationSplitView {
@@ -59,6 +61,7 @@ public struct GaussianSplatDemoView: View {
                             cameraMatrix: cameraMatrix,
                             modelMatrix: modelMatrix
                         )
+
                     case .spark:
                         SparkRendererView(
                             url: splatURL,
@@ -66,6 +69,7 @@ public struct GaussianSplatDemoView: View {
                             cameraMatrix: cameraMatrix,
                             modelMatrix: modelMatrix
                         )
+
                     case .stochastic:
                         StochasticRendererView(
                             url: splatURL,
@@ -87,9 +91,9 @@ public struct GaussianSplatDemoView: View {
                     Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
                     Model: (\(String(format: "%.2f", modelPos.x)), \(String(format: "%.2f", modelPos.y)), \(String(format: "%.2f", modelPos.z)))
                     """)
-                    .padding(8)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-                    .padding()
+                        .padding(8)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .padding()
                 }
             }
             .toolbar {
@@ -121,8 +125,9 @@ public struct GaussianSplatDemoView: View {
     }
 
     private func restoreFolderFromBookmark() {
-        guard let bookmarkData = folderBookmarkData,
-              let path = String(data: bookmarkData, encoding: .utf8) else { return }
+        guard let bookmarkData = folderBookmarkData, let path = String(data: bookmarkData, encoding: .utf8) else {
+            return
+        }
 
         let url = URL(fileURLWithPath: path)
         folderURL = url
@@ -137,7 +142,8 @@ public struct GaussianSplatDemoView: View {
             let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
             folderSplatFiles = contents.filter { file in
                 extensions.contains(file.pathExtension.lowercased())
-            }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
         } catch {
             print("Missing folder")
         }

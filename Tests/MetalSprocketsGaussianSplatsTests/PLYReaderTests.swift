@@ -1,10 +1,9 @@
-import Testing
 import Foundation
 @testable import MetalSprocketsGaussianSplats
+import Testing
 
 @Suite("PLYReader Tests")
 struct PLYReaderTests {
-
     // MARK: - Test Fixtures
 
     static let fixturesURL = URL(fileURLWithPath: #filePath)
@@ -168,10 +167,10 @@ struct PLYReaderTests {
 
         if case .char(let v) = record["prop_char"] { #expect(v == -42) }
         if case .uchar(let v) = record["prop_uchar"] { #expect(v == 200) }
-        if case .short(let v) = record["prop_short"] { #expect(v == -1000) }
-        if case .ushort(let v) = record["prop_ushort"] { #expect(v == 50000) }
-        if case .int(let v) = record["prop_int"] { #expect(v == -100000) }
-        if case .uint(let v) = record["prop_uint"] { #expect(v == 200000) }
+        if case .short(let v) = record["prop_short"] { #expect(v == -1_000) }
+        if case .ushort(let v) = record["prop_ushort"] { #expect(v == 50_000) }
+        if case .int(let v) = record["prop_int"] { #expect(v == -100_000) }
+        if case .uint(let v) = record["prop_uint"] { #expect(v == 200_000) }
         if case .float(let v) = record["prop_float"] { #expect(v == 3.14159) }
 
         if let doubleVal = record["prop_double"] {

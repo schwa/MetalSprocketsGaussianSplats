@@ -1,12 +1,12 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
-internal import os
 import Metal
-import SwiftUI
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSprocketsUI
+internal import os
+import SwiftUI
 
 let sparkLogger: Logger? = Logger(subsystem: "spark-splats", category: "spark-splats")
 

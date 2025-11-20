@@ -62,7 +62,7 @@ public struct SparkGPUSplat {
     }
 
     public var color: SIMD4<UInt8> {
-        return SIMD4<UInt8>(
+        SIMD4<UInt8>(
             UInt8(packed.x & 0xFF),
             UInt8((packed.x >> 8) & 0xFF),
             UInt8((packed.x >> 16) & 0xFF),
@@ -98,7 +98,8 @@ public struct SparkGPUSplat {
         if exponent <= 0 {
             // Underflow to zero
             return UInt16(sign)
-        } else if exponent >= 31 {
+        }
+        if exponent >= 31 {
             // Overflow to infinity
             return UInt16(sign | 0x7C00)
         }
@@ -121,15 +122,15 @@ public struct SparkGPUSplat {
             let exp: UInt32 = 127 - 14
             let mant = mantissa << 13
             return Float(bitPattern: sign | (exp << 23) | mant)
-        } else if exponent == 31 {
+        }
+        if exponent == 31 {
             // Infinity or NaN
             return Float(bitPattern: sign | 0x7F800000 | (mantissa << 13))
-        } else {
-            // Normalized - do arithmetic in Int space to avoid underflow
-            let exp = UInt32(exponent - 15 + 127)
-            let mant = mantissa << 13
-            return Float(bitPattern: sign | (exp << 23) | mant)
         }
+        // Normalized - do arithmetic in Int space to avoid underflow
+        let exp = UInt32(exponent - 15 + 127)
+        let mant = mantissa << 13
+        return Float(bitPattern: sign | (exp << 23) | mant)
     }
 
     // MARK: - Logarithmic Scale Encoding/Decoding
@@ -253,6 +254,6 @@ public struct SparkGPUSplat {
 
 extension SparkGPUSplat: SortableSplatProtocol {
     public var floatPosition: SIMD3<Float> {
-        return position
+        position
     }
 }

@@ -79,26 +79,19 @@ public extension SparkGPUSplat {
     /// Initialize a SparkGPUSplat from a PLY record
     init?(plyRecord record: PLYReader.Record) {
         // Extract position
-        guard let x = record["x"]?.floatValue,
-              let y = record["y"]?.floatValue,
-              let z = record["z"]?.floatValue else {
+        guard let x = record["x"]?.floatValue, let y = record["y"]?.floatValue, let z = record["z"]?.floatValue else {
             return nil
         }
         let position = SIMD3<Float>(x, y, z)
 
         // Extract scale (stored as log scale in PLY)
-        guard let sx = record["scale_0"]?.floatValue,
-              let sy = record["scale_1"]?.floatValue,
-              let sz = record["scale_2"]?.floatValue else {
+        guard let sx = record["scale_0"]?.floatValue, let sy = record["scale_1"]?.floatValue, let sz = record["scale_2"]?.floatValue else {
             return nil
         }
         let scale = SIMD3<Float>(exp(sx), exp(sy), exp(sz))
 
         // Extract rotation quaternion (wxyz order in PLY)
-        guard let rw = record["rot_0"]?.floatValue,
-              let rx = record["rot_1"]?.floatValue,
-              let ry = record["rot_2"]?.floatValue,
-              let rz = record["rot_3"]?.floatValue else {
+        guard let rw = record["rot_0"]?.floatValue, let rx = record["rot_1"]?.floatValue, let ry = record["rot_2"]?.floatValue, let rz = record["rot_3"]?.floatValue else {
             return nil
         }
         let quaternion = simd_normalize(simd_quatf(ix: rx, iy: ry, iz: rz, r: rw))
@@ -106,9 +99,7 @@ public extension SparkGPUSplat {
         // Extract color from spherical harmonics DC term
         // SH DC coefficient: color = (f_dc * SH_C0 + 0.5), where SH_C0 = 0.28209479177387814
         let SH_C0: Float = 0.28209479177387814
-        guard let f_dc_0 = record["f_dc_0"]?.floatValue,
-              let f_dc_1 = record["f_dc_1"]?.floatValue,
-              let f_dc_2 = record["f_dc_2"]?.floatValue else {
+        guard let f_dc_0 = record["f_dc_0"]?.floatValue, let f_dc_1 = record["f_dc_1"]?.floatValue, let f_dc_2 = record["f_dc_2"]?.floatValue else {
             return nil
         }
         let r = (f_dc_0 * SH_C0 + 0.5).clamped(to: 0...1) * 255
@@ -146,13 +137,19 @@ public extension Array where Element == SPZSplat {
 
         let coeffCount = firstSH.count
         let degree: UInt8 = switch coeffCount {
-        case 3: 1   // 3 coefficients for degree 1
-        case 8: 2   // 8 coefficients for degree 2
-        case 15: 3  // 15 coefficients for degree 3
-        default: 0
+        case 3:
+            1   // 3 coefficients for degree 1
+        case 8:
+            2   // 8 coefficients for degree 2
+        case 15:
+            3  // 15 coefficients for degree 3
+        default:
+            0
         }
 
-        guard degree > 0 else { return nil }
+        guard degree > 0 else {
+            return nil
+        }
 
         let floatsPerSplat = coeffCount * 3  // RGB channels
         var result = [Float]()
@@ -179,7 +176,7 @@ public extension Array where Element == SPZSplat {
 
 private extension Float {
     func clamped(to range: ClosedRange<Float>) -> Float {
-        return min(max(self, range.lowerBound), range.upperBound)
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }
 #endif

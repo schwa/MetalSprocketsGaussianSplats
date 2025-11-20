@@ -1,6 +1,6 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
-import SwiftUI
 import Charts
+import SwiftUI
 
 struct TileStats {
     let counts: [UInt32]
@@ -28,9 +28,7 @@ struct TileStatsView: View {
         let nonZeroCount = nonZero.count
         let avg = nonZeroCount > 0 ? Double(total) / Double(nonZeroCount) : 0
         let sorted = nonZero.sorted()
-        let median = sorted.isEmpty ? 0 : (sorted.count % 2 == 0 ?
-            (sorted[sorted.count/2 - 1] + sorted[sorted.count/2]) / 2 :
-            sorted[sorted.count/2])
+        let median = sorted.isEmpty ? 0 : (sorted.count % 2 == 0 ? (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2 : sorted[sorted.count / 2])
 
         Form {
             Section {
@@ -143,14 +141,20 @@ struct TileStatsView: View {
 
     // Helper functions for statistics
     private func percentile(_ sorted: [UInt32], _ p: Double) -> UInt32 {
-        guard !sorted.isEmpty else { return 0 }
+        guard !sorted.isEmpty else {
+            return 0
+        }
         let index = Int(Double(sorted.count - 1) * p)
         return sorted[index]
     }
 
     private func createHistogram(_ sorted: [UInt32]) -> [HistogramBin] {
-        guard !sorted.isEmpty else { return [] }
-        guard let min = sorted.first, let max = sorted.last else { return [] }
+        guard !sorted.isEmpty else {
+            return []
+        }
+        guard let min = sorted.first, let max = sorted.last else {
+            return []
+        }
 
         // Use percentiles to create adaptive bins
         let p25 = percentile(sorted, 0.25)
@@ -166,10 +170,8 @@ struct TileStatsView: View {
         var boundaries: [UInt32] = [min]
 
         // Add percentile boundaries (avoiding duplicates)
-        for value in [p25, p50, p75, p90, p95, p99, max] {
-            if value > boundaries.last! {
-                boundaries.append(value)
-            }
+        for value in [p25, p50, p75, p90, p95, p99, max] where value > boundaries.last! {
+            boundaries.append(value)
         }
 
         // Create bins from boundaries

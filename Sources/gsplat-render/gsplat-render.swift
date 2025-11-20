@@ -1,14 +1,14 @@
+import AppKit
 @preconcurrency import ArgumentParser
 import Foundation
+import GeometryLite3D
+import ImageIO
 import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
-import GeometryLite3D
-import ImageIO
 import simd
-import AppKit
 import SwiftUI
 
 @main
@@ -22,7 +22,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     var background: String = "0,0,0,1"
 
     @Option(help: "Width of the output image")
-    var width: Int = 1024
+    var width: Int = 1_024
 
     @Option(help: "Height of the output image")
     var height: Int = 768
@@ -76,7 +76,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     var reveal: Bool = false
 
     @MainActor
-    mutating func run() async throws {
+    mutating func run() throws {
         // Load config from file if specified, otherwise use command-line args
         var renderConfig: RenderConfig
         if let configPath = config {
@@ -87,7 +87,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 let bgComponents = try parseRGBA(background)
                 renderConfig.background = [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w]
             }
-            if width != 1024 { renderConfig.width = width }
+            if width != 1_024 { renderConfig.width = width }
             if height != 768 { renderConfig.height = height }
             if output != "output.png" { renderConfig.output = output }
             if let pos = modelPosition {
@@ -152,7 +152,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         // Load splats based on file type
         #if os(iOS) || (os(macOS) && !arch(x86_64))
         let antimatter15Splats: [Antimatter15Splat]
-        var spzSplats: [SPZSplat]? = nil  // Keep SPZ splats for SH extraction
+        var spzSplats: [SPZSplat]?  // Keep SPZ splats for SH extraction
 
         switch fileExtension {
         case "spz":
@@ -202,7 +202,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         // Convert to appropriate GPU format
         let antimatter15SplatCloud: SplatCloud<Antimatter15GPUSplat>?
         let sparkSplatCloud: SplatCloud<SparkGPUSplat>?
-        var shCoefficientsBuffer: TypedMTLBuffer<Float>? = nil
+        var shCoefficientsBuffer: TypedMTLBuffer<Float>?
         var effectiveSHDegree: UInt8 = 0
 
         if useSparkRenderer {
@@ -425,8 +425,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 return matrix
             }
             return rotationMatrix
-
-        } else if components.count == 9 {
+        }
+        if components.count == 9 {
             // 3x3 rotation matrix
             let matrix = simd_float4x4(
                 SIMD4<Float>(components[0], components[1], components[2], 0),
@@ -442,19 +442,16 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 return finalMatrix
             }
             return matrix
-
-        } else {
-            throw ValidationError("Camera rotation must be either 4 values (quaternion x,y,z,w) or 9 values (3x3 matrix)")
         }
+        throw ValidationError("Camera rotation must be either 4 values (quaternion x,y,z,w) or 9 values (3x3 matrix)")
     }
 
     func createProjection(from config: RenderConfig) throws -> any ProjectionProtocol {
         let angleOfView = config.projectionFov.map { AngleF.degrees(Float($0)) } ?? AngleF.degrees(60)
-        let projection = PerspectiveProjection(
+        return PerspectiveProjection(
             verticalAngleOfView: angleOfView,
             depthMode: .standard(zClip: config.near...config.far)
         )
-        return projection
     }
 }
 

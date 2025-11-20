@@ -1,9 +1,9 @@
 internal import AsyncAlgorithms
 import Metal
-internal import os
-import simd
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
+internal import os
+import simd
 
 // TODO: #146 Dangerous `@unchecked Sendable` usage in SplatCloud and SplatIndices.
 public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
