@@ -12,7 +12,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum RendererType: String, CaseIterable, Identifiable {
-    case antimatter15 = "Antimatter15"
+    case antimatter15 = "Antimatter15 (Buggy)"
     case spark = "Spark"
     case stochastic = "Stochastic (Experimental)"
 
