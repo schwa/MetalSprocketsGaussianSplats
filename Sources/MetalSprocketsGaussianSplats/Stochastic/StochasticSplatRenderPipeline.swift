@@ -13,10 +13,14 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
     var drawableSize: SIMD2<Float>
     var frameTime: UInt32
     var alphaThreshold: Float
+    var blueNoiseTexture: MTLTexture
 
     // Spherical harmonics (optional)
     var shCoefficients: TypedMTLBuffer<Float>?
     var shDegree: UInt8
+
+    // Noise method
+    var useBlueNoise: Bool
 
     @MSState
     var vertexShader: VertexShader
@@ -32,9 +36,11 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
         drawableSize: SIMD2<Float>,
         frameTime: UInt32 = 0,
         alphaThreshold: Float = 0.95,
+        blueNoiseTexture: MTLTexture,
         convertSRGBToLinear: Bool = true,
         shCoefficients: TypedMTLBuffer<Float>? = nil,
-        shDegree: UInt8 = 0
+        shDegree: UInt8 = 0,
+        useBlueNoise: Bool = true
     ) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
@@ -43,8 +49,10 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
         self.drawableSize = drawableSize
         self.frameTime = frameTime
         self.alphaThreshold = alphaThreshold
+        self.blueNoiseTexture = blueNoiseTexture
         self.shCoefficients = shCoefficients
         self.shDegree = shDegree
+        self.useBlueNoise = useBlueNoise
 
         // Load Stochastic shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("StochasticSplatRenderShader")
@@ -54,6 +62,7 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
+        fragmentConstants["use_blue_noise"] = .bool(useBlueNoise)
 
         self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
         self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
@@ -82,6 +91,8 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
                     commandEncoder.setFragmentBytes(&time, length: MemoryLayout<UInt32>.size, index: 0)
                     // Set alpha threshold for fragment shader
                     commandEncoder.setFragmentBytes(&threshold, length: MemoryLayout<Float>.size, index: 1)
+                    // Set blue noise texture
+                    commandEncoder.setFragmentTexture(blueNoiseTexture, index: 0)
                     // Set SH buffer and degree if available
                     if let buffer = shBuffer {
                         var shDegreeValue = UInt32(degree)

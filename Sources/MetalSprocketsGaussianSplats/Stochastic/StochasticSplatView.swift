@@ -2,6 +2,7 @@
 import GeometryLite3D
 internal import os
 import Metal
+import MetalKit
 import SwiftUI
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
@@ -30,6 +31,7 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
     @State private var movingBlend: Float = 0.5
     @State private var enableAccumulation: Bool = true
     @State private var alphaThreshold: Float = 0.95
+    @State private var useBlueNoise: Bool = true
 
     // Compute shader for blending
     @State private var blendFunction: ComputeKernel?
@@ -37,6 +39,9 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
     // Blit shaders for display
     @State private var blitVertexShader: VertexShader?
     @State private var blitFragmentShader: FragmentShader?
+
+    // Blue noise texture
+    @State private var blueNoiseTexture: MTLTexture?
 
     public init(
         splatCloud: SplatCloud<Splat>,
@@ -57,6 +62,7 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
         }
         .onAppear {
             loadBlendShader()
+            loadBlueNoiseTexture()
             previousCameraMatrix = cameraMatrix
         }
         .onChange(of: cameraMatrix) { oldValue, _ in
@@ -91,6 +97,10 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
                     Text("\(alphaThreshold, format: .number.precision(.fractionLength(2)))")
                         .frame(width: 40)
                 }
+
+                Divider()
+
+                Toggle("Blue Noise", isOn: $useBlueNoise)
             }
             .padding()
             .frame(maxWidth: 250)
@@ -114,8 +124,34 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
         }
     }
 
+    private func loadBlueNoiseTexture() {
+        guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {
+            stochasticLogger?.error("Blue noise texture not found")
+            return
+        }
+
+        let device = _MTLCreateSystemDefaultDevice()
+        let textureLoader = MTKTextureLoader(device: device)
+
+        do {
+            blueNoiseTexture = try textureLoader.newTexture(URL: url, options: [
+                .textureUsage: MTLTextureUsage.shaderRead.rawValue,
+                .textureStorageMode: MTLStorageMode.private.rawValue
+            ])
+        } catch {
+            stochasticLogger?.error("Failed to load blue noise texture: \(error)")
+        }
+    }
+
     @ViewBuilder
     private func renderView(time: UInt32) -> some View {
+        if let blueNoiseTexture {
+            renderViewWithTexture(time: time, blueNoiseTexture: blueNoiseTexture)
+        }
+    }
+
+    @ViewBuilder
+    private func renderViewWithTexture(time: UInt32, blueNoiseTexture: MTLTexture) -> some View {
         RenderView { _, drawableSize in
             if enableAccumulation {
                 // Render with temporal accumulation
@@ -139,8 +175,10 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
                             drawableSize: SIMD2<Float>(drawableSize),
                             frameTime: time,
                             alphaThreshold: alphaThreshold,
+                            blueNoiseTexture: blueNoiseTexture,
                             shCoefficients: nil,
-                            shDegree: 0
+                            shDegree: 0,
+                            useBlueNoise: useBlueNoise
                         )
                     }
                     .renderPassDescriptorModifier { descriptor in
@@ -188,8 +226,10 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
                         drawableSize: SIMD2<Float>(drawableSize),
                         frameTime: time,
                         alphaThreshold: alphaThreshold,
+                        blueNoiseTexture: blueNoiseTexture,
                         shCoefficients: nil,
-                        shDegree: 0
+                        shDegree: 0,
+                        useBlueNoise: useBlueNoise
                     )
                 }
             }

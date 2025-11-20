@@ -30,6 +30,18 @@ namespace StochasticSplatRenderShader {
     // Function constants
     constant bool convert_srgb_to_linear [[function_constant(0)]];
     constant bool use_sh [[function_constant(1)]];
+    constant bool use_blue_noise [[function_constant(2)]];
+
+    // PCG hash for fallback random generation
+    inline uint pcg_hash(uint input) {
+        uint state = input * 747796405u + 2891336453u;
+        uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+        return (word >> 22u) ^ word;
+    }
+
+    inline float hash_to_float(uint hash) {
+        return float(hash) / float(0xFFFFFFFFu);
+    }
 
     // Spherical Harmonics constants
     constant float SH_C0 = 0.28209479177387814;
@@ -276,7 +288,8 @@ namespace StochasticSplatRenderShader {
     [[fragment]] float4 fragment_main(
         FragmentIn in [[stage_in]],
         constant uint &uTime [[buffer(0)]],
-        constant float &alphaThreshold [[buffer(1)]]
+        constant float &alphaThreshold [[buffer(1)]],
+        texture2d<float> blueNoiseTexture [[texture(0)]]
     ) {
         float4 rgba = in.rgba;
 
@@ -306,13 +319,20 @@ namespace StochasticSplatRenderShader {
             return float4(rgba.rgb, 1.0);
         }
 
-        // PCG hash for pseudo-random generation
-        uint2 coord = uint2(in.position.xy);
-        uint state = uTime + 0x9e3779b9u * coord.x + 0x85ebca6bu * coord.y + 0xc2b2ae35u * in.splatIndex;
-        state = state * 747796405u + 2891336453u;
-        uint hash = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-        hash = (hash >> 22u) ^ hash;
-        float rand = float(hash) / 4294967296.0;
+        float rand;
+        if (use_blue_noise) {
+            // Blue noise sampling with temporal variation
+            uint2 coord = uint2(in.position.xy);
+            uint noiseSize = blueNoiseTexture.get_width();
+            // Offset by time and splat index for temporal variation
+            uint2 noiseCoord = (coord + uint2(uTime * 7, uTime * 13 + in.splatIndex)) % noiseSize;
+            rand = blueNoiseTexture.read(noiseCoord).r;
+        } else {
+            // PCG hash method
+            uint2 coord = uint2(in.position.xy);
+            uint hash = pcg_hash(coord.x + coord.y * 65536u + uTime * 16777216u + in.splatIndex);
+            rand = hash_to_float(hash);
+        }
 
         // Probabilistic accept/reject
         if (rand < rgba.a) {

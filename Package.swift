@@ -38,6 +38,9 @@ let package = Package(
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "GeometryLite3D", package: "GeometryLite3D"),
+            ],
+            resources: [
+                .process("Resources/LDR_RGBA_0.png")
             ]
         ),
         .target(
