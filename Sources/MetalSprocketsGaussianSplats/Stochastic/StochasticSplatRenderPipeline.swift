@@ -12,6 +12,7 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
     var cameraMatrix: simd_float4x4
     var drawableSize: SIMD2<Float>
     var frameTime: UInt32
+    var alphaThreshold: Float
 
     // Spherical harmonics (optional)
     var shCoefficients: TypedMTLBuffer<Float>?
@@ -30,6 +31,7 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
         cameraMatrix: simd_float4x4,
         drawableSize: SIMD2<Float>,
         frameTime: UInt32 = 0,
+        alphaThreshold: Float = 0.95,
         convertSRGBToLinear: Bool = true,
         shCoefficients: TypedMTLBuffer<Float>? = nil,
         shDegree: UInt8 = 0
@@ -40,6 +42,7 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
         self.frameTime = frameTime
+        self.alphaThreshold = alphaThreshold
         self.shCoefficients = shCoefficients
         self.shDegree = shDegree
 
@@ -68,6 +71,7 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
             let shBuffer = shCoefficients
             let degree = shDegree
             var time = frameTime
+            var threshold = alphaThreshold
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     let vertices: [SIMD2<Float>] = [
@@ -76,6 +80,8 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
                     // Set time uniform for fragment shader hash
                     commandEncoder.setFragmentBytes(&time, length: MemoryLayout<UInt32>.size, index: 0)
+                    // Set alpha threshold for fragment shader
+                    commandEncoder.setFragmentBytes(&threshold, length: MemoryLayout<Float>.size, index: 1)
                     // Set SH buffer and degree if available
                     if let buffer = shBuffer {
                         var shDegreeValue = UInt32(degree)

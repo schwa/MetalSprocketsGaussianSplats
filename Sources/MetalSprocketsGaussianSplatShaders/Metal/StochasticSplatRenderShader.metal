@@ -275,7 +275,8 @@ namespace StochasticSplatRenderShader {
 
     [[fragment]] float4 fragment_main(
         FragmentIn in [[stage_in]],
-        constant uint &uTime [[buffer(0)]]
+        constant uint &uTime [[buffer(0)]],
+        constant float &alphaThreshold [[buffer(1)]]
     ) {
         float4 rgba = in.rgba;
 
@@ -301,7 +302,7 @@ namespace StochasticSplatRenderShader {
         }
 
         // High alpha fragments are always accepted (reduces shimmer)
-        if (rgba.a > 0.95) {
+        if (rgba.a > alphaThreshold) {
             return float4(rgba.rgb, 1.0);
         }
 

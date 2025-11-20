@@ -28,6 +28,8 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
     // Blend factor controls
     @State private var stationaryBlend: Float = 0.1
     @State private var movingBlend: Float = 0.5
+    @State private var enableAccumulation: Bool = true
+    @State private var alphaThreshold: Float = 0.95
 
     // Compute shader for blending
     @State private var blendFunction: ComputeKernel?
@@ -62,20 +64,31 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
         }
         .overlay(alignment: .topLeading) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Temporal Accumulation")
+                Toggle("Temporal Accumulation", isOn: $enableAccumulation)
                     .font(.headline)
 
-                HStack {
-                    Text("Stationary:")
-                    Slider(value: $stationaryBlend, in: 0.01...0.5)
-                    Text("\(stationaryBlend, format: .number.precision(.fractionLength(2)))")
-                        .frame(width: 40)
+                if enableAccumulation {
+                    HStack {
+                        Text("Stationary:")
+                        Slider(value: $stationaryBlend, in: 0.01...0.5)
+                        Text("\(stationaryBlend, format: .number.precision(.fractionLength(2)))")
+                            .frame(width: 40)
+                    }
+
+                    HStack {
+                        Text("Moving:")
+                        Slider(value: $movingBlend, in: 0.1...1.0)
+                        Text("\(movingBlend, format: .number.precision(.fractionLength(2)))")
+                            .frame(width: 40)
+                    }
                 }
 
+                Divider()
+
                 HStack {
-                    Text("Moving:")
-                    Slider(value: $movingBlend, in: 0.1...1.0)
-                    Text("\(movingBlend, format: .number.precision(.fractionLength(2)))")
+                    Text("Alpha Threshold:")
+                    Slider(value: $alphaThreshold, in: 0.5...1.0)
+                    Text("\(alphaThreshold, format: .number.precision(.fractionLength(2)))")
                         .frame(width: 40)
                 }
             }
@@ -104,17 +117,68 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
     @ViewBuilder
     private func renderView(time: UInt32) -> some View {
         RenderView { _, drawableSize in
-            if let renderTexture, let depthTexture, let accumulationTextureA, let accumulationTextureB, let blendFunction, let blitVertexShader, let blitFragmentShader {
-                // Ping-pong between buffers based on frame
-                let useTextureA = (time % 2) == 0
-                let currentAccum = useTextureA ? accumulationTextureA : accumulationTextureB
-                let outputAccum = useTextureA ? accumulationTextureB : accumulationTextureA
+            if enableAccumulation {
+                // Render with temporal accumulation
+                if let renderTexture, let depthTexture, let accumulationTextureA, let accumulationTextureB, let blendFunction, let blitVertexShader, let blitFragmentShader {
+                    // Ping-pong between buffers based on frame
+                    let useTextureA = (time % 2) == 0
+                    let currentAccum = useTextureA ? accumulationTextureA : accumulationTextureB
+                    let outputAccum = useTextureA ? accumulationTextureB : accumulationTextureA
 
-                // Calculate blend factor based on camera movement
-                let blendFactor = calculateBlendFactor()
+                    // Calculate blend factor based on camera movement
+                    let blendFactor = calculateBlendFactor()
 
-                // 1. Render splats to intermediate texture
-                try RenderPass(label: "Stochastic Splat Pass") {
+                    // 1. Render splats to intermediate texture
+                    try RenderPass(label: "Stochastic Splat Pass") {
+                        let projectionMatrix = projection.projectionMatrix(for: drawableSize)
+                        try StochasticSplatRenderPipeline(
+                            splatCloud: splatCloud,
+                            projectionMatrix: projectionMatrix,
+                            modelMatrix: modelMatrix,
+                            cameraMatrix: cameraMatrix,
+                            drawableSize: SIMD2<Float>(drawableSize),
+                            frameTime: time,
+                            alphaThreshold: alphaThreshold,
+                            shCoefficients: nil,
+                            shDegree: 0
+                        )
+                    }
+                    .renderPassDescriptorModifier { descriptor in
+                        descriptor.colorAttachments[0].texture = renderTexture
+                        descriptor.colorAttachments[0].loadAction = .clear
+                        descriptor.colorAttachments[0].storeAction = .store
+                        descriptor.depthAttachment.texture = depthTexture
+                        descriptor.depthAttachment.loadAction = .clear
+                        descriptor.depthAttachment.storeAction = .dontCare
+                    }
+
+                    // 2. Blend with accumulation buffer
+                    try ComputePass(label: "Temporal Accumulation Pass") {
+                        try ComputePipeline(computeKernel: blendFunction) {
+                            try ComputeDispatch(
+                                threadsPerGrid: MTLSize(width: renderTexture.width, height: renderTexture.height, depth: 1),
+                                threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1)
+                            )
+                            .parameter("currentFrame", texture: renderTexture)
+                            .parameter("accumulationTexture", texture: currentAccum)
+                            .parameter("outputTexture", texture: outputAccum)
+                            .parameter("blendFactor", value: blendFactor)
+                        }
+                    }
+
+                    // 3. Display accumulated result
+                    try RenderPass(label: "Display Pass") {
+                        try RenderPipeline(vertexShader: blitVertexShader, fragmentShader: blitFragmentShader) {
+                            Draw { encoder in
+                                encoder.setFragmentTexture(outputAccum, index: 0)
+                                encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Render directly without accumulation
+                try RenderPass {
                     let projectionMatrix = projection.projectionMatrix(for: drawableSize)
                     try StochasticSplatRenderPipeline(
                         splatCloud: splatCloud,
@@ -123,41 +187,10 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
                         cameraMatrix: cameraMatrix,
                         drawableSize: SIMD2<Float>(drawableSize),
                         frameTime: time,
+                        alphaThreshold: alphaThreshold,
                         shCoefficients: nil,
                         shDegree: 0
                     )
-                }
-                .renderPassDescriptorModifier { descriptor in
-                    descriptor.colorAttachments[0].texture = renderTexture
-                    descriptor.colorAttachments[0].loadAction = .clear
-                    descriptor.colorAttachments[0].storeAction = .store
-                    descriptor.depthAttachment.texture = depthTexture
-                    descriptor.depthAttachment.loadAction = .clear
-                    descriptor.depthAttachment.storeAction = .dontCare
-                }
-
-                // 2. Blend with accumulation buffer
-                try ComputePass(label: "Temporal Accumulation Pass") {
-                    try ComputePipeline(computeKernel: blendFunction) {
-                        try ComputeDispatch(
-                            threadsPerGrid: MTLSize(width: renderTexture.width, height: renderTexture.height, depth: 1),
-                            threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1)
-                        )
-                        .parameter("currentFrame", texture: renderTexture)
-                        .parameter("accumulationTexture", texture: currentAccum)
-                        .parameter("outputTexture", texture: outputAccum)
-                        .parameter("blendFactor", value: blendFactor)
-                    }
-                }
-
-                // 3. Display accumulated result
-                try RenderPass(label: "Display Pass") {
-                    try RenderPipeline(vertexShader: blitVertexShader, fragmentShader: blitFragmentShader) {
-                        Draw { encoder in
-                            encoder.setFragmentTexture(outputAccum, index: 0)
-                            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
-                        }
-                    }
                 }
             }
         }
