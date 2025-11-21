@@ -1,0 +1,63 @@
+# Generate test splat files
+# Usage: just generate 100
+
+set shell := ["bash", "-c"]
+
+# Default number of splats
+default_count := "100"
+
+# Generate all test fixtures
+generate count=default_count:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Calculate grid dimensions (square root, rounded up)
+    size=$(echo "sqrt({{count}})" | bc)
+    if [ $((size * size)) -lt {{count}} ]; then
+        size=$((size + 1))
+    fi
+
+    echo "Generating {{count}} splats (${size}x${size} grid)..."
+
+    # Generate CSV, PLY, SOG directly from script
+    splat-transform -w gen-grid.mjs -p width=${size},height=${size},spacing=1.0,scale=0.1 test-grid.csv
+    splat-transform -w gen-grid.mjs -p width=${size},height=${size},spacing=1.0,scale=0.1 test-grid.ply
+    splat-transform -w gen-grid.mjs -p width=${size},height=${size},spacing=1.0,scale=0.1 test-grid.sog
+
+    # Convert PLY to SPZ using official Niantic tool
+    ply_to_spz test-grid.ply test-grid.spz
+
+    # Convert PLY to .splat (Antimatter15 format)
+    uv run --with plyfile convert.py test-grid.ply -o test-grid.splat
+
+    echo "Generated: test-grid.csv, test-grid.ply, test-grid.sog, test-grid.spz, test-grid.splat"
+
+# Generate only specific formats
+csv count=default_count:
+    #!/usr/bin/env bash
+    size=$(echo "sqrt({{count}})" | bc)
+    if [ $((size * size)) -lt {{count}} ]; then size=$((size + 1)); fi
+    splat-transform -w gen-grid.mjs -p width=$size,height=$size,spacing=1.0,scale=0.1 test-grid.csv
+
+ply count=default_count:
+    #!/usr/bin/env bash
+    size=$(echo "sqrt({{count}})" | bc)
+    if [ $((size * size)) -lt {{count}} ]; then size=$((size + 1)); fi
+    splat-transform -w gen-grid.mjs -p width=$size,height=$size,spacing=1.0,scale=0.1 test-grid.ply
+
+sog count=default_count:
+    #!/usr/bin/env bash
+    size=$(echo "sqrt({{count}})" | bc)
+    if [ $((size * size)) -lt {{count}} ]; then size=$((size + 1)); fi
+    splat-transform -w gen-grid.mjs -p width=$size,height=$size,spacing=1.0,scale=0.1 test-grid.sog
+
+spz: ply
+    ply_to_spz test-grid.ply test-grid.spz
+
+splat: ply
+    uv run --with plyfile convert.py test-grid.ply -o test-grid.splat
+
+# Clean generated files (keeps gen-grid.mjs and convert.py)
+clean:
+    rm -f test-grid.csv test-grid.ply test-grid.sog test-grid.spz test-grid.splat test-grid.ply.splat
+    rm -f means_l.webp means_u.webp quats.webp scales.webp sh0.webp shN_centroids.webp shN_labels.webp

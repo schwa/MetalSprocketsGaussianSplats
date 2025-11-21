@@ -11,6 +11,10 @@ let package = Package(
     ],
     products: [
         .library(
+            name: "Splats",
+            targets: ["Splats"]
+        ),
+        .library(
             name: "MetalSprocketsGaussianSplats",
             targets: ["MetalSprocketsGaussianSplats"]
         ),
@@ -27,8 +31,17 @@ let package = Package(
 //        .package(url: "https://github.com/schwa/MetalSprockets", from: "0.1.0"),
         .package(url: "https://github.com/schwa/MetalSprockets", branch: "main"),
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
     ],
     targets: [
+        .target(
+            name: "Splats",
+            dependencies: [
+                .product(name: "MetalSprockets", package: "MetalSprockets"),
+                .product(name: "GeometryLite3D", package: "GeometryLite3D"),
+                .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+            ]
+        ),
         .target(
             name: "MetalSprocketsGaussianSplats",
             dependencies: [
@@ -63,6 +76,14 @@ let package = Package(
         .testTarget(
             name: "MetalSprocketsGaussianSplatsTests",
             dependencies: ["MetalSprocketsGaussianSplats"],
+            resources: [.copy("Fixtures")]
+        ),
+        .testTarget(
+            name: "SplatsTests",
+            dependencies: [
+                "Splats",
+                .product(name: "GeometryLite3D", package: "GeometryLite3D"),
+            ],
             resources: [.copy("Fixtures")]
         ),
     ]
