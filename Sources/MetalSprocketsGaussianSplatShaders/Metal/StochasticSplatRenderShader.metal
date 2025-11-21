@@ -44,7 +44,7 @@ namespace StochasticSplatRenderShader {
     }
 
     // Spherical Harmonics constants
-    constant float SH_C0 = 0.28209479177387814;
+//    constant float SH_C0 = 0.28209479177387814;
     constant float SH_C1 = 0.4886025119029199;
     constant float SH_C2_0 = 1.0925484305920792;
     constant float SH_C2_1 = 0.31539156525252005;

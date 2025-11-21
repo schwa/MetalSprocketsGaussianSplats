@@ -74,28 +74,28 @@ namespace SOGSplatSupport {
 
         // Dequantize the stored three components to [-sqrt(2)/2, +sqrt(2)/2]
         float sqrt2 = sqrt(2.0);
-        float a = (packed.r - 0.5) * 2.0 / sqrt2;
-        float b = (packed.g - 0.5) * 2.0 / sqrt2;
-        float c = (packed.b - 0.5) * 2.0 / sqrt2;
+        float r0 = (packed.r - 0.5) * sqrt2;
+        float r1 = (packed.g - 0.5) * sqrt2;
+        float r2 = (packed.b - 0.5) * sqrt2;
 
         // Reconstruct the omitted component so ||q|| = 1
-        float t = a * a + b * b + c * c;
-        float d = sqrt(max(0.0, 1.0 - t));
+        float t = r0 * r0 + r1 * r1 + r2 * r2;
+        float rr = sqrt(max(0.0, 1.0 - t));
 
-        // Place components according to mode
-        // mode 0: omitted = x, q = [d, a, b, c]
-        // mode 1: omitted = y, q = [a, d, b, c]
-        // mode 2: omitted = z, q = [a, b, d, c]
-        // mode 3: omitted = w, q = [a, b, c, d]
+        // Place components according to mode (matches reference implementation)
+        // mode 0: W omitted, q = (r0, r1, r2, rr)
+        // mode 1: X omitted, q = (rr, r1, r2, r0)
+        // mode 2: Y omitted, q = (r1, rr, r2, r0)
+        // mode 3: Z omitted, q = (r1, r2, rr, r0)
         float4 q;
         if (mode == 0) {
-            q = float4(d, a, b, c);
+            q = float4(r0, r1, r2, rr);
         } else if (mode == 1) {
-            q = float4(a, d, b, c);
+            q = float4(rr, r1, r2, r0);
         } else if (mode == 2) {
-            q = float4(a, b, d, c);
+            q = float4(r1, rr, r2, r0);
         } else {
-            q = float4(a, b, c, d);
+            q = float4(r1, r2, rr, r0);
         }
 
         return q;

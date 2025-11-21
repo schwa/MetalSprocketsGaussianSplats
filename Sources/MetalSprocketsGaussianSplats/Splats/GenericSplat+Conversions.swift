@@ -19,7 +19,7 @@ public extension SparkGPUSplat {
             UInt8(splat.color.w.clamped(to: 0...1) * 255)
         )
 
-        // Rotation: normalize quaternion
+        // Rotation: normalize (Swift bridges rotation as simd_quatf)
         let quaternion = simd_normalize(splat.rotation)
 
         self.init(
