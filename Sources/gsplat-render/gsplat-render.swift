@@ -75,8 +75,12 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Reveal output file in Finder after rendering")
     var reveal: Bool = false
 
+    mutating func run() async throws {
+        try await _run()
+    }
+
     @MainActor
-    mutating func run() throws {
+    mutating func _run() async throws {
         // Load config from file if specified, otherwise use command-line args
         var renderConfig: RenderConfig
         if let configPath = config {
