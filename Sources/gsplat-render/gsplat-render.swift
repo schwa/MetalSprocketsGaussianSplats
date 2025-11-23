@@ -82,81 +82,133 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
     @MainActor
     mutating func _run() throws {
-        // Load config from file if specified, otherwise use command-line args
+        #if os(iOS) || (os(macOS) && !arch(x86_64))
+        let renderConfig = try loadConfig()
+        let device = _MTLCreateSystemDefaultDevice()
+        let genericSplats = try loadSplats(from: renderConfig.splat)
+
+        let modelMatrix = try parseModelMatrix(from: renderConfig)
+        let cameraMatrix = try parseCameraMatrix(from: renderConfig)
+        let useSparkRenderer = (renderConfig.renderer ?? "antimatter15").lowercased() == "spark"
+        let useSrgbToLinear = renderConfig.srgbToLinear ?? false
+
+        let (antimatter15SplatCloud, sparkSplatCloud, shCoefficientsBuffer, effectiveSHDegree) = try createSplatClouds(
+            genericSplats: genericSplats,
+            device: device,
+            useSparkRenderer: useSparkRenderer,
+            modelMatrix: modelMatrix,
+            cameraMatrix: cameraMatrix
+        )
+
+        let size = CGSize(width: renderConfig.width, height: renderConfig.height)
+        let projection = try createProjection(from: renderConfig)
+        let bgColor = renderConfig.getBackground()
+
+        let (rendering, splatCount) = try performRender(
+            renderConfig: renderConfig,
+            size: size,
+            projection: projection,
+            bgColor: bgColor,
+            useSparkRenderer: useSparkRenderer,
+            useSrgbToLinear: useSrgbToLinear,
+            modelMatrix: modelMatrix,
+            cameraMatrix: cameraMatrix,
+            antimatter15SplatCloud: antimatter15SplatCloud,
+            sparkSplatCloud: sparkSplatCloud,
+            shCoefficientsBuffer: shCoefficientsBuffer,
+            effectiveSHDegree: effectiveSHDegree
+        )
+
+        var cgImage = try rendering.cgImage
+        if label {
+            cgImage = addLabel(to: cgImage, renderConfig: renderConfig, splatCount: splatCount, useSparkRenderer: useSparkRenderer, useSrgbToLinear: useSrgbToLinear, effectiveSHDegree: effectiveSHDegree)
+        }
+
+        try saveOutput(cgImage: cgImage, to: renderConfig.output, reveal: reveal)
+        #else
+        throw ValidationError("This tool requires Apple Silicon (ARM64) on macOS")
+        #endif
+    }
+
+    // MARK: - Config Loading
+
+    mutating func loadConfig() throws -> RenderConfig {
         var renderConfig: RenderConfig
         if let configPath = config {
             renderConfig = try RenderConfig.load(from: configPath)
-
-            // CLI flags override config values
-            if background != "0,0,0,1" {
-                let bgComponents = try parseRGBA(background)
-                renderConfig.background = [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w]
-            }
-            if width != 1_024 { renderConfig.width = width }
-            if height != 768 { renderConfig.height = height }
-            if output != "output.png" { renderConfig.output = output }
-            if let pos = modelPosition {
-                let v = try parseXYZ(pos)
-                renderConfig.modelPosition = [v.x, v.y, v.z]
-            }
-            if let pos = cameraPosition {
-                let v = try parseXYZ(pos)
-                renderConfig.cameraPosition = [v.x, v.y, v.z]
-            }
-            if let lookat = cameraLookat {
-                let v = try parseXYZ(lookat)
-                renderConfig.cameraLookat = [v.x, v.y, v.z]
-            }
-            if let rot = cameraRotation {
-                renderConfig.cameraRotation = rot.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
-            }
-            if let fov = projectionFov { renderConfig.projectionFov = fov }
-            if near != 0.1 { renderConfig.near = near }
-            if far != 100.0 { renderConfig.far = far }
-            if let s = splat { renderConfig.splat = s }
-            if renderer != "antimatter15" { renderConfig.renderer = renderer }
-            if srgbToLinear { renderConfig.srgbToLinear = true }
+            try applyCliOverrides(to: &renderConfig)
         } else {
-            // Build config from command-line arguments
             guard let splatPath = splat else {
                 throw ValidationError("Must specify a splat file with --splat or use --config")
             }
-
-            let bgComponents = try parseRGBA(background)
-            renderConfig = RenderConfig(
-                background: [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w],
-                width: width,
-                height: height,
-                output: output,
-                modelPosition: try modelPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
-                cameraPosition: try cameraPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
-                cameraLookat: try cameraLookat.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
-                cameraRotation: cameraRotation?.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) },
-                projectionFov: projectionFov,
-                near: near,
-                far: far,
-                splat: splatPath,
-                renderer: renderer,
-                srgbToLinear: srgbToLinear
-            )
+            renderConfig = try buildConfigFromCli(splatPath: splatPath)
         }
 
-        // Use renderConfig for everything below
-        let bgColor = renderConfig.getBackground()
         let splatPath = renderConfig.splat
-
-        // Load the splat file
-        let splatURL = URL(fileURLWithPath: splatPath)
         guard FileManager.default.fileExists(atPath: splatPath) else {
             throw ValidationError("Splat file not found: \(splatPath)")
         }
 
-        // Determine file type and load splats
-        let fileExtension = splatURL.pathExtension.lowercased()
+        return renderConfig
+    }
 
-        // Load splats based on file type
-        #if os(iOS) || (os(macOS) && !arch(x86_64))
-        let genericSplats: [GenericSplat]
+    mutating func applyCliOverrides(to renderConfig: inout RenderConfig) throws {
+        if background != "0,0,0,1" {
+            let bgComponents = try parseRGBA(background)
+            renderConfig.background = [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w]
+        }
+        if width != 1_024 { renderConfig.width = width }
+        if height != 768 { renderConfig.height = height }
+        if output != "output.png" { renderConfig.output = output }
+        if let pos = modelPosition {
+            let v = try parseXYZ(pos)
+            renderConfig.modelPosition = [v.x, v.y, v.z]
+        }
+        if let pos = cameraPosition {
+            let v = try parseXYZ(pos)
+            renderConfig.cameraPosition = [v.x, v.y, v.z]
+        }
+        if let lookat = cameraLookat {
+            let v = try parseXYZ(lookat)
+            renderConfig.cameraLookat = [v.x, v.y, v.z]
+        }
+        if let rot = cameraRotation {
+            renderConfig.cameraRotation = rot.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
+        }
+        if let fov = projectionFov { renderConfig.projectionFov = fov }
+        if near != 0.1 { renderConfig.near = near }
+        if far != 100.0 { renderConfig.far = far }
+        if let s = splat { renderConfig.splat = s }
+        if renderer != "antimatter15" { renderConfig.renderer = renderer }
+        if srgbToLinear { renderConfig.srgbToLinear = true }
+    }
+
+    func buildConfigFromCli(splatPath: String) throws -> RenderConfig {
+        let bgComponents = try parseRGBA(background)
+        return RenderConfig(
+            background: [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w],
+            width: width,
+            height: height,
+            output: output,
+            modelPosition: try modelPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
+            cameraPosition: try cameraPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
+            cameraLookat: try cameraLookat.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
+            cameraRotation: cameraRotation?.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) },
+            projectionFov: projectionFov,
+            near: near,
+            far: far,
+            splat: splatPath,
+            renderer: renderer,
+            srgbToLinear: srgbToLinear
+        )
+    }
+
+    // MARK: - Splat Loading
+
+    #if os(iOS) || (os(macOS) && !arch(x86_64))
+    func loadSplats(from splatPath: String) throws -> [GenericSplat] {
+        let splatURL = URL(fileURLWithPath: splatPath)
+        let fileExtension = splatURL.pathExtension.lowercased()
 
         switch fileExtension {
         case "spz":
@@ -165,7 +217,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             try reader.read { _, splat in
                 tempSplats.append(splat)
             }
-            genericSplats = tempSplats
+            return tempSplats
 
         case "ply":
             let reader = try PLYSplatReader(url: splatURL)
@@ -173,70 +225,75 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             try reader.read { _, splat in
                 tempSplats.append(splat)
             }
-            genericSplats = tempSplats
+            return tempSplats
 
         case "splat":
-            // Antimatter15 .splat format - raw binary, 32 bytes per splat
             let reader = try Antimatter15Reader(url: splatURL)
             var tempSplats: [GenericSplat] = []
             try reader.read { _, splat in
                 tempSplats.append(splat)
             }
-            genericSplats = tempSplats
+            return tempSplats
 
         default:
             throw ValidationError("Unsupported file format: .\(fileExtension)")
         }
+    }
 
-        // Setup Metal device
-        let device = _MTLCreateSystemDefaultDevice()
+    // MARK: - Splat Cloud Creation
 
-        // Create splat cloud
-        let modelMatrix = try parseModelMatrix(from: renderConfig)
-        let cameraMatrix = try parseCameraMatrix(from: renderConfig)
-
-        // Determine which renderer to use
-        let useSparkRenderer = (renderConfig.renderer ?? "antimatter15").lowercased() == "spark"
-        let useSrgbToLinear = renderConfig.srgbToLinear ?? false
-
-        // Convert to appropriate GPU format
-        let antimatter15SplatCloud: SplatCloud<Antimatter15GPUSplat>?
-        let sparkSplatCloud: SplatCloud<SparkGPUSplat>?
+    func createSplatClouds(
+        genericSplats: [GenericSplat],
+        device: MTLDevice,
+        useSparkRenderer: Bool,
+        modelMatrix: simd_float4x4,
+        cameraMatrix: simd_float4x4
+    ) throws -> (SplatCloud<Antimatter15GPUSplat>?, SplatCloud<SparkGPUSplat>?, TypedMTLBuffer<Float>?, UInt8) {
         var shCoefficientsBuffer: TypedMTLBuffer<Float>?
-        var effectiveSHDegree: UInt8 = 0
+        let effectiveSHDegree: UInt8 = 0
 
         if useSparkRenderer {
             let gpuSplats = genericSplats.map { SparkGPUSplat($0) }
-            // TODO: SH extraction not yet supported with GenericSplat
             _ = shDegree // Silence unused variable warning
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-            sparkSplatCloud = try SplatCloud<SparkGPUSplat>(
+            let sparkSplatCloud = try SplatCloud<SparkGPUSplat>(
                 device: device,
                 splats: splatBuffer,
                 cameraMatrix: cameraMatrix,
                 modelMatrix: modelMatrix
             )
-            antimatter15SplatCloud = nil
+            return (nil, sparkSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
         } else {
             let gpuSplats = genericSplats.map { Antimatter15GPUSplat($0) }
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-            antimatter15SplatCloud = try SplatCloud<Antimatter15GPUSplat>(
+            let antimatter15SplatCloud = try SplatCloud<Antimatter15GPUSplat>(
                 device: device,
                 splats: splatBuffer,
                 cameraMatrix: cameraMatrix,
                 modelMatrix: modelMatrix
             )
-            sparkSplatCloud = nil
+            return (antimatter15SplatCloud, nil, shCoefficientsBuffer, effectiveSHDegree)
         }
+    }
 
-        // Create projection
-        let projection = try createProjection(from: renderConfig)
+    // MARK: - Rendering
 
-        // Setup offscreen renderer
-        let size = CGSize(width: renderConfig.width, height: renderConfig.height)
+    @MainActor
+    func performRender(
+        renderConfig: RenderConfig,
+        size: CGSize,
+        projection: any ProjectionProtocol,
+        bgColor: SIMD4<Float>,
+        useSparkRenderer: Bool,
+        useSrgbToLinear: Bool,
+        modelMatrix: simd_float4x4,
+        cameraMatrix: simd_float4x4,
+        antimatter15SplatCloud: SplatCloud<Antimatter15GPUSplat>?,
+        sparkSplatCloud: SplatCloud<SparkGPUSplat>?,
+        shCoefficientsBuffer: TypedMTLBuffer<Float>?,
+        effectiveSHDegree: UInt8
+    ) throws -> (OffscreenRenderer.Rendering, Int) {
         let renderer = try OffscreenRenderer(size: size)
-
-        // Update clear color
         renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
             red: Double(bgColor.x),
             green: Double(bgColor.y),
@@ -244,12 +301,10 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             alpha: Double(bgColor.w)
         )
 
-        // Create render content
-        let splatCount: Int
         let captureManager = MTLCaptureManager.shared()
+        let splatCount: Int
         let rendering: OffscreenRenderer.Rendering
 
-        // Render with Metal capture
         if useSparkRenderer {
             guard let cloud = sparkSplatCloud else {
                 throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Spark splat cloud is nil"])
@@ -294,50 +349,51 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             }
         }
 
-        // Save to PNG
-        var cgImage = try rendering.cgImage
+        return (rendering, splatCount)
+    }
 
-        // Add label overlay if requested
-        if label {
-            let fovStr = renderConfig.projectionFov.map { String(format: "%.1f°", $0) } ?? "60°"
-            let camPos = renderConfig.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
-            let modelPos = renderConfig.getModelPosition() ?? SIMD3<Float>(0, 0, 0)
+    // MARK: - Label Overlay
 
-            let shInfo = useSparkRenderer ? " | SH: \(effectiveSHDegree > 0 ? "deg \(effectiveSHDegree)" : "off")" : ""
-            let labelText = """
-            Renderer: \(useSparkRenderer ? "Spark" : "Antimatter15") | sRGB→Linear: \(useSrgbToLinear)\(shInfo)
-            Size: \(renderConfig.width)x\(renderConfig.height) | FOV: \(fovStr)
-            Splats: \(splatCount) | Near/Far: \(renderConfig.near)/\(renderConfig.far)
-            Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
-            Model: (\(String(format: "%.2f", modelPos.x)), \(String(format: "%.2f", modelPos.y)), \(String(format: "%.2f", modelPos.z)))
-            """
+    @MainActor
+    func addLabel(to cgImage: CGImage, renderConfig: RenderConfig, splatCount: Int, useSparkRenderer: Bool, useSrgbToLinear: Bool, effectiveSHDegree: UInt8) -> CGImage {
+        let fovStr = renderConfig.projectionFov.map { String(format: "%.1f°", $0) } ?? "60°"
+        let camPos = renderConfig.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
+        let modelPos = renderConfig.getModelPosition() ?? SIMD3<Float>(0, 0, 0)
 
-            let labelView = ZStack(alignment: .bottomLeading) {
-                Image(decorative: cgImage, scale: 1.0)
-                Text(labelText)
-                    .font(.system(size: 14, weight: .medium, design: .monospaced))
-                    .foregroundColor(.white)
-                    .padding(8)
-                    .background(Color.black.opacity(0.7))
-                    .cornerRadius(4)
-                    .padding(10)
-            }
+        let shInfo = useSparkRenderer ? " | SH: \(effectiveSHDegree > 0 ? "deg \(effectiveSHDegree)" : "off")" : ""
+        let labelText = """
+        Renderer: \(useSparkRenderer ? "Spark" : "Antimatter15") | sRGB→Linear: \(useSrgbToLinear)\(shInfo)
+        Size: \(renderConfig.width)x\(renderConfig.height) | FOV: \(fovStr)
+        Splats: \(splatCount) | Near/Far: \(renderConfig.near)/\(renderConfig.far)
+        Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
+        Model: (\(String(format: "%.2f", modelPos.x)), \(String(format: "%.2f", modelPos.y)), \(String(format: "%.2f", modelPos.z)))
+        """
 
-            let renderer = ImageRenderer(content: labelView)
-            renderer.scale = 1.0
-            if let labeledImage = renderer.cgImage {
-                cgImage = labeledImage
-            }
+        let labelView = ZStack(alignment: .bottomLeading) {
+            Image(decorative: cgImage, scale: 1.0)
+            Text(labelText)
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .foregroundColor(.white)
+                .padding(8)
+                .background(Color.black.opacity(0.7))
+                .cornerRadius(4)
+                .padding(10)
         }
 
-        // Make output path absolute if it's relative
-        var outputPath = renderConfig.output
-        if !outputPath.hasPrefix("/") {
-            outputPath = FileManager.default.currentDirectoryPath + "/" + outputPath
+        let renderer = ImageRenderer(content: labelView)
+        renderer.scale = 1.0
+        return renderer.cgImage ?? cgImage
+    }
+
+    // MARK: - Output Saving
+
+    func saveOutput(cgImage: CGImage, to outputPath: String, reveal: Bool) throws {
+        var finalPath = outputPath
+        if !finalPath.hasPrefix("/") {
+            finalPath = FileManager.default.currentDirectoryPath + "/" + finalPath
         }
 
-        // Ensure parent directory exists
-        let outputURL = URL(fileURLWithPath: outputPath)
+        let outputURL = URL(fileURLWithPath: finalPath)
         if let parentDir = outputURL.deletingLastPathComponent().path as String? {
             try FileManager.default.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
         }
@@ -349,18 +405,14 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         CGImageDestinationAddImage(destination, cgImage, nil)
 
         guard CGImageDestinationFinalize(destination) else {
-            throw ValidationError("Failed to write image to \(renderConfig.output)")
+            throw ValidationError("Failed to write image to \(outputPath)")
         }
 
-        // Reveal the image in Finder if requested
         if reveal {
-            NSWorkspace.shared.selectFile(outputPath, inFileViewerRootedAtPath: "")
+            NSWorkspace.shared.selectFile(finalPath, inFileViewerRootedAtPath: "")
         }
-
-        #else
-        throw ValidationError("This tool requires Apple Silicon (ARM64) on macOS")
-        #endif
     }
+    #endif
 
     // MARK: - Helper Functions
 
