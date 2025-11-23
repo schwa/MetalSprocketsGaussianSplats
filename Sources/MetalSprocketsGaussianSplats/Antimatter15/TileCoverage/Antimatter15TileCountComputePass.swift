@@ -39,7 +39,7 @@ public struct Antimatter15TileCountComputePass: Element {
         self.tileBuffer = tileBuffer
         self.maxCountBuffer = maxCountBuffer
 
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("Antimatter15SplatTileCoverage")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("Antimatter15SplatTileCoverage")
         self.computeKernel = try shaderLibrary.function(named: "compute_tile_overlaps", type: ComputeKernel.self)
     }
 

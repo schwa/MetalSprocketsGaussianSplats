@@ -1,10 +1,13 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import Foundation
 import Metal
+import MetalSprockets
+import GoldenImage
 @testable import MetalSprocketsGaussianSplats
 @testable import Splats
 import Testing
 import simd
+import CoreGraphics
 
 @Suite
 struct TypedMTLBufferTests {
@@ -206,4 +209,94 @@ extension simd_float4x4 {
         )
     }
 }
+
+// MARK: - Actual Rendering Tests
+
+@Suite
+struct SplatRenderingTests {
+    let device: MTLDevice
+
+    init() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            throw TestError.noMetalDevice
+        }
+        self.device = device
+    }
+
+    @Test
+    @MainActor
+    func testAntimatter15Rendering() throws {
+        // Create test splats - a simple red splat at origin
+        let splats = [
+            Antimatter15GPUSplat.testSplat(position: [0, 0, -5])
+        ]
+
+        let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
+
+        // Set up camera looking at the splat
+        let cameraMatrix = simd_float4x4.identity
+        let modelMatrix = simd_float4x4.identity
+
+        let cloud = try SplatCloud<Antimatter15GPUSplat>(
+            device: device,
+            splats: splatBuffer,
+            cameraMatrix: cameraMatrix,
+            modelMatrix: modelMatrix
+        )
+
+        // Create projection matrix
+        let size = CGSize(width: 512, height: 512)
+        let aspect = Float(size.width / size.height)
+        let projectionMatrix = perspectiveProjection(fovY: .pi / 4, aspect: aspect, near: 0.1, far: 100)
+
+        // Create the render pipeline
+        let renderPipeline = try Antimatter15SplatRenderPipeline(
+            splatCloud: cloud,
+            projectionMatrix: projectionMatrix,
+            modelMatrix: modelMatrix,
+            cameraMatrix: cameraMatrix,
+            drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
+            debugMode: .filled
+        )
+
+        // Render offscreen
+        let offscreenRenderer = try OffscreenRenderer(size: size)
+        let renderPass = try RenderPass {
+            renderPipeline
+        }
+        let rendering = try offscreenRenderer.render(renderPass)
+
+        // Basic validation - check we got a texture
+        #expect(rendering.texture.width == Int(size.width))
+        #expect(rendering.texture.height == Int(size.height))
+
+        // Compare with golden image
+        let image = try rendering.cgImage
+        let goldenImagesDir = try #require(Bundle.module.resourceURL?.appendingPathComponent("Golden Images"))
+        let comparison = GoldenImageComparison(imageDirectory: goldenImagesDir, options: .none)
+        let isMatch = try comparison.image(image: image, matchesGoldenImageNamed: "Antimatter15SingleSplat")
+        #expect(isMatch)
+    }
+}
+
+// MARK: - Math Helpers
+
+private func perspectiveProjection(fovY: Float, aspect: Float, near: Float, far: Float) -> simd_float4x4 {
+    let yScale = 1 / tan(fovY * 0.5)
+    let xScale = yScale / aspect
+    let zRange = far - near
+    let zScale = -(far + near) / zRange
+    let wzScale = -2 * far * near / zRange
+
+    return simd_float4x4(
+        SIMD4<Float>(xScale, 0, 0, 0),
+        SIMD4<Float>(0, yScale, 0, 0),
+        SIMD4<Float>(0, 0, zScale, -1),
+        SIMD4<Float>(0, 0, wzScale, 0)
+    )
+}
+
 #endif
+
+
+

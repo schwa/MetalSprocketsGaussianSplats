@@ -6,9 +6,3 @@
 #import "SOGSplatSupport.h"
 #import "GenericSplat.h"
 
-#ifdef __OBJC__
-#import <Foundation/Foundation.h>
-@interface NSBundle (GaussianSplatModule)
-+ (NSBundle *)MetalSprocketsGaussianSplatShaders;
-@end
-#endif

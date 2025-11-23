@@ -55,7 +55,7 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
         self.useBlueNoise = useBlueNoise
 
         // Load Stochastic shaders
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("StochasticSplatRenderShader")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("StochasticSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
         vertexConstants["use_sh"] = .bool(shCoefficients != nil)

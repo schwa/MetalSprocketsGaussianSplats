@@ -22,7 +22,7 @@ public struct Antimatter15TileHeatMapRenderPipeline: Element {
         self.tileCounts = tileCounts
         self.maxCountBuffer = maxCountBuffer
 
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("Antimatter15SplatTileCoverage")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("Antimatter15SplatTileCoverage")
 
         self.vertexShader = try shaderLibrary.function(named: "tile_heatmap_vertex", type: VertexShader.self)
         self.fragmentShader = try shaderLibrary.function(named: "tile_heatmap_fragment", type: FragmentShader.self)

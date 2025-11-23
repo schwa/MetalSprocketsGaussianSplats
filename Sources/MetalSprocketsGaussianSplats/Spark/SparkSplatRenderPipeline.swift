@@ -34,7 +34,7 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
         self.shDegree = shDegree
 
         // Load Spark shaders
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("SparkSplatRenderShader")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
         vertexConstants["use_sh"] = .bool(shCoefficients != nil)

@@ -6,7 +6,7 @@ excluded:
 only_rules:
   - accessibility_label_for_image
   - accessibility_trait_for_button
-  - anonymous_argument_in_multiline_closure
+#  - anonymous_argument_in_multiline_closure
   - array_init
   - async_without_await
   - attribute_name_spacing

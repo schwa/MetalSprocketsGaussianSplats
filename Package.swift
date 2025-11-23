@@ -32,6 +32,7 @@ let package = Package(
         .package(url: "https://github.com/schwa/MetalSprockets", branch: "main"),
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
+        .package(url: "https://github.com/schwa/GoldenImage", branch: "main"),
     ],
     targets: [
         .target(
@@ -41,6 +42,10 @@ let package = Package(
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
                 .product(name: "GeometryLite3D", package: "GeometryLite3D"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+                .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
+            ],
+            resources: [
+                .copy("Empty.txt"),
             ]
         ),
         .target(
@@ -49,6 +54,7 @@ let package = Package(
                 "Splats",
                 "MetalSprocketsGaussianSplatShaders",
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
+                .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
                 .product(name: "MetalSprocketsUI", package: "MetalSprockets"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "Collections", package: "swift-collections"),
@@ -76,8 +82,15 @@ let package = Package(
         ),
         .testTarget(
             name: "MetalSprocketsGaussianSplatsTests",
-            dependencies: ["MetalSprocketsGaussianSplats"],
-            resources: [.copy("Fixtures")]
+            dependencies: [
+                "MetalSprocketsGaussianSplats",
+                "MetalSprocketsGaussianSplatShaders",
+                "GoldenImage",
+            ],
+            resources: [
+                .copy("Fixtures"),
+                .copy("Golden Images")
+            ]
         ),
         .testTarget(
             name: "SplatsTests",

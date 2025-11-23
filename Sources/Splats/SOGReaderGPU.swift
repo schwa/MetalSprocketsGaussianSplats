@@ -210,7 +210,7 @@ public struct SOGToGenericSplatComputePass: Element {
         self.resources = resources
         self.outputBuffer = outputBuffer
 
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("SOGToGenericSplatConversion")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SOGToGenericSplatConversion")
         self.computeKernel = try shaderLibrary.function(named: "sog_to_generic_splat", type: ComputeKernel.self)
     }
 
@@ -251,7 +251,7 @@ public struct SOGToGenericSplatConverter {
     public init(device: MTLDevice) throws {
         self.device = device
 
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("SOGToGenericSplatConversion")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SOGToGenericSplatConversion")
         self.computeKernel = try shaderLibrary.function(named: "sog_to_generic_splat", type: ComputeKernel.self)
     }
 

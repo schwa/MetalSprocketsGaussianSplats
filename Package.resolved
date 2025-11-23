@@ -1,5 +1,5 @@
 {
-  "originHash" : "8bedec07c19440dbeeea7ae26cbb59369154161efdb2123a004de146effcf1b8",
+  "originHash" : "fb66d43eb4db042246a3cddb64f8831619c9c7cd3a835c78eaf7a195a148ce60",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7",
         "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "goldenimage",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/GoldenImage",
+      "state" : {
+        "branch" : "main",
+        "revision" : "34396251ee4fc108b9167ba5785f66a5c473088b"
       }
     },
     {

@@ -111,7 +111,7 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
 
     private func loadBlendShader() {
         do {
-            let library = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders())
+            let library = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
 
             let accumLibrary = library.namespaced("TemporalAccumulationShader")
             blendFunction = try accumLibrary.function(named: "blend", type: ComputeKernel.self)

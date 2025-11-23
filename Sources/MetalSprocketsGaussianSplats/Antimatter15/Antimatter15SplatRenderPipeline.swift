@@ -36,7 +36,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
         self.drawableSize = drawableSize
         self.debugMode = debugMode
 
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("Antimatter15SplatRenderShader")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("Antimatter15SplatRenderShader")
 
         // Initial shader setup
         var fragmentConstants = FunctionConstants()
@@ -86,7 +86,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
             .onChange(of: debugMode) {
                 do {
                     // Update shaders with new constants when debugMode changes
-                    let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders()).namespaced("Antimatter15SplatRenderShader")
+                    let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("Antimatter15SplatRenderShader")
                     var fragmentConstants = FunctionConstants()
                     fragmentConstants["debug_mode"] = .int32(debugMode.rawValue)
                     vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self)
@@ -126,3 +126,4 @@ public struct Antimatter15SplatRenderPipeline: Element {
 }
 
 #endif
+
