@@ -1,10 +1,9 @@
 import Foundation
-import Testing
 @testable import Splats
+import Testing
 
 @Suite
 struct PLYSplatReaderTests {
-
     @Test
     func testPLYSplatReader() throws {
         let url = Bundle.module.url(forResource: "test-grid", withExtension: "ply", subdirectory: "Fixtures")!

@@ -1,54 +1,54 @@
-import GeometryLite3D
+@_exported import MetalSprocketsGaussianSplatShaders
 import simd
 
-public struct GenericSplat: Equatable, Sendable {
-    public var position: SIMD3<Float>
-    public var scale: SIMD3<Float>
-    public var color: SIMD4<Float>
-    public var rotation: simd_quatf
-    public var sphericalHarmonics: [[Float]]?
-
-    public init(position: SIMD3<Float>, scale: SIMD3<Float>, color: SIMD4<Float>, rotation: simd_quatf, sphericalHarmonics: [[Float]]? = nil) {
-        self.position = position
-        self.scale = scale
-        self.color = color
-        self.rotation = rotation
-        self.sphericalHarmonics = sphericalHarmonics
+// GenericSplat is imported from MetalSprocketsGaussianSplatShaders C header
+extension GenericSplat: @retroactive Equatable, @unchecked @retroactive Sendable {
+    public static func == (lhs: GenericSplat, rhs: GenericSplat) -> Bool {
+        lhs.position == rhs.position &&
+            lhs.scale == rhs.scale &&
+            lhs.color == rhs.color &&
+            lhs.rotation == rhs.rotation
     }
 }
 
-extension GenericSplat: Decodable {
+public extension GenericSplat {
+    init(position: SIMD3<Float>, scale: SIMD3<Float>, color: SIMD4<Float>, rotation: simd_quatf) {
+        self.init()
+        self.position = position
+        self.scale = scale
+        self.color = color
+        self.rotation = rotation.vector
+    }
+}
+
+// Decodable conformance for GenericSplat
+extension GenericSplat: @retroactive Decodable {
     enum CodingKeys: String, CodingKey {
-        case position
-        case scale
-        case color
-        case rotation
+        case position, scale, color, rotation
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        position = try container.decode(SIMD3<Float>.self, forKey: .position)
-        scale = try container.decode(SIMD3<Float>.self, forKey: .scale)
-        color = try container.decode(SIMD4<Float>.self, forKey: .color)
-        let rotationVector = try container.decode(SIMD4<Float>.self, forKey: .rotation)
-        rotation = simd_quatf(angle: rotationVector.w, axis: SIMD3<Float>(rotationVector.x, rotationVector.y, rotationVector.z))
+        self.init()
+        self.position = try container.decode(SIMD3<Float>.self, forKey: .position)
+        self.scale = try container.decode(SIMD3<Float>.self, forKey: .scale)
+        self.color = try container.decode(SIMD4<Float>.self, forKey: .color)
+        self.rotation = try container.decode(SIMD4<Float>.self, forKey: .rotation)
     }
 }
 
-extension simd_float4 {
-    var length: Scalar {
-        simd_length(self)
-    }
-}
+// ExtendedSplat includes spherical harmonics data
+public struct ExtendedSplat: Equatable, Sendable {
+    public var genericSplat: GenericSplat
+    public var sphericalHarmonics: [[Float]]?
 
-extension SIMD4 where Scalar == Float {
-    func clamped(to range: ClosedRange<Scalar>) -> Self {
-        Self(map { $0.clamped(to: range) })
+    public init(genericSplat: GenericSplat, sphericalHarmonics: [[Float]]? = nil) {
+        self.genericSplat = genericSplat
+        self.sphericalHarmonics = sphericalHarmonics
     }
-}
 
-extension simd_quatf {
-    var vectorRealFirst: simd_float4 {
-        [vector.w, vector.x, vector.y, vector.z]
+    public init(position: SIMD3<Float>, scale: SIMD3<Float>, color: SIMD4<Float>, rotation: simd_quatf, sphericalHarmonics: [[Float]]? = nil) {
+        self.genericSplat = GenericSplat(position: position, scale: scale, color: color, rotation: rotation)
+        self.sphericalHarmonics = sphericalHarmonics
     }
 }

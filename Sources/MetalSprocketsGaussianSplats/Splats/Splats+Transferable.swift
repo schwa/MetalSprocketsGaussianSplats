@@ -1,5 +1,6 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import CoreTransferable
+import Splats
 
 extension Array: @retroactive Transferable where Element == Antimatter15Splat {
     public static var transferRepresentation: some TransferRepresentation {
@@ -11,8 +12,8 @@ extension Array: @retroactive Transferable where Element == Antimatter15Splat {
         DataRepresentation(importedContentType: .spz) { data in
             let reader = try SPZReader(data: data)
             var splats: [Antimatter15Splat] = []
-            try reader.read { spzSplat in
-                splats.append(Antimatter15Splat(spzSplat))
+            try reader.read { _, genericSplat in
+                splats.append(Antimatter15Splat(genericSplat))
             }
             return splats
         }
@@ -21,12 +22,10 @@ extension Array: @retroactive Transferable where Element == Antimatter15Splat {
                 .map(Antimatter15Splat.init)
         }
         DataRepresentation(importedContentType: .ply) { data in
-            let reader = try PLYReader(data: data)
+            let reader = try PLYSplatReader(data: data)
             var splats: [Antimatter15Splat] = []
-            try reader.read { record in
-                if let splat = Antimatter15Splat(plyRecord: record) {
-                    splats.append(splat)
-                }
+            try reader.read { _, genericSplat in
+                splats.append(Antimatter15Splat(genericSplat))
             }
             return splats
         }

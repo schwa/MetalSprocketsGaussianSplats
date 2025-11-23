@@ -28,7 +28,7 @@ struct TileStatsView: View {
         let nonZeroCount = nonZero.count
         let avg = nonZeroCount > 0 ? Double(total) / Double(nonZeroCount) : 0
         let sorted = nonZero.sorted()
-        let median = sorted.isEmpty ? 0 : (sorted.count % 2 == 0 ? (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2 : sorted[sorted.count / 2])
+        let median = sorted.isEmpty ? 0 : (sorted.count.isMultiple(of: 2) ? (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2 : sorted[sorted.count / 2])
 
         Form {
             Section {

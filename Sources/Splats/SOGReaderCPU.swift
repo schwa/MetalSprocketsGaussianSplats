@@ -53,7 +53,7 @@ public struct SOGReaderCPU: SplatReader {
 
         // Load metadata
         let metadataData = try extractData(from: archive, filename: "meta.json")
-        let metadata = try JSONDecoder().decode(SOGMetadata.self, from: metadataData)
+        let metadata = try JSONDecoder().decode(SOGReaderCPUMetadata.self, from: metadataData)
 
         // Load image data directly from archive
         let meansLowData = try loadImageData(from: archive, filename: metadata.means.files[0])
@@ -81,9 +81,9 @@ public struct SOGReaderCPU: SplatReader {
             let rawY = (UInt16(meansHighData[offset + 1]) << 8) | UInt16(meansLowData[offset + 1])
             let rawZ = (UInt16(meansHighData[offset + 2]) << 8) | UInt16(meansLowData[offset + 2])
 
-            let tx = Float(rawX) / 65535.0
-            let ty = Float(rawY) / 65535.0
-            let tz = Float(rawZ) / 65535.0
+            let tx = Float(rawX) / 65_535.0
+            let ty = Float(rawY) / 65_535.0
+            let tz = Float(rawZ) / 65_535.0
 
             let logX = mins.x + tx * (maxs.x - mins.x)
             let logY = mins.y + ty * (maxs.y - mins.y)
@@ -154,8 +154,7 @@ public struct SOGReaderCPU: SplatReader {
     private static func loadImageData(from archive: Archive, filename: String) throws -> [UInt8] {
         let imageData = try extractData(from: archive, filename: filename)
 
-        guard let imageSource = CGImageSourceCreateWithData(imageData as CFData, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+        guard let imageSource = CGImageSourceCreateWithData(imageData as CFData, nil), let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
             throw SOGError.failedToDecodeImage(filename)
         }
 
@@ -184,7 +183,8 @@ public struct SOGReaderCPU: SplatReader {
 
 // MARK: - Supporting Types
 
-struct SOGMetadata: Codable {
+/// Internal metadata structure for SOGReaderCPU (different nested types than public SOGMetadata)
+private struct SOGReaderCPUMetadata: Codable {
     let count: Int
     let means: MeansMetadata
     let scales: CodebookMetadata
@@ -212,6 +212,9 @@ struct SOGMetadata: Codable {
 public enum SOGError: Error, Equatable {
     case failedToExtractZIP
     case missingMetadata
+    case failedToDecodeMetadata
     case missingTexture(String)
     case failedToDecodeImage(String)
+    case failedToCreateTexture(String)
+    case failedToCreateBuffer
 }

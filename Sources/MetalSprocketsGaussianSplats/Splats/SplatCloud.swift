@@ -4,6 +4,7 @@ import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 internal import os
 import simd
+import Splats
 
 // TODO: #146 Dangerous `@unchecked Sendable` usage in SplatCloud and SplatIndices.
 public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
@@ -47,12 +48,12 @@ public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Spla
         case "spz":
             // SPZ files need decompression to read header
             let reader = try SPZReader(url: url)
-            return Int(reader.pointCount)
+            return reader.splatCount
 
         case "ply":
             // PLY files have count in ASCII header
-            let reader = try PLYReader(url: url)
-            return reader.recordCount
+            let reader = try PLYSplatReader(url: url)
+            return reader.splatCount
 
         case "splat":
             // .splat files: each splat is 32 bytes

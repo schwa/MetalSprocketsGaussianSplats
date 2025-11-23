@@ -1,5 +1,6 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import MetalSprocketsGaussianSplats
+import Splats
 import SwiftUI
 import UniformTypeIdentifiers
 

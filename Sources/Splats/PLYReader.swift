@@ -2,7 +2,12 @@ import Foundation
 import UniformTypeIdentifiers
 
 public extension UTType {
-    static let ply = UTType(filenameExtension: "ply")!
+    static var ply: UTType {
+        guard let type = UTType(filenameExtension: "ply") else {
+            fatalError("Failed to create UTType for .ply extension")
+        }
+        return type
+    }
 }
 
 public struct PLYReader {

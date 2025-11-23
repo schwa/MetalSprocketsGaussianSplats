@@ -3,7 +3,12 @@ import simd
 import UniformTypeIdentifiers
 
 public extension UTType {
-    static let antimatter15Splat = UTType(filenameExtension: "splat")!
+    static var antimatter15Splat: UTType {
+        guard let type = UTType(filenameExtension: "splat") else {
+            fatalError("Failed to create UTType for .splat extension")
+        }
+        return type
+    }
 }
 
 // MARK: - Antimatter15Reader
@@ -18,7 +23,7 @@ public struct Antimatter15Reader: SplatReader {
     }
 
     public init(data: Data) throws {
-        guard data.count % 32 == 0 else {
+        guard data.count.isMultiple(of: 32) else {
             throw Antimatter15Error.invalidFileSize
         }
         self.data = data

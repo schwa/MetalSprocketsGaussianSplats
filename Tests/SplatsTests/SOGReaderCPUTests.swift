@@ -1,10 +1,9 @@
 import Foundation
-import Testing
 @testable import Splats
+import Testing
 
 @Suite
 struct SOGReaderCPUTests {
-
     @Test
     func testSOGReaderCPU() throws {
         let url = Bundle.module.url(forResource: "test-grid", withExtension: "sog", subdirectory: "Fixtures")!

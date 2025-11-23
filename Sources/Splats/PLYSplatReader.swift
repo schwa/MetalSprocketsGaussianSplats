@@ -38,9 +38,7 @@ public extension GenericSplat {
     /// - Opacity: opacity
     init?(plyRecord record: PLYReader.Record) {
         // Extract position (required)
-        guard let x = record["x"]?.floatValue,
-              let y = record["y"]?.floatValue,
-              let z = record["z"]?.floatValue else {
+        guard let x = record["x"]?.floatValue, let y = record["y"]?.floatValue, let z = record["z"]?.floatValue else {
             return nil
         }
 
@@ -54,18 +52,14 @@ public extension GenericSplat {
         let colorG: Float
         let colorB: Float
 
-        if let fdc0 = record["f_dc_0"]?.floatValue,
-           let fdc1 = record["f_dc_1"]?.floatValue,
-           let fdc2 = record["f_dc_2"]?.floatValue {
+        if let fdc0 = record["f_dc_0"]?.floatValue, let fdc1 = record["f_dc_1"]?.floatValue, let fdc2 = record["f_dc_2"]?.floatValue {
             // Convert from spherical harmonics DC coefficient to color
             // SH C0 coefficient: 0.28209479177387814
             let SH_C0: Float = 0.28209479177387814
             colorR = (fdc0 * SH_C0 + 0.5).clamped(to: 0...1)
             colorG = (fdc1 * SH_C0 + 0.5).clamped(to: 0...1)
             colorB = (fdc2 * SH_C0 + 0.5).clamped(to: 0...1)
-        } else if let red = record["red"]?.floatValue,
-                  let green = record["green"]?.floatValue,
-                  let blue = record["blue"]?.floatValue {
+        } else if let red = record["red"]?.floatValue, let green = record["green"]?.floatValue, let blue = record["blue"]?.floatValue {
             // Normalize if values are in 0-255 range
             if red > 1.0 || green > 1.0 || blue > 1.0 {
                 colorR = (red / 255.0).clamped(to: 0...1)
@@ -114,12 +108,4 @@ public extension GenericSplat {
 
 public enum PLYSplatError: Error, Equatable {
     case invalidRecord(Int)
-}
-
-// MARK: - Helpers
-
-private extension Float {
-    func clamped(to range: ClosedRange<Float>) -> Float {
-        min(max(self, range.lowerBound), range.upperBound)
-    }
 }

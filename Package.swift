@@ -37,6 +37,7 @@ let package = Package(
         .target(
             name: "Splats",
             dependencies: [
+                "MetalSprocketsGaussianSplatShaders",
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
                 .product(name: "GeometryLite3D", package: "GeometryLite3D"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
@@ -45,6 +46,7 @@ let package = Package(
         .target(
             name: "MetalSprocketsGaussianSplats",
             dependencies: [
+                "Splats",
                 "MetalSprocketsGaussianSplatShaders",
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
                 .product(name: "MetalSprocketsUI", package: "MetalSprockets"),
@@ -61,8 +63,7 @@ let package = Package(
             exclude: ["Metal"],
             plugins: [
                 .plugin(name: "MetalCompilerPlugin", package: "MetalCompilerPlugin")
-            ],
-
+            ]
         ),
         .executableTarget(
             name: "gsplat-render",

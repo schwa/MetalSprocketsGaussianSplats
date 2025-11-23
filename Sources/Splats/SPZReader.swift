@@ -4,7 +4,12 @@ import simd
 import UniformTypeIdentifiers
 
 public extension UTType {
-    static let spz = UTType(filenameExtension: "spz")!
+    static var spz: UTType {
+        guard let type = UTType(filenameExtension: "spz") else {
+            fatalError("Failed to create UTType for .spz extension")
+        }
+        return type
+    }
 }
 
 // MARK: - SPZReader
@@ -105,13 +110,24 @@ public struct SPZReader: SplatReader {
 
             let sh = shCoeffCount > 0 ? try unpackSphericalHarmonics(at: shOffset + i * shCoeffCount * 3, coeffCount: shCoeffCount) : nil
 
+            // Convert scale from log space to actual scale
+            let actualScale = SIMD3<Float>(exp(scale.x), exp(scale.y), exp(scale.z))
+
+            // Convert color from SH DC coefficient space to 0-1 RGB
+            // Using SH_C0 = 0.28209479177387814 for proper color without SH
+            let SH_C0: Float = 0.28209479177387814
+            let rgb = simd_clamp(color * SH_C0 + 0.5, SIMD3<Float>(repeating: 0), SIMD3<Float>(repeating: 1))
+
+            // Convert alpha from logit space to probability using sigmoid
+            let alphaProbability = 1.0 / (1.0 + exp(-alpha))
+
             let splat = GenericSplat(
                 position: position,
-                scale: scale,
-                color: SIMD4<Float>(color.x, color.y, color.z, alpha),
-                rotation: rotation,
-                sphericalHarmonics: sh
+                scale: actualScale,
+                color: SIMD4<Float>(rgb.x, rgb.y, rgb.z, alphaProbability),
+                rotation: rotation
             )
+            // TODO: sphericalHarmonics (sh) data is available but not stored in GenericSplat
 
             try handler(i, splat)
         }

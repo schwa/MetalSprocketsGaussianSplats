@@ -1,10 +1,9 @@
 import Foundation
-import Testing
 @testable import Splats
+import Testing
 
 @Suite
 struct GenericSplatTests {
-
     @Test
     func testGenericSplatInit() {
         let splat = GenericSplat(

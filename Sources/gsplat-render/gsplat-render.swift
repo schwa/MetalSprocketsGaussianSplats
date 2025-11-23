@@ -9,6 +9,7 @@ import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import simd
+import Splats
 import SwiftUI
 
 @main
@@ -80,7 +81,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     }
 
     @MainActor
-    mutating func _run() async throws {
+    mutating func _run() throws {
         // Load config from file if specified, otherwise use command-line args
         var renderConfig: RenderConfig
         if let configPath = config {
@@ -155,38 +156,33 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
         // Load splats based on file type
         #if os(iOS) || (os(macOS) && !arch(x86_64))
-        let antimatter15Splats: [Antimatter15Splat]
-        var spzSplats: [SPZSplat]?  // Keep SPZ splats for SH extraction
+        let genericSplats: [GenericSplat]
 
         switch fileExtension {
         case "spz":
-            let reader = try SPZReader(url: splatURL)
-            var tempSPZSplats: [SPZSplat] = []
-            var tempSplats: [Antimatter15Splat] = []
-            try reader.read { spzSplat in
-                tempSPZSplats.append(spzSplat)
-                tempSplats.append(Antimatter15Splat(spzSplat))
+            let reader = try Splats.SPZReader(url: splatURL)
+            var tempSplats: [GenericSplat] = []
+            try reader.read { _, splat in
+                tempSplats.append(splat)
             }
-            spzSplats = tempSPZSplats
-            antimatter15Splats = tempSplats
+            genericSplats = tempSplats
 
         case "ply":
-            let data = try Data(contentsOf: splatURL)
-            let reader = try PLYReader(data: data)
-            var tempSplats: [Antimatter15Splat] = []
-            try reader.read { record in
-                if let splat = Antimatter15Splat(plyRecord: record) {
-                    tempSplats.append(splat)
-                }
+            let reader = try PLYSplatReader(url: splatURL)
+            var tempSplats: [GenericSplat] = []
+            try reader.read { _, splat in
+                tempSplats.append(splat)
             }
-            antimatter15Splats = tempSplats
+            genericSplats = tempSplats
 
         case "splat":
             // Antimatter15 .splat format - raw binary, 32 bytes per splat
-            let data = try Data(contentsOf: splatURL)
-            antimatter15Splats = data.withUnsafeBytes { buffer in
-                buffer.withMemoryRebound(to: Antimatter15Splat.self, Array.init)
+            let reader = try Antimatter15Reader(url: splatURL)
+            var tempSplats: [GenericSplat] = []
+            try reader.read { _, splat in
+                tempSplats.append(splat)
             }
+            genericSplats = tempSplats
 
         default:
             throw ValidationError("Unsupported file format: .\(fileExtension)")
@@ -210,22 +206,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         var effectiveSHDegree: UInt8 = 0
 
         if useSparkRenderer {
-            // For Spark, prefer to convert directly from SPZ if available (preserves SH)
-            let gpuSplats: [SparkGPUSplat]
-            if let spz = spzSplats {
-                gpuSplats = spz.map { SparkGPUSplat($0) }
-                // Extract spherical harmonics
-                if let (shCoeffs, degree) = spz.extractSphericalHarmonics() {
-                    // Apply override if specified
-                    let finalDegree = shDegree.map { UInt8(min(max($0, 0), Int(degree))) } ?? degree
-                    if finalDegree > 0 {
-                        effectiveSHDegree = finalDegree
-                        shCoefficientsBuffer = try device.makeTypedBuffer(values: shCoeffs, options: [])
-                    }
-                }
-            } else {
-                gpuSplats = antimatter15Splats.map { SparkGPUSplat($0) }
-            }
+            let gpuSplats = genericSplats.map { SparkGPUSplat($0) }
+            // TODO: SH extraction not yet supported with GenericSplat
+            _ = shDegree // Silence unused variable warning
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
             sparkSplatCloud = try SplatCloud<SparkGPUSplat>(
                 device: device,
@@ -235,7 +218,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             )
             antimatter15SplatCloud = nil
         } else {
-            let gpuSplats = antimatter15Splats.map { Antimatter15GPUSplat($0) }
+            let gpuSplats = genericSplats.map { Antimatter15GPUSplat($0) }
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
             antimatter15SplatCloud = try SplatCloud<Antimatter15GPUSplat>(
                 device: device,
@@ -262,17 +245,21 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         )
 
         // Create render content
-        let splatCount = useSparkRenderer ? sparkSplatCloud!.count : antimatter15SplatCloud!.count
-
-        // Render with Metal capture
+        let splatCount: Int
         let captureManager = MTLCaptureManager.shared()
         let rendering: OffscreenRenderer.Rendering
+
+        // Render with Metal capture
         if useSparkRenderer {
+            guard let cloud = sparkSplatCloud else {
+                throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Spark splat cloud is nil"])
+            }
+            splatCount = cloud.count
             let renderContent = try RenderPass {
                 let aspectRatio = Float(size.width) / Float(size.height)
                 let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
                 try SparkSplatRenderPipeline(
-                    splatCloud: sparkSplatCloud!,
+                    splatCloud: cloud,
                     projectionMatrix: projectionMatrix,
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
@@ -286,11 +273,15 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 try renderer.render(renderContent)
             }
         } else {
+            guard let cloud = antimatter15SplatCloud else {
+                throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Antimatter15 splat cloud is nil"])
+            }
+            splatCount = cloud.count
             let renderContent = try RenderPass {
                 let aspectRatio = Float(size.width) / Float(size.height)
                 let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
                 try Antimatter15SplatRenderPipeline(
-                    splatCloud: antimatter15SplatCloud!,
+                    splatCloud: cloud,
                     projectionMatrix: projectionMatrix,
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,

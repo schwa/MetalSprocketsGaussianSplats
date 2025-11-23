@@ -1,10 +1,9 @@
 import Foundation
-import Testing
 @testable import Splats
+import Testing
 
 @Suite
 struct SPZReaderTests {
-
     @Test
     func testSPZReader() throws {
         let url = Bundle.module.url(forResource: "test-grid", withExtension: "spz", subdirectory: "Fixtures")!

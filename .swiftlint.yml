@@ -61,12 +61,12 @@ only_rules:
   - empty_xctest_method
   - enum_case_associated_values_count
   - expiring_todo
-#  - explicit_acl # 158 violations
-#  - explicit_enum_raw_value # 4 violations
+#  - explicit_acl
+#  - explicit_enum_raw_value
   - explicit_init
   - explicit_self
-#  - explicit_top_level_acl # 13 violations
-#  - explicit_type_interface # 466 violations
+#  - explicit_top_level_acl
+#  - explicit_type_interface
   - extension_access_modifier
   - fallthrough
   - fatal_error_message
@@ -83,9 +83,9 @@ only_rules:
   - force_try
   - force_unwrapping
 #  - function_body_length # 5 violations
-#  - function_default_parameter_at_end # 2 violations
+#  - function_default_parameter_at_end
   - function_name_whitespace
-  - function_parameter_count
+#  - function_parameter_count
   - generic_type_name
   - ibinspectable_in_extension
   - identical_operands
@@ -96,18 +96,18 @@ only_rules:
   - implicitly_unwrapped_optional
   - inclusive_language
   - incompatible_concurrency_annotation
-  - indentation_width # 13 violations
+  - indentation_width
   - invalid_swiftlint_command
   - is_disjoint
   - joined_default_parameter
-#  - large_tuple # 2 violations
+#  - large_tuple
   - last_where
   - leading_whitespace
   - legacy_cggeometry_functions
   - legacy_constant
   - legacy_constructor
   - legacy_hashing
-  - legacy_multiple # 1 violations
+  - legacy_multiple
   - legacy_nsgeometry_functions
   - legacy_objc_type
   - legacy_random

@@ -2,12 +2,8 @@
 import GeometryLite3D
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
+import Splats
 import UniformTypeIdentifiers
-
-public extension UTType {
-    // A buffer of Antimatter15Splat in little endian format.
-    static let antimatter15Splat = UTType(filenameExtension: "splat")!
-}
 
 /// Defined as the .splat file format by Antimatter15 - http://antimatter15.com/splat/ and https://github.com/antimatter15/splat - it doesn't include spherical harmonics and is 32 bytes per splat.
 public struct Antimatter15Splat: Equatable, Sendable {

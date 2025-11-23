@@ -6,6 +6,7 @@ import Metal
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
+import Splats
 import UniformTypeIdentifiers
 
 // MARK: - Antimatter15GPUSplat Loading
@@ -44,7 +45,7 @@ public extension SplatCloud where Splat == Antimatter15GPUSplat {
 
     convenience init(splatURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
         let device = MTLCreateSystemDefaultDevice()!
-        let antimatterSplats = try await [Antimatter15Splat](importing: url, contentType: .antimatter15Splat)
+        let antimatterSplats = try await [Antimatter15Splat](importing: url, contentType: UTType.antimatter15Splat)
         let gpuSplats = antimatterSplats.map(Antimatter15GPUSplat.init)
         try self.init(device: device, splats: gpuSplats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
@@ -66,7 +67,7 @@ public extension SplatCloud where Splat == Antimatter15GPUSplat {
     @MainActor
     convenience init(sogURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = MTLCreateSystemDefaultDevice()!
-        let resources = try SOGLoader.load(url: url, device: device)
+        let resources = try SOGReaderGPU.load(url: url, device: device)
         let converter = try SOGToGenericSplatConverter(device: device)
         let genericSplats = try converter.convert(resources)
         let gpuSplats = genericSplats.map(Antimatter15GPUSplat.init)
@@ -79,7 +80,7 @@ public extension SplatCloud where Splat == Antimatter15GPUSplat {
 public extension SplatCloud where Splat == SparkGPUSplat {
     /// Combo init - dispatches based on file extension
     @MainActor
-    convenience init(url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
+    convenience init(url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         switch url.pathExtension.lowercased() {
         case "spz":
             try self.init(spzURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
@@ -91,7 +92,7 @@ public extension SplatCloud where Splat == SparkGPUSplat {
             try self.init(plyURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
 
         case "json":
-            try await self.init(jsonURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+            try self.init(jsonURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
 
         case "sog":
             try self.init(sogURL: url, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
@@ -103,86 +104,68 @@ public extension SplatCloud where Splat == SparkGPUSplat {
 
     convenience init(spzURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = _MTLCreateSystemDefaultDevice()
-        let reader = try SPZReader(url: url)
+        let reader = try Splats.SPZReader(url: url)
         var splats: [SparkGPUSplat] = []
-        splats.reserveCapacity(Int(reader.pointCount))
-        try reader.read { spzSplat in
-            splats.append(SparkGPUSplat(spzSplat))
+        splats.reserveCapacity(reader.splatCount)
+        try reader.read { _, genericSplat in
+            splats.append(SparkGPUSplat(genericSplat))
         }
         try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
 
     /// Load SPZ file and extract spherical harmonics if available
+    /// Note: SH extraction not yet supported with GenericSplat
     static func loadWithSH(url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws -> (splatCloud: SplatCloud<SparkGPUSplat>, shCoefficients: TypedMTLBuffer<Float>?, shDegree: UInt8) {
         let device = _MTLCreateSystemDefaultDevice()
-        let reader = try SPZReader(url: url)
+        let reader = try Splats.SPZReader(url: url)
 
-        var spzSplats: [SPZSplat] = []
         var gpuSplats: [SparkGPUSplat] = []
-        spzSplats.reserveCapacity(Int(reader.pointCount))
-        gpuSplats.reserveCapacity(Int(reader.pointCount))
+        gpuSplats.reserveCapacity(reader.splatCount)
 
-        try reader.read { spzSplat in
-            spzSplats.append(spzSplat)
-            // Load with 0.282 scale (usingSH: false) for correct colors when SH is off
-            gpuSplats.append(SparkGPUSplat(spzSplat, usingSH: false))
+        try reader.read { _, genericSplat in
+            gpuSplats.append(SparkGPUSplat(genericSplat))
         }
 
         let splatCloud = try SplatCloud(device: device, splats: gpuSplats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
 
-        // Extract SH coefficients if available
-        var shCoefficients: TypedMTLBuffer<Float>?
-        var shDegree: UInt8 = 0
-
-        if let (coeffs, degree) = spzSplats.extractSphericalHarmonics() {
-            shCoefficients = try device.makeTypedBuffer(values: coeffs, options: [])
-            shDegree = degree
-        }
-
-        return (splatCloud, shCoefficients, shDegree)
+        // TODO: SH extraction not yet supported with GenericSplat
+        return (splatCloud, nil, 0)
     }
 
     convenience init(splatURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = _MTLCreateSystemDefaultDevice()
-        let data = try Data(contentsOf: url)
-        let splatSize = MemoryLayout<Antimatter15Splat>.size
-        let count = data.count / splatSize
+        let reader = try Antimatter15Reader(url: url)
         var splats: [SparkGPUSplat] = []
-        splats.reserveCapacity(count)
-        data.withUnsafeBytes { buffer in
-            let am15Splats = buffer.bindMemory(to: Antimatter15Splat.self)
-            for index in 0..<count {
-                splats.append(SparkGPUSplat(am15Splats[index]))
-            }
+        splats.reserveCapacity(reader.splatCount)
+        try reader.read { _, genericSplat in
+            splats.append(SparkGPUSplat(genericSplat))
         }
         try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
 
     convenience init(plyURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = _MTLCreateSystemDefaultDevice()
-        let reader = try PLYReader(url: url)
+        let reader = try PLYSplatReader(url: url)
         var splats: [SparkGPUSplat] = []
-        splats.reserveCapacity(reader.recordCount)
-        try reader.read { record in
-            if let sparkSplat = SparkGPUSplat(plyRecord: record) {
-                splats.append(sparkSplat)
-            }
+        splats.reserveCapacity(reader.splatCount)
+        try reader.read { _, genericSplat in
+            splats.append(SparkGPUSplat(genericSplat))
         }
         try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
 
-    convenience init(jsonURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) async throws {
+    convenience init(jsonURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = _MTLCreateSystemDefaultDevice()
-        // Load JSON via Antimatter15Splat and convert
-        let antimatterSplats = try await [Antimatter15Splat](importing: url, contentType: .json)
-        let splats = antimatterSplats.map { SparkGPUSplat($0) }
+        // Load JSON as GenericSplat and convert
+        let genericSplats = try JSONDecoder().decode([GenericSplat].self, from: Data(contentsOf: url))
+        let splats = genericSplats.map { SparkGPUSplat($0) }
         try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
     }
 
     @MainActor
     convenience init(sogURL url: URL, cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws {
         let device = _MTLCreateSystemDefaultDevice()
-        let resources = try SOGLoader.load(url: url, device: device)
+        let resources = try SOGReaderGPU.load(url: url, device: device)
         let converter = try SOGToGenericSplatConverter(device: device)
         let genericSplats = try converter.convert(resources)
         let splats = genericSplats.map(SparkGPUSplat.init)
