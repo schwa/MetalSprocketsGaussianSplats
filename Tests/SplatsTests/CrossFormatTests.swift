@@ -103,7 +103,7 @@ struct CrossFormatTests {
             #expect(ply.scale.isApproximatelyEqual(to: expectedScale, absoluteTolerance: 0.0001), "PLY scale mismatch at \(i)")
 
             // Rotation (quaternion) - compare as SIMD4 for component equality
-            let plyQuat = SIMD4<Float>(ply.rotation.imag.x, ply.rotation.imag.y, ply.rotation.imag.z, ply.rotation.real)
+            let plyQuat = ply.rotation
             let csvQuat = SIMD4<Float>(csv.rotation.imag.x, csv.rotation.imag.y, csv.rotation.imag.z, csv.rotation.real)
             #expect(plyQuat.isApproximatelyEqual(to: csvQuat, absoluteTolerance: 0.0001), "PLY rotation mismatch at \(i): got \(plyQuat), expected \(csvQuat)")
 
@@ -147,7 +147,7 @@ struct CrossFormatTests {
                 "SOG scale mismatch at \(i)")
 
             // Rotation (quaternion) - SOG uses 8-bit quantization
-            let sogQuat = SIMD4<Float>(sog.rotation.imag.x, sog.rotation.imag.y, sog.rotation.imag.z, sog.rotation.real)
+            let sogQuat = sog.rotation
             let csvQuat = SIMD4<Float>(csv.rotation.imag.x, csv.rotation.imag.y, csv.rotation.imag.z, csv.rotation.real)
             #expect(sogQuat.isApproximatelyEqual(to: csvQuat, absoluteTolerance: 0.01),
                 "SOG rotation mismatch at \(i): got \(sogQuat), expected \(csvQuat)")
@@ -187,19 +187,26 @@ struct CrossFormatTests {
             #expect(spz.position.isApproximatelyEqual(to: csv.position, absoluteTolerance: 0.0001),
                 "SPZ position mismatch at \(i)")
 
-            // SPZ stores log scale directly
-            #expect(spz.scale.isApproximatelyEqual(to: csv.scale, absoluteTolerance: 0.018),
+            // Scale (SPZ returns exp(log_scale))
+            let expectedScale = SIMD3<Float>(exp(csv.scale.x), exp(csv.scale.y), exp(csv.scale.z))
+            #expect(spz.scale.isApproximatelyEqual(to: expectedScale, absoluteTolerance: 0.001),
                 "SPZ scale mismatch at \(i)")
 
             // Rotation (quaternion)
-            let spzQuat = SIMD4<Float>(spz.rotation.imag.x, spz.rotation.imag.y, spz.rotation.imag.z, spz.rotation.real)
+            let spzQuat = spz.rotation
             let csvQuat = SIMD4<Float>(csv.rotation.imag.x, csv.rotation.imag.y, csv.rotation.imag.z, csv.rotation.real)
             #expect(spzQuat.isApproximatelyEqual(to: csvQuat, absoluteTolerance: 0.01),
                 "SPZ rotation mismatch at \(i): got \(spzQuat), expected \(csvQuat)")
 
-            // Color - SPZ stores raw f_dc values (8-bit quantization requires ~0.02 tolerance)
+            // Color (SPZ converts from f_dc using SH_C0)
+            let SH_C0: Float = 0.28209479177387814
+            let expectedColor = SIMD3<Float>(
+                csv.color.x * SH_C0 + 0.5,
+                csv.color.y * SH_C0 + 0.5,
+                csv.color.z * SH_C0 + 0.5
+            )
             let spzColor = SIMD3<Float>(spz.color.x, spz.color.y, spz.color.z)
-            #expect(spzColor.isApproximatelyEqual(to: csv.color, absoluteTolerance: 0.02),
+            #expect(spzColor.isApproximatelyEqual(to: expectedColor, absoluteTolerance: 0.01),
                 "SPZ color mismatch at \(i)")
         }
     }
@@ -232,7 +239,7 @@ struct CrossFormatTests {
                 "SPLAT scale mismatch at \(i)")
 
             // Rotation (quaternion) - Antimatter15 uses 8-bit quantization
-            let splatQuat = SIMD4<Float>(splat.rotation.imag.x, splat.rotation.imag.y, splat.rotation.imag.z, splat.rotation.real)
+            let splatQuat = splat.rotation
             let csvQuat = SIMD4<Float>(csv.rotation.imag.x, csv.rotation.imag.y, csv.rotation.imag.z, csv.rotation.real)
             #expect(splatQuat.isApproximatelyEqual(to: csvQuat, absoluteTolerance: 0.01),
                 "SPLAT rotation mismatch at \(i): got \(splatQuat), expected \(csvQuat)")

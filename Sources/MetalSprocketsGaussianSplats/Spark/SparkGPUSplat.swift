@@ -23,7 +23,7 @@ public struct SparkGPUSplat {
         self.packed = packed
     }
 
-    public init(position: SIMD3<Float>, scale: SIMD3<Float>, quaternion: simd_quatf, color: SIMD4<UInt8>) {
+    public init(position: SIMD3<Float>, scale: SIMD3<Float>, rotation: simd_quatf, color: SIMD4<UInt8>) {
         // Word 0: RGBA
         let word0 = UInt32(color.x)
             | (UInt32(color.y) << 8)
@@ -37,7 +37,7 @@ public struct SparkGPUSplat {
 
         // Word 2: centerZ as float16, quatX, quatY as uint8
         let centerZ = Self.floatToHalf(position.z)
-        let quatEncoded = Self.encodeQuatOctXy88R8(quaternion)
+        let quatEncoded = Self.encodeQuatOctXy88R8(rotation)
         let quatX = UInt8(quatEncoded & 0xFF)
         let quatY = UInt8((quatEncoded >> 8) & 0xFF)
         let word2 = UInt32(centerZ) | (UInt32(quatX) << 16) | (UInt32(quatY) << 24)
@@ -77,7 +77,7 @@ public struct SparkGPUSplat {
         return SIMD3<Float>(scaleX, scaleY, scaleZ)
     }
 
-    public var quaternion: simd_quatf {
+    public var rotation: simd_quatf {
         let quatX = UInt8((packed.z >> 16) & 0xFF)
         let quatY = UInt8((packed.z >> 24) & 0xFF)
         let quatZ = UInt8((packed.w >> 24) & 0xFF)
