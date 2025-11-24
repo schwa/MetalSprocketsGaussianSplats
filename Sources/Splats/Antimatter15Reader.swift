@@ -53,11 +53,11 @@ public struct Antimatter15Reader: SplatReader {
             let a = Float(data[offset + 27]) / 255.0
             let color = SIMD4<Float>(r, g, b, a)
 
-            // Read rotation (4 UInt8, 4 bytes) - stored as WXYZ order in file
-            let rotW = (Float(data[offset + 28]) - 128.0) / 128.0
-            let rotX = (Float(data[offset + 29]) - 128.0) / 128.0
-            let rotY = (Float(data[offset + 30]) - 128.0) / 128.0
-            let rotZ = (Float(data[offset + 31]) - 128.0) / 128.0
+            // Read rotation (4 UInt8, 4 bytes) - stored as XYZW order in file
+            let rotX = (Float(data[offset + 28]) - 128.0) / 128.0
+            let rotY = (Float(data[offset + 29]) - 128.0) / 128.0
+            let rotZ = (Float(data[offset + 30]) - 128.0) / 128.0
+            let rotW = (Float(data[offset + 31]) - 128.0) / 128.0
             let rotation = simd_quatf(ix: rotX, iy: rotY, iz: rotZ, r: rotW)
 
             let splat = GenericSplat(

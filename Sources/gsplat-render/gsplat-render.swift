@@ -249,7 +249,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4
     ) throws -> (SplatCloud<Antimatter15GPUSplat>?, SplatCloud<SparkGPUSplat>?, TypedMTLBuffer<Float>?, UInt8) {
-        let shCoefficientsBuffer: TypedMTLBuffer<Float>?
+        let shCoefficientsBuffer: TypedMTLBuffer<Float>? = nil
         let effectiveSHDegree: UInt8 = 0
 
         if useSparkRenderer {
