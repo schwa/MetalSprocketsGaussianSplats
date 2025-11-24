@@ -1,5 +1,5 @@
 {
-  "originHash" : "fb66d43eb4db042246a3cddb64f8831619c9c7cd3a835c78eaf7a195a148ce60",
+  "originHash" : "e6dfec8fb30cd2f0829583204f96f506e0d337dd1880efbe410ea982eec03c89",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalCompilerPlugin",
       "state" : {
-        "revision" : "4f361b5611e7e2022baeaa74da60ea32635323b1",
-        "version" : "0.1.4"
+        "revision" : "36c761478a8e3fb934acf8ef2db4696af95069b4",
+        "version" : "0.1.5"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms",
       "state" : {
-        "revision" : "042e1c4d9d19748c9c228f8d4ebc97bb1e339b0b",
-        "version" : "1.0.4"
+        "revision" : "2773d4125311133a2f705ec374c363a935069d45",
+        "version" : "1.1.0"
       }
     },
     {
