@@ -1,7 +1,7 @@
 import Foundation
 import MetalCompilerPluginSupport
 
-extension Bundle {
+public extension Bundle {
     static var metalSprocketsGaussianSplatShaders: Bundle {
         guard let bundle = Bundle.module.peerBundle(withSuffix: "MetalSprocketsGaussianSplatShaders") else {
             fatalError("Failed to load MetalSprocketsGaussianSplatShaders bundle. Parent bundle: \(String(describing: Bundle.module.parentBundle)), searched for suffix: MetalSprocketsGaussianSplatShaders")
@@ -10,7 +10,7 @@ extension Bundle {
     }
 }
 
-extension Bundle {
+internal extension Bundle {
     func peerBundle(withSuffix suffix: String) -> Bundle? {
         let url = bundleURL.deletingLastPathComponent()
         let fileManager = FileManager()

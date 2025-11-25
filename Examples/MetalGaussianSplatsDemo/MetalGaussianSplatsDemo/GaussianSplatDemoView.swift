@@ -15,6 +15,7 @@ enum RendererType: String, CaseIterable, Identifiable {
     case antimatter15 = "Antimatter15 (Buggy)"
     case spark = "Spark"
     case stochastic = "Stochastic (Experimental)"
+    case tileBased = "Tile-Based (Experimental)"
 
     var id: String { rawValue }
 }
@@ -72,6 +73,14 @@ public struct GaussianSplatDemoView: View {
 
                     case .stochastic:
                         StochasticRendererView(
+                            url: splatURL,
+                            projection: projection,
+                            cameraMatrix: cameraMatrix,
+                            modelMatrix: modelMatrix
+                        )
+
+                    case .tileBased:
+                        TileBasedDemoView(
                             url: splatURL,
                             projection: projection,
                             cameraMatrix: cameraMatrix,
