@@ -71,7 +71,7 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
                     }
                     commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
                 }
-                .parameter("packedSplats", buffer: splatCloud.splats.unsafeMTLBuffer)
+                .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
                 .parameter("indexedDistances", buffer: splatCloud.indexedDistances.indices.unsafeMTLBuffer)
                 .parameter("modelMatrix", value: modelMatrix)
                 .parameter("viewMatrix", value: cameraMatrix.inverse)

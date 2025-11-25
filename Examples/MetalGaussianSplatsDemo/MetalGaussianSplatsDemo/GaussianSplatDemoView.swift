@@ -117,7 +117,7 @@ public struct GaussianSplatDemoView: View {
         }
         .onChange(of: splatURL, initial: true) {
             if let url = splatURL {
-                splatCount = try? SplatCloud<SparkGPUSplat>.splatCount(from: url)
+                splatCount = try? SplatCloud<SparkSplat>.splatCount(from: url)
             } else {
                 splatCount = nil
             }

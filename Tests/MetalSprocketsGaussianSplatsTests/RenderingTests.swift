@@ -116,7 +116,7 @@ struct GenericSplatConversionTests {
     }
 
     @Test
-    func testGenericSplatToSparkGPUSplat() throws {
+    func testGenericSplatToSparkSplat() throws {
         let genericSplat = GenericSplat(
             position: [4, 5, 6],
             scale: [0.5, 0.5, 0.5],
@@ -124,7 +124,7 @@ struct GenericSplatConversionTests {
             rotation: .init(ix: 0, iy: 0, iz: 0, r: 1)
         )
 
-        let gpuSplat = SparkGPUSplat(genericSplat)
+        let gpuSplat = SparkSplat(genericSplat)
         #expect(gpuSplat.position.x == 4)
         #expect(gpuSplat.position.y == 5)
         #expect(gpuSplat.position.z == 6)

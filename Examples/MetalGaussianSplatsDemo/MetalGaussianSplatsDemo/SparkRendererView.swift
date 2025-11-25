@@ -14,7 +14,7 @@ struct SparkRendererView: View {
     let cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
 
-    @State private var splatCloud: SplatCloud<SparkGPUSplat>?
+    @State private var splatCloud: SplatCloud<SparkSplat>?
     @State private var shCoefficients: TypedMTLBuffer<Float>?
     @State private var shDegree: UInt8 = 0
 
@@ -45,7 +45,7 @@ struct SparkRendererView: View {
 
         // Use loadWithSH for SPZ files to get SH data
         if url.pathExtension.lowercased() == "spz" {
-            let result = try! SplatCloud<SparkGPUSplat>.loadWithSH(url: url, cameraMatrix: cameraMatrix)
+            let result = try! SplatCloud<SparkSplat>.loadWithSH(url: url, cameraMatrix: cameraMatrix)
             splatCloud = result.splatCloud
             shCoefficients = result.shCoefficients
             shDegree = result.shDegree

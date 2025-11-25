@@ -17,11 +17,14 @@ public extension Antimatter15Splat {
     }
 }
 
-public extension SparkGPUSplat {
-    /// Initialize a SparkGPUSplat from a GenericSplat
+public extension SparkSplat {
+    /// Initialize a SparkSplat from a GenericSplat
     init(_ splat: GenericSplat) {
-        let color = SIMD4<UInt8>(splat.color.clamped(to: 0...1) * 255.0)
-        self.init(position: splat.position, scale: splat.scale, rotation: simd_quatf(vector: splat.rotation), color: color)
+        self.init()
+        self.position = simd_half3(splat.position)
+        self.scale = simd_half3(splat.scale)
+        self.rotation = simd_half4(splat.rotation)
+        self.color = SIMD4<UInt8>(splat.color.clamped(to: 0...1) * 255.0)
     }
 }
 

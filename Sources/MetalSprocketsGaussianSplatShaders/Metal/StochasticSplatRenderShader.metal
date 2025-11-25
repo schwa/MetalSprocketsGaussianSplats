@@ -133,7 +133,7 @@ namespace StochasticSplatRenderShader {
     [[vertex]] VertexOut vertex_main(
         VertexIn in [[stage_in]],
         uint instance_id [[instance_id]],
-        constant uint4 *packedSplats [[buffer(2)]],
+        constant SparkSplat *splats [[buffer(2)]],
         constant float4x4 &modelMatrix [[buffer(4)]],
         constant float4x4 &viewMatrix [[buffer(5)]],
         constant float4x4 &projectionMatrix [[buffer(6)]],
@@ -153,12 +153,13 @@ namespace StochasticSplatRenderShader {
         // Use instance_id directly - no sorting needed for stochastic rendering
         uint splatIndex = instance_id;
 
-        // Fetch and unpack splat
-        uint4 packed = packedSplats[splatIndex];
+        // Fetch splat directly (no unpacking needed)
+        SparkSplat splat = splats[splatIndex];
 
-        float3 center, scales;
-        float4 quaternion, rgba;
-        unpackSplatEncoding(packed, center, scales, quaternion, rgba);
+        float3 center = float3(splat.position);
+        float3 scales = float3(splat.scale);
+        float4 quaternion = float4(splat.rotation);
+        float4 rgba = float4(splat.color) / 255.0;
 
         // Cull by alpha
         if (rgba.a < MIN_ALPHA) {

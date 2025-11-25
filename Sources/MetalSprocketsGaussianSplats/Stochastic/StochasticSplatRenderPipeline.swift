@@ -101,7 +101,7 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
                     }
                     commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
                 }
-                .parameter("packedSplats", buffer: splatCloud.splats.unsafeMTLBuffer)
+                .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
                 .parameter("modelMatrix", value: modelMatrix)
                 .parameter("viewMatrix", value: cameraMatrix.inverse)
                 .parameter("projectionMatrix", value: projectionMatrix)

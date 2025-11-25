@@ -13,7 +13,7 @@ struct StochasticRendererView: View {
     let cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
 
-    @State private var splatCloud: SplatCloud<SparkGPUSplat>?
+    @State private var splatCloud: SplatCloud<SparkSplat>?
 
     var body: some View {
         ZStack {

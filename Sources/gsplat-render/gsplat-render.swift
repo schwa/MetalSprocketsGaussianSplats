@@ -248,15 +248,15 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         useSparkRenderer: Bool,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4
-    ) throws -> (SplatCloud<Antimatter15GPUSplat>?, SplatCloud<SparkGPUSplat>?, TypedMTLBuffer<Float>?, UInt8) {
+    ) throws -> (SplatCloud<Antimatter15GPUSplat>?, SplatCloud<SparkSplat>?, TypedMTLBuffer<Float>?, UInt8) {
         let shCoefficientsBuffer: TypedMTLBuffer<Float>? = nil
         let effectiveSHDegree: UInt8 = 0
 
         if useSparkRenderer {
-            let gpuSplats = genericSplats.map { SparkGPUSplat($0) }
+            let gpuSplats = genericSplats.map { SparkSplat($0) }
             _ = shDegree // Silence unused variable warning
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-            let sparkSplatCloud = try SplatCloud<SparkGPUSplat>(
+            let sparkSplatCloud = try SplatCloud<SparkSplat>(
                 device: device,
                 splats: splatBuffer,
                 cameraMatrix: cameraMatrix,
@@ -289,7 +289,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
         antimatter15SplatCloud: SplatCloud<Antimatter15GPUSplat>?,
-        sparkSplatCloud: SplatCloud<SparkGPUSplat>?,
+        sparkSplatCloud: SplatCloud<SparkSplat>?,
         shCoefficientsBuffer: TypedMTLBuffer<Float>?,
         effectiveSHDegree: UInt8
     ) throws -> (OffscreenRenderer.Rendering, Int) {
