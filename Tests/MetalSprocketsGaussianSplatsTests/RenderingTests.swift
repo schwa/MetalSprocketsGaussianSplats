@@ -1,13 +1,13 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
+import CoreGraphics
 import Foundation
+import GoldenImage
 import Metal
 import MetalSprockets
-import GoldenImage
 @testable import MetalSprocketsGaussianSplats
+import simd
 @testable import Splats
 import Testing
-import simd
-import CoreGraphics
 
 @Suite
 struct TypedMTLBufferTests {
@@ -23,7 +23,7 @@ struct TypedMTLBufferTests {
     @Test
     func testCreateEmptyBuffer() throws {
         let buffer: TypedMTLBuffer<Float> = try device.makeTypedBuffer(element: Float.self, capacity: 100, options: [])
-        #expect(buffer.count == 0)
+        #expect(buffer.isEmpty)
         #expect(buffer.capacity == 100)
     }
 
@@ -148,7 +148,7 @@ struct SplatCloudTests {
     func testSplatCloudCreation() throws {
         let splats = [
             Antimatter15GPUSplat.testSplat(position: [0, 0, 0]),
-            Antimatter15GPUSplat.testSplat(position: [1, 0, 0]),
+            Antimatter15GPUSplat.testSplat(position: [1, 0, 0])
         ]
 
         let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
@@ -297,6 +297,3 @@ private func perspectiveProjection(fovY: Float, aspect: Float, near: Float, far:
 }
 
 #endif
-
-
-

@@ -263,24 +263,23 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 modelMatrix: modelMatrix
             )
             return (nil, sparkSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
-        } else {
-            let gpuSplats = genericSplats.map { Antimatter15GPUSplat($0) }
-            let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-            let antimatter15SplatCloud = try SplatCloud<Antimatter15GPUSplat>(
-                device: device,
-                splats: splatBuffer,
-                cameraMatrix: cameraMatrix,
-                modelMatrix: modelMatrix
-            )
-            return (antimatter15SplatCloud, nil, shCoefficientsBuffer, effectiveSHDegree)
         }
+        let gpuSplats = genericSplats.map { Antimatter15GPUSplat($0) }
+        let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
+        let antimatter15SplatCloud = try SplatCloud<Antimatter15GPUSplat>(
+            device: device,
+            splats: splatBuffer,
+            cameraMatrix: cameraMatrix,
+            modelMatrix: modelMatrix
+        )
+        return (antimatter15SplatCloud, nil, shCoefficientsBuffer, effectiveSHDegree)
     }
 
     // MARK: - Rendering
 
     @MainActor
     func performRender(
-        renderConfig: RenderConfig,
+        renderConfig _: RenderConfig,
         size: CGSize,
         projection: any ProjectionProtocol,
         bgColor: SIMD4<Float>,

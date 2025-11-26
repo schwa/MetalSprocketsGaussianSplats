@@ -22,13 +22,11 @@ struct StochasticRendererView: View {
             }
         }
         .onChange(of: url, initial: true) {
-            Task {
-                await loadSplatCloud()
-            }
+            loadSplatCloud()
         }
     }
 
-    private func loadSplatCloud() async {
+    private func loadSplatCloud() {
         guard let url else {
             return
         }

@@ -126,4 +126,3 @@ public struct Antimatter15SplatRenderPipeline: Element {
 }
 
 #endif
-

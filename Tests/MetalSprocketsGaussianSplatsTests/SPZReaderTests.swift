@@ -34,7 +34,7 @@ struct SPZReaderTests {
         var count = 0
         var firstSplat: GenericSplat?
 
-        try reader.read { index, splat in
+        try reader.read { _, splat in
             if count == 0 {
                 firstSplat = splat
             }

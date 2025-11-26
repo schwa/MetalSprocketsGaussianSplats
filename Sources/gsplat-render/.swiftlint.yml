@@ -1,4 +1,4 @@
 disabled_rules:
-  - force_unwrapping
-  - force_try
+#   - force_unwrapping
+#   - force_try
   - explicit_top_level_acl

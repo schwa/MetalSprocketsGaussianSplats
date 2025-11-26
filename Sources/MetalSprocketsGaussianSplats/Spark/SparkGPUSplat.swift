@@ -13,9 +13,9 @@ extension SparkSplat: @unchecked @retroactive Sendable {
 extension SparkSplat: @retroactive Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.position == rhs.position &&
-        lhs.scale == rhs.scale &&
-        lhs.rotation == rhs.rotation &&
-        lhs.color == rhs.color
+            lhs.scale == rhs.scale &&
+            lhs.rotation == rhs.rotation &&
+            lhs.color == rhs.color
     }
 }
 

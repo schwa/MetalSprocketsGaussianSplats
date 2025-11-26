@@ -8,7 +8,7 @@ import MetalSprocketsUI
 internal import os
 import SwiftUI
 
-let sparkLogger: Logger? = Logger(subsystem: "spark-splats", category: "spark-splats")
+private let sparkLogger: Logger? = Logger(subsystem: "spark-splats", category: "spark-splats")
 
 public struct SparkSplatView: View {
     private var splatCloud: SplatCloud<SparkSplat>
