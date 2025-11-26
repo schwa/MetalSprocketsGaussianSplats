@@ -110,10 +110,6 @@ public struct StochasticSplatRenderPipeline: Element {
                 .parameter("cameraPosition", value: SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z))
             }
             .vertexDescriptor(vertexDescriptor)
-            .renderPipelineDescriptorModifier { renderPipelineDescriptor in
-                // Disable blending - stochastic rendering uses depth buffer
-                renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = false
-            }
             .depthCompare(function: .less, enabled: true)
         }
     }
