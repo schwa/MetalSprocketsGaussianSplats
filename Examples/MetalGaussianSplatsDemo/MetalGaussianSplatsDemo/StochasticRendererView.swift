@@ -32,7 +32,7 @@ struct StochasticRendererView: View {
         guard let url else {
             return
         }
-        splatCloud = try! await SplatCloud(url: url, cameraMatrix: cameraMatrix)
+        splatCloud = try! SplatCloud(url: url, cameraMatrix: cameraMatrix)
     }
 }
 

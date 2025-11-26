@@ -5,8 +5,8 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
-    var splatCloud: SplatCloud<Splat>
+public struct SparkSplatRenderPipeline: Element {
+    var splatCloud: SplatCloud<SparkSplat>
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
@@ -17,14 +17,14 @@ public struct SparkSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
     var shDegree: UInt8
 
     @MSState
-    private var sortManager: AsyncSortManager<Splat>?
+    private var sortManager: AsyncSortManager<SparkSplat>?
     @MSState
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
 
-    public init(splatCloud: SplatCloud<Splat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) throws {
+    public init(splatCloud: SplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix

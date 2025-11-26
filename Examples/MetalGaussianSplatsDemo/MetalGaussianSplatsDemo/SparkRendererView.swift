@@ -50,7 +50,7 @@ struct SparkRendererView: View {
             shCoefficients = result.shCoefficients
             shDegree = result.shDegree
         } else {
-            splatCloud = try! await SplatCloud(url: url, cameraMatrix: cameraMatrix)
+            splatCloud = try! SplatCloud(url: url, cameraMatrix: cameraMatrix)
             shCoefficients = nil
             shDegree = 0
         }

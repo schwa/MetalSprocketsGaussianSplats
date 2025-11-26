@@ -11,8 +11,8 @@ import SwiftUI
 
 private let stochasticLogger: Logger? = Logger(subsystem: "stochastic-splats", category: "stochastic-splats")
 
-public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
-    private var splatCloud: SplatCloud<Splat>
+public struct StochasticSplatView: View {
+    private var splatCloud: SplatCloud<SparkSplat>
     private var projection: any ProjectionProtocol
     private var cameraMatrix: simd_float4x4
     private var modelMatrix: simd_float4x4
@@ -44,7 +44,7 @@ public struct StochasticSplatView<Splat: SortableSplatProtocol>: View {
     @State private var blueNoiseTexture: MTLTexture?
 
     public init(
-        splatCloud: SplatCloud<Splat>,
+        splatCloud: SplatCloud<SparkSplat>,
         projection: any ProjectionProtocol,
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity

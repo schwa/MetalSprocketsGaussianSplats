@@ -10,8 +10,8 @@ import SwiftUI
 
 let sparkLogger: Logger? = Logger(subsystem: "spark-splats", category: "spark-splats")
 
-public struct SparkSplatView<Splat: SortableSplatProtocol>: View {
-    private var splatCloud: SplatCloud<Splat>
+public struct SparkSplatView: View {
+    private var splatCloud: SplatCloud<SparkSplat>
     private var projection: any ProjectionProtocol
     private var cameraMatrix: simd_float4x4
     private var modelMatrix: simd_float4x4
@@ -21,7 +21,7 @@ public struct SparkSplatView<Splat: SortableSplatProtocol>: View {
     @State private var enableSH: Bool
 
     public init(
-        splatCloud: SplatCloud<Splat>,
+        splatCloud: SplatCloud<SparkSplat>,
         projection: any ProjectionProtocol,
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,

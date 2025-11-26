@@ -5,8 +5,8 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Element {
-    var splatCloud: SplatCloud<Splat>
+public struct StochasticSplatRenderPipeline: Element {
+    var splatCloud: SplatCloud<SparkSplat>
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
@@ -29,7 +29,7 @@ public struct StochasticSplatRenderPipeline<Splat: SortableSplatProtocol>: Eleme
     var vertexDescriptor: MTLVertexDescriptor
 
     public init(
-        splatCloud: SplatCloud<Splat>,
+        splatCloud: SplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
