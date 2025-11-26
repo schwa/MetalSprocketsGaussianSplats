@@ -5,10 +5,7 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSprocketsUI
-internal import os
 import SwiftUI
-
-private let sparkLogger: Logger? = Logger(subsystem: "spark-splats", category: "spark-splats")
 
 public struct SparkSplatView: View {
     private var splatCloud: SplatCloud<SparkSplat>

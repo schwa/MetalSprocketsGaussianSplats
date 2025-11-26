@@ -7,8 +7,6 @@ import MetalSprocketsUI
 internal import os
 import SwiftUI
 
-internal let logger: Logger? = Logger(subsystem: "gaussian-splats", category: "gaussian-splats")
-
 public struct Antimatter15SplatView: View {
     private var splatCloud: SplatCloud<Antimatter15GPUSplat>
     private var projection: any ProjectionProtocol
