@@ -34,25 +34,44 @@ public struct StochasticSplatView: View {
     @State private var useBlueNoise: Bool = true
 
     // Compute shader for blending
-    @State private var blendFunction: ComputeKernel?
+    private var blendFunction: ComputeKernel
 
     // Blit shaders for display
-    @State private var blitVertexShader: VertexShader?
-    @State private var blitFragmentShader: FragmentShader?
+    private var blitVertexShader: VertexShader
+    private var blitFragmentShader: FragmentShader
 
     // Blue noise texture
-    @State private var blueNoiseTexture: MTLTexture?
+    private var blueNoiseTexture: MTLTexture
 
     public init(
         splatCloud: SplatCloud<SparkSplat>,
         projection: any ProjectionProtocol,
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity
-    ) {
+    ) throws {
         self.splatCloud = splatCloud
         self.projection = projection
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
+
+        // Load shaders
+        let library = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
+        let accumLibrary = library.namespaced("TemporalAccumulationShader")
+        self.blendFunction = try accumLibrary.function(named: "blend", type: ComputeKernel.self)
+        let blitLibrary = library.namespaced("BlitShader")
+        self.blitVertexShader = try blitLibrary.function(named: "vertex_main", type: VertexShader.self)
+        self.blitFragmentShader = try blitLibrary.function(named: "fragment_main", type: FragmentShader.self)
+
+        // Load blue noise texture
+        guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let device = _MTLCreateSystemDefaultDevice()
+        let textureLoader = MTKTextureLoader(device: device)
+        self.blueNoiseTexture = try textureLoader.newTexture(URL: url, options: [
+            .textureUsage: MTLTextureUsage.shaderRead.rawValue,
+            .textureStorageMode: MTLStorageMode.private.rawValue
+        ])
     }
 
     public var body: some View {
@@ -61,8 +80,6 @@ public struct StochasticSplatView: View {
             renderView(time: time)
         }
         .onAppear {
-            loadBlendShader()
-            loadBlueNoiseTexture()
             previousCameraMatrix = cameraMatrix
         }
         .onChange(of: cameraMatrix) { oldValue, _ in
@@ -109,108 +126,64 @@ public struct StochasticSplatView: View {
         }
     }
 
-    private func loadBlendShader() {
-        do {
-            let library = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
-
-            let accumLibrary = library.namespaced("TemporalAccumulationShader")
-            blendFunction = try accumLibrary.function(named: "blend", type: ComputeKernel.self)
-
-            let blitLibrary = library.namespaced("BlitShader")
-            blitVertexShader = try blitLibrary.function(named: "vertex_main", type: VertexShader.self)
-            blitFragmentShader = try blitLibrary.function(named: "fragment_main", type: FragmentShader.self)
-        } catch {
-            stochasticLogger?.error("Failed to load shaders: \(error)")
-        }
-    }
-
-    private func loadBlueNoiseTexture() {
-        guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {
-            stochasticLogger?.error("Blue noise texture not found")
-            return
-        }
-
-        let device = _MTLCreateSystemDefaultDevice()
-        let textureLoader = MTKTextureLoader(device: device)
-
-        do {
-            blueNoiseTexture = try textureLoader.newTexture(URL: url, options: [
-                .textureUsage: MTLTextureUsage.shaderRead.rawValue,
-                .textureStorageMode: MTLStorageMode.private.rawValue
-            ])
-        } catch {
-            stochasticLogger?.error("Failed to load blue noise texture: \(error)")
-        }
-    }
-
     @ViewBuilder
     private func renderView(time: UInt32) -> some View {
-        if let blueNoiseTexture {
-            renderViewWithTexture(time: time, blueNoiseTexture: blueNoiseTexture)
-        }
-    }
-
-    @ViewBuilder
-    private func renderViewWithTexture(time: UInt32, blueNoiseTexture: MTLTexture) -> some View {
         RenderView { _, drawableSize in
-            if enableAccumulation {
-                // Render with temporal accumulation
-                if let renderTexture, let depthTexture, let accumulationTextureA, let accumulationTextureB, let blendFunction, let blitVertexShader, let blitFragmentShader {
-                    // Ping-pong between buffers based on frame
-                    let useTextureA = (time % 2) == 0
-                    let currentAccum = useTextureA ? accumulationTextureA : accumulationTextureB
-                    let outputAccum = useTextureA ? accumulationTextureB : accumulationTextureA
+            if enableAccumulation, let renderTexture, let depthTexture, let accumulationTextureA, let accumulationTextureB {
+                // Ping-pong between buffers based on frame
+                let useTextureA = (time % 2) == 0
+                let currentAccum = useTextureA ? accumulationTextureA : accumulationTextureB
+                let outputAccum = useTextureA ? accumulationTextureB : accumulationTextureA
 
-                    // Calculate blend factor based on camera movement
-                    let blendFactor = calculateBlendFactor()
+                // Calculate blend factor based on camera movement
+                let blendFactor = calculateBlendFactor()
 
-                    // 1. Render splats to intermediate texture
-                    try RenderPass(label: "Stochastic Splat Pass") {
-                        let projectionMatrix = projection.projectionMatrix(for: drawableSize)
-                        try StochasticSplatRenderPipeline(
-                            splatCloud: splatCloud,
-                            projectionMatrix: projectionMatrix,
-                            modelMatrix: modelMatrix,
-                            cameraMatrix: cameraMatrix,
-                            drawableSize: SIMD2<Float>(drawableSize),
-                            frameTime: time,
-                            alphaThreshold: alphaThreshold,
-                            blueNoiseTexture: blueNoiseTexture,
-                            shCoefficients: nil,
-                            shDegree: 0,
-                            useBlueNoise: useBlueNoise
+                // 1. Render splats to intermediate texture
+                try RenderPass(label: "Stochastic Splat Pass") {
+                    let projectionMatrix = projection.projectionMatrix(for: drawableSize)
+                    try StochasticSplatRenderPipeline(
+                        splatCloud: splatCloud,
+                        projectionMatrix: projectionMatrix,
+                        modelMatrix: modelMatrix,
+                        cameraMatrix: cameraMatrix,
+                        drawableSize: SIMD2<Float>(drawableSize),
+                        frameTime: time,
+                        alphaThreshold: alphaThreshold,
+                        blueNoiseTexture: blueNoiseTexture,
+                        shCoefficients: nil,
+                        shDegree: 0,
+                        useBlueNoise: useBlueNoise
+                    )
+                }
+                .renderPassDescriptorModifier { descriptor in
+                    descriptor.colorAttachments[0].texture = renderTexture
+                    descriptor.colorAttachments[0].loadAction = .clear
+                    descriptor.colorAttachments[0].storeAction = .store
+                    descriptor.depthAttachment.texture = depthTexture
+                    descriptor.depthAttachment.loadAction = .clear
+                    descriptor.depthAttachment.storeAction = .dontCare
+                }
+
+                // 2. Blend with accumulation buffer
+                try ComputePass(label: "Temporal Accumulation Pass") {
+                    try ComputePipeline(computeKernel: blendFunction) {
+                        try ComputeDispatch(
+                            threadsPerGrid: MTLSize(width: renderTexture.width, height: renderTexture.height, depth: 1),
+                            threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1)
                         )
+                        .parameter("currentFrame", texture: renderTexture)
+                        .parameter("accumulationTexture", texture: currentAccum)
+                        .parameter("outputTexture", texture: outputAccum)
+                        .parameter("blendFactor", value: blendFactor)
                     }
-                    .renderPassDescriptorModifier { descriptor in
-                        descriptor.colorAttachments[0].texture = renderTexture
-                        descriptor.colorAttachments[0].loadAction = .clear
-                        descriptor.colorAttachments[0].storeAction = .store
-                        descriptor.depthAttachment.texture = depthTexture
-                        descriptor.depthAttachment.loadAction = .clear
-                        descriptor.depthAttachment.storeAction = .dontCare
-                    }
+                }
 
-                    // 2. Blend with accumulation buffer
-                    try ComputePass(label: "Temporal Accumulation Pass") {
-                        try ComputePipeline(computeKernel: blendFunction) {
-                            try ComputeDispatch(
-                                threadsPerGrid: MTLSize(width: renderTexture.width, height: renderTexture.height, depth: 1),
-                                threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1)
-                            )
-                            .parameter("currentFrame", texture: renderTexture)
-                            .parameter("accumulationTexture", texture: currentAccum)
-                            .parameter("outputTexture", texture: outputAccum)
-                            .parameter("blendFactor", value: blendFactor)
-                        }
-                    }
-
-                    // 3. Display accumulated result
-                    try RenderPass(label: "Display Pass") {
-                        try RenderPipeline(vertexShader: blitVertexShader, fragmentShader: blitFragmentShader) {
-                            Draw { encoder in
-                                encoder.setFragmentTexture(outputAccum, index: 0)
-                                encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
-                            }
+                // 3. Display accumulated result
+                try RenderPass(label: "Display Pass") {
+                    try RenderPipeline(vertexShader: blitVertexShader, fragmentShader: blitFragmentShader) {
+                        Draw { encoder in
+                            encoder.setFragmentTexture(outputAccum, index: 0)
+                            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
                         }
                     }
                 }
@@ -235,7 +208,7 @@ public struct StochasticSplatView: View {
             }
         }
         .onDrawableSizeChange { size in
-            createTextures(size: size)
+            ensureTextures(size: size)
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalDepthStencilPixelFormat(.depth32Float)
@@ -265,6 +238,16 @@ public struct StochasticSplatView: View {
             return stationaryBlend + t * (movingBlend - stationaryBlend)
         }
         return stationaryBlend
+    }
+
+    private func ensureTextures(size: CGSize) {
+        let width = Int(size.width)
+        let height = Int(size.height)
+        // Check if textures exist and are the right size
+        if let existing = renderTexture, existing.width == width, existing.height == height {
+            return
+        }
+        createTextures(size: size)
     }
 
     private func createTextures(size: CGSize) {

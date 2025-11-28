@@ -18,7 +18,9 @@ struct StochasticRendererView: View {
     var body: some View {
         ZStack {
             if let splatCloud {
-                StochasticSplatView(splatCloud: splatCloud, projection: projection, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+                ThrowingView {
+                    try StochasticSplatView(splatCloud: splatCloud, projection: projection, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+                }
             }
         }
         .onChange(of: url, initial: true) {
