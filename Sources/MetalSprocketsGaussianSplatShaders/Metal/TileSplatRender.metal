@@ -126,8 +126,11 @@ namespace TileSplatRender {
             float4 clipCenter = uniforms.projectionMatrix * float4(viewCenter, 1.0);
             float3 ndcCenter = clipCenter.xyz / clipCenter.w;
 
-            // Convert NDC to screen coordinates
-            float2 splatCenter2D = (ndcCenter.xy + 1.0) * 0.5 * uniforms.drawableSize;
+            // Convert NDC to screen coordinates (flip Y: NDC Y=-1 is bottom, screen Y=0 is top)
+            float2 splatCenter2D = float2(
+                (ndcCenter.x + 1.0) * 0.5 * uniforms.drawableSize.x,
+                (1.0 - ndcCenter.y) * 0.5 * uniforms.drawableSize.y
+            );
 
             // Build rotation-scale matrix and transform to view space
             float3x3 localRS = scaleQuaternionToMatrix(scales, quaternion);
@@ -155,6 +158,10 @@ namespace TileSplatRender {
 
             // Eigendecomposition for Gaussian evaluation
             Eigen2D eigen = eigendecompose2D(cov2D, MAX_PIXEL_RADIUS, MAX_STD_DEV);
+
+            // Flip Y component of eigen axes to match screen coordinates (Y flipped from NDC)
+            eigen.majorAxis.y = -eigen.majorAxis.y;
+            eigen.minorAxis.y = -eigen.minorAxis.y;
 
             // Compute pixel's position relative to splat center
             float2 delta = pixelPos - splatCenter2D;

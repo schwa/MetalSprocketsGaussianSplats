@@ -74,9 +74,15 @@ namespace TileSplatSupport {
         thread uint2& minTile,
         thread uint2& maxTile
     ) {
-        // NDC space: -1 to 1, grid space: 0 to tileGridSize
-        float2 minTileFloat = (ndcMin + 1.0) * 0.5 * float2(tileGridSize);
-        float2 maxTileFloat = (ndcMax + 1.0) * 0.5 * float2(tileGridSize);
+        // NDC space: X from -1 (left) to 1 (right), Y from -1 (bottom) to 1 (top)
+        // Screen space: X from 0 (left), Y from 0 (top) - Y is flipped!
+        // Convert to normalized screen coordinates (0 to 1), flipping Y
+        float2 screenMin = float2((ndcMin.x + 1.0) * 0.5, (1.0 - ndcMax.y) * 0.5);
+        float2 screenMax = float2((ndcMax.x + 1.0) * 0.5, (1.0 - ndcMin.y) * 0.5);
+
+        // Convert to tile coordinates
+        float2 minTileFloat = screenMin * float2(tileGridSize);
+        float2 maxTileFloat = screenMax * float2(tileGridSize);
 
         // Clamp to valid tile range
         minTile = uint2(clamp(minTileFloat, float2(0.0), float2(tileGridSize - 1)));
