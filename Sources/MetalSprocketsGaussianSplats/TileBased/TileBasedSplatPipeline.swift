@@ -18,7 +18,6 @@ public struct TileBasedSplatPipeline: Element {
     var cameraMatrix: simd_float4x4
     var drawableSize: SIMD2<Float>
     var tileSplatResources: TileSplatResources
-    var debugTileOverflow: Bool
     var debugTileBorders: Bool
 
     // MARK: - Initialization
@@ -30,7 +29,6 @@ public struct TileBasedSplatPipeline: Element {
         cameraMatrix: simd_float4x4,
         drawableSize: SIMD2<Float>,
         tileSplatResources: TileSplatResources,
-        debugTileOverflow: Bool = false,
         debugTileBorders: Bool = false
     ) {
         self.splatCloud = splatCloud
@@ -39,7 +37,6 @@ public struct TileBasedSplatPipeline: Element {
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
         self.tileSplatResources = tileSplatResources
-        self.debugTileOverflow = debugTileOverflow
         self.debugTileBorders = debugTileBorders
     }
 
@@ -47,9 +44,23 @@ public struct TileBasedSplatPipeline: Element {
 
     public var body: some Element {
         get throws {
-            // Pass 1: Tile Binning
-            // Assigns each splat to all tiles it overlaps
-            try TileBinningComputePass(
+            // Pass 1a: Count splats per tile
+            try TileBinningCountPass(
+                splatCloud: splatCloud,
+                projectionMatrix: projectionMatrix,
+                modelMatrix: modelMatrix,
+                cameraMatrix: cameraMatrix,
+                drawableSize: drawableSize,
+                tileSplatResources: tileSplatResources
+            )
+
+            // Pass 1b: Compute prefix sum of tile counts
+            try TilePrefixSumComputePass(
+                tileSplatResources: tileSplatResources
+            )
+
+            // Pass 1c: Write splats to compacted buffer using offsets
+            try TileBinningWritePass(
                 splatCloud: splatCloud,
                 projectionMatrix: projectionMatrix,
                 modelMatrix: modelMatrix,
@@ -74,7 +85,6 @@ public struct TileBasedSplatPipeline: Element {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: drawableSize,
-                    debugTileOverflow: debugTileOverflow,
                     debugTileBorders: debugTileBorders
                 )
             }

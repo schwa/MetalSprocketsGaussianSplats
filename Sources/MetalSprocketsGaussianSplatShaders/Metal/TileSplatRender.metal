@@ -10,10 +10,8 @@ using namespace metal;
 using namespace SparkSplatSupport;
 using namespace TileSplatSupport;
 
-// Debug mode: when enabled, tiles that exceed MAX_SPLATS_PER_TILE are drawn in red
-constant bool debugTileOverflow [[function_constant(0)]];
 // Debug mode: when enabled, draws red border at tile edges (x=0 or y=0 within tile)
-constant bool debugTileBorders [[function_constant(1)]];
+constant bool debugTileBorders [[function_constant(0)]];
 
 namespace TileSplatRender {
 
@@ -50,7 +48,7 @@ namespace TileSplatRender {
         FragmentIn in [[stage_in]],
         constant SparkSplat* splats [[buffer(0)]],
         device TileSplatIndex* tileSplatIndices [[buffer(1)]],
-        device uint* tileCounters [[buffer(2)]],
+        device const uint* tileOffsets [[buffer(2)]],
         constant TileRenderUniforms& uniforms [[buffer(3)]],
         TileSplatImageblock imageblockIn [[imageblock_data(TileSplatImageblock)]],
         ushort2 pixelPositionInTile [[pixel_position_in_tile]],
@@ -78,23 +76,16 @@ namespace TileSplatRender {
         uint2 tileCoord = pixelToTile(pixelCoord);
         uint tileIndex = tileToLinearIndex(tileCoord, uniforms.tileGridSize);
 
-        // Get raw and capped splat count for this tile
-        uint rawCount = tileCounters[tileIndex];
-        uint count = min(rawCount, uniforms.maxSplatsPerTile);
-
-        // Debug mode: draw tiles that overflow in red
-        if (debugTileOverflow && rawCount > MAX_SPLATS_PER_TILE) {
-            out.imageblock.color = half4(1.0, 0.0, 0.0, 1.0);
-            return out;
-        }
+        // Get tile's range from offsets
+        uint startIndex = tileOffsets[tileIndex];
+        uint endIndex = tileOffsets[tileIndex + 1];
+        uint count = endIndex - startIndex;
 
         if (count == 0) {
             // Empty tile - transparent
             out.imageblock.color = half4(0.0);
             return out;
         }
-
-        uint baseIndex = getTileBaseIndex(tileIndex);
 
         // Initialize accumulation for front-to-back blending
         float4 accumulatedColor = float4(0.0);
@@ -108,7 +99,7 @@ namespace TileSplatRender {
 
         // Process splats front-to-back (already sorted by depth)
         for (uint i = 0; i < count; i++) {
-            TileSplatIndex idx = tileSplatIndices[baseIndex + i];
+            TileSplatIndex idx = tileSplatIndices[startIndex + i];
             SparkSplat splat = splats[idx.splatID];
 
             float3 center = float3(splat.position);

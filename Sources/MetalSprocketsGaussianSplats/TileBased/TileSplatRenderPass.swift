@@ -18,7 +18,6 @@ public struct TileSplatRenderPass: Element {
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
     var drawableSize: SIMD2<Float>
-    var debugTileOverflow: Bool
     var debugTileBorders: Bool
 
     var shaderLibrary: ShaderNamespace
@@ -39,7 +38,6 @@ public struct TileSplatRenderPass: Element {
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
         drawableSize: SIMD2<Float>,
-        debugTileOverflow: Bool = false,
         debugTileBorders: Bool = false
     ) throws {
         self.splatCloud = splatCloud
@@ -48,19 +46,17 @@ public struct TileSplatRenderPass: Element {
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
-        self.debugTileOverflow = debugTileOverflow
         self.debugTileBorders = debugTileBorders
 
         self.shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
             .namespaced("TileSplatRender")
         self.vertexShader = try shaderLibrary.function(named: "tile_vertex", type: VertexShader.self)
-        self.fragmentShader = try Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileOverflow: debugTileOverflow, debugTileBorders: debugTileBorders)
+        self.fragmentShader = try Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileBorders: debugTileBorders)
         self.blitFragmentShader = try shaderLibrary.function(named: "tile_blit_fragment", type: FragmentShader.self)
     }
 
-    private static func makeFragmentShader(shaderLibrary: ShaderNamespace, debugTileOverflow: Bool, debugTileBorders: Bool) throws -> FragmentShader {
+    private static func makeFragmentShader(shaderLibrary: ShaderNamespace, debugTileBorders: Bool) throws -> FragmentShader {
         var fragmentConstants = FunctionConstants()
-        fragmentConstants["debugTileOverflow"] = .bool(debugTileOverflow)
         fragmentConstants["debugTileBorders"] = .bool(debugTileBorders)
         return try shaderLibrary.function(named: "tile_fragment", type: FragmentShader.self, constants: fragmentConstants)
     }
@@ -89,8 +85,8 @@ public struct TileSplatRenderPass: Element {
 
                     // Fragment shader buffers
                     commandEncoder.setFragmentBuffer(splatCloud.splats.unsafeMTLBuffer, offset: 0, index: 0)
-                    commandEncoder.setFragmentBuffer(tileSplatResources.tileSplatIndices.unsafeMTLBuffer, offset: 0, index: 1)
-                    commandEncoder.setFragmentBuffer(tileSplatResources.tileCounters.unsafeMTLBuffer, offset: 0, index: 2)
+                    commandEncoder.setFragmentBuffer(tileSplatResources.tileSplatIndicesA.unsafeMTLBuffer, offset: 0, index: 1)
+                    commandEncoder.setFragmentBuffer(tileSplatResources.tileOffsets.unsafeMTLBuffer, offset: 0, index: 2)
 
                     // Uniforms
                     var uniformsCopy = uniforms
@@ -99,11 +95,8 @@ public struct TileSplatRenderPass: Element {
                     commandEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
                 }
             }
-            .onChange(of: debugTileOverflow, initial: true) { _, _ in
-                fragmentShader = try! Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileOverflow: debugTileOverflow, debugTileBorders: debugTileBorders)
-            }
             .onChange(of: debugTileBorders, initial: true) { _, _ in
-                fragmentShader = try! Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileOverflow: debugTileOverflow, debugTileBorders: debugTileBorders)
+                fragmentShader = try! Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileBorders: debugTileBorders)
             }
 
             // Step 2: Blit imageblock to color attachment (framebuffer)

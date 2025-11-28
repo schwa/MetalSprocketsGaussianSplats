@@ -13,7 +13,6 @@ public struct TileBasedSplatView: View {
     private var projection: any ProjectionProtocol
     private var cameraMatrix: simd_float4x4
     private var modelMatrix: simd_float4x4
-    private var debugTileOverflow: Bool
     private var debugTileBorders: Bool
 
     @State private var tileSplatResources: TileSplatResources?
@@ -23,14 +22,12 @@ public struct TileBasedSplatView: View {
         projection: any ProjectionProtocol,
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,
-        debugTileOverflow: Bool = false,
         debugTileBorders: Bool = false
     ) {
         self.splatCloud = splatCloud
         self.projection = projection
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
-        self.debugTileOverflow = debugTileOverflow
         self.debugTileBorders = debugTileBorders
     }
 
@@ -40,8 +37,23 @@ public struct TileBasedSplatView: View {
             let resources = try ensureTileResources(size: drawableSize)
             let projectionMatrix = projection.projectionMatrix(aspectRatio: Float(drawableSize.width / drawableSize.height))
 
-            // Pass 1: Tile Binning (compute) - assigns splats to tiles
-            try TileBinningComputePass(
+            // Pass 1a: Count splats per tile
+            try TileBinningCountPass(
+                splatCloud: splatCloud,
+                projectionMatrix: projectionMatrix,
+                modelMatrix: modelMatrix,
+                cameraMatrix: cameraMatrix,
+                drawableSize: drawableSizeFloat,
+                tileSplatResources: resources
+            )
+
+            // Pass 1b: Compute prefix sum of tile counts
+            try TilePrefixSumComputePass(
+                tileSplatResources: resources
+            )
+
+            // Pass 1c: Write splats to compacted buffer using offsets
+            try TileBinningWritePass(
                 splatCloud: splatCloud,
                 projectionMatrix: projectionMatrix,
                 modelMatrix: modelMatrix,
@@ -64,7 +76,6 @@ public struct TileBasedSplatView: View {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: drawableSizeFloat,
-                    debugTileOverflow: debugTileOverflow,
                     debugTileBorders: debugTileBorders
                 )
             }

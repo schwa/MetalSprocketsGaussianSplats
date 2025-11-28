@@ -6,12 +6,10 @@
 // MARK: - Tile Configuration Constants
 
 #define TILE_SIZE 16
-#define MAX_SPLATS_PER_TILE 2048
 #define ALPHA_THRESHOLD 0.95f
 
 // Function constant indices for shader specialization
-#define FC_DEBUG_TILE_OVERFLOW 0
-#define FC_DEBUG_TILE_BORDERS 1
+#define FC_DEBUG_TILE_BORDERS 0
 
 // MARK: - Data Structures
 
@@ -28,7 +26,6 @@ struct TileRenderUniforms {
     simd_float4x4 projectionMatrix;
     simd_float2 drawableSize;
     simd_uint2 tileGridSize;
-    uint32_t maxSplatsPerTile;
     float scale;
 };
 
@@ -65,11 +62,6 @@ namespace TileSplatSupport {
     /// Convert tile coordinate to linear tile index
     inline uint tileToLinearIndex(uint2 tileCoord, uint2 tileGridSize) {
         return tileCoord.y * tileGridSize.x + tileCoord.x;
-    }
-
-    /// Get the base index into tileSplatIndices buffer for a tile
-    inline uint getTileBaseIndex(uint tileIndex) {
-        return tileIndex * MAX_SPLATS_PER_TILE;
     }
 
     // MARK: - Bounding Box in Tile Space

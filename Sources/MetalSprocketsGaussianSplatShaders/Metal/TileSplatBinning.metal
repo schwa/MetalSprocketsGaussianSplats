@@ -11,28 +11,21 @@ using namespace TileSplatSupport;
 
 namespace TileSplatBinning {
 
-    // MARK: - Tile Binning Compute Kernel
+    // MARK: - Shared Splat Processing
 
-    /// Assigns each splat to all tiles it overlaps
-    /// One thread per splat
-    [[kernel]] void tile_binning(
-        uint splatID [[thread_position_in_grid]],
-        constant SparkSplat* splats [[buffer(0)]],
-        constant uint& splatCount [[buffer(1)]],
-        constant float4x4& modelMatrix [[buffer(2)]],
-        constant float4x4& viewMatrix [[buffer(3)]],
-        constant float4x4& projectionMatrix [[buffer(4)]],
-        constant float2& drawableSize [[buffer(5)]],
-        constant float& scale [[buffer(6)]],
-        constant uint2& tileGridSize [[buffer(7)]],
-        device atomic_uint* tileCounters [[buffer(8)]],
-        device TileSplatIndex* tileSplatIndices [[buffer(9)]]
+    /// Compute tile bounds for a splat, returns false if splat should be culled
+    inline bool computeSplatTileBounds(
+        uint splatID,
+        constant SparkSplat* splats,
+        constant float4x4& modelMatrix,
+        constant float4x4& viewMatrix,
+        constant float4x4& projectionMatrix,
+        constant float2& drawableSize,
+        constant uint2& tileGridSize,
+        thread uint2& minTile,
+        thread uint2& maxTile,
+        thread float& depth
     ) {
-        if (splatID >= splatCount) {
-            return;
-        }
-
-        // Fetch splat
         SparkSplat splat = splats[splatID];
 
         float3 center = float3(splat.position);
@@ -42,12 +35,12 @@ namespace TileSplatBinning {
 
         // Cull by alpha
         if (rgba.a < MIN_ALPHA) {
-            return;
+            return false;
         }
 
         // Cull if all scales are zero
         if (scales.x == 0.0 && scales.y == 0.0 && scales.z == 0.0) {
-            return;
+            return false;
         }
 
         // Transform center to world space
@@ -59,24 +52,24 @@ namespace TileSplatBinning {
 
         // Cull splats behind camera
         if (viewCenter.z >= 0.0) {
-            return;
+            return false;
         }
 
         // Store depth for sorting (negative Z, closer = more negative)
-        float depth = viewCenter.z;
+        depth = viewCenter.z;
 
         // Compute clip space center
         float4 clipCenter = projectionMatrix * float4(viewCenter, 1.0);
 
         // Cull outside near/far planes
         if (abs(clipCenter.z) >= clipCenter.w) {
-            return;
+            return false;
         }
 
         // Cull outside XY frustum
         float clip = CLIP_XY * clipCenter.w;
         if (abs(clipCenter.x) > clip || abs(clipCenter.y) > clip) {
-            return;
+            return false;
         }
 
         // Build rotation-scale matrix and transform to view space
@@ -103,12 +96,16 @@ namespace TileSplatBinning {
         float3 ndcCenter = clipCenter.xyz / clipCenter.w;
 
         // Compute bounding box in NDC space
-        // The ellipse axes are in pixels, convert to NDC
         float2 majorAxisNDC = (2.0 / drawableSize) * eigen.majorAxis;
         float2 minorAxisNDC = (2.0 / drawableSize) * eigen.minorAxis;
 
         // Compute extent of ellipse in NDC
         float2 extent = abs(majorAxisNDC) + abs(minorAxisNDC);
+
+        // Add minimum padding of 1 tile in NDC space to handle small/distant splats
+        // This ensures splats near tile boundaries are assigned to neighboring tiles
+        float2 tilePaddingNDC = 2.0 * float2(TILE_SIZE) / drawableSize;
+        extent = max(extent, tilePaddingNDC);
 
         float2 ndcMin = ndcCenter.xy - extent;
         float2 ndcMax = ndcCenter.xy + extent;
@@ -118,26 +115,97 @@ namespace TileSplatBinning {
         ndcMax = clamp(ndcMax, float2(-1.0), float2(1.0));
 
         // Convert to tile coordinates
-        uint2 minTile, maxTile;
         ndcBoundsToTiles(ndcMin, ndcMax, tileGridSize, minTile, maxTile);
+
+        return true;
+    }
+
+    // MARK: - Phase 1: Count Splats Per Tile
+
+    /// Count how many splats overlap each tile (phase 1 of binning)
+    /// One thread per splat
+    [[kernel]] void tile_binning_count(
+        uint splatID [[thread_position_in_grid]],
+        constant SparkSplat* splats [[buffer(0)]],
+        constant uint& splatCount [[buffer(1)]],
+        constant float4x4& modelMatrix [[buffer(2)]],
+        constant float4x4& viewMatrix [[buffer(3)]],
+        constant float4x4& projectionMatrix [[buffer(4)]],
+        constant float2& drawableSize [[buffer(5)]],
+        constant float& scale [[buffer(6)]],
+        constant uint2& tileGridSize [[buffer(7)]],
+        device atomic_uint* tileCounters [[buffer(8)]]
+    ) {
+        if (splatID >= splatCount) {
+            return;
+        }
+
+        uint2 minTile, maxTile;
+        float depth;
+
+        if (!computeSplatTileBounds(splatID, splats, modelMatrix, viewMatrix,
+                                     projectionMatrix, drawableSize, tileGridSize,
+                                     minTile, maxTile, depth)) {
+            return;
+        }
+
+        // Increment counter for all overlapping tiles
+        for (uint ty = minTile.y; ty <= maxTile.y; ty++) {
+            for (uint tx = minTile.x; tx <= maxTile.x; tx++) {
+                uint tileIndex = tileToLinearIndex(uint2(tx, ty), tileGridSize);
+                atomic_fetch_add_explicit(&tileCounters[tileIndex], 1u, memory_order_relaxed);
+            }
+        }
+    }
+
+    // MARK: - Phase 2: Write Splats to Compacted Buffer
+
+    /// Write splats to compacted buffer using precomputed offsets (phase 2 of binning)
+    /// One thread per splat
+    [[kernel]] void tile_binning_write(
+        uint splatID [[thread_position_in_grid]],
+        constant SparkSplat* splats [[buffer(0)]],
+        constant uint& splatCount [[buffer(1)]],
+        constant float4x4& modelMatrix [[buffer(2)]],
+        constant float4x4& viewMatrix [[buffer(3)]],
+        constant float4x4& projectionMatrix [[buffer(4)]],
+        constant float2& drawableSize [[buffer(5)]],
+        constant float& scale [[buffer(6)]],
+        constant uint2& tileGridSize [[buffer(7)]],
+        device atomic_uint* tileCounters [[buffer(8)]],
+        device TileSplatIndex* tileSplatIndices [[buffer(9)]],
+        device const uint* tileOffsets [[buffer(10)]],
+        constant uint& maxTotalIntersections [[buffer(11)]]
+    ) {
+        if (splatID >= splatCount) {
+            return;
+        }
+
+        uint2 minTile, maxTile;
+        float depth;
+
+        if (!computeSplatTileBounds(splatID, splats, modelMatrix, viewMatrix,
+                                     projectionMatrix, drawableSize, tileGridSize,
+                                     minTile, maxTile, depth)) {
+            return;
+        }
 
         // Write to all overlapping tiles
         for (uint ty = minTile.y; ty <= maxTile.y; ty++) {
             for (uint tx = minTile.x; tx <= maxTile.x; tx++) {
                 uint tileIndex = tileToLinearIndex(uint2(tx, ty), tileGridSize);
 
-                // Atomic increment counter
-                uint localIndex = atomic_fetch_add_explicit(
-                    &tileCounters[tileIndex], 1u, memory_order_relaxed
-                );
+                // Atomic increment counter to get local index within tile
+                uint localIndex = atomic_fetch_add_explicit(&tileCounters[tileIndex], 1u, memory_order_relaxed);
 
-                // Write to tile buffer if not full (truncate at MAX_SPLATS_PER_TILE)
-                if (localIndex < MAX_SPLATS_PER_TILE) {
-                    uint writeIndex = getTileBaseIndex(tileIndex) + localIndex;
+                // Compute write index using precomputed offset
+                uint writeIndex = tileOffsets[tileIndex] + localIndex;
+
+                // Bounds check against total buffer size
+                if (writeIndex < maxTotalIntersections) {
                     tileSplatIndices[writeIndex].splatID = splatID;
                     tileSplatIndices[writeIndex].depth = depth;
                 }
-                // Continue counting even if full (for diagnostics)
             }
         }
     }

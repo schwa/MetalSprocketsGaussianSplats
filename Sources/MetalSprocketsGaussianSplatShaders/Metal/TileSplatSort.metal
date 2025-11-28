@@ -28,33 +28,35 @@ namespace TileSplatSort {
     // MARK: - Radix Sort Implementation
 
     /// Radix sort using 4 passes of 8-bit counting sort
-    /// One thread per tile, sorts in-place using threadgroup memory
+    /// One thread per tile, uses device memory ping-pong between two buffers
+    /// Uses tileOffsets for variable-length tile ranges
+    /// After 4 passes (even number), result is back in buffer A
     [[kernel]] void tile_sort(
         uint tileIndex [[thread_position_in_grid]],
-        device TileSplatIndex* tileSplatIndices [[buffer(0)]],
-        device uint* tileCounters [[buffer(1)]],
-        constant uint& numTiles [[buffer(2)]]
+        device TileSplatIndex* tileSplatIndicesA [[buffer(0)]],
+        device TileSplatIndex* tileSplatIndicesB [[buffer(1)]],
+        device const uint* tileOffsets [[buffer(2)]],
+        constant uint& numTiles [[buffer(3)]]
     ) {
         if (tileIndex >= numTiles) {
             return;
         }
 
-        uint count = min(tileCounters[tileIndex], uint(MAX_SPLATS_PER_TILE));
+        // Get tile's range from offsets
+        uint startIndex = tileOffsets[tileIndex];
+        uint endIndex = tileOffsets[tileIndex + 1];
+        uint count = endIndex - startIndex;
 
         if (count <= 1) {
             return;
         }
 
-        uint baseIndex = getTileBaseIndex(tileIndex);
-
-        // Temporary storage for double-buffering during sort
-        // Using stack arrays since we're single-threaded per tile
-        TileSplatIndex temp[MAX_SPLATS_PER_TILE];
+        // Histogram for counting sort (256 buckets for 8-bit radix)
         uint histogram[256];
 
-        // Pointers for double-buffering
-        device TileSplatIndex* src = tileSplatIndices + baseIndex;
-        thread TileSplatIndex* dst = temp;
+        // Ping-pong between device buffers
+        device TileSplatIndex* src = tileSplatIndicesA + startIndex;
+        device TileSplatIndex* dst = tileSplatIndicesB + startIndex;
 
         // 4 passes for 32-bit key (8 bits per pass, LSB first)
         for (uint pass = 0; pass < 4; pass++) {
@@ -79,7 +81,7 @@ namespace TileSplatSort {
                 sum += val;
             }
 
-            // Scatter to destination
+            // Scatter to destination buffer
             for (uint i = 0; i < count; i++) {
                 uint sortableKey = ~floatToSortableKey(src[i].depth);
                 uint radixKey = getRadixKey(sortableKey, pass);
@@ -87,19 +89,14 @@ namespace TileSplatSort {
                 dst[destIndex] = src[i];
             }
 
-            // Swap buffers for next pass
-            if (pass < 3) {
-                // Copy back to device buffer for next pass
-                for (uint i = 0; i < count; i++) {
-                    src[i] = dst[i];
-                }
-            }
+            // Swap src and dst for next pass
+            device TileSplatIndex* tmp = src;
+            src = dst;
+            dst = tmp;
         }
 
-        // Final copy back to device buffer (result is in temp after 4 passes)
-        for (uint i = 0; i < count; i++) {
-            (tileSplatIndices + baseIndex)[i] = temp[i];
-        }
+        // After 4 passes (even number), result is in original src buffer (buffer A)
+        // No copy needed - data is already in place
     }
 
 } // namespace TileSplatSort

@@ -1,5 +1,5 @@
 {
-  "originHash" : "e6dfec8fb30cd2f0829583204f96f506e0d337dd1880efbe410ea982eec03c89",
+  "originHash" : "bf9f3d7def0abd3154f9a92feadbcdbc34c8067308d4ffd45ee406522ff78f21",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -26,15 +26,6 @@
       "state" : {
         "revision" : "36c761478a8e3fb934acf8ef2db4696af95069b4",
         "version" : "0.1.5"
-      }
-    },
-    {
-      "identity" : "metalsprockets",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/MetalSprockets",
-      "state" : {
-        "branch" : "main",
-        "revision" : "7e7f67894582b80e9ba5613565c417d663f040fb"
       }
     },
     {

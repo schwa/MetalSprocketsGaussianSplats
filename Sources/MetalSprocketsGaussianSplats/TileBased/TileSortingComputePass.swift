@@ -36,8 +36,9 @@ public struct TileSortingComputePass: Element {
                         threadsPerGrid: MTLSize(width: numTiles, height: 1, depth: 1),
                         threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1)
                     )
-                    .parameter("tileSplatIndices", buffer: tileSplatResources.tileSplatIndices.unsafeMTLBuffer)
-                    .parameter("tileCounters", buffer: tileSplatResources.tileCounters.unsafeMTLBuffer)
+                    .parameter("tileSplatIndicesA", buffer: tileSplatResources.tileSplatIndicesA.unsafeMTLBuffer)
+                    .parameter("tileSplatIndicesB", buffer: tileSplatResources.tileSplatIndicesB.unsafeMTLBuffer)
+                    .parameter("tileOffsets", buffer: tileSplatResources.tileOffsets.unsafeMTLBuffer)
                     .parameter("numTiles", value: UInt32(numTiles))
                 }
             }

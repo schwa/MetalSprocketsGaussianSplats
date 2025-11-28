@@ -15,7 +15,6 @@ struct TileBasedDemoView: View {
     let modelMatrix: simd_float4x4
 
     @State private var splatCloud: SplatCloud<SparkSplat>?
-    @State private var debugTileOverflow = false
     @State private var debugTileBorders = false
 
     var body: some View {
@@ -26,14 +25,12 @@ struct TileBasedDemoView: View {
                     projection: projection,
                     cameraMatrix: cameraMatrix,
                     modelMatrix: modelMatrix,
-                    debugTileOverflow: debugTileOverflow,
                     debugTileBorders: debugTileBorders
                 )
             }
         }
         .overlay(alignment: .topLeading) {
             VStack(alignment: .leading) {
-                Toggle("Tile Overflow", isOn: $debugTileOverflow)
                 Toggle("Tile Borders", isOn: $debugTileBorders)
             }
             .toggleStyle(.switch)

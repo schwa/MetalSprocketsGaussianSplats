@@ -10,7 +10,10 @@ public final class TileSplatResources {
     // MARK: - Configuration
 
     public static let tileSize = UInt32(TILE_SIZE)
-    public static let maxSplatsPerTile = UInt32(MAX_SPLATS_PER_TILE)
+
+    /// Maximum total splat-tile intersections (splats * average tiles per splat)
+    /// Conservative estimate: each splat overlaps ~8 tiles on average
+    public static let maxTotalSplatTileIntersections = 16 * 1024 * 1024  // 16M entries = 128MB
 
     // MARK: - Properties
 
@@ -25,13 +28,19 @@ public final class TileSplatResources {
         Int(tileGridSize.x) * Int(tileGridSize.y)
     }
 
-    /// Buffer containing TileSplatIndex entries for all tiles
-    /// Layout: [tile_0_indices][tile_1_indices]...[tile_N_indices]
-    /// Each tile has MAX_SPLATS_PER_TILE entries
-    public private(set) var tileSplatIndices: TypedMTLBuffer<TileSplatIndex>
+    /// Buffer containing TileSplatIndex entries for all tiles (compacted)
+    /// Layout: [tile_0_indices...][tile_1_indices...]...[tile_N_indices...]
+    /// Each tile's range is defined by tileOffsets[tile] to tileOffsets[tile+1]
+    /// Two buffers for ping-pong radix sorting
+    public private(set) var tileSplatIndicesA: TypedMTLBuffer<TileSplatIndex>
+    public private(set) var tileSplatIndicesB: TypedMTLBuffer<TileSplatIndex>
 
     /// Atomic counter buffer - one uint per tile tracking actual splat count
     public private(set) var tileCounters: TypedMTLBuffer<UInt32>
+
+    /// Prefix sum of tile counts - tileOffsets[i] is starting index for tile i
+    /// tileOffsets[numTiles] contains total count
+    public private(set) var tileOffsets: TypedMTLBuffer<UInt32>
 
     /// Drawable size this resource was created for
     public private(set) var drawableSize: SIMD2<Float>
@@ -48,15 +57,21 @@ public final class TileSplatResources {
         self.tileGridSize = SIMD2(gridWidth, gridHeight)
 
         let totalTiles = Int(gridWidth) * Int(gridHeight)
-        let indexBufferCapacity = totalTiles * Int(Self.maxSplatsPerTile)
 
-        // Allocate tile splat index buffer
-        self.tileSplatIndices = try device.makeTypedBuffer(element: TileSplatIndex.self, capacity: indexBufferCapacity, options: .storageModePrivate).labeled("TileSplatIndices")
-        self.tileSplatIndices.count = indexBufferCapacity
+        // Allocate two compacted tile splat index buffers for ping-pong sorting
+        self.tileSplatIndicesA = try device.makeTypedBuffer(element: TileSplatIndex.self, capacity: Self.maxTotalSplatTileIntersections, options: .storageModePrivate).labeled("TileSplatIndicesA")
+        self.tileSplatIndicesA.count = Self.maxTotalSplatTileIntersections
+
+        self.tileSplatIndicesB = try device.makeTypedBuffer(element: TileSplatIndex.self, capacity: Self.maxTotalSplatTileIntersections, options: .storageModePrivate).labeled("TileSplatIndicesB")
+        self.tileSplatIndicesB.count = Self.maxTotalSplatTileIntersections
 
         // Allocate tile counter buffer
         self.tileCounters = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModePrivate).labeled("TileCounters")
         self.tileCounters.count = totalTiles
+
+        // Allocate tile offsets buffer (numTiles + 1 for total count)
+        self.tileOffsets = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles + 1, options: .storageModePrivate).labeled("TileOffsets")
+        self.tileOffsets.count = totalTiles + 1
     }
 
     // MARK: - Resize
@@ -81,14 +96,16 @@ public final class TileSplatResources {
         self.tileGridSize = SIMD2(gridWidth, gridHeight)
 
         let totalTiles = Int(gridWidth) * Int(gridHeight)
-        let indexBufferCapacity = totalTiles * Int(Self.maxSplatsPerTile)
 
-        // Reallocate buffers
-        self.tileSplatIndices = try device.makeTypedBuffer(element: TileSplatIndex.self, capacity: indexBufferCapacity, options: .storageModePrivate).labeled("TileSplatIndices")
-        self.tileSplatIndices.count = indexBufferCapacity
+        // tileSplatIndices doesn't need resize - it's sized for max total intersections
 
+        // Reallocate tile counter buffer
         self.tileCounters = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModePrivate).labeled("TileCounters")
         self.tileCounters.count = totalTiles
+
+        // Reallocate tile offsets buffer
+        self.tileOffsets = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles + 1, options: .storageModePrivate).labeled("TileOffsets")
+        self.tileOffsets.count = totalTiles + 1
     }
 
     // MARK: - Uniforms
@@ -106,7 +123,6 @@ public final class TileSplatResources {
             projectionMatrix: projectionMatrix,
             drawableSize: drawableSize,
             tileGridSize: tileGridSize,
-            maxSplatsPerTile: Self.maxSplatsPerTile,
             scale: scale
         )
     }
@@ -115,15 +131,17 @@ public final class TileSplatResources {
 
     /// Total GPU memory used by tile resources (in bytes)
     public var totalMemoryUsage: Int {
-        let indexBufferSize = tileSplatIndices.unsafeMTLBuffer.length
+        let indexBufferASize = tileSplatIndicesA.unsafeMTLBuffer.length
+        let indexBufferBSize = tileSplatIndicesB.unsafeMTLBuffer.length
         let counterBufferSize = tileCounters.unsafeMTLBuffer.length
-        return indexBufferSize + counterBufferSize
+        let offsetsBufferSize = tileOffsets.unsafeMTLBuffer.length
+        return indexBufferASize + indexBufferBSize + counterBufferSize + offsetsBufferSize
     }
 
     /// Human-readable memory usage string
     public var memoryUsageDescription: String {
         let mb = Double(totalMemoryUsage) / (1_024 * 1_024)
-        return String(format: "%.1f MB (%d tiles, %d splats/tile)", mb, numTiles, Self.maxSplatsPerTile)
+        return String(format: "%.1f MB (%d tiles, max %d total intersections)", mb, numTiles, Self.maxTotalSplatTileIntersections)
     }
 }
 
