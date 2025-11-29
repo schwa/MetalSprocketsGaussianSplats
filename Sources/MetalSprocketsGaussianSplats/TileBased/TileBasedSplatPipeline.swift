@@ -19,6 +19,7 @@ public struct TileBasedSplatPipeline: Element {
     var drawableSize: SIMD2<Float>
     var tileSplatResources: TileSplatResources
     var debugTileBorders: Bool
+    var showHeatMap: Bool
 
     // MARK: - Initialization
 
@@ -29,7 +30,8 @@ public struct TileBasedSplatPipeline: Element {
         cameraMatrix: simd_float4x4,
         drawableSize: SIMD2<Float>,
         tileSplatResources: TileSplatResources,
-        debugTileBorders: Bool = false
+        debugTileBorders: Bool = false,
+        showHeatMap: Bool = false
     ) {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
@@ -38,6 +40,7 @@ public struct TileBasedSplatPipeline: Element {
         self.drawableSize = drawableSize
         self.tileSplatResources = tileSplatResources
         self.debugTileBorders = debugTileBorders
+        self.showHeatMap = showHeatMap
     }
 
     // MARK: - Element Body
@@ -94,6 +97,13 @@ public struct TileBasedSplatPipeline: Element {
                 descriptor.tileHeight = Int(TILE_SIZE)
                 // TileSplatImageblock contains half4 = 4 * 2 bytes = 8 bytes, aligned to 16
                 descriptor.imageblockSampleLength = 16
+            }
+
+            // Optional: Heatmap overlay showing splat density per tile
+            if showHeatMap {
+                try RenderPass {
+                    try TileHeatMapRenderPass(tileSplatResources: tileSplatResources)
+                }
             }
         }
     }

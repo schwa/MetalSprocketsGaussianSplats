@@ -42,6 +42,13 @@ public final class TileSplatResources {
     /// tileOffsets[numTiles] contains total count
     public private(set) var tileOffsets: TypedMTLBuffer<UInt32>
 
+    /// Maximum splat count across all tiles (for heatmap normalization)
+    /// Written by prefix sum kernel
+    public private(set) var maxTileCount: TypedMTLBuffer<UInt32>
+
+    /// Shared-mode buffer for reading back tile counts to CPU (for stats display)
+    public private(set) var tileCountersReadback: TypedMTLBuffer<UInt32>
+
     /// Drawable size this resource was created for
     public private(set) var drawableSize: SIMD2<Float>
 
@@ -72,6 +79,14 @@ public final class TileSplatResources {
         // Allocate tile offsets buffer (numTiles + 1 for total count)
         self.tileOffsets = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles + 1, options: .storageModePrivate).labeled("TileOffsets")
         self.tileOffsets.count = totalTiles + 1
+
+        // Allocate max tile count buffer (single uint for heatmap normalization)
+        self.maxTileCount = try device.makeTypedBuffer(element: UInt32.self, capacity: 1, options: .storageModePrivate).labeled("MaxTileCount")
+        self.maxTileCount.count = 1
+
+        // Allocate readback buffer for CPU access to tile counts
+        self.tileCountersReadback = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModeShared).labeled("TileCountersReadback")
+        self.tileCountersReadback.count = totalTiles
     }
 
     // MARK: - Resize
@@ -106,6 +121,10 @@ public final class TileSplatResources {
         // Reallocate tile offsets buffer
         self.tileOffsets = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles + 1, options: .storageModePrivate).labeled("TileOffsets")
         self.tileOffsets.count = totalTiles + 1
+
+        // Reallocate readback buffer
+        self.tileCountersReadback = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModeShared).labeled("TileCountersReadback")
+        self.tileCountersReadback.count = totalTiles
     }
 
     // MARK: - Uniforms
@@ -135,13 +154,22 @@ public final class TileSplatResources {
         let indexBufferBSize = tileSplatIndicesB.unsafeMTLBuffer.length
         let counterBufferSize = tileCounters.unsafeMTLBuffer.length
         let offsetsBufferSize = tileOffsets.unsafeMTLBuffer.length
-        return indexBufferASize + indexBufferBSize + counterBufferSize + offsetsBufferSize
+        let maxTileCountSize = maxTileCount.unsafeMTLBuffer.length
+        let readbackBufferSize = tileCountersReadback.unsafeMTLBuffer.length
+        return indexBufferASize + indexBufferBSize + counterBufferSize + offsetsBufferSize + maxTileCountSize + readbackBufferSize
     }
 
     /// Human-readable memory usage string
     public var memoryUsageDescription: String {
         let mb = Double(totalMemoryUsage) / (1_024 * 1_024)
         return String(format: "%.1f MB (%d tiles, max %d total intersections)", mb, numTiles, Self.maxTotalSplatTileIntersections)
+    }
+
+    // MARK: - Stats Readback
+
+    /// Read tile counts from the readback buffer (call after GPU work completes)
+    public func readTileCounts() -> [UInt32] {
+        Array(tileCountersReadback)
     }
 }
 

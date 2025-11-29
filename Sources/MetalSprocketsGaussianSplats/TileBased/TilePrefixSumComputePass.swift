@@ -7,6 +7,7 @@ import MetalSprocketsSupport
 
 /// Compute pass that computes exclusive prefix sum of tile counters
 /// Output: tileOffsets[i] = starting index for tile i in the compacted buffer
+/// Also computes maxTileCount for heatmap normalization
 public struct TilePrefixSumComputePass: Element {
     // MARK: - Properties
 
@@ -39,6 +40,7 @@ public struct TilePrefixSumComputePass: Element {
                     .parameter("tileCounters", buffer: tileSplatResources.tileCounters.unsafeMTLBuffer)
                     .parameter("tileOffsets", buffer: tileSplatResources.tileOffsets.unsafeMTLBuffer)
                     .parameter("numTiles", value: UInt32(tileSplatResources.numTiles))
+                    .parameter("maxTileCount", buffer: tileSplatResources.maxTileCount.unsafeMTLBuffer)
                 }
             }
         }

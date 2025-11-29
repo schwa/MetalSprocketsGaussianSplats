@@ -14,6 +14,8 @@ public struct TileBasedSplatView: View {
     private var cameraMatrix: simd_float4x4
     private var modelMatrix: simd_float4x4
     private var debugTileBorders: Bool
+    private var showHeatMap: Bool
+    private var onResourcesChanged: ((TileSplatResources) -> Void)?
 
     @State private var tileSplatResources: TileSplatResources?
 
@@ -22,13 +24,17 @@ public struct TileBasedSplatView: View {
         projection: any ProjectionProtocol,
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,
-        debugTileBorders: Bool = false
+        debugTileBorders: Bool = false,
+        showHeatMap: Bool = false,
+        onResourcesChanged: ((TileSplatResources) -> Void)? = nil
     ) {
         self.splatCloud = splatCloud
         self.projection = projection
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
         self.debugTileBorders = debugTileBorders
+        self.showHeatMap = showHeatMap
+        self.onResourcesChanged = onResourcesChanged
     }
 
     public var body: some View {
@@ -85,6 +91,26 @@ public struct TileBasedSplatView: View {
                 // half4 = 8 bytes, aligned to 16 bytes
                 descriptor.imageblockSampleLength = 16
             }
+
+            // Optional: Heatmap overlay showing splat density per tile
+            if showHeatMap {
+                try RenderPass {
+                    try TileHeatMapRenderPass(tileSplatResources: resources, showTileBorders: debugTileBorders)
+                }
+            }
+
+            // Copy tile counters to readback buffer for stats
+            try BlitPass {
+                Blit { encoder in
+                    encoder.copy(
+                        from: resources.tileCounters.unsafeMTLBuffer,
+                        sourceOffset: 0,
+                        to: resources.tileCountersReadback.unsafeMTLBuffer,
+                        destinationOffset: 0,
+                        size: resources.tileCounters.unsafeMTLBuffer.length
+                    )
+                }
+            }
         }
     }
 
@@ -95,12 +121,14 @@ public struct TileBasedSplatView: View {
             if existing.needsResize(for: drawableSizeFloat) {
                 try existing.resize(for: drawableSizeFloat)
             }
+            onResourcesChanged?(existing)
             return existing
         }
 
         let device = _MTLCreateSystemDefaultDevice()
         let resources = try TileSplatResources(device: device, drawableSize: drawableSizeFloat)
         tileSplatResources = resources
+        onResourcesChanged?(resources)
         return resources
     }
 }
