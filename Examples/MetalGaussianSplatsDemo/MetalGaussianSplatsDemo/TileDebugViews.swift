@@ -7,25 +7,26 @@ struct TileStatsOverlay: View {
     var updateCounter: Int = 0
     @Binding var maxOverlapsEver: UInt64
 
-    var body: some View {
-        let _ = updateCounter
+    private var stats: TileOverlayStats {
         let counts = resources.readTileCounts()
-        let gridSize = resources.tileGridSize
         let nonZero = counts.filter { $0 > 0 }
-        let maxCount = counts.max() ?? 0
         let total = UInt64(counts.reduce(0) { $0 + UInt64($1) })
-        let avg = nonZero.isEmpty ? 0.0 : Double(total) / Double(nonZero.count)
         let sorted = nonZero.sorted()
-        let median = sorted.isEmpty ? UInt32(0) : sorted[sorted.count / 2]
-        let p95 = sorted.isEmpty ? UInt32(0) : sorted[Int(Double(sorted.count - 1) * 0.95)]
-        let p99 = sorted.isEmpty ? UInt32(0) : sorted[Int(Double(sorted.count - 1) * 0.99)]
+        return TileOverlayStats(
+            gridSize: resources.tileGridSize,
+            counts: counts,
+            nonZero: nonZero,
+            maxCount: counts.max() ?? 0,
+            total: total,
+            avg: nonZero.isEmpty ? 0.0 : Double(total) / Double(nonZero.count),
+            median: sorted.isEmpty ? UInt32(0) : sorted[sorted.count / 2],
+            p95: sorted.isEmpty ? UInt32(0) : sorted[Int(Double(sorted.count - 1) * 0.95)],
+            p99: sorted.isEmpty ? UInt32(0) : sorted[Int(Double(sorted.count - 1) * 0.99)]
+        )
+    }
 
-        let _ = {
-            if total > maxOverlapsEver {
-                maxOverlapsEver = total
-            }
-        }()
-
+    var body: some View {
+        let currentStats = stats
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
             GridRow {
                 Text("Tile Stats").font(.headline)
@@ -34,15 +35,15 @@ struct TileStatsOverlay: View {
             Divider().gridCellColumns(2)
             GridRow {
                 Text("Grid")
-                Text("\(gridSize.x) x \(gridSize.y)")
+                Text("\(currentStats.gridSize.x) x \(currentStats.gridSize.y)")
             }
             GridRow {
                 Text("Active tiles")
-                Text("\(nonZero.count) / \(counts.count)")
+                Text("\(currentStats.nonZero.count) / \(currentStats.counts.count)")
             }
             GridRow {
                 Text("Total overlaps")
-                Text("\(total)")
+                Text("\(currentStats.total)")
             }
             GridRow {
                 Text("Max overlaps")
@@ -51,30 +52,47 @@ struct TileStatsOverlay: View {
             Divider().gridCellColumns(2)
             GridRow {
                 Text("Max")
-                Text("\(maxCount)")
+                Text("\(currentStats.maxCount)")
             }
             GridRow {
                 Text("Avg")
-                Text(String(format: "%.1f", avg))
+                Text(String(format: "%.1f", currentStats.avg))
             }
             GridRow {
                 Text("Median")
-                Text("\(median)")
+                Text("\(currentStats.median)")
             }
             GridRow {
                 Text("P95")
-                Text("\(p95)")
+                Text("\(currentStats.p95)")
             }
             GridRow {
                 Text("P99")
-                Text("\(p99)")
+                Text("\(currentStats.p99)")
             }
         }
         .monospacedDigit()
         .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
         .fixedSize()
+        .onChange(of: currentStats.total) { _, newTotal in
+            if newTotal > maxOverlapsEver {
+                maxOverlapsEver = newTotal
+            }
+        }
     }
+}
+
+private struct TileOverlayStats: Equatable {
+    let gridSize: SIMD2<UInt32>
+    let counts: [UInt32]
+    let nonZero: [UInt32]
+    let maxCount: UInt32
+    let total: UInt64
+    let avg: Double
+    let median: UInt32
+    let p95: UInt32
+    let p99: UInt32
 }
 
 struct HeatMapLegend: View {

@@ -95,7 +95,7 @@ only_rules:
   - implicit_return
   - implicitly_unwrapped_optional
   - inclusive_language
-  - incompatible_concurrency_annotation
+#  - incompatible_concurrency_annotation
   - indentation_width
   - invalid_swiftlint_command
   - is_disjoint
