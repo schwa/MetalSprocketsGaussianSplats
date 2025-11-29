@@ -32,15 +32,14 @@ struct TileBasedDemoView: View {
                     cameraMatrix: cameraMatrix,
                     modelMatrix: modelMatrix,
                     debugTileBorders: debugTileBorders,
-                    showHeatMap: showHeatMap,
-                    onFrameCompleted: { resources in
-                        Task { @MainActor in
-                            tileSplatResources = resources
-                            statsUpdateCounter += 1
-                        }
-                        onFrameCompleted?()
+                    showHeatMap: showHeatMap
+                ) { resources in
+                    Task { @MainActor in
+                        tileSplatResources = resources
+                        statsUpdateCounter += 1
                     }
-                )
+                    onFrameCompleted?()
+                }
             }
         }
         .overlay(alignment: .topLeading) {
@@ -59,7 +58,7 @@ struct TileBasedDemoView: View {
         }
         .overlay(alignment: .bottomTrailing) {
             if showHeatMap, let resources = tileSplatResources {
-                let _ = statsUpdateCounter
+                _ = statsUpdateCounter
                 let maxCount = resources.readTileCounts().max() ?? 0
                 HeatMapLegend(maxCount: maxCount)
                     .padding()

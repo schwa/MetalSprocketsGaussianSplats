@@ -13,7 +13,7 @@ public final class TileSplatResources {
 
     /// Maximum total splat-tile intersections (splats * average tiles per splat)
     /// Conservative estimate: each splat overlaps ~8 tiles on average
-    public static let maxTotalSplatTileIntersections = 16 * 1024 * 1024  // 16M entries = 128MB
+    public static let maxTotalSplatTileIntersections = 16 * 1_024 * 1_024  // 16M entries = 128MB
 
     // MARK: - Properties
 
