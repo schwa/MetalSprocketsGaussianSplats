@@ -98,7 +98,7 @@ public struct GaussianSplatDemoView: View {
                     }
                 }
                 .overlay(alignment: .top) {
-                    FPSOverlay(fps: fps)
+                    FPSView(fps: fps)
                         .padding()
                 }
                 .overlay(alignment: .bottomLeading) {
