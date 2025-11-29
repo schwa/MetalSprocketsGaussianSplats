@@ -1,7 +1,7 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import Foundation
 import Metal
-import MetalSprocketsSupport
+import MetalSprocketsGaussianSplatShaders
 
 /// Container for SOG textures and codebook buffers for GPU rendering
 public struct SOGResources: @unchecked Sendable {

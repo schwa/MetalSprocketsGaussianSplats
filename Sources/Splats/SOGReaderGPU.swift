@@ -5,7 +5,6 @@ import Metal
 import MetalKit
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
 import UniformTypeIdentifiers
 public enum SOGReaderGPU {
     /// Load SOG file and return GPU resources

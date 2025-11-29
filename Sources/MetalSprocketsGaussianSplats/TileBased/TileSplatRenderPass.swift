@@ -17,7 +17,6 @@ public struct TileSplatRenderPass: Element {
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
-    var drawableSize: SIMD2<Float>
     var debugTileBorders: Bool
 
     var shaderLibrary: ShaderNamespace
@@ -37,7 +36,6 @@ public struct TileSplatRenderPass: Element {
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
-        drawableSize: SIMD2<Float>,
         debugTileBorders: Bool = false
     ) throws {
         self.splatCloud = splatCloud
@@ -45,7 +43,6 @@ public struct TileSplatRenderPass: Element {
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
-        self.drawableSize = drawableSize
         self.debugTileBorders = debugTileBorders
 
         self.shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)

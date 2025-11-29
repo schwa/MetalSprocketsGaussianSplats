@@ -1,7 +1,6 @@
 internal import AsyncAlgorithms
 @preconcurrency import Metal
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
 internal import os
 import simd
 

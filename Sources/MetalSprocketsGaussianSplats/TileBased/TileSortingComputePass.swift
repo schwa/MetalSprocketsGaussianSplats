@@ -3,7 +3,6 @@ import Foundation
 import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
 
 /// Compute pass that sorts each tile's splat list by depth (front-to-back)
 public struct TileSortingComputePass: Element {

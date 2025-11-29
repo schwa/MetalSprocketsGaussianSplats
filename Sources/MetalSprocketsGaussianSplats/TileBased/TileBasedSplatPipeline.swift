@@ -3,7 +3,6 @@ import Foundation
 import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
 
 /// Complete tile-based splat rendering pipeline
 /// Combines binning, sorting, and rendering passes
@@ -87,7 +86,6 @@ public struct TileBasedSplatPipeline: Element {
                     projectionMatrix: projectionMatrix,
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
-                    drawableSize: drawableSize,
                     debugTileBorders: debugTileBorders
                 )
             }

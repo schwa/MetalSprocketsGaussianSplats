@@ -6,10 +6,7 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSprocketsUI
-internal import os
 import SwiftUI
-
-private let stochasticLogger: Logger? = Logger(subsystem: "stochastic-splats", category: "stochastic-splats")
 
 public struct StochasticSplatView: View {
     private var splatCloud: SplatCloud<SparkSplat>

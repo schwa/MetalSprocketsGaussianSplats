@@ -1,7 +1,6 @@
 internal import AsyncAlgorithms
 import Metal
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
 internal import os
 import simd
 import Splats
@@ -10,7 +9,6 @@ import Splats
 public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
     public private(set) var splats: TypedMTLBuffer<Splat>
     internal var indexedDistances: SplatIndices
-    public var label: String?
 
     // MARK: -
 

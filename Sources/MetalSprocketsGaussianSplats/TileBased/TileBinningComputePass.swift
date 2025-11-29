@@ -3,7 +3,6 @@ import Foundation
 import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
 
 /// Compute pass that counts splats per tile (phase 1 of two-phase binning)
 public struct TileBinningCountPass: Element {

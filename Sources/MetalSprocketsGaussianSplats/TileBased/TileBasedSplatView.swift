@@ -81,7 +81,6 @@ public struct TileBasedSplatView: View {
                     projectionMatrix: projectionMatrix,
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
-                    drawableSize: drawableSizeFloat,
                     debugTileBorders: debugTileBorders
                 )
             }

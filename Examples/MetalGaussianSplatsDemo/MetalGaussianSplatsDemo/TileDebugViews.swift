@@ -8,7 +8,7 @@ struct TileStatsOverlay: View {
     @Binding var maxOverlapsEver: UInt64
 
     var body: some View {
-        _ = updateCounter
+        let _ = updateCounter
         let counts = resources.readTileCounts()
         let gridSize = resources.tileGridSize
         let nonZero = counts.filter { $0 > 0 }
@@ -20,7 +20,7 @@ struct TileStatsOverlay: View {
         let p95 = sorted.isEmpty ? UInt32(0) : sorted[Int(Double(sorted.count - 1) * 0.95)]
         let p99 = sorted.isEmpty ? UInt32(0) : sorted[Int(Double(sorted.count - 1) * 0.99)]
 
-        _ = {
+        let _ = {
             if total > maxOverlapsEver {
                 maxOverlapsEver = total
             }

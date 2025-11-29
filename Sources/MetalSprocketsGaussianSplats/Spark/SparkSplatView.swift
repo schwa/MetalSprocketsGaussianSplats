@@ -3,7 +3,6 @@ import GeometryLite3D
 import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
 import MetalSprocketsUI
 import SwiftUI
 

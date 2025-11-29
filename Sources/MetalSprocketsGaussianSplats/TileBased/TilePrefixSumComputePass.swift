@@ -3,7 +3,6 @@ import Foundation
 import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
 
 /// Compute pass that computes exclusive prefix sum of tile counters
 /// Output: tileOffsets[i] = starting index for tile i in the compacted buffer

@@ -58,7 +58,7 @@ struct TileBasedDemoView: View {
         }
         .overlay(alignment: .bottomTrailing) {
             if showHeatMap, let resources = tileSplatResources {
-                _ = statsUpdateCounter
+                let _ = statsUpdateCounter
                 let maxCount = resources.readTileCounts().max() ?? 0
                 HeatMapLegend(maxCount: maxCount)
                     .padding()

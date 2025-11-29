@@ -1,8 +1,6 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
 import MetalSprocketsGaussianSplatShaders
-import MetalSprocketsSupport
-import Splats
 import UniformTypeIdentifiers
 
 /// Defined as the .splat file format by Antimatter15 - http://antimatter15.com/splat/ and https://github.com/antimatter15/splat - it doesn't include spherical harmonics and is 32 bytes per splat.
