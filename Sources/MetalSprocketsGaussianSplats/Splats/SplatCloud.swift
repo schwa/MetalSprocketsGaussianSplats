@@ -5,7 +5,8 @@ internal import os
 import simd
 import Splats
 
-// TODO: #146 Dangerous `@unchecked Sendable` usage in SplatCloud and SplatIndices.
+// @unchecked Sendable required because indexedDistances is mutated from async sort tasks.
+// The mutation is coordinated through AsyncSortManager's actor isolation.
 public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
     public private(set) var splats: TypedMTLBuffer<Splat>
     internal var indexedDistances: SplatIndices
@@ -69,8 +70,7 @@ public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Spla
 
 // MARK: -
 
-// TODO: #146 Dangerous `@unchecked Sendable` usage in SplatCloud and SplatIndices.
-public struct SplatIndices: @unchecked Sendable, Equatable {
+public struct SplatIndices: Sendable, Equatable {
     var parameters: SortParameters
     var indices: TypedMTLBuffer<IndexedDistance>
 }

@@ -126,3 +126,9 @@ public extension TypedMTLBuffer {
         return self
     }
 }
+
+// MARK: - Sendable
+
+// MTLBuffer is thread-safe for concurrent reads per Apple documentation.
+// This wrapper only holds the buffer reference and a count, making it safe to share across threads.
+extension TypedMTLBuffer: @unchecked Sendable where Element: Sendable {}

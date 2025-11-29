@@ -4,6 +4,7 @@ import Metal
 import MetalSprocketsGaussianSplatShaders
 
 /// Container for SOG textures and codebook buffers for GPU rendering
+/// @unchecked Sendable: All properties are `let` and MTLTexture is thread-safe for reads.
 public struct SOGResources: @unchecked Sendable {
     public let metadata: SOGMetadata
     public let count: Int
