@@ -13,13 +13,15 @@ public struct Antimatter15SplatView: View {
     private var cameraMatrix: simd_float4x4
     private var modelMatrix: simd_float4x4
     private var debugMode: Antimatter15SplatRenderPipeline.DebugMode
+    private var onFrameCompleted: (@Sendable () -> Void)?
 
-    public init(splatCloud: SplatCloud<Antimatter15GPUSplat>, projection: any ProjectionProtocol, cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4 = .identity, debugMode: Antimatter15SplatRenderPipeline.DebugMode = .off) {
+    public init(splatCloud: SplatCloud<Antimatter15GPUSplat>, projection: any ProjectionProtocol, cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4 = .identity, debugMode: Antimatter15SplatRenderPipeline.DebugMode = .off, onFrameCompleted: (@Sendable () -> Void)? = nil) {
         self.splatCloud = splatCloud
         self.projection = projection
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
         self.debugMode = debugMode
+        self.onFrameCompleted = onFrameCompleted
     }
 
     public var body: some View {
@@ -27,6 +29,9 @@ public struct Antimatter15SplatView: View {
             try RenderPass {
                 let projectionMatrix = projection.projectionMatrix(for: drawableSize)
                 try Antimatter15SplatRenderPipeline(splatCloud: splatCloud, projectionMatrix: projectionMatrix, modelMatrix: modelMatrix, cameraMatrix: cameraMatrix, drawableSize: SIMD2<Float>(drawableSize), debugMode: debugMode)
+            }
+            .onCommandBufferCompleted { _ in
+                onFrameCompleted?()
             }
         }
     }

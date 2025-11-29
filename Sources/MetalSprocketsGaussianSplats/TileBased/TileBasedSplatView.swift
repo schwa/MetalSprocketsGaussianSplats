@@ -15,7 +15,7 @@ public struct TileBasedSplatView: View {
     private var modelMatrix: simd_float4x4
     private var debugTileBorders: Bool
     private var showHeatMap: Bool
-    private var onResourcesChanged: ((TileSplatResources) -> Void)?
+    private var onFrameCompleted: (@Sendable (TileSplatResources) -> Void)?
 
     @State private var tileSplatResources: TileSplatResources?
 
@@ -26,7 +26,7 @@ public struct TileBasedSplatView: View {
         modelMatrix: simd_float4x4 = .identity,
         debugTileBorders: Bool = false,
         showHeatMap: Bool = false,
-        onResourcesChanged: ((TileSplatResources) -> Void)? = nil
+        onFrameCompleted: (@Sendable (TileSplatResources) -> Void)? = nil
     ) {
         self.splatCloud = splatCloud
         self.projection = projection
@@ -34,7 +34,7 @@ public struct TileBasedSplatView: View {
         self.modelMatrix = modelMatrix
         self.debugTileBorders = debugTileBorders
         self.showHeatMap = showHeatMap
-        self.onResourcesChanged = onResourcesChanged
+        self.onFrameCompleted = onFrameCompleted
     }
 
     public var body: some View {
@@ -111,6 +111,9 @@ public struct TileBasedSplatView: View {
                     )
                 }
             }
+            .onCommandBufferCompleted { _ in
+                onFrameCompleted?(resources)
+            }
         }
     }
 
@@ -121,14 +124,12 @@ public struct TileBasedSplatView: View {
             if existing.needsResize(for: drawableSizeFloat) {
                 try existing.resize(for: drawableSizeFloat)
             }
-            onResourcesChanged?(existing)
             return existing
         }
 
         let device = _MTLCreateSystemDefaultDevice()
         let resources = try TileSplatResources(device: device, drawableSize: drawableSizeFloat)
         tileSplatResources = resources
-        onResourcesChanged?(resources)
         return resources
     }
 }

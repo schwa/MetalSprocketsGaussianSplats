@@ -16,6 +16,7 @@ public struct StochasticSplatView: View {
     private var projection: any ProjectionProtocol
     private var cameraMatrix: simd_float4x4
     private var modelMatrix: simd_float4x4
+    private var onFrameCompleted: (@Sendable () -> Void)?
 
     // Textures for temporal accumulation
     @State private var renderTexture: MTLTexture?
@@ -47,12 +48,14 @@ public struct StochasticSplatView: View {
         splatCloud: SplatCloud<SparkSplat>,
         projection: any ProjectionProtocol,
         cameraMatrix: simd_float4x4,
-        modelMatrix: simd_float4x4 = .identity
+        modelMatrix: simd_float4x4 = .identity,
+        onFrameCompleted: (@Sendable () -> Void)? = nil
     ) throws {
         self.splatCloud = splatCloud
         self.projection = projection
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
+        self.onFrameCompleted = onFrameCompleted
 
         // Load shaders
         let library = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
@@ -187,6 +190,9 @@ public struct StochasticSplatView: View {
                         }
                     }
                 }
+                .onCommandBufferCompleted { _ in
+                    onFrameCompleted?()
+                }
             } else {
                 // Render directly without accumulation
                 try RenderPass {
@@ -204,6 +210,9 @@ public struct StochasticSplatView: View {
                         shDegree: 0,
                         useBlueNoise: useBlueNoise
                     )
+                }
+                .onCommandBufferCompleted { _ in
+                    onFrameCompleted?()
                 }
             }
         }

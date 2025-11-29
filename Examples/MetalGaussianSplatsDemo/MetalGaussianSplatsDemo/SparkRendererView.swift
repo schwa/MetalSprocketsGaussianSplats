@@ -13,6 +13,7 @@ struct SparkRendererView: View {
     let projection: any ProjectionProtocol
     let cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
+    var onFrameCompleted: (@Sendable () -> Void)?
 
     @State private var splatCloud: SplatCloud<SparkSplat>?
     @State private var shCoefficients: TypedMTLBuffer<Float>?
@@ -27,7 +28,8 @@ struct SparkRendererView: View {
                     cameraMatrix: cameraMatrix,
                     modelMatrix: modelMatrix,
                     shCoefficients: shCoefficients,
-                    shDegree: shDegree
+                    shDegree: shDegree,
+                    onFrameCompleted: onFrameCompleted
                 )
             }
         }

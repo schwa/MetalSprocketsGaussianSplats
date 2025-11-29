@@ -45,20 +45,55 @@ struct HeatMapLegend: View {
     }
 }
 
-struct TileStatsOverlay: View {
-    let resources: TileSplatResources
+struct FPSOverlay: View {
+    var fps: Double
+
+    private var fpsColor: Color {
+        switch fps {
+        case 55...:
+            return .green
+        case 45..<55:
+            return .yellow
+        case 30..<45:
+            return .orange
+        default:
+            return .red
+        }
+    }
 
     var body: some View {
+        Text(String(format: "%.1f FPS", fps))
+            .font(.system(.body, design: .monospaced, weight: .semibold))
+            .foregroundStyle(fpsColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+struct TileStatsOverlay: View {
+    let resources: TileSplatResources
+    var updateCounter: Int = 0
+    @Binding var maxOverlapsEver: UInt64
+
+    var body: some View {
+        let _ = updateCounter
         let counts = resources.readTileCounts()
         let gridSize = resources.tileGridSize
         let nonZero = counts.filter { $0 > 0 }
         let maxCount = counts.max() ?? 0
-        let total = counts.reduce(0, +)
+        let total = UInt64(counts.reduce(0) { $0 + UInt64($1) })
         let avg = nonZero.isEmpty ? 0.0 : Double(total) / Double(nonZero.count)
         let sorted = nonZero.sorted()
         let median = sorted.isEmpty ? UInt32(0) : sorted[sorted.count / 2]
         let p95 = sorted.isEmpty ? UInt32(0) : sorted[Int(Double(sorted.count - 1) * 0.95)]
         let p99 = sorted.isEmpty ? UInt32(0) : sorted[Int(Double(sorted.count - 1) * 0.99)]
+
+        let _ = {
+            if total > maxOverlapsEver {
+                maxOverlapsEver = total
+            }
+        }()
 
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
             GridRow {
@@ -77,6 +112,10 @@ struct TileStatsOverlay: View {
             GridRow {
                 Text("Total overlaps")
                 Text("\(total)")
+            }
+            GridRow {
+                Text("Max overlaps")
+                Text("\(maxOverlapsEver)")
             }
             Divider().gridCellColumns(2)
             GridRow {
@@ -112,12 +151,15 @@ struct TileBasedDemoView: View {
     let projection: any ProjectionProtocol
     let cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
+    var onFrameCompleted: (@Sendable () -> Void)?
 
     @State private var splatCloud: SplatCloud<SparkSplat>?
     @State private var debugTileBorders = false
     @State private var showHeatMap = false
     @State private var showStats = false
     @State private var tileSplatResources: TileSplatResources?
+    @State private var statsUpdateCounter = 0
+    @State private var maxOverlapsEver: UInt64 = 0
 
     var body: some View {
         ZStack {
@@ -129,8 +171,12 @@ struct TileBasedDemoView: View {
                     modelMatrix: modelMatrix,
                     debugTileBorders: debugTileBorders,
                     showHeatMap: showHeatMap,
-                    onResourcesChanged: { resources in
-                        tileSplatResources = resources
+                    onFrameCompleted: { resources in
+                        Task { @MainActor in
+                            tileSplatResources = resources
+                            statsUpdateCounter += 1
+                        }
+                        onFrameCompleted?()
                     }
                 )
             }
@@ -148,19 +194,16 @@ struct TileBasedDemoView: View {
         }
         .overlay(alignment: .topTrailing) {
             if showStats, let resources = tileSplatResources {
-                TimelineView(.periodic(from: .now, by: 0.5)) { _ in
-                    TileStatsOverlay(resources: resources)
-                }
-                .padding()
+                TileStatsOverlay(resources: resources, updateCounter: statsUpdateCounter, maxOverlapsEver: $maxOverlapsEver)
+                    .padding()
             }
         }
         .overlay(alignment: .bottomTrailing) {
             if showHeatMap, let resources = tileSplatResources {
-                TimelineView(.periodic(from: .now, by: 0.5)) { _ in
-                    let maxCount = resources.readTileCounts().max() ?? 0
-                    HeatMapLegend(maxCount: maxCount)
-                }
-                .padding()
+                let _ = statsUpdateCounter // Force refresh on counter change
+                let maxCount = resources.readTileCounts().max() ?? 0
+                HeatMapLegend(maxCount: maxCount)
+                    .padding()
             }
         }
         .onChange(of: url, initial: true) {

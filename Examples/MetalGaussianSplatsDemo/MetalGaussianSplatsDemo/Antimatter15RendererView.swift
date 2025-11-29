@@ -14,6 +14,7 @@ struct Antimatter15RendererView: View {
     let projection: any ProjectionProtocol
     let cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
+    var onFrameCompleted: (@Sendable () -> Void)?
 
     @State private var splatCloud: SplatCloud<Antimatter15GPUSplat>?
     @State private var debugMode: Antimatter15SplatRenderPipeline.DebugMode = .off
@@ -26,7 +27,8 @@ struct Antimatter15RendererView: View {
                     projection: projection,
                     cameraMatrix: cameraMatrix,
                     modelMatrix: modelMatrix,
-                    debugMode: debugMode
+                    debugMode: debugMode,
+                    onFrameCompleted: onFrameCompleted
                 )
             }
         }

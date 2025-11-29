@@ -14,6 +14,7 @@ public struct SparkSplatView: View {
     private var modelMatrix: simd_float4x4
     private var shCoefficients: TypedMTLBuffer<Float>?
     private var shDegree: UInt8
+    private var onFrameCompleted: (@Sendable () -> Void)?
 
     @State private var enableSH: Bool
 
@@ -23,7 +24,8 @@ public struct SparkSplatView: View {
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,
         shCoefficients: TypedMTLBuffer<Float>? = nil,
-        shDegree: UInt8 = 0
+        shDegree: UInt8 = 0,
+        onFrameCompleted: (@Sendable () -> Void)? = nil
     ) {
         self.splatCloud = splatCloud
         self.projection = projection
@@ -31,6 +33,7 @@ public struct SparkSplatView: View {
         self.modelMatrix = modelMatrix
         self.shCoefficients = shCoefficients
         self.shDegree = shDegree
+        self.onFrameCompleted = onFrameCompleted
         // Default to OFF (colors are loaded with 0.282 scale for correct display)
         self._enableSH = State(initialValue: false)
     }
@@ -49,6 +52,9 @@ public struct SparkSplatView: View {
                     shCoefficients: shCoefficients,
                     shDegree: enableSH ? shDegree : 0
                 )
+            }
+            .onCommandBufferCompleted { _ in
+                onFrameCompleted?()
             }
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)

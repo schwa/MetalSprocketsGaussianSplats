@@ -12,6 +12,7 @@ struct StochasticRendererView: View {
     let projection: any ProjectionProtocol
     let cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
+    var onFrameCompleted: (@Sendable () -> Void)?
 
     @State private var splatCloud: SplatCloud<SparkSplat>?
 
@@ -19,7 +20,7 @@ struct StochasticRendererView: View {
         ZStack {
             if let splatCloud {
                 ThrowingView {
-                    try StochasticSplatView(splatCloud: splatCloud, projection: projection, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+                    try StochasticSplatView(splatCloud: splatCloud, projection: projection, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, onFrameCompleted: onFrameCompleted)
                 }
             }
         }

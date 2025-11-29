@@ -38,6 +38,11 @@ public struct GaussianSplatDemoView: View {
     @State private var rotationZ: Float = 0
     @State private var splatCount: Int?
 
+    // FPS tracking
+    @State private var fps: Double = 0
+    @State private var lastFrameTime: CFAbsoluteTime = 0
+    @State private var frameCount: Int = 0
+
     public init() {
         // This line intentionally left blank.
     }
@@ -60,7 +65,8 @@ public struct GaussianSplatDemoView: View {
                             url: splatURL,
                             projection: projection,
                             cameraMatrix: cameraMatrix,
-                            modelMatrix: modelMatrix
+                            modelMatrix: modelMatrix,
+                            onFrameCompleted: updateFPS
                         )
 
                     case .spark:
@@ -68,7 +74,8 @@ public struct GaussianSplatDemoView: View {
                             url: splatURL,
                             projection: projection,
                             cameraMatrix: cameraMatrix,
-                            modelMatrix: modelMatrix
+                            modelMatrix: modelMatrix,
+                            onFrameCompleted: updateFPS
                         )
 
                     case .stochastic:
@@ -76,7 +83,8 @@ public struct GaussianSplatDemoView: View {
                             url: splatURL,
                             projection: projection,
                             cameraMatrix: cameraMatrix,
-                            modelMatrix: modelMatrix
+                            modelMatrix: modelMatrix,
+                            onFrameCompleted: updateFPS
                         )
 
                     case .tileBased:
@@ -84,9 +92,14 @@ public struct GaussianSplatDemoView: View {
                             url: splatURL,
                             projection: projection,
                             cameraMatrix: cameraMatrix,
-                            modelMatrix: modelMatrix
+                            modelMatrix: modelMatrix,
+                            onFrameCompleted: updateFPS
                         )
                     }
+                }
+                .overlay(alignment: .top) {
+                    FPSOverlay(fps: fps)
+                        .padding()
                 }
                 .overlay(alignment: .bottomLeading) {
                     let camPos = SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z)
@@ -163,6 +176,19 @@ public struct GaussianSplatDemoView: View {
         let rotY = float4x4(yRotation: .radians(rotationY))
         let rotZ = float4x4(zRotation: .radians(rotationZ))
         modelMatrix = rotZ * rotY * rotX
+    }
+
+    func updateFPS() {
+        Task { @MainActor in
+            let now = CFAbsoluteTimeGetCurrent()
+            frameCount += 1
+            let elapsed = now - lastFrameTime
+            if elapsed >= 1.0 {
+                fps = Double(frameCount) / elapsed
+                frameCount = 0
+                lastFrameTime = now
+            }
+        }
     }
 
     @ToolbarContentBuilder
