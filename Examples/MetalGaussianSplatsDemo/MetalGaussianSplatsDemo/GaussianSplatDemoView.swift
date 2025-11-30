@@ -201,6 +201,8 @@ public struct GaussianSplatDemoView: View {
             }
         }
 
+        CameraMenuToolbarContent(cameraMatrix: $cameraMatrix)
+
         ToolbarItem {
             Button("Adjust Axes") {
                 showingRotationPopover = true

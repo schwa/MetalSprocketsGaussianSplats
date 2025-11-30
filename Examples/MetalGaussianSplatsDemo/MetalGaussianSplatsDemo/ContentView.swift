@@ -5,7 +5,3 @@ struct ContentView: View {
         GaussianSplatDemoView()
     }
 }
-
-#Preview {
-    ContentView()
-}
