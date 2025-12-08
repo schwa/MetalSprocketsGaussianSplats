@@ -201,7 +201,13 @@ public struct GaussianSplatDemoView: View {
             }
         }
 
-        CameraMenuToolbarContent(cameraMatrix: $cameraMatrix)
+        SceneMenuToolbarContent(
+            cameraMatrix: $cameraMatrix,
+            splatURL: $splatURL,
+            rotationX: $rotationX,
+            rotationY: $rotationY,
+            rotationZ: $rotationZ
+        )
 
         ToolbarItem {
             Button("Adjust Axes") {
