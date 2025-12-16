@@ -32,3 +32,5 @@ playground.xcworkspace
 .build/
 
 tmp
+
+.swiftpm
