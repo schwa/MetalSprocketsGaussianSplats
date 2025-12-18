@@ -91,16 +91,18 @@ public struct SparkSplatRenderPipeline: Element {
                 renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
             }
             .onChange(of: splatCloud, initial: true) { _, _ in
-                sortManager = try! AsyncSortManager(device: _MTLCreateSystemDefaultDevice(), splatCloud: splatCloud, capacity: splatCloud.count, logger: logger)
-                Task {
-                    let channel = await sortManager!.sortedIndicesChannel()
+                let newSortManager = try! AsyncSortManager(device: _MTLCreateSystemDefaultDevice(), splatCloud: splatCloud, capacity: splatCloud.count, logger: logger)
+                sortManager = newSortManager
+                nonisolated(unsafe) var splatCloudRef = splatCloud
+                Task { @MainActor [sortManager = newSortManager, logger] in
+                    let channel = await sortManager.sortedIndicesChannel()
                     for await sort in channel {
-                        if sort.parameters.time < splatCloud.indexedDistances.parameters.time {
+                        if sort.parameters.time < splatCloudRef.indexedDistances.parameters.time {
                             logger?.error("Out of order sort")
                             return
                         }
 
-                        splatCloud.indexedDistances = sort
+                        splatCloudRef.indexedDistances = sort
                     }
                 }
                 requestSort()
