@@ -33,7 +33,6 @@ let package = Package(
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
         .package(url: "https://github.com/schwa/GoldenImage", branch: "main"),
-//        .package(path: "/Users/schwa/Projects/Sharp")
     ],
     targets: [
         .target(
