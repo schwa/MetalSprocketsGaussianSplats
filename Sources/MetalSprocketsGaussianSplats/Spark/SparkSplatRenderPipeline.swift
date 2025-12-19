@@ -6,15 +6,11 @@ import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
 public struct SparkSplatRenderPipeline: Element {
-    var splatCloud: SplatCloud<SparkSplat>
+    var splatCloud: GPUSplatCloud<SparkSplat>
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
     var drawableSize: SIMD2<Float>
-
-    // Spherical harmonics (optional)
-    var shCoefficients: TypedMTLBuffer<Float>?
-    var shDegree: UInt8
 
     @MSState
     private var sortManager: AsyncSortManager<SparkSplat>?
@@ -24,20 +20,18 @@ public struct SparkSplatRenderPipeline: Element {
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
 
-    public init(splatCloud: SplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
-        self.shCoefficients = shCoefficients
-        self.shDegree = shDegree
 
         // Load Spark shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
-        vertexConstants["use_sh"] = .bool(shCoefficients != nil)
+        vertexConstants["use_sh"] = .bool(splatCloud.shCoefficients != nil)
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
@@ -55,8 +49,8 @@ public struct SparkSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            let shBuffer = shCoefficients
-            let degree = shDegree
+            let shBuffer = splatCloud.shCoefficients
+            let degree = splatCloud.shDegree
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     let vertices: [SIMD2<Float>] = [

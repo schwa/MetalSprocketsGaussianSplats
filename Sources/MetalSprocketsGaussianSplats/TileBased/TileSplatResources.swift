@@ -3,6 +3,7 @@ import Foundation
 import Metal
 import MetalSprocketsGaussianSplatShaders
 import simd
+import Splats
 
 /// Resources for tile-based splat rendering
 /// Manages GPU buffers for tile binning, sorting, and rendering

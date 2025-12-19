@@ -1,10 +1,10 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
+import MetalSprocketsGaussianSplatShaders
 import Foundation
 import ImageIO
 import Metal
 import MetalKit
 import MetalSprockets
-import MetalSprocketsGaussianSplatShaders
 import UniformTypeIdentifiers
 public enum SOGReaderGPU {
     /// Load SOG file and return GPU resources

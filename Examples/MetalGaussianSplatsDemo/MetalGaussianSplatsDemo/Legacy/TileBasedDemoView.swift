@@ -1,3 +1,7 @@
+// TODO: TileBasedDemoView needs to be updated to use SplatCloudDescriptor.loadGPUSplatCloud()
+// Commented out until tile-based rendering is integrated into SplatDocumentRenderView
+
+/*
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import GeometryLite3D
 import Interaction3D
@@ -15,7 +19,7 @@ struct TileBasedDemoView: View {
     let modelMatrix: simd_float4x4
     var onFrameCompleted: (@Sendable () -> Void)?
 
-    @State private var splatCloud: SplatCloud<SparkSplat>?
+    @State private var splatCloud: GPUSplatCloud<SparkSplat>?
     @State private var debugTileBorders = false
     @State private var showHeatMap = false
     @State private var showStats = false
@@ -65,17 +69,18 @@ struct TileBasedDemoView: View {
         }
         .onChange(of: url, initial: true) {
             Task {
-                loadSplatCloud()
+                loadGPUSplatCloud()
             }
         }
     }
 
-    private func loadSplatCloud() {
+    private func loadGPUSplatCloud() {
         guard let url else {
             return
         }
-        splatCloud = try! SplatCloud(url: url, cameraMatrix: cameraMatrix)
+        splatCloud = try! GPUSplatCloud(url: url, cameraMatrix: cameraMatrix)
     }
 }
 
 #endif
+*/

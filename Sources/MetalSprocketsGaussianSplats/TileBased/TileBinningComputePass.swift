@@ -8,7 +8,7 @@ import MetalSprocketsGaussianSplatShaders
 public struct TileBinningCountPass: Element {
     // MARK: - Properties
 
-    var splatCloud: SplatCloud<SparkSplat>
+    var splatCloud: GPUSplatCloud<SparkSplat>
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
@@ -21,7 +21,7 @@ public struct TileBinningCountPass: Element {
     // MARK: - Initialization
 
     public init(
-        splatCloud: SplatCloud<SparkSplat>,
+        splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
@@ -81,7 +81,7 @@ public struct TileBinningCountPass: Element {
 public struct TileBinningWritePass: Element {
     // MARK: - Properties
 
-    var splatCloud: SplatCloud<SparkSplat>
+    var splatCloud: GPUSplatCloud<SparkSplat>
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
@@ -94,7 +94,7 @@ public struct TileBinningWritePass: Element {
     // MARK: - Initialization
 
     public init(
-        splatCloud: SplatCloud<SparkSplat>,
+        splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,

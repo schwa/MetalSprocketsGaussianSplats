@@ -1,4 +1,5 @@
 import Compression
+import MetalSprocketsGaussianSplatShaders
 import Foundation
 import simd
 import UniformTypeIdentifiers

@@ -34,7 +34,7 @@
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
         "branch" : "main",
-        "revision" : "e0f28a93be5017b53edfa00b46073f37e3026692"
+        "revision" : "8d5954abe1987b39586f1320664d6458e6e010c2"
       }
     },
     {
@@ -43,7 +43,7 @@
       "location" : "https://github.com/schwa/Sharp",
       "state" : {
         "branch" : "main",
-        "revision" : "b6da1e8e61d970c969253576098aba43229b76bf"
+        "revision" : "3b97ab7a48f7f163906657d1ebab05196a329a74"
       }
     },
     {

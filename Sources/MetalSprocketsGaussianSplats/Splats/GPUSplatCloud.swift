@@ -7,15 +7,23 @@ import Splats
 
 // @unchecked Sendable required because indexedDistances is mutated from async sort tasks.
 // The mutation is coordinated through AsyncSortManager's actor isolation.
-public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
+public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
     public private(set) var splats: TypedMTLBuffer<Splat>
     internal var indexedDistances: SplatIndices
 
+    /// Spherical harmonics coefficients buffer (optional, for view-dependent color)
+    public var shCoefficients: TypedMTLBuffer<Float>?
+
+    /// Spherical harmonics degree (0 = no SH, 1-3 for increasing detail)
+    public var shDegree: UInt8
+
     // MARK: -
 
-    public init(splats: TypedMTLBuffer<Splat>, indexedDistances: SplatIndices) {
+    public init(splats: TypedMTLBuffer<Splat>, indexedDistances: SplatIndices, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) {
         self.splats = splats
         self.indexedDistances = indexedDistances
+        self.shCoefficients = shCoefficients
+        self.shDegree = shDegree
     }
 
     public convenience init(device: MTLDevice, splats: TypedMTLBuffer<Splat>, cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4) throws {
@@ -30,41 +38,13 @@ public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Spla
 
     // MARK: -
 
-    public static func == (lhs: SplatCloud, rhs: SplatCloud) -> Bool {
-        lhs.splats == rhs.splats && lhs.indexedDistances == rhs.indexedDistances
+    public static func == (lhs: GPUSplatCloud, rhs: GPUSplatCloud) -> Bool {
+        lhs.splats == rhs.splats && lhs.indexedDistances == rhs.indexedDistances && lhs.shCoefficients == rhs.shCoefficients && lhs.shDegree == rhs.shDegree
     }
 
     /// How many splats are currently in the splat cloud
     public var count: Int {
         splats.count
-    }
-
-    /// Quickly get the splat count from a URL without fully loading the file
-    public static func splatCount(from url: URL) throws -> Int {
-        let ext = url.pathExtension.lowercased()
-
-        switch ext {
-        case "spz":
-            // SPZ files need decompression to read header
-            let reader = try SPZReader(url: url)
-            return reader.splatCount
-
-        case "ply":
-            // PLY files have count in ASCII header
-            let reader = try PLYSplatReader(url: url)
-            return reader.splatCount
-
-        case "splat":
-            // .splat files: each splat is 32 bytes
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            guard let fileSize = attributes[.size] as? Int else {
-                throw NSError(domain: "SplatCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: "Cannot get file size"])
-            }
-            return fileSize / 32
-
-        default:
-            throw NSError(domain: "SplatCloud", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unsupported file extension: \(ext)"])
-        }
     }
 }
 
@@ -73,17 +53,22 @@ public final class SplatCloud <Splat>: Equatable, @unchecked Sendable where Spla
 public struct SplatIndices: Sendable, Equatable {
     var parameters: SortParameters
     var indices: TypedMTLBuffer<IndexedDistance>
+
+    public init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>) {
+        self.parameters = parameters
+        self.indices = indices
+    }
 }
 
 // MARK: -
 
-internal struct SortParameters: Sendable, Equatable {
+public struct SortParameters: Sendable, Equatable {
     var time: TimeInterval
     var camera: simd_float4x4
     var model: simd_float4x4
     var reversed: Bool
 
-    init(time: TimeInterval = Date.timeIntervalSinceReferenceDate, camera: simd_float4x4, model: simd_float4x4, reversed: Bool = false) {
+    public init(time: TimeInterval = Date.timeIntervalSinceReferenceDate, camera: simd_float4x4, model: simd_float4x4, reversed: Bool = false) {
         self.time = time
         self.camera = camera
         self.model = model

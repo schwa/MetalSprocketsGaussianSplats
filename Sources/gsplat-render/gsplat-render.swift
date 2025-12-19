@@ -92,7 +92,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let useSparkRenderer = (renderConfig.renderer ?? "antimatter15").lowercased() == "spark"
         let useSrgbToLinear = renderConfig.srgbToLinear ?? false
 
-        let (antimatter15SplatCloud, sparkSplatCloud, shCoefficientsBuffer, effectiveSHDegree) = try createSplatClouds(
+        let (antimatter15GPUSplatCloud, sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree) = try createGPUSplatClouds(
             genericSplats: genericSplats,
             device: device,
             useSparkRenderer: useSparkRenderer,
@@ -113,8 +113,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             useSrgbToLinear: useSrgbToLinear,
             modelMatrix: modelMatrix,
             cameraMatrix: cameraMatrix,
-            antimatter15SplatCloud: antimatter15SplatCloud,
-            sparkSplatCloud: sparkSplatCloud,
+            antimatter15GPUSplatCloud: antimatter15GPUSplatCloud,
+            sparkGPUSplatCloud: sparkGPUSplatCloud,
             shCoefficientsBuffer: shCoefficientsBuffer,
             effectiveSHDegree: effectiveSHDegree
         )
@@ -242,13 +242,13 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
     // MARK: - Splat Cloud Creation
 
-    func createSplatClouds(
+    func createGPUSplatClouds(
         genericSplats: [GenericSplat],
         device: MTLDevice,
         useSparkRenderer: Bool,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4
-    ) throws -> (SplatCloud<Antimatter15GPUSplat>?, SplatCloud<SparkSplat>?, TypedMTLBuffer<Float>?, UInt8) {
+    ) throws -> (GPUSplatCloud<Antimatter15GPUSplat>?, GPUSplatCloud<SparkSplat>?, TypedMTLBuffer<Float>?, UInt8) {
         let shCoefficientsBuffer: TypedMTLBuffer<Float>? = nil
         let effectiveSHDegree: UInt8 = 0
 
@@ -256,23 +256,23 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             let gpuSplats = genericSplats.map { SparkSplat($0) }
             _ = shDegree // Silence unused variable warning
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-            let sparkSplatCloud = try SplatCloud<SparkSplat>(
+            let sparkGPUSplatCloud = try GPUSplatCloud<SparkSplat>(
                 device: device,
                 splats: splatBuffer,
                 cameraMatrix: cameraMatrix,
                 modelMatrix: modelMatrix
             )
-            return (nil, sparkSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
+            return (nil, sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
         }
         let gpuSplats = genericSplats.map { Antimatter15GPUSplat($0) }
         let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-        let antimatter15SplatCloud = try SplatCloud<Antimatter15GPUSplat>(
+        let antimatter15GPUSplatCloud = try GPUSplatCloud<Antimatter15GPUSplat>(
             device: device,
             splats: splatBuffer,
             cameraMatrix: cameraMatrix,
             modelMatrix: modelMatrix
         )
-        return (antimatter15SplatCloud, nil, shCoefficientsBuffer, effectiveSHDegree)
+        return (antimatter15GPUSplatCloud, nil, shCoefficientsBuffer, effectiveSHDegree)
     }
 
     // MARK: - Rendering
@@ -287,8 +287,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         useSrgbToLinear: Bool,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
-        antimatter15SplatCloud: SplatCloud<Antimatter15GPUSplat>?,
-        sparkSplatCloud: SplatCloud<SparkSplat>?,
+        antimatter15GPUSplatCloud: GPUSplatCloud<Antimatter15GPUSplat>?,
+        sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>?,
         shCoefficientsBuffer: TypedMTLBuffer<Float>?,
         effectiveSHDegree: UInt8
     ) throws -> (OffscreenRenderer.Rendering, Int) {
@@ -305,7 +305,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let rendering: OffscreenRenderer.Rendering
 
         if useSparkRenderer {
-            guard let cloud = sparkSplatCloud else {
+            guard let cloud = sparkGPUSplatCloud else {
                 throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Spark splat cloud is nil"])
             }
             splatCount = cloud.count
@@ -327,7 +327,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 try renderer.render(renderContent)
             }
         } else {
-            guard let cloud = antimatter15SplatCloud else {
+            guard let cloud = antimatter15GPUSplatCloud else {
                 throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Antimatter15 splat cloud is nil"])
             }
             splatCount = cloud.count

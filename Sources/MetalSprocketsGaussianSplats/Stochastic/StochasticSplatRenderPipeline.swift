@@ -1,27 +1,25 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import Foundation
 import Metal
+import MetalKit
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
 public struct StochasticSplatRenderPipeline: Element {
-    var splatCloud: SplatCloud<SparkSplat>
+    var splatCloud: GPUSplatCloud<SparkSplat>
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var cameraMatrix: simd_float4x4
     var drawableSize: SIMD2<Float>
     var frameTime: UInt32
     var alphaThreshold: Float
-    var blueNoiseTexture: MTLTexture
-
-    // Spherical harmonics (optional)
-    var shCoefficients: TypedMTLBuffer<Float>?
-    var shDegree: UInt8
 
     // Noise method
     var useBlueNoise: Bool
 
+    @MSState
+    var blueNoiseTexture: MTLTexture
     @MSState
     var vertexShader: VertexShader
     @MSState
@@ -29,17 +27,14 @@ public struct StochasticSplatRenderPipeline: Element {
     var vertexDescriptor: MTLVertexDescriptor
 
     public init(
-        splatCloud: SplatCloud<SparkSplat>,
+        splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
         drawableSize: SIMD2<Float>,
-        frameTime: UInt32 = 0,
+        frameTime: UInt32,
         alphaThreshold: Float = 0.95,
-        blueNoiseTexture: MTLTexture,
         convertSRGBToLinear: Bool = true,
-        shCoefficients: TypedMTLBuffer<Float>? = nil,
-        shDegree: UInt8 = 0,
         useBlueNoise: Bool = true
     ) throws {
         self.splatCloud = splatCloud
@@ -49,16 +44,24 @@ public struct StochasticSplatRenderPipeline: Element {
         self.drawableSize = drawableSize
         self.frameTime = frameTime
         self.alphaThreshold = alphaThreshold
-        self.blueNoiseTexture = blueNoiseTexture
-        self.shCoefficients = shCoefficients
-        self.shDegree = shDegree
         self.useBlueNoise = useBlueNoise
+
+        // Load blue noise texture
+        guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let device = _MTLCreateSystemDefaultDevice()
+        let textureLoader = MTKTextureLoader(device: device)
+        self.blueNoiseTexture = try textureLoader.newTexture(URL: url, options: [
+            .textureUsage: MTLTextureUsage.shaderRead.rawValue,
+            .textureStorageMode: MTLStorageMode.private.rawValue
+        ])
 
         // Load Stochastic shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("StochasticSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
-        vertexConstants["use_sh"] = .bool(shCoefficients != nil)
+        vertexConstants["use_sh"] = .bool(splatCloud.shCoefficients != nil)
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
@@ -77,8 +80,8 @@ public struct StochasticSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            let shBuffer = shCoefficients
-            let degree = shDegree
+            let shBuffer = splatCloud.shCoefficients
+            let degree = splatCloud.shDegree
             var time = frameTime
             var threshold = alphaThreshold
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {

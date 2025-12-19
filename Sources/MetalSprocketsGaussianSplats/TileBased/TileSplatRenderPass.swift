@@ -12,7 +12,7 @@ import MetalSprocketsSupport
 public struct TileSplatRenderPass: Element {
     // MARK: - Properties
 
-    var splatCloud: SplatCloud<SparkSplat>
+    var splatCloud: GPUSplatCloud<SparkSplat>
     var tileSplatResources: TileSplatResources
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
@@ -31,7 +31,7 @@ public struct TileSplatRenderPass: Element {
     // MARK: - Initialization
 
     public init(
-        splatCloud: SplatCloud<SparkSplat>,
+        splatCloud: GPUSplatCloud<SparkSplat>,
         tileSplatResources: TileSplatResources,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,

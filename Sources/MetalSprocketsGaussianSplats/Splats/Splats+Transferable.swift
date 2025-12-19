@@ -1,6 +1,7 @@
 #if os(iOS) || (os(macOS) && !arch(x86_64))
 import CoreTransferable
 import Splats
+import MetalSprocketsGaussianSplatShaders
 
 extension Array: @retroactive Transferable where Element == Antimatter15Splat {
     public static var transferRepresentation: some TransferRepresentation {

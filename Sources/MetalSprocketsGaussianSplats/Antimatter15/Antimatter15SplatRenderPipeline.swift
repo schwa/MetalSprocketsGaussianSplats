@@ -12,7 +12,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
         case filled = 2
     }
 
-    var splatCloud: SplatCloud<Antimatter15GPUSplat>
+    var splatCloud: GPUSplatCloud<Antimatter15GPUSplat>
 
     @MSState
     var vertexShader: VertexShader
@@ -28,7 +28,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var debugMode: DebugMode
 
-    public init(splatCloud: SplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe) throws {
+    public init(splatCloud: GPUSplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix

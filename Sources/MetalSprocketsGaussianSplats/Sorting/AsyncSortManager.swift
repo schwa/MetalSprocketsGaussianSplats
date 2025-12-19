@@ -5,13 +5,13 @@ internal import os
 import simd
 
 internal actor AsyncSortManager <Splat> where Splat: SortableSplatProtocol {
-    private var splatCloud: SplatCloud<Splat>
+    private var splatCloud: GPUSplatCloud<Splat>
     private var _sortRequestChannel: AsyncChannel<SortParameters> = .init()
     private var _sortedIndicesChannel: AsyncChannel<SplatIndices> = .init()
     private var logger: Logger?
     private var sorter: CPUSplatRadixSorter<Splat>
 
-    internal init(device: MTLDevice, splatCloud: SplatCloud<Splat>, capacity: Int, logger: Logger? = nil) throws {
+    internal init(device: MTLDevice, splatCloud: GPUSplatCloud<Splat>, capacity: Int, logger: Logger? = nil) throws {
         self.sorter = .init(device: device, capacity: capacity)
         self.splatCloud = splatCloud
         self.logger = logger

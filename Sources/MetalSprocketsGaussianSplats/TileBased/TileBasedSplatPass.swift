@@ -8,40 +8,42 @@ import MetalSprocketsUI
 internal import os
 import SwiftUI
 
-public struct TileBasedSplatView: View {
-    private var splatCloud: SplatCloud<SparkSplat>
+public struct TileBasedSplatPass: Element {
+    private var splatCloud: GPUSplatCloud<SparkSplat>
     private var projection: any ProjectionProtocol
     private var cameraMatrix: simd_float4x4
     private var modelMatrix: simd_float4x4
     private var debugTileBorders: Bool
     private var showHeatMap: Bool
     private var onFrameCompleted: (@Sendable (TileSplatResources) -> Void)?
+    private var drawableSize: SIMD2<Float>
 
-    @State private var tileSplatResources: TileSplatResources?
+    @MSState private var resources: TileSplatResources
 
     public init(
-        splatCloud: SplatCloud<SparkSplat>,
+        splatCloud: GPUSplatCloud<SparkSplat>,
         projection: any ProjectionProtocol,
+        drawableSize: SIMD2<Float>,
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,
         debugTileBorders: Bool = false,
         showHeatMap: Bool = false,
         onFrameCompleted: (@Sendable (TileSplatResources) -> Void)? = nil
-    ) {
+    ) throws {
         self.splatCloud = splatCloud
         self.projection = projection
+        self.drawableSize = drawableSize
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
         self.debugTileBorders = debugTileBorders
         self.showHeatMap = showHeatMap
         self.onFrameCompleted = onFrameCompleted
+        self.resources = try Self.makeResources(drawableSize: drawableSize)
     }
 
-    public var body: some View {
-        RenderView { _, drawableSize in
-            let drawableSizeFloat = SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
-            let resources = try ensureTileResources(size: drawableSize)
-            let projectionMatrix = projection.projectionMatrix(aspectRatio: Float(drawableSize.width / drawableSize.height))
+    public var body: some Element {
+        get throws {
+            let projectionMatrix = projection.projectionMatrix(aspectRatio: drawableSize.x / drawableSize.y)
 
             // Pass 1a: Count splats per tile
             try TileBinningCountPass(
@@ -49,9 +51,12 @@ public struct TileBasedSplatView: View {
                 projectionMatrix: projectionMatrix,
                 modelMatrix: modelMatrix,
                 cameraMatrix: cameraMatrix,
-                drawableSize: drawableSizeFloat,
+                drawableSize: drawableSize,
                 tileSplatResources: resources
             )
+            .onChange(of: drawableSize) { _, _ in
+                self.resources = try! Self.makeResources(drawableSize: drawableSize)
+            }
 
             // Pass 1b: Compute prefix sum of tile counts
             try TilePrefixSumComputePass(
@@ -64,7 +69,7 @@ public struct TileBasedSplatView: View {
                 projectionMatrix: projectionMatrix,
                 modelMatrix: modelMatrix,
                 cameraMatrix: cameraMatrix,
-                drawableSize: drawableSizeFloat,
+                drawableSize: drawableSize,
                 tileSplatResources: resources
             )
 
@@ -116,20 +121,9 @@ public struct TileBasedSplatView: View {
         }
     }
 
-    private func ensureTileResources(size: CGSize) throws -> TileSplatResources {
-        let drawableSizeFloat = SIMD2<Float>(Float(size.width), Float(size.height))
-
-        if let existing = tileSplatResources {
-            if existing.needsResize(for: drawableSizeFloat) {
-                try existing.resize(for: drawableSizeFloat)
-            }
-            return existing
-        }
-
+    static func makeResources(drawableSize: SIMD2<Float>) throws -> TileSplatResources {
         let device = _MTLCreateSystemDefaultDevice()
-        let resources = try TileSplatResources(device: device, drawableSize: drawableSizeFloat)
-        tileSplatResources = resources
-        return resources
+        return try TileSplatResources(device: device, drawableSize: drawableSize)
     }
 }
 

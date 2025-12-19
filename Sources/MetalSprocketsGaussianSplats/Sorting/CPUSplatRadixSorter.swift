@@ -3,6 +3,7 @@ internal import AsyncAlgorithms
 import MetalSprocketsGaussianSplatShaders
 internal import os
 import simd
+import Splats
 
 private let signposter: OSSignposter = .init(subsystem: "io.schwa.MetalSprockets-examples", category: OSLog.Category.pointsOfInterest)
 

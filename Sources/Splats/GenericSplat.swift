@@ -1,4 +1,4 @@
-@_exported import MetalSprocketsGaussianSplatShaders
+import MetalSprocketsGaussianSplatShaders
 import simd
 
 // GenericSplat is imported from MetalSprocketsGaussianSplatShaders C header

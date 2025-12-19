@@ -134,7 +134,7 @@ struct GenericSplatConversionTests {
 }
 
 @Suite
-struct SplatCloudTests {
+struct GPUSplatCloudTests {
     let device: MTLDevice
 
     init() throws {
@@ -145,14 +145,14 @@ struct SplatCloudTests {
     }
 
     @Test
-    func testSplatCloudCreation() throws {
+    func testGPUSplatCloudCreation() throws {
         let splats = [
             Antimatter15GPUSplat.testSplat(position: [0, 0, 0]),
             Antimatter15GPUSplat.testSplat(position: [1, 0, 0])
         ]
 
         let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
-        let cloud = try SplatCloud<Antimatter15GPUSplat>(
+        let cloud = try GPUSplatCloud<Antimatter15GPUSplat>(
             device: device,
             splats: splatBuffer,
             cameraMatrix: .identity,
@@ -163,14 +163,14 @@ struct SplatCloudTests {
     }
 
     @Test
-    func testSplatCloudWithManySplats() throws {
+    func testGPUSplatCloudWithManySplats() throws {
         // Test with a larger number of splats
         let splats = (0..<100).map { i in
             Antimatter15GPUSplat.testSplat(position: [Float(i), 0, 0])
         }
 
         let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
-        let cloud = try SplatCloud<Antimatter15GPUSplat>(
+        let cloud = try GPUSplatCloud<Antimatter15GPUSplat>(
             device: device,
             splats: splatBuffer,
             cameraMatrix: .identity,
@@ -237,7 +237,7 @@ struct SplatRenderingTests {
         let cameraMatrix = simd_float4x4.identity
         let modelMatrix = simd_float4x4.identity
 
-        let cloud = try SplatCloud<Antimatter15GPUSplat>(
+        let cloud = try GPUSplatCloud<Antimatter15GPUSplat>(
             device: device,
             splats: splatBuffer,
             cameraMatrix: cameraMatrix,

@@ -1,4 +1,5 @@
 import Foundation
+import MetalSprocketsGaussianSplatShaders
 import simd
 import UniformTypeIdentifiers
 
