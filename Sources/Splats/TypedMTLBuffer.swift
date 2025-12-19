@@ -1,4 +1,5 @@
 import Metal
+import MetalSprocketsSupport
 
 // TODO: #128 Unit tests.
 public struct TypedMTLBuffer<Element> {

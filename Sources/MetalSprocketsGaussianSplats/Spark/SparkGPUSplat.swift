@@ -1,3 +1,4 @@
+#if os(iOS) || (os(macOS) && !arch(x86_64))
 import MetalSprocketsGaussianSplatShaders
 import simd
 
@@ -24,3 +25,4 @@ extension SparkSplat: SortableSplatProtocol {
         SIMD3<Float>(position)
     }
 }
+#endif
