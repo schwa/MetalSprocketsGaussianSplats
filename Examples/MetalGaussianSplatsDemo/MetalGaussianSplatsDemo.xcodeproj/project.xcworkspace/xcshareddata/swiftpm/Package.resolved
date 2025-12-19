@@ -1,5 +1,5 @@
 {
-  "originHash" : "cdb78b4ce14da596075c094f30f6f6198c1b811db92448896d89f31446420570",
+  "originHash" : "33fc1901e37bdbbc4e2e76c189a9928c36331e464ce45b323741be684b399c1a",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -35,6 +35,15 @@
       "state" : {
         "branch" : "main",
         "revision" : "c1ff35c2d6b361bfe9d38c2def54e6e7f5dfedfb"
+      }
+    },
+    {
+      "identity" : "sharp",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/Sharp",
+      "state" : {
+        "branch" : "main",
+        "revision" : "8882d6ca703b474f0f606c736f05c5d61532c14e"
       }
     },
     {

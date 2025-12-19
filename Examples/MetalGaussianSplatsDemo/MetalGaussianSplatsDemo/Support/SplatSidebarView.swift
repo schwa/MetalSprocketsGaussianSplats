@@ -5,7 +5,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SplatSidebarView: View {
-    @Binding var splatURL: URL?
+    @Binding var selection: SidebarSelection?
     @Binding var folderURL: URL?
     @Binding var folderSplatFiles: [URL]
     @Binding var folderBookmarkData: Data?
@@ -17,14 +17,14 @@ struct SplatSidebarView: View {
     @State private var isDownloading = false
 
     var body: some View {
-        List(selection: $splatURL) {
+        List(selection: $selection) {
             Section {
                 Button("Choose Splat File...") {
                     showingImporter = true
                 }
                 .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.antimatter15Splat, .spz, .ply, .json]) { result in
                     if case .success(let url) = result {
-                        splatURL = url
+                        selection = .splat(url)
                     }
                 }
 
@@ -61,18 +61,27 @@ struct SplatSidebarView: View {
                 }
             }
 
+            Section("Sharp") {
+                Text("Image to Splat")
+                    .tag(SidebarSelection.sharp)
+            }
+
             Section("Bundled") {
-                Text("Last Chance")
-                    .tag(Bundle.main.url(forResource: "centered_lastchance", withExtension: "splat"))
-                Text("Train")
-                    .tag(Bundle.main.url(forResource: "train", withExtension: "splat"))
+                if let url = Bundle.main.url(forResource: "centered_lastchance", withExtension: "splat") {
+                    Text("Last Chance")
+                        .tag(SidebarSelection.splat(url))
+                }
+                if let url = Bundle.main.url(forResource: "train", withExtension: "splat") {
+                    Text("Train")
+                        .tag(SidebarSelection.splat(url))
+                }
             }
 
             if !folderSplatFiles.isEmpty {
                 Section(folderURL?.lastPathComponent ?? "Folder") {
                     ForEach(folderSplatFiles, id: \.self) { file in
                         Text(file.lastPathComponent)
-                            .tag(file as URL?)
+                            .tag(SidebarSelection.splat(file))
                     }
                 }
             }
@@ -97,18 +106,14 @@ struct SplatSidebarView: View {
 
     @MainActor
     private func downloadSparkAssets(to destinationURL: URL) async {
-        // Security scope already started by caller
-
         isDownloading = true
 
-        // Fetch assets.json
         let assetsURL = URL(string: "https://raw.githubusercontent.com/sparkjsdev/spark/main/examples/assets.json")!
 
         do {
             let (data, _) = try await URLSession.shared.data(from: assetsURL)
             let assets = try JSONDecoder().decode([String: AssetInfo].self, from: data)
 
-            // Filter for splat files only
             let splatAssets = assets.filter { $0.key.hasSuffix(".spz") }
             let total = splatAssets.count
             var completed = 0

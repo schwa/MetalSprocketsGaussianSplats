@@ -20,10 +20,15 @@ enum RendererType: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum SidebarSelection: Hashable {
+    case splat(URL)
+    case sharp
+}
+
 public struct GaussianSplatDemoView: View {
     @State private var rendererType: RendererType = .spark
     @State private var showingRotationPopover = false
-    @State private var splatURL: URL?
+    @State private var selection: SidebarSelection?
     @State private var folderURL: URL?
     @State private var folderSplatFiles: [URL] = []
 
@@ -43,6 +48,22 @@ public struct GaussianSplatDemoView: View {
     @State private var lastFrameTime: CFAbsoluteTime = 0
     @State private var frameCount: Int = 0
 
+    private var splatURL: Binding<URL?> {
+        Binding(
+            get: {
+                if case .splat(let url) = selection {
+                    return url
+                }
+                return nil
+            },
+            set: { newURL in
+                if let url = newURL {
+                    selection = .splat(url)
+                }
+            }
+        )
+    }
+
     public init() {
         // This line intentionally left blank.
     }
@@ -50,76 +71,19 @@ public struct GaussianSplatDemoView: View {
     public var body: some View {
         NavigationSplitView {
             SplatSidebarView(
-                splatURL: $splatURL,
+                selection: $selection,
                 folderURL: $folderURL,
                 folderSplatFiles: $folderSplatFiles,
                 folderBookmarkData: $folderBookmarkData
             )
         } detail: {
-            ZStack {
-                Color.black
-                WorldView(projection: $projection, cameraMatrix: $cameraMatrix) {
-                    switch rendererType {
-                    case .antimatter15:
-                        Antimatter15RendererView(
-                            url: splatURL,
-                            projection: projection,
-                            cameraMatrix: cameraMatrix,
-                            modelMatrix: modelMatrix,
-                            onFrameCompleted: updateFPS
-                        )
-
-                    case .spark:
-                        SparkRendererView(
-                            url: splatURL,
-                            projection: projection,
-                            cameraMatrix: cameraMatrix,
-                            modelMatrix: modelMatrix,
-                            onFrameCompleted: updateFPS
-                        )
-
-                    case .stochastic:
-                        StochasticRendererView(
-                            url: splatURL,
-                            projection: projection,
-                            cameraMatrix: cameraMatrix,
-                            modelMatrix: modelMatrix,
-                            onFrameCompleted: updateFPS
-                        )
-
-                    case .tileBased:
-                        TileBasedDemoView(
-                            url: splatURL,
-                            projection: projection,
-                            cameraMatrix: cameraMatrix,
-                            modelMatrix: modelMatrix,
-                            onFrameCompleted: updateFPS
-                        )
-                    }
-                }
-                .overlay(alignment: .top) {
-                    FPSView(fps: fps)
-                        .padding()
-                }
-                .overlay(alignment: .bottomLeading) {
-                    let camPos = SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z)
-                    let modelPos = SIMD3<Float>(modelMatrix.columns.3.x, modelMatrix.columns.3.y, modelMatrix.columns.3.z)
-                    let fileName = splatURL?.lastPathComponent ?? "No file"
-
-                    Text("""
-                    Renderer: \(rendererType.rawValue)
-                    File: \(fileName)
-                    Splats: \(splatCount.map { $0.formatted() } ?? "—")
-                    Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
-                    Model: (\(String(format: "%.2f", modelPos.x)), \(String(format: "%.2f", modelPos.y)), \(String(format: "%.2f", modelPos.z)))
-                    """)
-                        .padding(8)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-                        .padding()
-                }
-            }
-            .toolbar {
-                toolbar
+            switch selection {
+            case .sharp:
+                SharpView()
+            case .splat(let url):
+                splatDetailView(url: url)
+            case nil:
+                Text("Select a splat")
             }
         }
         .onChange(of: rotationX, initial: true) {
@@ -132,17 +96,88 @@ public struct GaussianSplatDemoView: View {
             updateModelMatrix()
         }
         .onAppear {
-            if splatURL == nil {
-                splatURL = Bundle.main.url(forResource: "centered_lastchance", withExtension: "splat")
+            if selection == nil {
+                if let url = Bundle.main.url(forResource: "centered_lastchance", withExtension: "splat") {
+                    selection = .splat(url)
+                }
             }
             restoreFolderFromBookmark()
         }
-        .onChange(of: splatURL, initial: true) {
-            if let url = splatURL {
+        .onChange(of: selection, initial: true) {
+            if let url = splatURL.wrappedValue {
                 splatCount = try? SplatCloud<SparkSplat>.splatCount(from: url)
             } else {
                 splatCount = nil
             }
+        }
+    }
+
+    @ViewBuilder
+    private func splatDetailView(url: URL) -> some View {
+        ZStack {
+            Color.black
+            WorldView(projection: $projection, cameraMatrix: $cameraMatrix) {
+                switch rendererType {
+                case .antimatter15:
+                    Antimatter15RendererView(
+                        url: url,
+                        projection: projection,
+                        cameraMatrix: cameraMatrix,
+                        modelMatrix: modelMatrix,
+                        onFrameCompleted: updateFPS
+                    )
+
+                case .spark:
+                    SparkRendererView(
+                        url: url,
+                        projection: projection,
+                        cameraMatrix: cameraMatrix,
+                        modelMatrix: modelMatrix,
+                        onFrameCompleted: updateFPS
+                    )
+
+                case .stochastic:
+                    StochasticRendererView(
+                        url: url,
+                        projection: projection,
+                        cameraMatrix: cameraMatrix,
+                        modelMatrix: modelMatrix,
+                        onFrameCompleted: updateFPS
+                    )
+
+                case .tileBased:
+                    TileBasedDemoView(
+                        url: url,
+                        projection: projection,
+                        cameraMatrix: cameraMatrix,
+                        modelMatrix: modelMatrix,
+                        onFrameCompleted: updateFPS
+                    )
+                }
+            }
+            .overlay(alignment: .top) {
+                FPSView(fps: fps)
+                    .padding()
+            }
+            .overlay(alignment: .bottomLeading) {
+                let camPos = SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z)
+                let modelPos = SIMD3<Float>(modelMatrix.columns.3.x, modelMatrix.columns.3.y, modelMatrix.columns.3.z)
+                let fileName = url.lastPathComponent
+
+                Text("""
+                Renderer: \(rendererType.rawValue)
+                File: \(fileName)
+                Splats: \(splatCount.map { $0.formatted() } ?? "—")
+                Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
+                Model: (\(String(format: "%.2f", modelPos.x)), \(String(format: "%.2f", modelPos.y)), \(String(format: "%.2f", modelPos.z)))
+                """)
+                    .padding(8)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .padding()
+            }
+        }
+        .toolbar {
+            toolbar
         }
     }
 
@@ -203,7 +238,7 @@ public struct GaussianSplatDemoView: View {
 
         SceneMenuToolbarContent(
             cameraMatrix: $cameraMatrix,
-            splatURL: $splatURL,
+            splatURL: splatURL,
             rotationX: $rotationX,
             rotationY: $rotationY,
             rotationZ: $rotationZ
