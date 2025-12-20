@@ -22,6 +22,8 @@ struct SplatDocumentCameraView: View {
                 }
             }
             .pickerStyle(.segmented)
+            Toggle("Zoom to Fit", isOn: $viewModel.zoomToFit)
+                .disabled(viewModel.cameraMode != .object)
         }
         Section("Field of View") {
             Slider(value: $viewModel.verticalAngleOfView, in: 30...120) {
