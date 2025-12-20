@@ -26,7 +26,7 @@ struct SplatDocumentRenderView: View {
         ZStack {
             WorldView(projection: $projection, cameraMatrix: $cameraMatrix) {
                 RenderView { context, drawableSize in
-                    SplatRenderPass(rendererType: viewModel.rendererType, descriptor: viewModel.descriptor!, drawableSize: drawableSize, frame: context.frameUniforms.index)
+                    SplatRenderPass(rendererType: viewModel.rendererType, descriptor: viewModel.descriptor!, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, drawableSize: drawableSize, frame: context.frameUniforms.index)
                 }
                 .metalColorPixelFormat(.bgra8Unorm_srgb)
                 .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
@@ -39,9 +39,8 @@ struct SplatRenderPass: Element {
     let rendererType: SplatRendererType
     let descriptor: SplatCloudDescriptor
 
-    // Hardcoded transforms
-    var cameraMatrix: simd_float4x4 = .identity
-    var modelMatrix: simd_float4x4 = .identity
+    var cameraMatrix: simd_float4x4
+    var modelMatrix: simd_float4x4
     var projection: (any ProjectionProtocol) = PerspectiveProjection(verticalAngleOfView: .degrees(90), depthMode: .standard(zClip: 0.01 ... 1_000))
     var drawableSize: CGSize
     var frame: UInt32
