@@ -2,13 +2,13 @@ import SwiftUI
 
 /// A view that displays the source image while conversion to 3DGS is in progress.
 struct ImageConversionView: View {
-    let sourceImage: NSImage
+    let sourceImage: PlatformImage
     let statusMessage: String
 
     var body: some View {
         ZStack {
             // Source image as blurred background
-            Image(nsImage: sourceImage)
+            platformImage(sourceImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .blur(radius: 20)
@@ -16,7 +16,7 @@ struct ImageConversionView: View {
 
             VStack(spacing: 24) {
                 // Original image preview
-                Image(nsImage: sourceImage)
+                platformImage(sourceImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: 400, maxHeight: 300)
@@ -38,5 +38,13 @@ struct ImageConversionView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Converting image: \(statusMessage)")
+    }
+
+    private func platformImage(_ image: PlatformImage) -> Image {
+        #if os(macOS)
+        Image(nsImage: image)
+        #else
+        Image(uiImage: image)
+        #endif
     }
 }

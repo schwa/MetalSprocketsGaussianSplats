@@ -21,9 +21,11 @@ struct SettingsView: View {
                 Link("apple/ml-sharp on GitHub", destination: URL(string: "https://github.com/apple/ml-sharp")!)
                 if let modelURL = Sharp.cachedModel(in: modelDirectory) {
                     HStack {
+                        #if os(macOS)
                         Button("Reveal") {
                             NSWorkspace.shared.selectFile(modelURL.path, inFileViewerRootedAtPath: modelDirectory.path)
                         }
+                        #endif
                         Label("Model Downloaded", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                         Spacer()

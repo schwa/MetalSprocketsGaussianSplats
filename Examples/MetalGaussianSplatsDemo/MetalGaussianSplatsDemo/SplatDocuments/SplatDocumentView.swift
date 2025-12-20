@@ -70,23 +70,27 @@ struct SplatDocumentView: View {
             }
         }
         .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
+        #if !os(visionOS)
         .inspector(isPresented: $showInspector) {
             SplatDocumentInspectorView(tab: $inspectorTab)
                 .environment(viewModel)
         }
         .focusedSceneValue(\.inspectorVisibility, $showInspector)
         .focusedSceneValue(\.inspectorTab, $inspectorTab)
+        #endif
         .toolbar {
             ToolbarItem {
                 Button("Screenshot", systemImage: "camera") {
                     showScreenshotSheet = true
                 }
             }
+            #if !os(visionOS)
             ToolbarItem {
                 Button("Inspector", systemImage: "sidebar.right") {
                     showInspector.toggle()
                 }
             }
+            #endif
         }
         .sheet(isPresented: $showScreenshotSheet) {
             ScreenshotSheet(

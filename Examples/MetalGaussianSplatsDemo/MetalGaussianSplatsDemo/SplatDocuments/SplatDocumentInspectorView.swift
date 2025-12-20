@@ -22,6 +22,8 @@ struct SplatDocumentInspectorView: View {
                 SplatDocumentCameraView()
             }
         }
+        #if !os(visionOS)
         .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
+        #endif
     }
 }

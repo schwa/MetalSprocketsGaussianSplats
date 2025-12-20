@@ -1,4 +1,3 @@
-import AppKit
 import CoreGraphics
 import Foundation
 import GeometryLite3D
@@ -7,6 +6,12 @@ import Sharp
 import simd
 import SwiftUI
 import UniformTypeIdentifiers
+
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 enum LoadingState: Equatable {
     case idle
@@ -28,7 +33,7 @@ final class SplatDocumentViewModel {
     var convertedURL: URL?
 
     // Image conversion state
-    var sourceImage: NSImage?
+    var sourceImage: PlatformImage?
     var isImageConversion: Bool = false
 
     // Camera
@@ -188,7 +193,11 @@ final class SplatDocumentViewModel {
             isImageConversion = true
             cameraMode = .spatialScene
             // Load source image for display during conversion
+            #if os(macOS)
             sourceImage = NSImage(contentsOf: url)
+            #else
+            sourceImage = UIImage(contentsOfFile: url.path)
+            #endif
             await convertImage(url: url)
         } else {
             isImageConversion = false

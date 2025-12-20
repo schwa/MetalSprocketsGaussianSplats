@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		451155A42EC3EF9700C04880 /* GeometryLite3D in Frameworks */ = {isa = PBXBuildFile; productRef = 451155A32EC3EF9700C04880 /* GeometryLite3D */; };
-		454CBDFB2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 454CBDEC2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		454CBDFB2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 454CBDEC2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex */; platformFilters = (macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		454CBE022EF7576300A16AD0 /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 454CBE012EF7576300A16AD0 /* MetalSprocketsGaussianSplats */; };
 		454CBE042EF75A7A00A16AD0 /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 454CBE032EF75A7A00A16AD0 /* Interaction3D */; };
 		457A346D2EB3DBF20001F508 /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 457A346C2EB3DBF20001F508 /* MetalSprocketsGaussianSplats */; };
@@ -302,6 +302,9 @@
 /* Begin PBXTargetDependency section */
 		454CBDFA2EF753EC00A16AD0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				macos,
+			);
 			target = 454CBDEB2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension */;
 			targetProxy = 454CBDF92EF753EC00A16AD0 /* PBXContainerItemProxy */;
 		};
