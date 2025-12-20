@@ -289,8 +289,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         cameraMatrix: simd_float4x4,
         antimatter15GPUSplatCloud: GPUSplatCloud<Antimatter15GPUSplat>?,
         sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>?,
-        shCoefficientsBuffer: TypedMTLBuffer<Float>?,
-        effectiveSHDegree: UInt8
+        shCoefficientsBuffer _: TypedMTLBuffer<Float>?,
+        effectiveSHDegree _: UInt8
     ) throws -> (OffscreenRenderer.Rendering, Int) {
         let renderer = try OffscreenRenderer(size: size)
         renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
@@ -318,9 +318,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                    convertSRGBToLinear: useSrgbToLinear,
-                    shCoefficients: shCoefficientsBuffer,
-                    shDegree: effectiveSHDegree
+                    convertSRGBToLinear: useSrgbToLinear
                 )
             }
             rendering = try captureManager.with(enabled: capture) {
