@@ -88,6 +88,7 @@ struct SplatDocumentView: View {
                 defaultWidth: Int(viewModel.viewSize.width * displayScale),
                 defaultHeight: Int(viewModel.viewSize.height * displayScale)
             )
+            .environment(viewModel)
         }
         .onChange(of: fileURL, initial: true) { _, newURL in
             confirmedLoad = false
