@@ -18,6 +18,16 @@
 		457A34552EB3D9AE0001F508 /* MetalGaussianSplatsDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MetalGaussianSplatsDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		450DB2A02EF7293D003752BC /* Exceptions for "MetalGaussianSplatsDemo" folder in "MetalGaussianSplatsDemo" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 457A34542EB3D9AE0001F508 /* MetalGaussianSplatsDemo */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		452EC1342EF51EF600AB9206 /* Configuration */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -26,6 +36,9 @@
 		};
 		457A34572EB3D9AE0001F508 /* MetalGaussianSplatsDemo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				450DB2A02EF7293D003752BC /* Exceptions for "MetalGaussianSplatsDemo" folder in "MetalGaussianSplatsDemo" target */,
+			);
 			path = MetalGaussianSplatsDemo;
 			sourceTree = "<group>";
 		};

@@ -119,8 +119,6 @@ struct SplatRenderPass: Element {
         }
     }
 }
-
-
 #else
 
 struct SplatDocumentRenderView: View {
@@ -135,4 +133,3 @@ struct SplatDocumentRenderView: View {
     }
 }
 #endif
-
