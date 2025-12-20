@@ -16,11 +16,6 @@ struct SplatDocumentView: View {
         return descriptor.splatCount >= 1_000_000 && !confirmedLoad
     }
 
-    /// The URL to use for rendering (converted URL for images, original for splats)
-    private var renderURL: URL? {
-        viewModel.convertedURL ?? fileURL
-    }
-
     var body: some View {
         Group {
             switch viewModel.loadingState {
@@ -40,9 +35,8 @@ struct SplatDocumentView: View {
                     Text(message)
                 }
             case .ready:
-                if let renderURL, !needsConfirmation {
-                    SplatDocumentRenderView(url: renderURL)
-                        .environment(viewModel)
+                if let descriptor = viewModel.descriptor, !needsConfirmation {
+                    SplatDocumentRenderView(rendererType: viewModel.rendererType, descriptor: descriptor)
                         .ignoresSafeArea()
                 } else if needsConfirmation {
                     ContentUnavailableView {
