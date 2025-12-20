@@ -49,7 +49,7 @@ public struct SOGReaderCPU: SplatReader {
         do {
             archive = try Archive(url: url, accessMode: .read)
         } catch {
-            throw SOGError.failedToExtractZIP
+            throw SplatsError.failedToExtractZIP
         }
 
         // Load metadata
@@ -142,7 +142,7 @@ public struct SOGReaderCPU: SplatReader {
 
     private static func extractData(from archive: Archive, filename: String) throws -> Data {
         guard let entry = archive[filename] else {
-            throw SOGError.missingTexture(filename)
+            throw SplatsError.missingTexture(filename)
         }
 
         var data = Data()
@@ -156,7 +156,7 @@ public struct SOGReaderCPU: SplatReader {
         let imageData = try extractData(from: archive, filename: filename)
 
         guard let imageSource = CGImageSourceCreateWithData(imageData as CFData, nil), let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
-            throw SOGError.failedToDecodeImage(filename)
+            throw SplatsError.failedToDecodeImage(filename)
         }
 
         let width = cgImage.width
@@ -173,7 +173,7 @@ public struct SOGReaderCPU: SplatReader {
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
-            throw SOGError.failedToDecodeImage(filename)
+            throw SplatsError.failedToDecodeImage(filename)
         }
 
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
@@ -206,16 +206,4 @@ private struct SOGReaderCPUMetadata: Codable {
     struct QuatsMetadata: Codable {
         let files: [String]
     }
-}
-
-// MARK: - Error Types
-
-public enum SOGError: Error, Equatable {
-    case failedToExtractZIP
-    case missingMetadata
-    case failedToDecodeMetadata
-    case missingTexture(String)
-    case failedToDecodeImage(String)
-    case failedToCreateTexture(String)
-    case failedToCreateBuffer
 }

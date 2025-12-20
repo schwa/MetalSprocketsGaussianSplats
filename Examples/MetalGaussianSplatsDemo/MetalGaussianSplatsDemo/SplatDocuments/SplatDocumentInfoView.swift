@@ -3,10 +3,8 @@ import SwiftUI
 
 struct SplatDocumentInfoView: View {
     @Environment(SplatDocumentViewModel.self) private var viewModel
-    @Environment(\.displayScale) private var displayScale
 
     private var descriptor: SplatCloudDescriptor? { viewModel.descriptor }
-    private var viewSize: CGSize { viewModel.viewSize }
 
     var body: some View {
         Section("File") {
@@ -28,44 +26,10 @@ struct SplatDocumentInfoView: View {
                 }
             }
         }
-        Section("Window") {
-            LabeledContent("Size", value: "\(formattedDimension(viewSize.width)) × \(formattedDimension(viewSize.height))")
-            LabeledContent("Aspect Ratio", value: aspectRatioString)
-            LabeledContent("Megapixels", value: megapixelsString)
-            if displayScale != 1 {
-                LabeledContent("Scale", value: "\(Int(displayScale))x")
-            }
-        }
     }
 
     private func formatVector(_ v: SIMD3<Float>) -> String {
         String(format: "(%.2f, %.2f, %.2f)", v.x, v.y, v.z)
-    }
-
-    private var aspectRatioString: String {
-        guard viewSize.width > 0, viewSize.height > 0 else {
-            return "—"
-        }
-        let ratio = viewSize.width / viewSize.height
-        return String(format: "%.2f:1", ratio)
-    }
-
-    private var megapixelsString: String {
-        guard viewSize.width > 0, viewSize.height > 0 else {
-            return "—"
-        }
-        let pixels = viewSize.width * displayScale * viewSize.height * displayScale
-        let megapixels = pixels / 1_000_000
-        return String(format: "%.2f MP", megapixels)
-    }
-
-    private func formattedDimension(_ value: CGFloat) -> String {
-        let pts = Int(value)
-        if displayScale == 1 {
-            return "\(pts)"
-        }
-        let px = Int(value * displayScale)
-        return "\(pts) (\(px))"
     }
 }
 

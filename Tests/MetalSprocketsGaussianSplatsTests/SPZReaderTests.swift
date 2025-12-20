@@ -120,7 +120,7 @@ struct SPZReaderTests {
     func testInvalidGzipData() throws {
         let invalidData = Data([0x00, 0x01, 0x02, 0x03])
 
-        #expect(throws: SPZError.self) {
+        #expect(throws: SplatsError.self) {
             _ = try SPZReader(data: invalidData)
         }
     }
@@ -129,7 +129,7 @@ struct SPZReaderTests {
     func testEmptyData() throws {
         let emptyData = Data()
 
-        #expect(throws: SPZError.self) {
+        #expect(throws: SplatsError.self) {
             _ = try SPZReader(data: emptyData)
         }
     }

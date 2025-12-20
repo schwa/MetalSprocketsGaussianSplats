@@ -1,6 +1,6 @@
 import Foundation
 @testable import MetalSprocketsGaussianSplats
-import Splats
+@testable import Splats
 import Testing
 
 // MARK: - Test-only extensions
@@ -278,7 +278,7 @@ struct PLYReaderTests {
         let url = try createInvalidPLY()
         defer { try? FileManager.default.removeItem(at: url) }
 
-        #expect(throws: PLYError.self) {
+        #expect(throws: SplatsError.self) {
             _ = try PLYReader(url: url)
         }
     }
@@ -288,7 +288,7 @@ struct PLYReaderTests {
         let url = try createPLYWithoutEndHeader()
         defer { try? FileManager.default.removeItem(at: url) }
 
-        #expect(throws: PLYError.missingEndHeader) {
+        #expect(throws: SplatsError.missingEndHeader) {
             _ = try PLYReader(url: url)
         }
     }

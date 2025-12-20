@@ -37,17 +37,17 @@ public struct SPZReader: SplatReader {
         self.decompressedData = decompressed
 
         guard decompressed.count >= headerSize else {
-            throw SPZError.invalidHeader
+            throw SplatsError.invalidHeader
         }
 
         let magic = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
         guard magic == 0x5053474e else {
-            throw SPZError.invalidMagic
+            throw SplatsError.invalidMagic
         }
 
         version = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 4, as: UInt32.self) }
         guard version == 2 || version == 3 else {
-            throw SPZError.unsupportedVersion(version)
+            throw SplatsError.unsupportedVersion(version)
         }
 
         pointCount = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 8, as: UInt32.self) }
@@ -57,7 +57,7 @@ public struct SPZReader: SplatReader {
         isAntialiased = (flags & 0x1) != 0
 
         guard shDegree <= 3 else {
-            throw SPZError.invalidSHDegree(shDegree)
+            throw SplatsError.invalidSHDegree(shDegree)
         }
     }
 
@@ -76,7 +76,7 @@ public struct SPZReader: SplatReader {
 
         let totalSize = headerSize + positionsSize + alphasSize + colorsSize + scalesSize + rotationsSize + shSize
         guard decompressedData.count >= totalSize else {
-            throw SPZError.insufficientData
+            throw SplatsError.insufficientData
         }
 
         let positionsOffset = offset
@@ -278,18 +278,18 @@ public struct SPZReader: SplatReader {
 
     private static func decompressGzip(_ data: Data) throws -> Data {
         guard data.count > 10 else {
-            throw SPZError.decompressionFailed
+            throw SplatsError.decompressionFailed
         }
 
         guard data[0] == 0x1f, data[1] == 0x8b else {
-            throw SPZError.decompressionFailed
+            throw SplatsError.decompressionFailed
         }
 
         var headerSize = 10
         let flags = data[3]
 
         if (flags & 0x04) != 0 {
-            guard data.count > headerSize + 2 else { throw SPZError.decompressionFailed }
+            guard data.count > headerSize + 2 else { throw SplatsError.decompressionFailed }
             let xlen = Int(data[headerSize]) | (Int(data[headerSize + 1]) << 8)
             headerSize += 2 + xlen
         }
@@ -313,14 +313,14 @@ public struct SPZReader: SplatReader {
         }
 
         guard headerSize < data.count else {
-            throw SPZError.decompressionFailed
+            throw SplatsError.decompressionFailed
         }
 
         let compressedData = data.subdata(in: headerSize..<(data.count - 8))
 
         return try compressedData.withUnsafeBytes { (inputPtr: UnsafeRawBufferPointer) -> Data in
             guard let inputAddress = inputPtr.baseAddress else {
-                throw SPZError.decompressionFailed
+                throw SplatsError.decompressionFailed
             }
 
             var outputSize = compressedData.count * 10
@@ -352,22 +352,11 @@ public struct SPZReader: SplatReader {
             } while decompressedSize == 0 && outputSize < compressedData.count * 100
 
             guard decompressedSize > 0 else {
-                throw SPZError.decompressionFailed
+                throw SplatsError.decompressionFailed
             }
 
             outputData.count = decompressedSize
             return outputData
         }
     }
-}
-
-// MARK: - Error Types
-
-public enum SPZError: Error, Equatable {
-    case decompressionFailed
-    case invalidHeader
-    case invalidMagic
-    case unsupportedVersion(UInt32)
-    case invalidSHDegree(UInt8)
-    case insufficientData
 }

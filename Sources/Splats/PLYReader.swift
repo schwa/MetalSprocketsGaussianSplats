@@ -96,7 +96,7 @@ public struct PLYReader {
 
         let headerBytes = data[0..<headerEndOffset]
         guard let headerString = String(data: headerBytes, encoding: .ascii) else {
-            throw PLYError.invalidEncoding
+            throw SplatsError.invalidEncoding
         }
 
         let lines = headerString.components(separatedBy: .newlines)
@@ -118,7 +118,7 @@ public struct PLYReader {
                 continue
 
             case "format":
-                guard parts.count >= 2 else { throw PLYError.invalidHeader }
+                guard parts.count >= 2 else { throw SplatsError.invalidHeader }
                 switch parts[1] {
                 case "ascii":
                     format = .ascii
@@ -130,7 +130,7 @@ public struct PLYReader {
                     format = .binaryBigEndian
 
                 default:
-                    throw PLYError.unsupportedFormat(parts[1])
+                    throw SplatsError.unsupportedFormat(parts[1])
                 }
 
             case "element":
@@ -139,16 +139,16 @@ public struct PLYReader {
                 }
 
                 guard parts.count >= 3, let count = Int(parts[2]) else {
-                    throw PLYError.invalidHeader
+                    throw SplatsError.invalidHeader
                 }
                 currentElement = (name: parts[1], count: count, properties: [])
 
             case "property":
-                guard var element = currentElement else { throw PLYError.invalidHeader }
+                guard var element = currentElement else { throw SplatsError.invalidHeader }
 
                 if parts[1] == "list" {
                     guard parts.count >= 5, let countType = PropertyType(string: parts[2]), let itemType = PropertyType(string: parts[3]) else {
-                        throw PLYError.invalidHeader
+                        throw SplatsError.invalidHeader
                     }
                     let property = Property(
                         name: parts[4],
@@ -160,7 +160,7 @@ public struct PLYReader {
                     element.properties.append(property)
                 } else {
                     guard parts.count >= 3, let type = PropertyType(string: parts[1]) else {
-                        throw PLYError.invalidHeader
+                        throw SplatsError.invalidHeader
                     }
                     let property = Property(
                         name: parts[2],
@@ -185,19 +185,19 @@ public struct PLYReader {
             }
         }
 
-        throw PLYError.missingEndHeader
+        throw SplatsError.missingEndHeader
     }
 
     public func read(_ callback: (Record) throws -> Void) throws {
         guard let element = primaryElement else {
-            throw PLYError.noElements
+            throw SplatsError.noElements
         }
         try read(element: element, callback: callback)
     }
 
     public func read(element: Element, callback: (Record) throws -> Void) throws {
         guard let format else {
-            throw PLYError.formatNotSet
+            throw SplatsError.formatNotSet
         }
 
         switch format {
@@ -214,7 +214,7 @@ public struct PLYReader {
 
     private func readASCII(element: Element, callback: (Record) throws -> Void) throws {
         guard let content = String(data: data, encoding: .utf8) else {
-            throw PLYError.invalidEncoding
+            throw SplatsError.invalidEncoding
         }
         let lines = content.components(separatedBy: .newlines)
 
@@ -245,13 +245,13 @@ public struct PLYReader {
             for property in element.properties {
                 if property.isList {
                     guard valueIndex < values.count, let listCount = Int(values[valueIndex]) else {
-                        throw PLYError.invalidData
+                        throw SplatsError.invalidData
                     }
                     valueIndex += 1
 
                     var listValues: [PropertyValue] = []
                     for _ in 0..<listCount {
-                        guard valueIndex < values.count else { throw PLYError.invalidData }
+                        guard valueIndex < values.count else { throw SplatsError.invalidData }
                         if let value = PropertyValue(string: values[valueIndex], type: property.listItemType ?? property.type) {
                             listValues.append(value)
                         }
@@ -259,7 +259,7 @@ public struct PLYReader {
                     }
                     record[property.name] = .list(listValues)
                 } else {
-                    guard valueIndex < values.count else { throw PLYError.invalidData }
+                    guard valueIndex < values.count else { throw SplatsError.invalidData }
                     if let value = PropertyValue(string: values[valueIndex], type: property.type) {
                         record[property.name] = value
                     }
@@ -289,7 +289,7 @@ public struct PLYReader {
 
             for property in element.properties {
                 if property.isList {
-                    guard let countType = property.listCountType else { throw PLYError.invalidData }
+                    guard let countType = property.listCountType else { throw SplatsError.invalidData }
                     let (listCount, countSize) = try readBinaryValue(from: data, at: offset, type: countType, littleEndian: littleEndian)
                     offset += countSize
 
@@ -307,7 +307,7 @@ public struct PLYReader {
                     case .uint(let v):
                         Int(v)
                     default:
-                        throw PLYError.invalidData
+                        throw SplatsError.invalidData
                     }
                     var listValues: [PropertyValue] = []
 
@@ -330,7 +330,7 @@ public struct PLYReader {
 
     private func readBinaryValue(from data: Data, at offset: Int, type: PropertyType, littleEndian: Bool) throws -> (PropertyValue, Int) {
         guard offset + type.size <= data.count else {
-            throw PLYError.invalidData
+            throw SplatsError.invalidData
         }
 
         let bytes = data[offset..<(offset + type.size)]
@@ -369,16 +369,6 @@ public struct PLYReader {
             return (.double(Double(bitPattern: swapped)), 8)
         }
     }
-}
-
-public enum PLYError: Error, Equatable {
-    case invalidEncoding
-    case invalidHeader
-    case unsupportedFormat(String)
-    case missingEndHeader
-    case noElements
-    case formatNotSet
-    case invalidData
 }
 
 public extension PLYReader.PropertyType {

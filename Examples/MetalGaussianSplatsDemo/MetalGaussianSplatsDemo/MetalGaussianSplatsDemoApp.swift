@@ -11,6 +11,9 @@ struct MetalGaussianSplatsDemoApp: App {
         DocumentGroup(viewing: SplatDocument.self) { file in
             SplatDocumentView(document: file.document, fileURL: file.fileURL)
         }
+        .commands {
+            InspectorCommands()
+        }
 
         #if os(macOS)
         Settings {

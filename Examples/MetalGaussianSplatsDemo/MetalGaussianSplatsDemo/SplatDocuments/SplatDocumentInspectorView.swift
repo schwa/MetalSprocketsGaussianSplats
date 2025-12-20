@@ -1,28 +1,25 @@
 import SwiftUI
 
 struct SplatDocumentInspectorView: View {
-    enum Mode: String, CaseIterable {
-        case info = "Info"
-        case renderer = "Renderer"
-    }
-
-    @State private var mode: Mode = .info
+    @Binding var tab: InspectorTab
 
     var body: some View {
         Form {
-            Picker("Mode", selection: $mode) {
-                ForEach(Mode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+            Picker("Tab", selection: $tab) {
+                ForEach(InspectorTab.allCases, id: \.self) { tab in
+                    Text(tab.rawValue).tag(tab)
                 }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
 
-            switch mode {
+            switch tab {
             case .info:
                 SplatDocumentInfoView()
-            case .renderer:
+            case .render:
                 SplatDocumentRendererSettingsView()
+            case .camera:
+                SplatDocumentCameraView()
             }
         }
         .inspectorColumnWidth(min: 200, ideal: 300, max: 400)

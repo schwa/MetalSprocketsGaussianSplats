@@ -7,6 +7,7 @@ struct SplatDocumentView: View {
 
     @State private var viewModel = SplatDocumentViewModel()
     @State private var showInspector = false
+    @State private var inspectorTab: InspectorTab = .info
     @State private var confirmedLoad = false
 
     private var needsConfirmation: Bool {
@@ -36,8 +37,14 @@ struct SplatDocumentView: View {
                 }
             case .ready:
                 if let descriptor = viewModel.descriptor, !needsConfirmation {
-                    SplatDocumentRenderView(rendererType: viewModel.rendererType, descriptor: descriptor)
-                        .ignoresSafeArea()
+                    SplatDocumentRenderView(
+                        rendererType: viewModel.rendererType,
+                        descriptor: descriptor,
+                        cameraMatrix: $viewModel.cameraMatrix,
+                        modelMatrix: $viewModel.modelMatrix,
+                        verticalAngleOfView: $viewModel.verticalAngleOfView
+                    )
+                    .ignoresSafeArea()
                 } else if needsConfirmation {
                     ContentUnavailableView {
                         Label("Large Splat Cloud", systemImage: "exclamationmark.triangle.fill")
@@ -56,9 +63,11 @@ struct SplatDocumentView: View {
         }
         .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
         .inspector(isPresented: $showInspector) {
-            SplatDocumentInspectorView()
+            SplatDocumentInspectorView(tab: $inspectorTab)
                 .environment(viewModel)
         }
+        .focusedSceneValue(\.inspectorVisibility, $showInspector)
+        .focusedSceneValue(\.inspectorTab, $inspectorTab)
         .toolbar {
             ToolbarItem {
                 Button("Inspector", systemImage: "sidebar.right") {

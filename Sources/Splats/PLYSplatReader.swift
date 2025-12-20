@@ -19,7 +19,7 @@ public struct PLYSplatReader: SplatReader {
         var index = 0
         try plyReader.read { record in
             guard let splat = GenericSplat(plyRecord: record) else {
-                throw PLYSplatError.invalidRecord(index)
+                throw SplatsError.invalidRecord(index)
             }
             try handler(index, splat)
             index += 1
@@ -103,10 +103,4 @@ public extension GenericSplat {
             rotation: rotation
         )
     }
-}
-
-// MARK: - Error Types
-
-public enum PLYSplatError: Error, Equatable {
-    case invalidRecord(Int)
 }

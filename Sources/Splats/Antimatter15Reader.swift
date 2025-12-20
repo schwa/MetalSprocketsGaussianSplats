@@ -25,7 +25,7 @@ public struct Antimatter15Reader: SplatReader {
 
     public init(data: Data) throws {
         guard data.count.isMultiple(of: 32) else {
-            throw Antimatter15Error.invalidFileSize
+            throw SplatsError.invalidFileSize
         }
         self.data = data
     }
@@ -71,10 +71,4 @@ public struct Antimatter15Reader: SplatReader {
             try handler(i, splat)
         }
     }
-}
-
-// MARK: - Error Types
-
-public enum Antimatter15Error: Error, Equatable {
-    case invalidFileSize
 }
