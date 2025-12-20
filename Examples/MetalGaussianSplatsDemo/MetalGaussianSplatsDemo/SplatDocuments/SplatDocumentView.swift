@@ -9,6 +9,9 @@ struct SplatDocumentView: View {
     @State private var showInspector = false
     @State private var inspectorTab: InspectorTab = .info
     @State private var confirmedLoad = false
+    @State private var showScreenshotSheet = false
+
+    @Environment(\.displayScale) private var displayScale
 
     private var needsConfirmation: Bool {
         guard let descriptor = viewModel.descriptor else {
@@ -70,10 +73,21 @@ struct SplatDocumentView: View {
         .focusedSceneValue(\.inspectorTab, $inspectorTab)
         .toolbar {
             ToolbarItem {
+                Button("Screenshot", systemImage: "camera") {
+                    showScreenshotSheet = true
+                }
+            }
+            ToolbarItem {
                 Button("Inspector", systemImage: "sidebar.right") {
                     showInspector.toggle()
                 }
             }
+        }
+        .sheet(isPresented: $showScreenshotSheet) {
+            ScreenshotSheet(
+                defaultWidth: Int(viewModel.viewSize.width * displayScale),
+                defaultHeight: Int(viewModel.viewSize.height * displayScale)
+            )
         }
         .onChange(of: fileURL, initial: true) { _, newURL in
             confirmedLoad = false
