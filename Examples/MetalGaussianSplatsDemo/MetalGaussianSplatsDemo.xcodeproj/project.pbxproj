@@ -8,9 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		451155A42EC3EF9700C04880 /* GeometryLite3D in Frameworks */ = {isa = PBXBuildFile; productRef = 451155A32EC3EF9700C04880 /* GeometryLite3D */; };
-		454CBDEF2EF753EC00A16AD0 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 454CBDEE2EF753EC00A16AD0 /* Quartz.framework */; };
 		454CBDFB2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 454CBDEC2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		454CBE022EF7576300A16AD0 /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 454CBE012EF7576300A16AD0 /* MetalSprocketsGaussianSplats */; };
+		454CBE042EF75A7A00A16AD0 /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 454CBE032EF75A7A00A16AD0 /* Interaction3D */; };
 		457A346D2EB3DBF20001F508 /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 457A346C2EB3DBF20001F508 /* MetalSprocketsGaussianSplats */; };
 		45A86FEE2EC3F5CF00CCC501 /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 45A86FED2EC3F5CF00CCC501 /* Interaction3D */; };
 		45E9BB732EF504C00016C77E /* Sharp in Frameworks */ = {isa = PBXBuildFile; productRef = 45E9BB722EF504C00016C77E /* Sharp */; };
@@ -93,7 +93,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				454CBDEF2EF753EC00A16AD0 /* Quartz.framework in Frameworks */,
+				454CBE042EF75A7A00A16AD0 /* Interaction3D in Frameworks */,
 				454CBE022EF7576300A16AD0 /* MetalSprocketsGaussianSplats in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -162,6 +162,7 @@
 			name = GuassianSplatsPreviewExtension;
 			packageProductDependencies = (
 				454CBE012EF7576300A16AD0 /* MetalSprocketsGaussianSplats */,
+				454CBE032EF75A7A00A16AD0 /* Interaction3D */,
 			);
 			productName = GuassianSplatsPreviewExtension;
 			productReference = 454CBDEC2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex */;
@@ -603,6 +604,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 457A346B2EB3DBF20001F508 /* XCLocalSwiftPackageReference "../../../MetalSprocketsGaussianSplats" */;
 			productName = MetalSprocketsGaussianSplats;
+		};
+		454CBE032EF75A7A00A16AD0 /* Interaction3D */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 45EAFFD72EC3F49500F49EB0 /* XCRemoteSwiftPackageReference "Interaction3D" */;
+			productName = Interaction3D;
 		};
 		457A346C2EB3DBF20001F508 /* MetalSprocketsGaussianSplats */ = {
 			isa = XCSwiftPackageProductDependency;

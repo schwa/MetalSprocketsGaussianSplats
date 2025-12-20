@@ -1,39 +1,82 @@
-//
-//  PreviewViewController.swift
-//  GuassianSplatsPreviewExtension
-//
-//  Created by Jonathan Wight on 12/20/25.
-//
-
 import Cocoa
-import Quartz
+import GeometryLite3D
+import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatShaders
+import MetalSprocketsSupport
+import QuickLookUI
+import simd
+import Splats
+import SwiftUI
+import UniformTypeIdentifiers
 
 class PreviewViewController: NSViewController, QLPreviewingController {
 
-    override var nibName: NSNib.Name? {
-        return NSNib.Name("PreviewViewController")
+    override func viewDidLoad() {
+        super.viewDidLoad()
     }
-
-    override func loadView() {
-        super.loadView()
-        // Do any additional setup after loading the view.
-    }
-
-    /*
-    func preparePreviewOfSearchableItem(identifier: String, queryString: String?) async throws {
-        // Implement this method and set QLSupportsSearchableItems to YES in the Info.plist of the extension if you support CoreSpotlight.
-
-        // Perform any setup necessary in order to prepare the view.
-        // Quick Look will display a loading spinner until this returns.
-    }
-    */
 
     func preparePreviewOfFile(at url: URL) async throws {
-        // Add the supported content types to the QLSupportedContentTypes array in the Info.plist of the extension.
+        let contentType = UTType(filenameExtension: url.pathExtension)
 
-        // Perform any setup necessary in order to prepare the view.
+        // Load splats
+        var splats: [SparkSplat] = []
 
-        // Quick Look will display a loading spinner until this returns.
+        switch contentType {
+        case .spz:
+            let reader = try SPZReader(url: url)
+            splats.reserveCapacity(reader.splatCount)
+            try reader.read { _, genericSplat in
+                splats.append(SparkSplat(genericSplat))
+            }
+        case .ply:
+            let reader = try PLYSplatReader(url: url)
+            splats.reserveCapacity(reader.splatCount)
+            try reader.read { _, genericSplat in
+                splats.append(SparkSplat(genericSplat))
+            }
+        case .antimatter15Splat:
+            let reader = try Antimatter15Reader(url: url)
+            splats.reserveCapacity(reader.splatCount)
+            try reader.read { _, genericSplat in
+                splats.append(SparkSplat(genericSplat))
+            }
+        case .sog:
+            let reader = try SOGReaderCPU(url: url)
+            splats.reserveCapacity(reader.splatCount)
+            try reader.read { _, genericSplat in
+                splats.append(SparkSplat(genericSplat))
+            }
+        default:
+            throw NSError(
+                domain: "PreviewViewController",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Unsupported file type: \(contentType?.identifier ?? "unknown")"]
+            )
+        }
+
+        // Create splat cloud
+        let cameraMatrix = simd_float4x4(translation: [0, 0, 5])
+        let modelMatrix = simd_float4x4(xRotation: .radians(.pi))
+
+        let device = _MTLCreateSystemDefaultDevice()
+        let splatCloud = try GPUSplatCloud(
+            device: device,
+            splats: splats,
+            cameraMatrix: cameraMatrix,
+            modelMatrix: modelMatrix
+        )
+
+        // Create and host the SwiftUI view
+        let previewView = SplatPreviewView(splatCloud: splatCloud)
+        let hostingView = NSHostingView(rootView: previewView)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+
+        view.addSubview(hostingView)
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: view.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
     }
-
 }
