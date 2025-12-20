@@ -77,7 +77,7 @@ struct SplatCloudDescriptor {
     }
 }
 
-#if os(iOS) || (os(macOS) && !arch(x86_64))
+#if !arch(x86_64)
 import Metal
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport

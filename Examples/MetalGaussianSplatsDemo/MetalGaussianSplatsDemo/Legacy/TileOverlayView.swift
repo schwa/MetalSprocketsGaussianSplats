@@ -1,4 +1,4 @@
-#if os(iOS) || (os(macOS) && !arch(x86_64))
+#if !arch(x86_64)
 import Charts
 import SwiftUI
 

@@ -82,7 +82,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
     @MainActor
     mutating func _run() throws {
-        #if os(iOS) || (os(macOS) && !arch(x86_64))
+        #if !arch(x86_64)
         let renderConfig = try loadConfig()
         let device = _MTLCreateSystemDefaultDevice()
         let genericSplats = try loadSplats(from: renderConfig.splat)
@@ -205,7 +205,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
     // MARK: - Splat Loading
 
-    #if os(iOS) || (os(macOS) && !arch(x86_64))
+    #if !arch(x86_64)
     func loadSplats(from splatPath: String) throws -> [GenericSplat] {
         let splatURL = URL(fileURLWithPath: splatPath)
         let fileExtension = splatURL.pathExtension.lowercased()

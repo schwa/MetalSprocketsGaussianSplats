@@ -2,7 +2,7 @@
 // Commented out until tile-based rendering is integrated into SplatDocumentRenderView
 
 /*
-#if os(iOS) || (os(macOS) && !arch(x86_64))
+#if !arch(x86_64)
 import GeometryLite3D
 import Interaction3D
 import Metal
