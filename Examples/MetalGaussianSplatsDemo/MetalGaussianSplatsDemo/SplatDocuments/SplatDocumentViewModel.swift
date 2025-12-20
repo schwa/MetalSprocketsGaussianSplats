@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import GeometryLite3D
@@ -10,7 +11,7 @@ import UniformTypeIdentifiers
 enum LoadingState: Equatable {
     case idle
     case loading
-    case converting
+    case converting(status: String)
     case ready
     case error(String)
 }
@@ -26,15 +27,24 @@ final class SplatDocumentViewModel {
     var loadingState: LoadingState = .idle
     var convertedURL: URL?
 
+    // Image conversion state
+    var sourceImage: NSImage?
+    var isImageConversion: Bool = false
+
     // Camera
     enum CameraMode: String, CaseIterable {
         case object = "Object"
         case room = "Room"
+        case spatialScene = "Spatial Scene"
 
         var initialPosition: SIMD3<Float> {
             switch self {
-            case .object: [0, 0, 5]
-            case .room: [0, 0, 0]
+            case .object:
+                [0, 0, 5]
+            case .room:
+                [0, 0, 0]
+            case .spatialScene:
+                [0, 0, 0.2]
             }
         }
     }
@@ -167,14 +177,22 @@ final class SplatDocumentViewModel {
         guard let url else {
             descriptor = nil
             convertedURL = nil
+            sourceImage = nil
+            isImageConversion = false
             loadingState = .idle
             return
         }
 
         // Check if this is an image that needs conversion
         if let contentType, contentType.conforms(to: .image) {
+            isImageConversion = true
+            cameraMode = .spatialScene
+            // Load source image for display during conversion
+            sourceImage = NSImage(contentsOf: url)
             await convertImage(url: url)
         } else {
+            isImageConversion = false
+            sourceImage = nil
             loadingState = .loading
             descriptor = try? SplatCloudDescriptor(url: url)
             convertedURL = nil
@@ -191,15 +209,17 @@ final class SplatDocumentViewModel {
     }
 
     private func convertImage(url: URL) async {
-        loadingState = .converting
+        loadingState = .converting(status: "Initializing Sharp model...")
 
         do {
             // Initialize Sharp if needed
             if sharp == nil {
                 if let cachedModel = Sharp.cachedModel(in: modelDirectory) {
+                    loadingState = .converting(status: "Loading cached model...")
                     sharp = try Sharp(modelURL: cachedModel)
                 } else {
-                    fatalError("TODO")
+                    loadingState = .error("Sharp model not found. Please download the model first.")
+                    return
                 }
             }
 
@@ -216,10 +236,14 @@ final class SplatDocumentViewModel {
             let outputName = url.deletingPathExtension().lastPathComponent + ".ply"
             let outputURL = outputDir.appendingPathComponent(outputName)
 
+            loadingState = .converting(status: "Converting to 3D Gaussian Splats...")
+
             // Convert in background
             try await Task.detached {
                 try sharp.convert(from: url, to: outputURL)
             }.value
+
+            loadingState = .converting(status: "Loading converted splat cloud...")
 
             convertedURL = outputURL
             descriptor = try? SplatCloudDescriptor(url: outputURL)

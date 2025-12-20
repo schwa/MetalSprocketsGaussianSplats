@@ -11,6 +11,7 @@ import Interaction3D
 struct SplatDocumentRenderView: View {
     let rendererType: SplatRendererType
     let descriptor: SplatCloudDescriptor
+    let cameraMode: SplatDocumentViewModel.CameraMode
 
     @Binding var cameraMatrix: simd_float4x4
     @Binding var modelMatrix: simd_float4x4
@@ -22,12 +23,7 @@ struct SplatDocumentRenderView: View {
     var body: some View {
         Group {
             if let splatCloud {
-                RenderView { context, drawableSize in
-                    SplatRenderPass(rendererType: rendererType, splatCloud: splatCloud, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projection: projection, drawableSize: drawableSize, frame: context.frameUniforms.index)
-                }
-                .modifier(TurntableCameraController(transform: $cameraMatrix))
-                .metalColorPixelFormat(.bgra8Unorm_srgb)
-                .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
+                renderView(splatCloud: splatCloud)
             } else {
                 ProgressView("Loading splat cloud...")
             }
@@ -52,6 +48,22 @@ struct SplatDocumentRenderView: View {
                     self.splatCloud = splatCloud
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func renderView(splatCloud: AnyGPUSplatCloud) -> some View {
+        let view = RenderView { context, drawableSize in
+            SplatRenderPass(rendererType: rendererType, splatCloud: splatCloud, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projection: projection, drawableSize: drawableSize, frame: context.frameUniforms.index)
+        }
+        .metalColorPixelFormat(.bgra8Unorm_srgb)
+        .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
+
+        switch cameraMode {
+        case .spatialScene:
+            view.modifier(SpatialSceneCameraController(transform: $cameraMatrix))
+        case .object, .room:
+            view.modifier(TurntableCameraController(transform: $cameraMatrix))
         }
     }
 

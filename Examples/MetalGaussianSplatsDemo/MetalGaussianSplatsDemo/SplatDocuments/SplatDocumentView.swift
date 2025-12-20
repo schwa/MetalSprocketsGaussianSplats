@@ -25,12 +25,16 @@ struct SplatDocumentView: View {
             switch viewModel.loadingState {
             case .idle, .loading:
                 ContentUnavailableView("Loading…", systemImage: "circle.dotted")
-            case .converting:
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(2)
-                    Text("Converting image with Sharp…")
-                        .foregroundStyle(.secondary)
+            case .converting(let status):
+                if let sourceImage = viewModel.sourceImage {
+                    ImageConversionView(sourceImage: sourceImage, statusMessage: status)
+                } else {
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(2)
+                        Text(status)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             case .error(let message):
                 ContentUnavailableView {
@@ -43,6 +47,7 @@ struct SplatDocumentView: View {
                     SplatDocumentRenderView(
                         rendererType: viewModel.rendererType,
                         descriptor: descriptor,
+                        cameraMode: viewModel.cameraMode,
                         cameraMatrix: $viewModel.cameraMatrix,
                         modelMatrix: $viewModel.modelMatrix,
                         verticalAngleOfView: $viewModel.verticalAngleOfView
