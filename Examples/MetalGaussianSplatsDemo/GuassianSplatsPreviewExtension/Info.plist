@@ -7,16 +7,21 @@
 		<key>NSExtensionAttributes</key>
 		<dict>
 			<key>QLIsDataBasedPreview</key>
-			<false/>
+			<true/>
 			<key>QLSupportedContentTypes</key>
-			<array/>
+			<array>
+				<string>public.polygon-file-format</string>
+				<string>com.antimatter15.splat</string>
+				<string>com.nianticlabs.spz</string>
+				<string>com.playcanvas.sog</string>
+			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.quicklook.preview</string>
 		<key>NSExtensionPrincipalClass</key>
-		<string>$(PRODUCT_MODULE_NAME).PreviewViewController</string>
+		<string>$(PRODUCT_MODULE_NAME).PreviewProvider</string>
 	</dict>
 </dict>
 </plist>

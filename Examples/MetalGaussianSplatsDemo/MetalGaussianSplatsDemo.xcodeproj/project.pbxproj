@@ -10,6 +10,7 @@
 		451155A42EC3EF9700C04880 /* GeometryLite3D in Frameworks */ = {isa = PBXBuildFile; productRef = 451155A32EC3EF9700C04880 /* GeometryLite3D */; };
 		454CBDEF2EF753EC00A16AD0 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 454CBDEE2EF753EC00A16AD0 /* Quartz.framework */; };
 		454CBDFB2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 454CBDEC2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		454CBE022EF7576300A16AD0 /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 454CBE012EF7576300A16AD0 /* MetalSprocketsGaussianSplats */; };
 		457A346D2EB3DBF20001F508 /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 457A346C2EB3DBF20001F508 /* MetalSprocketsGaussianSplats */; };
 		45A86FEE2EC3F5CF00CCC501 /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 45A86FED2EC3F5CF00CCC501 /* Interaction3D */; };
 		45E9BB732EF504C00016C77E /* Sharp in Frameworks */ = {isa = PBXBuildFile; productRef = 45E9BB722EF504C00016C77E /* Sharp */; };
@@ -93,6 +94,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				454CBDEF2EF753EC00A16AD0 /* Quartz.framework in Frameworks */,
+				454CBE022EF7576300A16AD0 /* MetalSprocketsGaussianSplats in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -159,6 +161,7 @@
 			);
 			name = GuassianSplatsPreviewExtension;
 			packageProductDependencies = (
+				454CBE012EF7576300A16AD0 /* MetalSprocketsGaussianSplats */,
 			);
 			productName = GuassianSplatsPreviewExtension;
 			productReference = 454CBDEC2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex */;
@@ -489,6 +492,18 @@
 			baseConfigurationReferenceAnchor = 452EC1342EF51EF600AB9206 /* Configuration */;
 			baseConfigurationReferenceRelativePath = "MetalGaussianSplatsDemo-Debug.xcconfig";
 			buildSettings = {
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 			};
 			name = Debug;
 		};
@@ -497,6 +512,18 @@
 			baseConfigurationReferenceAnchor = 452EC1342EF51EF600AB9206 /* Configuration */;
 			baseConfigurationReferenceRelativePath = "MetalGaussianSplatsDemo-Release.xcconfig";
 			buildSettings = {
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 			};
 			name = Release;
 		};
@@ -571,6 +598,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 451155A22EC3EF9700C04880 /* XCRemoteSwiftPackageReference "GeometryLite3D" */;
 			productName = GeometryLite3D;
+		};
+		454CBE012EF7576300A16AD0 /* MetalSprocketsGaussianSplats */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 457A346B2EB3DBF20001F508 /* XCLocalSwiftPackageReference "../../../MetalSprocketsGaussianSplats" */;
+			productName = MetalSprocketsGaussianSplats;
 		};
 		457A346C2EB3DBF20001F508 /* MetalSprocketsGaussianSplats */ = {
 			isa = XCSwiftPackageProductDependency;
