@@ -1,0 +1,5 @@
+# xcb project configuration
+# Settings here override global config (~/.config/xcb/config.toml).
+
+[defaults]
+target = "MetalGaussianSplatsDemo"
