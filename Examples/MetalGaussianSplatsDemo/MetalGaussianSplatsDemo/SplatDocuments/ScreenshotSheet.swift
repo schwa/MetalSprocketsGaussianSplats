@@ -121,46 +121,35 @@ struct ScreenshotSheet: View {
 
         do {
             // Capture values
-            let rendererType = viewModel.rendererType
             let cameraMatrix = viewModel.cameraMatrix
             let modelMatrix = viewModel.modelMatrix
 
-            // Load splat cloud
-            let splatCloud: AnyGPUSplatCloud
-            switch rendererType {
-            case .spark, .stochastic, .tileBased:
-                let cloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud(
-                    cameraMatrix: cameraMatrix,
-                    modelMatrix: modelMatrix
-                )
-                splatCloud = AnyGPUSplatCloud(cloud)
-            case .antimatter15:
-                let cloud: GPUSplatCloud<Antimatter15GPUSplat> = try descriptor.loadGPUSplatCloud(
-                    cameraMatrix: cameraMatrix,
-                    modelMatrix: modelMatrix
-                )
-                splatCloud = AnyGPUSplatCloud(cloud)
-            }
+            // Load splat cloud (always use SparkSplat)
+            let splatCloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud(
+                cameraMatrix: cameraMatrix,
+                modelMatrix: modelMatrix
+            )
 
             // Create projection
             let projection = PerspectiveProjection(
                 verticalAngleOfView: .degrees(Float(viewModel.verticalAngleOfView)),
                 depthMode: .standard(zClip: 0.01 ... 1_000)
             )
+            let projectionMatrix = projection.projectionMatrix(for: CGSize(width: width, height: height))
 
-            // Render offscreen
+            // Render offscreen using Spark renderer
             let size = CGSize(width: width, height: height)
             let renderer = try OffscreenRenderer(size: size)
 
-            let renderPass = SplatRenderPass(
-                rendererType: rendererType,
-                splatCloud: splatCloud,
-                cameraMatrix: cameraMatrix,
-                modelMatrix: modelMatrix,
-                projection: projection,
-                drawableSize: size,
-                frame: 0
-            )
+            let renderPass = try RenderPass {
+                try SparkSplatRenderPipeline(
+                    splatCloud: splatCloud,
+                    projectionMatrix: projectionMatrix,
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrix,
+                    drawableSize: SIMD2<Float>(size)
+                )
+            }
 
             let rendering = try renderer.render(renderPass)
             let cgImage = try rendering.cgImage
