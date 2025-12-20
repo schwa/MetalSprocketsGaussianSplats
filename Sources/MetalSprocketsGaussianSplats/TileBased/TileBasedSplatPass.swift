@@ -55,7 +55,7 @@ public struct TileBasedSplatPass: Element {
                 tileSplatResources: resources
             )
             .onChange(of: drawableSize) { _, _ in
-                self.resources = try! Self.makeResources(drawableSize: drawableSize)
+                resources = try! Self.makeResources(drawableSize: drawableSize)
             }
 
             // Pass 1b: Compute prefix sum of tile counts

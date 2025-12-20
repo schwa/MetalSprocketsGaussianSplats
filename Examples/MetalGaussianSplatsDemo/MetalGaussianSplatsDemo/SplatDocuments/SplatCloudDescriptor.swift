@@ -1,18 +1,19 @@
 import Foundation
 import GeometryLite3D
+import Metal
 import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatShaders
+import MetalSprocketsSupport
 import simd
 import Splats
 import UniformTypeIdentifiers
 
-
-struct SplatCloudDescriptor {
+struct SplatCloudDescriptor: Sendable {
     var url: URL
     var contentType: UTType?
     var fileSize: Int
-    var splatCount: Int
-    var shDegree: UInt8
-    var boundingBox: BoundingBox
+    var splatCount: Int = 0
+    var shDegree: UInt8 = 0
 
     var bytesPerSplat: Double {
         guard splatCount > 0 else {
@@ -37,43 +38,59 @@ struct SplatCloudDescriptor {
 
         contentType = UTType(filenameExtension: url.pathExtension)
 
-        var bounds = BoundingBox.empty
+        try timeit("Count calculation.") {
+            switch contentType {
+            case .spz:
+                let reader = try SPZReader(url: url)
+                splatCount = reader.splatCount
+                shDegree = reader.shDegree
+            case .ply:
+                let reader = try PLYSplatReader(url: url)
+                splatCount = reader.splatCount
+                shDegree = 0
+            case .antimatter15Splat:
+                let reader = try Antimatter15Reader(url: url)
+                splatCount = reader.splatCount
+                shDegree = 0
+            case .sog:
+                let reader = try SOGReaderCPU(url: url)
+                splatCount = reader.splatCount
+                shDegree = 0
+            default:
+                splatCount = 0
+                shDegree = 0
+            }
+        }
+    }
 
+    @concurrent
+    func computeBounds() async throws -> BoundingBox {
+        var bounds = BoundingBox.empty
         switch contentType {
         case .spz:
             let reader = try SPZReader(url: url)
-            splatCount = reader.splatCount
-            shDegree = reader.shDegree
             try reader.read { _, splat in
                 bounds.expand(by: splat.position)
             }
         case .ply:
             let reader = try PLYSplatReader(url: url)
-            splatCount = reader.splatCount
-            shDegree = 0
             try reader.read { _, splat in
                 bounds.expand(by: splat.position)
             }
         case .antimatter15Splat:
             let reader = try Antimatter15Reader(url: url)
-            splatCount = reader.splatCount
-            shDegree = 0
             try reader.read { _, splat in
                 bounds.expand(by: splat.position)
             }
         case .sog:
             let reader = try SOGReaderCPU(url: url)
-            splatCount = reader.splatCount
-            shDegree = 0
             try reader.read { _, splat in
                 bounds.expand(by: splat.position)
             }
         default:
-            splatCount = 0
-            shDegree = 0
+            break
         }
-
-        boundingBox = bounds
+        return bounds
     }
 }
 

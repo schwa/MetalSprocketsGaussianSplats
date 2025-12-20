@@ -4,6 +4,10 @@ import UniformTypeIdentifiers
 @main
 struct MetalGaussianSplatsDemoApp: App {
     var body: some Scene {
+        #if os(macOS)
+        SplashScene()
+        #endif
+
         DocumentGroup(viewing: SplatDocument.self) { file in
             SplatDocumentView(document: file.document, fileURL: file.fileURL)
         }

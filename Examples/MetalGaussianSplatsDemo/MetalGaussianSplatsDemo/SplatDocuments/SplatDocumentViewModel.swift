@@ -57,8 +57,7 @@ final class SplatDocumentViewModel {
                 if let cachedModel = Sharp.cachedModel(in: modelDirectory) {
                     sharp = try Sharp(modelURL: cachedModel)
                 } else {
-                    // Download model
-                    sharp = try await Sharp.download(to: modelDirectory) { _ in }
+                    fatalError("TODO")
                 }
             }
 

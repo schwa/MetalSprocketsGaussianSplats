@@ -47,7 +47,7 @@ struct SplatDocument: FileDocument {
         contentType = configuration.contentType
     }
 
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+    func fileWrapper(configuration _: WriteConfiguration) throws -> FileWrapper {
         throw CocoaError(.fileWriteNoPermission) // Read-only document
     }
 }

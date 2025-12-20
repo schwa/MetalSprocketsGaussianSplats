@@ -21,7 +21,6 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Image to Gaussian Splat Conversion") {
-
                 Text("Sharp is an Apple ML model that converts images to Gaussian Splats.")
                 Link("apple/ml-sharp on GitHub", destination: URL(string: "https://github.com/apple/ml-sharp")!)
                 if let modelURL = Sharp.cachedModel(in: modelDirectory) {

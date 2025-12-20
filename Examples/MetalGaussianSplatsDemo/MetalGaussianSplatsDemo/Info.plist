@@ -44,7 +44,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.playcanvas.sog</string>
 			<key>UTTypeDescription</key>
-			<string>SOG (Spatially Ordered Gaussians)</string>
+			<string>playcanvas.com Gaussian Splat</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.zip-archive</string>
@@ -61,7 +61,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.antimatter15.splat</string>
 			<key>UTTypeDescription</key>
-			<string>Gaussian Splat</string>
+			<string>Antimatter15 Gaussian Splat</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
@@ -78,7 +78,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.nianticlabs.spz</string>
 			<key>UTTypeDescription</key>
-			<string>Gaussian Splat SPZ</string>
+			<string>nianticlabs.com Gaussian Splat</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>

@@ -23,7 +23,7 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
     internal func sort(splats: TypedMTLBuffer<Splat>, camera: simd_float4x4, model: simd_float4x4, reversed: Bool = false) throws -> TypedMTLBuffer<IndexedDistance> {
         let startTime = CFAbsoluteTimeGetCurrent()
         defer {
-            let durationMS = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+            let durationMS = (CFAbsoluteTimeGetCurrent() - startTime) * 1_000
             logger?.debug("CPU splat sort: \(String(format: "%.2f", durationMS))ms (\(splats.count) splats)")
         }
         return try signposter.withIntervalSignpost("CPUSplatRadixSorter.sort().make_buffers", id: signpost) {

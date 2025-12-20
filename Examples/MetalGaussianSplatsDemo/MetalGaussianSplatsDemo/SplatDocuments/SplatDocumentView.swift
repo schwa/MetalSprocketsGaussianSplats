@@ -10,7 +10,9 @@ struct SplatDocumentView: View {
     @State private var confirmedLoad = false
 
     private var needsConfirmation: Bool {
-        guard let descriptor = viewModel.descriptor else { return false }
+        guard let descriptor = viewModel.descriptor else {
+            return false
+        }
         return descriptor.splatCount >= 1_000_000 && !confirmedLoad
     }
 

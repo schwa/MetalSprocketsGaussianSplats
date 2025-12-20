@@ -2,9 +2,9 @@ import SwiftUI
 
 enum SplatRendererType: String, CaseIterable {
     case spark = "Spark"
-    case antimatter15 = "Antimatter15"
-    case stochastic = "Stochastic"
-    case tileBased = "Tile Based"
+    case stochastic = "Stochastic (Experimental)"
+    case tileBased = "Tile Based (Experimental)"
+    case antimatter15 = "Antimatter15 (Legacy)"
 }
 
 struct SplatDocumentRendererSettingsView: View {

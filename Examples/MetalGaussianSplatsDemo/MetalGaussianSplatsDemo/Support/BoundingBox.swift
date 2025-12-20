@@ -1,5 +1,6 @@
 import simd
 
+nonisolated
 struct BoundingBox {
     var min: SIMD3<Float>
     var max: SIMD3<Float>
@@ -12,7 +13,7 @@ struct BoundingBox {
         (min + max) / 2
     }
 
-    static let empty = BoundingBox(
+    static let empty = Self(
         min: SIMD3<Float>(repeating: .infinity),
         max: SIMD3<Float>(repeating: -.infinity)
     )
