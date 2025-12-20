@@ -51,25 +51,3 @@ struct SplatDocument: FileDocument {
         throw CocoaError(.fileWriteNoPermission) // Read-only document
     }
 }
-
-// MARK: - SplatDocument Helpers
-
-extension SplatDocument {
-    /// Returns the file extension based on the content type
-    var fileExtension: String? {
-        contentType?.preferredFilenameExtension
-    }
-
-    /// Returns a human-readable description of the file type
-    var fileTypeDescription: String {
-        if contentType?.conforms(to: .image) == true {
-            return "Image (Sharp conversion)"
-        }
-        return contentType?.localizedDescription ?? "Unknown"
-    }
-
-    /// Returns true if this is an image that needs Sharp conversion
-    var isImage: Bool {
-        contentType?.conforms(to: .image) == true
-    }
-}

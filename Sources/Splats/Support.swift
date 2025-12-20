@@ -23,12 +23,6 @@ public extension Float {
     }
 }
 
-public extension simd_float4 {
-    var length: Scalar {
-        simd_length(self)
-    }
-}
-
 public extension SIMD4 where Scalar == Float {
     func clamped(to range: ClosedRange<Scalar>) -> Self {
         Self(
@@ -37,11 +31,5 @@ public extension SIMD4 where Scalar == Float {
             z.clamped(to: range),
             w.clamped(to: range)
         )
-    }
-}
-
-public extension simd_quatf {
-    var vectorRealFirst: simd_float4 {
-        [vector.w, vector.x, vector.y, vector.z]
     }
 }

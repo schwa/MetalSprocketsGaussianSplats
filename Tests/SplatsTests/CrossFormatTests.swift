@@ -1,5 +1,6 @@
 import Foundation
 import GeometryLite3D
+import MetalSprocketsGaussianSplatShaders
 import simd
 @testable import Splats
 import TabularData

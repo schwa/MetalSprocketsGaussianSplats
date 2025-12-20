@@ -96,6 +96,7 @@ let package = Package(
             name: "SplatsTests",
             dependencies: [
                 "Splats",
+                "MetalSprocketsGaussianSplatShaders",
                 .product(name: "GeometryLite3D", package: "GeometryLite3D"),
             ],
             resources: [.copy("Fixtures")]

@@ -64,19 +64,10 @@ public struct PLYReader {
         primaryElement?.count ?? 0
     }
 
-    public var recordStruct: [Property] {
-        primaryElement?.properties ?? []
-    }
-
     private var headerEndOffset: Int = 0
 
     public init(data: Data) throws {
         self.data = data
-        try parseHeader()
-    }
-
-    public init(url: URL) throws {
-        self.data = try Data(contentsOf: url)
         try parseHeader()
     }
 

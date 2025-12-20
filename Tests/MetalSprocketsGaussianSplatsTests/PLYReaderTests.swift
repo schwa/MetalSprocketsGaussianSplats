@@ -1,6 +1,20 @@
 import Foundation
 @testable import MetalSprocketsGaussianSplats
+import Splats
 import Testing
+
+// MARK: - Test-only extensions
+
+extension PLYReader {
+    var recordStruct: [Property] {
+        primaryElement?.properties ?? []
+    }
+
+    init(url: URL) throws {
+        let data = try Data(contentsOf: url)
+        try self.init(data: data)
+    }
+}
 
 @Suite("PLYReader Tests")
 struct PLYReaderTests {

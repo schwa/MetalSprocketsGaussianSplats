@@ -1,7 +1,6 @@
 import GeometryLite3D
 import Interaction3D
 import MetalSprockets
-import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsUI
 import simd

@@ -14,10 +14,6 @@ struct SettingsView: View {
             .appendingPathComponent("SharpModel")
     }
 
-    private var isModelDownloaded: Bool {
-        Sharp.cachedModel(in: modelDirectory) != nil
-    }
-
     var body: some View {
         Form {
             Section("Image to Gaussian Splat Conversion") {

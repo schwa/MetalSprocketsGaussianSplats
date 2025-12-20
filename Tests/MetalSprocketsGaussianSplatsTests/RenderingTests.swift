@@ -5,6 +5,7 @@ import GoldenImage
 import Metal
 import MetalSprockets
 @testable import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatShaders
 import simd
 @testable import Splats
 import Testing

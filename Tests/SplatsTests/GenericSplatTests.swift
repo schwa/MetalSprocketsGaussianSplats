@@ -1,4 +1,5 @@
 import Foundation
+import MetalSprocketsGaussianSplatShaders
 @testable import Splats
 import Testing
 
