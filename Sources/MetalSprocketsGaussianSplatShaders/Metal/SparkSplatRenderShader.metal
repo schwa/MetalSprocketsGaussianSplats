@@ -16,6 +16,7 @@ namespace SparkSplatRenderShader {
         float4 position [[position]];
         float2 splatUv;          // Relative position on splat ellipse
         float4 rgba;
+        ushort renderTargetArrayIndex [[render_target_array_index]];
     };
 
     typedef VertexOut FragmentIn;
@@ -35,22 +36,29 @@ namespace SparkSplatRenderShader {
     [[vertex]] VertexOut vertex_main(
         VertexIn in [[stage_in]],
         uint instance_id [[instance_id]],
+        ushort amplification_id [[amplification_id]],
+        ushort amplification_count [[amplification_count]],
         constant SparkSplat *splats [[buffer(2)]],
         constant IndexedDistance *indexedDistances [[buffer(3)]],
         constant float4x4 &modelMatrix [[buffer(4)]],
-        constant float4x4 &viewMatrix [[buffer(5)]],
-        constant float4x4 &projectionMatrix [[buffer(6)]],
+        constant float4x4 *viewMatrices [[buffer(5)]],
+        constant float4x4 *projectionMatrices [[buffer(6)]],
         constant float2 &drawableSize [[buffer(8)]],
         constant float &scale [[buffer(9)]],
-        constant float3 &cameraPosition [[buffer(10)]],
+        constant float3 *cameraPositions [[buffer(10)]],
         constant uint &shDegree [[buffer(11), function_constant(use_sh)]],
         device const float *shCoefficients [[buffer(12), function_constant(use_sh)]]
     ) {
+        // Select matrices based on amplification_id (0 for mono, 0/1 for stereo)
+        float4x4 viewMatrix = viewMatrices[amplification_id];
+        float4x4 projectionMatrix = projectionMatrices[amplification_id];
+        float3 cameraPosition = cameraPositions[amplification_id];
         VertexOut out;
         // Default to outside frustum so it's discarded if we return early
         out.position = float4(0.0, 0.0, 2.0, 1.0);
         out.splatUv = float2(0.0);
         out.rgba = float4(0.0);
+        out.renderTargetArrayIndex = amplification_id;
 
         // Get sorted index
         uint splatIndex = indexedDistances[instance_id].index;
