@@ -35,7 +35,6 @@ struct SettingsView: View {
             Section {
                 NavigationLink {
                     AboutView()
-                        .navigationTitle("About")
                 } label: {
                     Label("About", systemImage: "info.circle")
                 }

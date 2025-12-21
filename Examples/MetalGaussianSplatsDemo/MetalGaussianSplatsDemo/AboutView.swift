@@ -34,9 +34,11 @@ struct AboutView: View {
                             angle: 35.0
                         )
 
+                    #if !os(iOS)
                     Text("Gaussian Splats Demo")
                         .font(.title)
                         .fontWeight(.bold)
+                    #endif
 
                     if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
                         Text("Version \(version) (\(build))")
@@ -74,6 +76,7 @@ struct AboutView: View {
         .onAppear {
             licenses = loadLicenses()
         }
+        .navigationTitle("About Gaussian Splats Demo")
     }
 
     private func loadLicenses() -> [(name: String, text: String)] {
@@ -115,9 +118,17 @@ private struct LicenseSection: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         } header: {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
+            HStack {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Spacer()
+                ShareLink(item: text) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+            }
         }
     }
 }

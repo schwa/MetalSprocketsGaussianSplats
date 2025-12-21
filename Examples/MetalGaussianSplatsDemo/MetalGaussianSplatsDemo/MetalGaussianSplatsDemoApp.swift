@@ -18,7 +18,7 @@ struct MetalGaussianSplatsDemoApp: App {
         SplashScene()
         #endif
 
-        #if os(iOS) && !os(visionOS)
+        #if os(iOS) || os(visionOS)
         WindowGroup {
             MobileLaunchView()
         }
