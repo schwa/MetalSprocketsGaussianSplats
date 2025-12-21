@@ -5,7 +5,7 @@ struct SettingsView: View {
 
     var body: some View {
         form
-        #if !os(macOS)
+            #if !os(macOS)
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

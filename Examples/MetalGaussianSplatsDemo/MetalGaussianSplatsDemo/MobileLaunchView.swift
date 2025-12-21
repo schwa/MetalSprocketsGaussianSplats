@@ -9,18 +9,18 @@ struct MobileLaunchView: View {
     var body: some View {
         NavigationStack {
             documentLaunchView
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Settings", systemImage: "gear") {
-                        showSettings = true
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Settings", systemImage: "gear") {
+                            showSettings = true
+                        }
                     }
                 }
-            }
-            .sheet(isPresented: $showSettings) {
-                NavigationStack {
-                    SettingsView()
+                .sheet(isPresented: $showSettings) {
+                    NavigationStack {
+                        SettingsView()
+                    }
                 }
-            }
         }
     }
 

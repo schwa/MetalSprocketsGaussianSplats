@@ -150,7 +150,6 @@ struct SampleAssetsDownloadView: View {
             // Reveal in Finder
             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: destinationFolder.path)
             #endif
-
         } catch is CancellationError {
             state = .idle
         } catch {
@@ -194,11 +193,11 @@ private struct FolderPickerDocument: FileDocument {
 
     init() {}
 
-    init(configuration: ReadConfiguration) throws {
+    init(configuration _: ReadConfiguration) throws {
         // Not used for folder creation
     }
 
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+    func fileWrapper(configuration _: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(directoryWithFileWrappers: [:])
     }
 }
@@ -217,14 +216,14 @@ private class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
         self.completionHandler = completion
     }
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+    func urlSession(_: URLSession, downloadTask _: URLSessionDownloadTask, didWriteData _: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         let progress = totalBytesExpectedToWrite > 0
             ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
             : 0
         progressHandler(progress)
     }
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+    func urlSession(_: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         do {
             try FileManager.default.moveItem(at: location, to: tempURL)
@@ -238,7 +237,7 @@ private class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Error?) {
         if let error {
             completionHandler(.failure(error))
         }

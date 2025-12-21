@@ -113,8 +113,8 @@ struct SplatDocumentView: View {
         .focusedSceneValue(\.inspectorTab, $inspectorTab)
         #else
         .inspector(isPresented: $showInspector) {
-            SplatDocumentInspectorView(tab: $inspectorTab)
-                .environment(viewModel)
+        SplatDocumentInspectorView(tab: $inspectorTab)
+        .environment(viewModel)
         }
         .focusedSceneValue(\.inspectorVisibility, $showInspector)
         .focusedSceneValue(\.inspectorTab, $inspectorTab)

@@ -205,11 +205,11 @@ private class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         self.completionHandler = completion
     }
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+    func urlSession(_: URLSession, downloadTask _: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         progressHandler(bytesWritten, totalBytesWritten, totalBytesExpectedToWrite)
     }
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+    func urlSession(_: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         // Move to a persistent location before the temp file is deleted
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".zip")
         do {
@@ -224,7 +224,7 @@ private class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Error?) {
         if let error {
             completionHandler(.failure(error))
         }
