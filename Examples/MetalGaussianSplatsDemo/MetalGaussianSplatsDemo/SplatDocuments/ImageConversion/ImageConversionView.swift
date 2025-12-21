@@ -22,6 +22,13 @@ struct ImageConversionView: View {
                     .frame(maxWidth: 400, maxHeight: 300)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .shadow(radius: 20)
+                    .glimmer(
+                        sweepDuration: 2.0,
+                        pauseDuration: 3.0,
+                        gradientWidth: 0.4,
+                        maxLightness: 0.3,
+                        angle: 35.0
+                    )
 
                 VStack(spacing: 12) {
                     ProgressView()

@@ -38,6 +38,13 @@ struct SplashView: View {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable()
                         .frame(width: 128, height: 128)
+                        .glimmer(
+                            sweepDuration: 1.5,
+                            pauseDuration: 5.0,
+                            gradientWidth: 0.3,
+                            maxLightness: 0.3,
+                            angle: 35.0
+                        )
                         .accessibilityHidden(true)
 
                     Text("Gaussian Splats")

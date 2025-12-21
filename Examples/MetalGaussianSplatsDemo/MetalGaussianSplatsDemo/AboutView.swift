@@ -24,7 +24,14 @@ struct AboutView: View {
                 if let appIcon = NSApplication.shared.applicationIconImage {
                     Image(nsImage: appIcon)
                         .resizable()
-                        .frame(width: 128, height: 128)
+                        .frame(width: 180, height: 180)
+                        .glimmer(
+                            sweepDuration: 1.5,
+                            pauseDuration: 4.0,
+                            gradientWidth: 0.25,
+                            maxLightness: 0.6,
+                            angle: 35.0
+                        )
                 }
 
                 Text("Gaussian Splats Demo")
