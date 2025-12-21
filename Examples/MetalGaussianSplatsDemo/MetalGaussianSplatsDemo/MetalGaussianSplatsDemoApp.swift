@@ -12,12 +12,19 @@ struct MetalGaussianSplatsDemoApp: App {
         SplashScene()
         #endif
 
+        #if os(iOS) || os(visionOS)
+        DocumentGroupLaunchScene(Text("Gaussian Splats")) {
+            // Viewer app - no new document action
+        }
+        #endif
+
         DocumentGroup(viewing: SplatDocument.self) { file in
             SplatDocumentView(document: file.document, fileURL: file.fileURL)
         }
         .commands {
             InspectorCommands()
         }
+
 
         #if os(macOS)
         Settings {
