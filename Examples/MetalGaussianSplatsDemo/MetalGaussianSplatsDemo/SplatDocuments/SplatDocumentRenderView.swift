@@ -37,6 +37,12 @@ struct SplatDocumentRenderView: View {
                 let splatCloud = try! await loadSplatCloud(cameraMatrix: cameraMatrix)
                 Task { @MainActor in
                     self.splatCloud = splatCloud
+                    #if os(visionOS)
+                    // Also update ImmersiveState with the SparkSplat cloud
+                    if let sparkCloud = splatCloud.typed(as: SparkSplat.self) {
+                        ImmersiveState.shared.splatCloud = sparkCloud
+                    }
+                    #endif
                 }
             }
         }
@@ -46,8 +52,19 @@ struct SplatDocumentRenderView: View {
                 let splatCloud = try! await loadSplatCloud(cameraMatrix: cameraMatrix)
                 Task { @MainActor in
                     self.splatCloud = splatCloud
+                    #if os(visionOS)
+                    // Also update ImmersiveState with the SparkSplat cloud
+                    if let sparkCloud = splatCloud.typed(as: SparkSplat.self) {
+                        ImmersiveState.shared.splatCloud = sparkCloud
+                    }
+                    #endif
                 }
             }
+        }
+        .onChange(of: modelMatrix) {
+            #if os(visionOS)
+            ImmersiveState.shared.modelMatrix = modelMatrix
+            #endif
         }
     }
 

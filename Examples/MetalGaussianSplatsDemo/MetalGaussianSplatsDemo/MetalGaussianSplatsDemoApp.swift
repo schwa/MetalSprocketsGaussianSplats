@@ -1,6 +1,12 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+#if os(visionOS)
+import MetalSprockets
+import MetalSprocketsGaussianSplats
+import MetalSprocketsUI
+#endif
+
 @main
 struct MetalGaussianSplatsDemoApp: App {
     #if os(macOS)
@@ -25,6 +31,17 @@ struct MetalGaussianSplatsDemoApp: App {
             InspectorCommands()
         }
 
+        #if os(visionOS)
+        ImmersiveSpace(id: "GaussianSplatImmersive") {
+            ImmersiveRenderContent(progressive: false) { context in
+                try ImmersiveRenderPass(context: context, label: "GaussianSplat") {
+                    try GaussianSplatImmersiveContent(context: context)
+                }
+            }
+        }
+        .immersionStyle(selection: .constant(.mixed), in: .mixed)
+        .upperLimbVisibility(.visible)
+        #endif
 
         #if os(macOS)
         Settings {

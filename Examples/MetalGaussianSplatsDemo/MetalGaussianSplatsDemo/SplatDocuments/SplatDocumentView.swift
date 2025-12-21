@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if os(visionOS)
+import MetalSprocketsGaussianSplats
+#endif
+
 /// A view for displaying a single Gaussian Splat document
 struct SplatDocumentView: View {
     let document: SplatDocument
@@ -10,6 +14,12 @@ struct SplatDocumentView: View {
     @State private var inspectorTab: InspectorTab = .info
     @State private var confirmedLoad = false
     @State private var showScreenshotSheet = false
+
+    #if os(visionOS)
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @State private var immersiveState = ImmersiveState.shared
+    #endif
 
     @Environment(\.displayScale) private var displayScale
 
@@ -44,6 +54,25 @@ struct SplatDocumentView: View {
                 }
             case .ready:
                 if let descriptor = viewModel.descriptor, !needsConfirmation {
+                    #if os(visionOS)
+                    if immersiveState.isImmersive {
+                        ContentUnavailableView {
+                            Label("Immersive Mode Active", systemImage: "visionpro")
+                        } description: {
+                            Text("Look around you to see the splat cloud in immersive space.")
+                        }
+                    } else {
+                        SplatDocumentRenderView(
+                            rendererType: viewModel.rendererType,
+                            descriptor: descriptor,
+                            cameraMode: viewModel.cameraMode,
+                            cameraMatrix: $viewModel.cameraMatrix,
+                            modelMatrix: $viewModel.modelMatrix,
+                            verticalAngleOfView: $viewModel.verticalAngleOfView
+                        )
+                        .ignoresSafeArea()
+                    }
+                    #else
                     SplatDocumentRenderView(
                         rendererType: viewModel.rendererType,
                         descriptor: descriptor,
@@ -53,6 +82,7 @@ struct SplatDocumentView: View {
                         verticalAngleOfView: $viewModel.verticalAngleOfView
                     )
                     .ignoresSafeArea()
+                    #endif
                 } else if needsConfirmation {
                     ContentUnavailableView {
                         Label("Large Splat Cloud", systemImage: "exclamationmark.triangle.fill")
@@ -84,7 +114,24 @@ struct SplatDocumentView: View {
                     showScreenshotSheet = true
                 }
             }
-            #if !os(visionOS)
+            #if os(visionOS)
+            ToolbarItem {
+                Button(immersiveState.isImmersive ? "Exit Immersive" : "Enter Immersive", systemImage: "visionpro") {
+                    Task {
+                        if immersiveState.isImmersive {
+                            await dismissImmersiveSpace()
+                            immersiveState.isImmersive = false
+                        } else {
+                            let result = await openImmersiveSpace(id: "GaussianSplatImmersive")
+                            if case .opened = result {
+                                immersiveState.isImmersive = true
+                            }
+                        }
+                    }
+                }
+                .disabled(viewModel.loadingState != .ready)
+            }
+            #else
             ToolbarItem {
                 Button("Inspector", systemImage: "sidebar.right") {
                     showInspector.toggle()

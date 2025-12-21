@@ -1,71 +1,56 @@
 #if os(visionOS)
 import CompositorServices
+import GeometryLite3D
 import Metal
 import MetalSprockets
+import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSprocketsUI
 import simd
 
 struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
     let context: ImmersiveContext
-    let shaderLibrary: ShaderLibrary
+    let splatCloud: GPUSplatCloud<SparkSplat>?
+    let modelMatrix: simd_float4x4
 
     init(context: ImmersiveContext) throws {
         self.context = context
-        self.shaderLibrary = try ShaderLibrary(bundle: .main)
+        self.splatCloud = ImmersiveState.shared.splatCloud
+        self.modelMatrix = ImmersiveState.shared.modelMatrix
     }
 
     nonisolated var body: some Element {
         get throws {
-            try RenderPipeline(vertexShader: shaderLibrary.vertexImmersive, fragmentShader: shaderLibrary.fragmentMain) {
-                Draw { encoder in
-//                    // Vertex amplification renders geometry twice (once per eye) in a single draw call.
-//                    // View mappings tell Metal which viewport/render target to use for each amplification.
-//                    var viewMappings = (0 ..< context.viewCount).map {
-//                        MTLVertexAmplificationViewMapping(
-//                            viewportArrayIndexOffset: UInt32($0),
-//                            renderTargetArrayIndexOffset: UInt32($0)
-//                        )
-//                    }
-//                    encoder.setVertexAmplificationCount(context.viewCount, viewMappings: &viewMappings)
-//                    encoder.setViewports(context.viewports)
-//
-//                    // Position cube in world space: 2m in front, 1.5m up, scaled to 30cm
-//                    let modelMatrix = float4x4.translation(0, 1.5, -2)
-//                        * cubeRotationMatrix(time: context.time)
-//                        * float4x4.scale(0.3, 0.3, 0.3)
-//
-//                    // ImmersiveContext provides head-tracked view/projection matrices for each eye
-//                    let leftView = context.viewMatrix(eye: 0)
-//                    let rightView = context.viewCount > 1 ? context.viewMatrix(eye: 1) : leftView
-//                    let leftProj = context.projectionMatrix(eye: 0)
-//                    let rightProj = context.viewCount > 1 ? context.projectionMatrix(eye: 1) : leftProj
-//
-//                    var uniforms = Uniforms(
-//                        modelMatrix: modelMatrix,
-//                        cameras: (
-//                            CameraUniforms(viewMatrix: leftView, projectionMatrix: leftProj),
-//                            CameraUniforms(viewMatrix: rightView, projectionMatrix: rightProj)
-//                        )
-//                    )
-//                    encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
-//
-//                    // Pass time to fragment shader for edge animation
-//                    var time = Float(context.time)
-//                    encoder.setFragmentBytes(&time, length: MemoryLayout<Float>.stride, index: 0)
-//
-//                    var vertices = generateCubeVertices()
-//                    encoder.setVertexBytes(&vertices, length: MemoryLayout<Vertex>.stride * vertices.count, index: 0)
-//                    encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count)
+            if let splatCloud {
+                // Build view and projection matrices for stereo rendering
+                let viewMatrices = (0 ..< context.viewCount).map { context.viewMatrix(eye: $0) }
+                let projectionMatrices = (0 ..< context.viewCount).map { context.projectionMatrix(eye: $0) }
+                let cameraMatrices = viewMatrices.map(\.inverse)
+
+                // Position splat cloud in world space: 2m in front, 1.5m up, scaled to 30cm
+                let worldModelMatrix = simd_float4x4(translation: [0, 1.5, -2])
+                    * simd_float4x4(scale: [0.3, 0.3, 0.3])
+                    * modelMatrix
+
+                let drawableSize = SIMD2<Float>(
+                    Float(context.drawable.colorTextures[0].width),
+                    Float(context.drawable.colorTextures[0].height)
+                )
+
+                try SparkSplatRenderPipeline(
+                    splatCloud: splatCloud,
+                    projectionMatrices: projectionMatrices,
+                    modelMatrix: worldModelMatrix,
+                    cameraMatrices: cameraMatrices,
+                    drawableSize: drawableSize,
+                    convertSRGBToLinear: false
+                )
+                .renderPipelineDescriptorModifier { descriptor in
+                    descriptor.maxVertexAmplificationCount = context.viewCount
+                    descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
+                    descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
                 }
-            }
-//            .vertexDescriptor(Vertex.descriptor)
-//            .depthCompare(function: .greater, enabled: true)  // visionOS uses reverse-Z depth buffer
-            .renderPipelineDescriptorModifier { descriptor in
-                // Configure pipeline for stereo rendering
-                descriptor.maxVertexAmplificationCount = context.viewCount
-                descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
-                descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
             }
         }
     }
