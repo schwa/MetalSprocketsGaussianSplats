@@ -35,6 +35,7 @@ struct ImageConversionView: View {
                 .padding(24)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
             }
+            .fixedSize()
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Converting image: \(statusMessage)")
