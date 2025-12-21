@@ -191,7 +191,9 @@ struct SampleAssetsDownloadView: View {
 private struct FolderPickerDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.folder] }
 
-    init() {}
+    init() {
+        // Empty folder document for folder picker
+    }
 
     init(configuration _: ReadConfiguration) throws {
         // Not used for folder creation
@@ -240,6 +242,8 @@ private class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
     func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Error?) {
         if let error {
             completionHandler(.failure(error))
+        } else {
+            // Successful completion is handled by urlSession(_:downloadTask:didFinishDownloadingTo:)
         }
     }
 }

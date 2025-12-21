@@ -10,7 +10,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 class PreviewViewController: NSViewController, QLPreviewingController {
-    func preparePreviewOfFile(at url: URL) throws {
+    // swiftlint:disable:next async_without_await
+    func preparePreviewOfFile(at url: URL) async throws {
         let contentType = UTType(filenameExtension: url.pathExtension)
 
         // Load splats

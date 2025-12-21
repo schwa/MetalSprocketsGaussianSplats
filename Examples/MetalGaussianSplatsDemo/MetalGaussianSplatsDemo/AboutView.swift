@@ -126,6 +126,7 @@ private struct LicenseSection: View {
                 ShareLink(item: text) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.caption)
+                        .accessibilityLabel("Share license")
                 }
                 .buttonStyle(.borderless)
             }

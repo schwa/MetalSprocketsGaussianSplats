@@ -69,7 +69,9 @@ struct MobileLaunchView: View {
             Spacer()
         }
         .padding(40)
-        .fileImporter(isPresented: $openImport, allowedContentTypes: SplatDocument.readableContentTypes) { _ in }
+        .fileImporter(isPresented: $openImport, allowedContentTypes: SplatDocument.readableContentTypes) { _ in
+            // Document opening is handled by the system
+        }
         #endif
     }
 }

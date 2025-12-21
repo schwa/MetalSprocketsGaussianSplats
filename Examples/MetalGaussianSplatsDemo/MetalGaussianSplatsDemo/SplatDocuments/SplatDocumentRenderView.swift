@@ -86,14 +86,16 @@ struct SplatDocumentRenderView: View {
 
     @concurrent
     private func loadSplatCloud(cameraMatrix: simd_float4x4) async throws -> AnyGPUSplatCloud {
-        try timeit("Load splat cloud") {
-            switch rendererType {
-            case .spark, .stochastic, .tileBased:
-                let cloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud(cameraMatrix: cameraMatrix)
-                return AnyGPUSplatCloud(cloud)
-            case .antimatter15:
-                let cloud: GPUSplatCloud<Antimatter15GPUSplat> = try descriptor.loadGPUSplatCloud(cameraMatrix: cameraMatrix)
-                return AnyGPUSplatCloud(cloud)
+        try await MainActor.run {
+            try timeit("Load splat cloud") {
+                switch rendererType {
+                case .spark, .stochastic, .tileBased:
+                    let cloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud(cameraMatrix: cameraMatrix)
+                    return AnyGPUSplatCloud(cloud)
+                case .antimatter15:
+                    let cloud: GPUSplatCloud<Antimatter15GPUSplat> = try descriptor.loadGPUSplatCloud(cameraMatrix: cameraMatrix)
+                    return AnyGPUSplatCloud(cloud)
+                }
             }
         }
     }

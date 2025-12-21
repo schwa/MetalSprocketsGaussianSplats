@@ -1,3 +1,4 @@
+// swiftlint:disable indentation_width
 // TODO: TileBasedDemoView needs to be updated to use SplatCloudDescriptor.loadGPUSplatCloud()
 // Commented out until tile-based rendering is integrated into SplatDocumentRenderView
 
@@ -84,3 +85,4 @@
 
  #endif
  */
+// swiftlint:enable indentation_width
