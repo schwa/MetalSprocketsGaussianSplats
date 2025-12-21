@@ -66,11 +66,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleWindowClose(_ notification: Notification) {
-        guard let closingWindow = notification.object as? NSWindow else { return }
+        guard let closingWindow = notification.object as? NSWindow else {
+            return
+        }
 
         // Check if this is a document window (not splash, settings, etc.)
-        guard closingWindow.identifier?.rawValue.contains("document") == true ||
-                NSDocumentController.shared.document(for: closingWindow) != nil else {
+        guard closingWindow.identifier?.rawValue.contains("document") == true || NSDocumentController.shared.document(for: closingWindow) != nil else {
             return
         }
 

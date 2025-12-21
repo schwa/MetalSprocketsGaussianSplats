@@ -101,9 +101,15 @@ final class SplatDocumentViewModel {
     }
 
     private func updateCameraForZoomToFit() {
-        guard zoomToFit, cameraMode == .object else { return }
-        guard viewSize.width > 0, viewSize.height > 0 else { return }
-        guard boundsSize != .zero else { return }
+        guard zoomToFit, cameraMode == .object else {
+            return
+        }
+        guard viewSize.width > 0, viewSize.height > 0 else {
+            return
+        }
+        guard boundsSize != .zero else {
+            return
+        }
 
         // Get the maximum extent of the bounding box (after rotation)
         let rotX = simd_float4x4(xRotation: .radians(modelRotationX))

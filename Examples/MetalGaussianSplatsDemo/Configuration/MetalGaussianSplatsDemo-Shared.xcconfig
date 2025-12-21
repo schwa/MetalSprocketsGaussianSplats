@@ -48,3 +48,8 @@ XROS_DEPLOYMENT_TARGET = 26.1
 // float16 support only on Apple Silicon Macs
 ARCHS[sdk=macosx*] = arm64
 EXCLUDED_ARCHS[sdk=macosx*] = x86_64
+
+//ASSETCATALOG_COMPILER_APPICON_NAME = macOSAppIcon
+//ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*] = macOSAppIcon
+//ASSETCATALOG_COMPILER_APPICON_NAME[sdk=xros*] = visionOSAppIcon
+//ASSETCATALOG_COMPILER_APPICON_NAME[sdk=iphoneos*] = iOSAppIcon

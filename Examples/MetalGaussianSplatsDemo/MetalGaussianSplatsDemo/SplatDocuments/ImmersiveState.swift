@@ -14,6 +14,8 @@ final class ImmersiveState {
     var modelMatrix = simd_float4x4(xRotation: .radians(.pi))
 
     static let shared = ImmersiveState()
-    private init() {}
+    private init() {
+        // This line intentionally left blank.
+    }
 }
 #endif

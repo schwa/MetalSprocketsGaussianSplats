@@ -496,6 +496,10 @@
 			baseConfigurationReferenceAnchor = 452EC1342EF51EF600AB9206 /* Configuration */;
 			baseConfigurationReferenceRelativePath = "MetalGaussianSplatsDemo-Debug.xcconfig";
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=iphoneos*]" = AppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = macOSAppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=xros*]" = visionOSAppIcon;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -508,6 +512,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 			};
 			name = Debug;
 		};
@@ -516,6 +521,10 @@
 			baseConfigurationReferenceAnchor = 452EC1342EF51EF600AB9206 /* Configuration */;
 			baseConfigurationReferenceRelativePath = "MetalGaussianSplatsDemo-Release.xcconfig";
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=iphoneos*]" = AppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = macOSAppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=xros*]" = visionOSAppIcon;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -528,6 +537,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 			};
 			name = Release;
 		};
