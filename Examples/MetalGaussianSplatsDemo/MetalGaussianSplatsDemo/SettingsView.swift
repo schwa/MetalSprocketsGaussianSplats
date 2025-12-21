@@ -37,6 +37,12 @@ struct SettingsView: View {
                     destinationDirectory: SharpModelManager.modelDirectory
                 )
             }
+
+            Section("Sample Splats") {
+                Text("Sample Gaussian Splat files from the Spark project, including food scans, animals, and scenes.")
+                Link("sparkjs.dev", destination: URL(string: "https://sparkjs.dev")!)
+                SampleAssetsDownloadView()
+            }
         }
         .formStyle(.grouped)
         #if os(macOS)

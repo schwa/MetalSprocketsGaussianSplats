@@ -166,6 +166,9 @@ struct ModelDownloadView: View {
     private func extract(zipURL: URL, to directory: URL) async throws {
         try await Task.detached {
             try FileManager.default.unzipItem(at: zipURL, to: directory)
+            // Clean up macOS metadata folder
+            let macosxFolder = directory.appendingPathComponent("__MACOSX")
+            try? FileManager.default.removeItem(at: macosxFolder)
         }.value
     }
 
