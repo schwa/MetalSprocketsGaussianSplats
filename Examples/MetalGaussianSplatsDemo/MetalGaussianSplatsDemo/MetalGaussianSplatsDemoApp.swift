@@ -29,7 +29,18 @@ struct MetalGaussianSplatsDemoApp: App {
         }
         .commands {
             InspectorCommands()
+            #if os(macOS)
+            AboutCommand()
+            #endif
         }
+
+        #if os(macOS)
+        Window("About Gaussian Splats Demo", id: "about") {
+            AboutView()
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
+        #endif
 
         #if os(visionOS)
         ImmersiveSpace(id: "GaussianSplatImmersive") {

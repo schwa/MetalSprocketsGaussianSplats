@@ -1,14 +1,19 @@
 list:
     @just --list
 
-build:
-    swift build --configuration release
+ack_dir := "Examples/MetalGaussianSplatsDemo/MetalGaussianSplatsDemo/Acknowledgements"
 
-render-all: build
-    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH3.png" --renderer "Spark" --label
-    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH2.png" --renderer "Spark" --label --sh-degree 2
-    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH1.png" --renderer "Spark" --label --sh-degree 1
-    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Spark_SH0.png" --renderer "Spark" --label --sh-degree 0
-    .build/release/gsplat-render --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_Antimatter15.png" --renderer "Antimatter15" --label
-    command -v spark-screenshot > /dev/null && spark-screenshot --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_SparkJS.png" --label || true
-    command -v rs-spark > /dev/null && rs-spark --config "Samples/butterfly-wings-closed.json" --output "tmp/butterfly-wings-closed_RsSpark.png" --label || true
+# Gather all LICENSE files from dependencies and copy to Acknowledgements folder
+acknowledgements:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "{{ack_dir}}"
+    for license in .build/checkouts/*/LICENSE*; do
+        if [ -f "$license" ]; then
+            pkg=$(echo "$license" | cut -d'/' -f3)
+            ext="${license##*/}"
+            cp "$license" "{{ack_dir}}/${pkg}-${ext}"
+            echo "Copied: $pkg"
+        fi
+    done
+    echo "Done. Licenses copied to {{ack_dir}}"

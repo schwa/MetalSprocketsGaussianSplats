@@ -14,6 +14,7 @@ struct SplatDocumentView: View {
     @State private var inspectorTab: InspectorTab = .info
     @State private var confirmedLoad = false
     @State private var showScreenshotSheet = false
+    @State private var showExportDialog = false
 
     #if os(visionOS)
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
@@ -113,6 +114,13 @@ struct SplatDocumentView: View {
         .focusedSceneValue(\.inspectorTab, $inspectorTab)
         #endif
         .toolbar {
+            if viewModel.isImageConversion, viewModel.convertedURL != nil {
+                ToolbarItem {
+                    Button("Export PLY", systemImage: "square.and.arrow.down") {
+                        showExportDialog = true
+                    }
+                }
+            }
             ToolbarItem {
                 Button("Screenshot", systemImage: "camera") {
                     showScreenshotSheet = true
@@ -150,6 +158,12 @@ struct SplatDocumentView: View {
             )
             .environment(viewModel)
         }
+        .fileExporter(
+            isPresented: $showExportDialog,
+            document: viewModel.convertedURL.map { PLYFileDocument(url: $0) },
+            contentType: .ply,
+            defaultFilename: viewModel.convertedURL?.deletingPathExtension().lastPathComponent
+        ) { _ in }
         .onChange(of: fileURL, initial: true) { _, newURL in
             confirmedLoad = false
             Task {
