@@ -38,6 +38,18 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
                     Float(context.drawable.colorTextures[0].height)
                 )
 
+                // Set up viewports for stereo rendering
+                Draw { encoder in
+                    var viewMappings = (0 ..< context.viewCount).map {
+                        MTLVertexAmplificationViewMapping(
+                            viewportArrayIndexOffset: UInt32($0),
+                            renderTargetArrayIndexOffset: UInt32($0)
+                        )
+                    }
+                    encoder.setVertexAmplificationCount(context.viewCount, viewMappings: &viewMappings)
+                    encoder.setViewports(context.viewports)
+                }
+
                 try SparkSplatRenderPipeline(
                     splatCloud: splatCloud,
                     projectionMatrices: projectionMatrices,
@@ -46,6 +58,7 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
                     drawableSize: drawableSize,
                     convertSRGBToLinear: false
                 )
+                .depthCompare(function: .greater, enabled: true) // visionOS uses reverse-Z
                 .renderPipelineDescriptorModifier { descriptor in
                     descriptor.maxVertexAmplificationCount = context.viewCount
                     descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
