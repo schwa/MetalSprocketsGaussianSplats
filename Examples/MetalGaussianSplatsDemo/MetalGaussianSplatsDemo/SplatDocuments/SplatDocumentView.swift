@@ -15,6 +15,9 @@ struct SplatDocumentView: View {
     @State private var confirmedLoad = false
     @State private var showScreenshotSheet = false
     @State private var showExportDialog = false
+    #if !os(macOS)
+    @State private var showSettings = false
+    #endif
 
     #if os(visionOS)
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
@@ -156,6 +159,22 @@ struct SplatDocumentView: View {
                         .frame(width: 320, height: 480)
                 }
             }
+            ToolbarItem {
+                Button("Settings", systemImage: "gear") {
+                    showSettings = true
+                }
+            }
+            #elseif os(iOS)
+            ToolbarItem {
+                Button("Inspector", systemImage: "sidebar.right") {
+                    showInspector.toggle()
+                }
+            }
+            ToolbarItem {
+                Button("Settings", systemImage: "gear") {
+                    showSettings = true
+                }
+            }
             #else
             ToolbarItem {
                 Button("Inspector", systemImage: "sidebar.right") {
@@ -177,6 +196,11 @@ struct SplatDocumentView: View {
             contentType: .ply,
             defaultFilename: viewModel.convertedURL?.deletingPathExtension().lastPathComponent
         ) { _ in }
+        #if !os(macOS)
+        .sheet(isPresented: $showSettings) {
+            MobileSettingsView()
+        }
+        #endif
         .onChange(of: fileURL, initial: true) { _, newURL in
             confirmedLoad = false
             Task {

@@ -1,7 +1,9 @@
 #if os(macOS)
 import AppKit
+#endif
 import SwiftUI
 
+#if os(macOS)
 struct AboutCommand: Commands {
     @Environment(\.openWindow) private var openWindow
 
@@ -13,16 +15,17 @@ struct AboutCommand: Commands {
         }
     }
 }
+#endif
 
 struct AboutView: View {
     @State private var licenses: [(name: String, text: String)] = []
 
     var body: some View {
-        VStack(spacing: 20) {
-            // App Icon and Name
-            VStack(spacing: 8) {
-                if let appIcon = NSApplication.shared.applicationIconImage {
-                    Image(nsImage: appIcon)
+        ScrollView {
+            VStack(spacing: 20) {
+                // App Icon and Name
+                VStack(spacing: 8) {
+                    appIcon
                         .resizable()
                         .frame(width: 180, height: 180)
                         .glimmer(
@@ -32,34 +35,32 @@ struct AboutView: View {
                             maxLightness: 0.6,
                             angle: 35.0
                         )
+
+                    Text("Gaussian Splats Demo")
+                        .font(.title)
+                        .fontWeight(.bold)
+
+                    if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                       let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+                        Text("Version \(version) (\(build))")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 16) {
+                        Link("metalsprockets.com", destination: URL(string: "https://metalsprockets.com")!)
+                        Link("schwa.io", destination: URL(string: "https://schwa.io")!)
+                    }
+                    .font(.subheadline)
                 }
 
-                Text("Gaussian Splats Demo")
-                    .font(.title)
-                    .fontWeight(.bold)
+                Divider()
 
-                if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
-                   let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
-                    Text("Version \(version) (\(build))")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                // Acknowledgements
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Acknowledgements")
+                        .font(.headline)
 
-                HStack(spacing: 16) {
-                    Link("metalsprockets.com", destination: URL(string: "https://metalsprockets.com")!)
-                    Link("schwa.io", destination: URL(string: "https://schwa.io")!)
-                }
-                .font(.subheadline)
-            }
-
-            Divider()
-
-            // Acknowledgements
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Acknowledgements")
-                    .font(.headline)
-
-                ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         ForEach(licenses, id: \.name) { license in
                             LicenseSection(title: license.name, text: license.text)
@@ -67,14 +68,25 @@ struct AboutView: View {
                     }
                     .padding(.horizontal, 4)
                 }
-                .frame(maxHeight: 300)
             }
+            .padding(24)
         }
-        .padding(24)
-        .frame(width: 500)
+        #if os(macOS)
+        .frame(width: 500, height: 600)
+        #endif
         .onAppear {
             licenses = loadLicenses()
         }
+    }
+
+    private var appIcon: Image {
+        #if os(macOS)
+        if let nsImage = NSApplication.shared.applicationIconImage {
+            return Image(nsImage: nsImage)
+        }
+        #endif
+        // Fallback for iOS/visionOS - use the app icon from assets
+        return Image("AppIcon")
     }
 
     private func loadLicenses() -> [(name: String, text: String)] {
@@ -126,4 +138,3 @@ private struct LicenseSection: View {
 #Preview {
     AboutView()
 }
-#endif

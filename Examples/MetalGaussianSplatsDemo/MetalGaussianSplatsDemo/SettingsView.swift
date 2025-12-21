@@ -62,7 +62,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        #if os(macOS)
         .frame(minWidth: 400, minHeight: 200)
+        #endif
     }
 
     private func downloadModel() async {
@@ -83,3 +85,40 @@ struct SettingsView: View {
         isDownloading = false
     }
 }
+
+/// A mobile-friendly settings view with navigation for iOS and visionOS
+#if !os(macOS)
+struct MobileSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    NavigationLink {
+                        SettingsView()
+                            .navigationTitle("Settings")
+                    } label: {
+                        Label("Settings", systemImage: "gear")
+                    }
+
+                    NavigationLink {
+                        AboutView()
+                            .navigationTitle("About")
+                    } label: {
+                        Label("About", systemImage: "info.circle")
+                    }
+                }
+            }
+            .navigationTitle("Gaussian Splats")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+#endif
