@@ -2,17 +2,32 @@
 import SwiftUI
 
 struct MobileLaunchView: View {
+    @State private var showSettings = false
+
     var body: some View {
-o        DocumentLaunchView(
-            "Gaussian Splats",
-            for: SplatDocument.readableContentTypes
-        ) {
-            // No new document button - viewer only
-        } onDocumentOpen: { url in
-            SplatDocumentView(
-                document: SplatDocument(),
-                fileURL: url
-            )
+        NavigationStack {
+            DocumentLaunchView(
+                "Gaussian Splats",
+                for: SplatDocument.readableContentTypes
+            ) {
+                // No new document button - viewer only
+            } onDocumentOpen: { url in
+                SplatDocumentView(
+                    document: SplatDocument(),
+                    fileURL: url
+                )
+            }
+            .navigationTitle("Gaussian Splats")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Settings", systemImage: "gear") {
+                        showSettings = true
+                    }
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                MobileSettingsView()
+            }
         }
     }
 }

@@ -19,8 +19,8 @@ struct MetalGaussianSplatsDemoApp: App {
         #endif
 
         #if os(iOS) && !os(visionOS)
-        DocumentGroupLaunchScene(Text("Gaussian Splats")) {
-            // Viewer app - no new document action
+        WindowGroup {
+            MobileLaunchView()
         }
         #endif
 
