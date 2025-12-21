@@ -13,6 +13,7 @@
 		454CBE042EF75A7A00A16AD0 /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 454CBE032EF75A7A00A16AD0 /* Interaction3D */; };
 		457A346D2EB3DBF20001F508 /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 457A346C2EB3DBF20001F508 /* MetalSprocketsGaussianSplats */; };
 		45A86FEE2EC3F5CF00CCC501 /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 45A86FED2EC3F5CF00CCC501 /* Interaction3D */; };
+		45B4CDDB2EF86B8D00BFC1FC /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 45B4CDDA2EF86B8D00BFC1FC /* ZIPFoundation */; };
 		45E9BB732EF504C00016C77E /* Sharp in Frameworks */ = {isa = PBXBuildFile; productRef = 45E9BB722EF504C00016C77E /* Sharp */; };
 		45E9BB762EF519850016C77E /* Sharp in Frameworks */ = {isa = PBXBuildFile; productRef = 45E9BB752EF519850016C77E /* Sharp */; };
 /* End PBXBuildFile section */
@@ -107,6 +108,7 @@
 				457A346D2EB3DBF20001F508 /* MetalSprocketsGaussianSplats in Frameworks */,
 				45E9BB732EF504C00016C77E /* Sharp in Frameworks */,
 				45E9BB762EF519850016C77E /* Sharp in Frameworks */,
+				45B4CDDB2EF86B8D00BFC1FC /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -193,6 +195,7 @@
 				45A86FED2EC3F5CF00CCC501 /* Interaction3D */,
 				45E9BB722EF504C00016C77E /* Sharp */,
 				45E9BB752EF519850016C77E /* Sharp */,
+				45B4CDDA2EF86B8D00BFC1FC /* ZIPFoundation */,
 			);
 			productName = MetalGaussianSplatsDemo;
 			productReference = 457A34552EB3D9AE0001F508 /* MetalGaussianSplatsDemo.app */;
@@ -230,6 +233,7 @@
 				451155A22EC3EF9700C04880 /* XCRemoteSwiftPackageReference "GeometryLite3D" */,
 				45EAFFD72EC3F49500F49EB0 /* XCRemoteSwiftPackageReference "Interaction3D" */,
 				45E9BB742EF519850016C77E /* XCRemoteSwiftPackageReference "Sharp" */,
+				45B4CDD92EF86B8D00BFC1FC /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 457A34562EB3D9AE0001F508 /* Products */;
@@ -589,6 +593,14 @@
 				minimumVersion = 0.1.0;
 			};
 		};
+		45B4CDD92EF86B8D00BFC1FC /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.20;
+			};
+		};
 		45E9BB742EF519850016C77E /* XCRemoteSwiftPackageReference "Sharp" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/schwa/Sharp";
@@ -631,6 +643,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 45EAFFD72EC3F49500F49EB0 /* XCRemoteSwiftPackageReference "Interaction3D" */;
 			productName = Interaction3D;
+		};
+		45B4CDDA2EF86B8D00BFC1FC /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 45B4CDD92EF86B8D00BFC1FC /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
 		};
 		45E9BB722EF504C00016C77E /* Sharp */ = {
 			isa = XCSwiftPackageProductDependency;

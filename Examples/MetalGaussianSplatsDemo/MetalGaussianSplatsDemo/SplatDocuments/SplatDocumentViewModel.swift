@@ -179,11 +179,6 @@ final class SplatDocumentViewModel {
 
     private var sharp: Sharp?
 
-    private var modelDirectory: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SharpModel")
-    }
-
     func load(url: URL?, contentType: UTType?) async {
         guard let url else {
             descriptor = nil
@@ -231,9 +226,9 @@ final class SplatDocumentViewModel {
         do {
             // Initialize Sharp if needed
             if sharp == nil {
-                if let cachedModel = Sharp.cachedModel(in: modelDirectory) {
+                if SharpModelManager.isModelDownloaded {
                     loadingState = .converting(status: "Loading cached model...")
-                    sharp = try Sharp(modelURL: cachedModel)
+                    sharp = try Sharp(modelURL: SharpModelManager.modelURL)
                 } else {
                     loadingState = .error("Sharp model not found. Please download the model first.")
                     return
