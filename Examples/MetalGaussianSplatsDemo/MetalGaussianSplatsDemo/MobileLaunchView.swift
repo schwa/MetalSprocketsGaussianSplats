@@ -6,9 +6,6 @@ struct MobileLaunchView: View {
 
     @State private var openImport = false
 
-    @Environment(\.openURL)
-    private var openURL
-
     var body: some View {
         NavigationStack {
             documentLaunchView
@@ -42,14 +39,37 @@ struct MobileLaunchView: View {
             )
         }
         #else
-        ZStack {
-            Button("Open Document") {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(.splatCloud)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 180, height: 180)
+                .accessibilityHidden(true)
+
+            Text("Gaussian Splats")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+
+            Text("Open a splat file to view it in mixed reality")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Button {
                 openImport = true
+            } label: {
+                Label("Open Document", systemImage: "doc.badge.plus")
+                    .font(.title3)
             }
-            .fileImporter(isPresented: $openImport, allowedContentTypes: SplatDocument.readableContentTypes) { result in
-                // This line intentionally left blank
-            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+
+            Spacer()
         }
+        .padding(40)
+        .fileImporter(isPresented: $openImport, allowedContentTypes: SplatDocument.readableContentTypes) { _ in }
         #endif
     }
 }
