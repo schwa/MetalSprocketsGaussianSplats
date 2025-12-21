@@ -105,7 +105,10 @@ struct SplatDocumentView: View {
             }
         }
         .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
-        #if !os(visionOS)
+        #if os(visionOS)
+        .focusedSceneValue(\.inspectorVisibility, $showInspector)
+        .focusedSceneValue(\.inspectorTab, $inspectorTab)
+        #else
         .inspector(isPresented: $showInspector) {
             SplatDocumentInspectorView(tab: $inspectorTab)
                 .environment(viewModel)
@@ -142,6 +145,16 @@ struct SplatDocumentView: View {
                     }
                 }
                 .disabled(viewModel.loadingState != .ready)
+            }
+            ToolbarItem {
+                Button("Inspector", systemImage: "sidebar.right") {
+                    showInspector.toggle()
+                }
+                .popover(isPresented: $showInspector) {
+                    SplatDocumentInspectorView(tab: $inspectorTab)
+                        .environment(viewModel)
+                        .frame(width: 320, height: 480)
+                }
             }
             #else
             ToolbarItem {

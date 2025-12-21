@@ -10,7 +10,7 @@ struct SplatDocumentInspectorView: View {
                     Text(tab.rawValue).tag(tab)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.segmented)o
             .labelsHidden()
 
             switch tab {
