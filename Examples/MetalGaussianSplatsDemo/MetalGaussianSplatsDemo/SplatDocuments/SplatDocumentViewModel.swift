@@ -58,7 +58,7 @@ final class SplatDocumentViewModel {
         didSet { cameraMatrix = .init(translation: cameraMode.initialPosition) }
     }
     var cameraMatrix: simd_float4x4 = .init(translation: [0, 0, 5])
-    var modelMatrix: simd_float4x4 = simd_float4x4(xRotation: .radians(.pi))
+    var modelMatrix = simd_float4x4(xRotation: .radians(.pi))
     var verticalAngleOfView: Double = 90 {
         didSet { updateCameraForZoomToFit() }
     }

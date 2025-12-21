@@ -11,7 +11,7 @@ import simd
 final class ImmersiveState {
     var isImmersive = false
     var splatCloud: GPUSplatCloud<SparkSplat>?
-    var modelMatrix: simd_float4x4 = simd_float4x4(xRotation: .radians(.pi))
+    var modelMatrix = simd_float4x4(xRotation: .radians(.pi))
 
     static let shared = ImmersiveState()
     private init() {}

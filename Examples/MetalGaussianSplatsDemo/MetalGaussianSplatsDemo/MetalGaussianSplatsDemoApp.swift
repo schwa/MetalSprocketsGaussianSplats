@@ -70,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check if this is a document window (not splash, settings, etc.)
         guard closingWindow.identifier?.rawValue.contains("document") == true ||
-              NSDocumentController.shared.document(for: closingWindow) != nil else {
+                NSDocumentController.shared.document(for: closingWindow) != nil else {
             return
         }
 
@@ -84,8 +84,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Count remaining document windows
         let documentWindows = NSApp.windows.filter { window in
             window.isVisible &&
-            (window.identifier?.rawValue.contains("document") == true ||
-             NSDocumentController.shared.document(for: window) != nil)
+                (window.identifier?.rawValue.contains("document") == true ||
+                    NSDocumentController.shared.document(for: window) != nil)
         }
 
         // If no document windows remain, open splash

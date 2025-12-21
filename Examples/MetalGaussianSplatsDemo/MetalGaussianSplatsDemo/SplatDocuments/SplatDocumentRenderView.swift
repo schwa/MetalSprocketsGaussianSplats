@@ -1,4 +1,5 @@
 import GeometryLite3D
+import Interaction3D
 import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
@@ -6,7 +7,6 @@ import MetalSprocketsUI
 import simd
 import SwiftUI
 import UniformTypeIdentifiers
-import Interaction3D
 
 struct SplatDocumentRenderView: View {
     let rendererType: SplatRendererType

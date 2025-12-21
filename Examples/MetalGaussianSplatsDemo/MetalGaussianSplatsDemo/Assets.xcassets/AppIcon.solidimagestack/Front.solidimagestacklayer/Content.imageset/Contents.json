@@ -1,8 +1,9 @@
 {
   "images" : [
     {
-      "filename" : "image.png",
-      "idiom" : "universal"
+      "filename" : "512.png",
+      "idiom" : "vision",
+      "scale" : "2x"
     }
   ],
   "info" : {

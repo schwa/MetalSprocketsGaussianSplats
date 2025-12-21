@@ -110,7 +110,7 @@ struct ScreenshotSheet: View {
         }
     }
 
-    private func renderScreenshot() async {
+    private func renderScreenshot() {
         guard let descriptor = viewModel.descriptor else {
             errorMessage = "No splat cloud loaded"
             return

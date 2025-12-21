@@ -56,5 +56,3 @@ struct SpatialSceneCameraController: ViewModifier {
         ).cameraMatrix
     }
 }
-
-
