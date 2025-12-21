@@ -198,6 +198,8 @@ final class SplatDocumentViewModel {
         if let contentType, contentType.conforms(to: .image) {
             isImageConversion = true
             cameraMode = .spatialScene
+            verticalAngleOfView = 45
+            modelRotationZ = .pi
             // Load source image for display during conversion
             #if os(macOS)
             sourceImage = NSImage(contentsOf: url)

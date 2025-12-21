@@ -27,6 +27,10 @@ struct SplatDocumentView: View {
         guard let descriptor = viewModel.descriptor else {
             return false
         }
+        // Skip confirmation for image conversions (they produce small splat clouds)
+        if viewModel.isImageConversion {
+            return false
+        }
         return descriptor.splatCount >= 1_000_000 && !confirmedLoad
     }
 
