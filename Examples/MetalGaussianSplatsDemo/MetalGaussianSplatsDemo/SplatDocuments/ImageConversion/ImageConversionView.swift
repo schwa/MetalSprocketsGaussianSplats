@@ -20,15 +20,16 @@ struct ImageConversionView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: 400, maxHeight: 300)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(radius: 20)
                     .glimmer(
-                        sweepDuration: 2.0,
-                        pauseDuration: 3.0,
+                        sweepDuration: 1.0,
+                        pauseDuration: 1.5,
                         gradientWidth: 0.4,
                         maxLightness: 0.3,
-                        angle: 35.0
+                        angle: 90.0,
+                        rainbowSpeed: 0.3
                     )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(radius: 20)
 
                 VStack(spacing: 12) {
                     ProgressView()

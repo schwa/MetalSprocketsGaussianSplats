@@ -25,6 +25,12 @@ struct GlimmerModifier: ViewModifier {
     /// The angle of the glimmer sweep in degrees (0 = horizontal, 45 = diagonal).
     var angle: Double = 45.0
 
+    /// Optional tint color for the glimmer. Use opacity to control blend amount.
+    var tintColor: Color?
+
+    /// If > 0, cycles the tint through rainbow colors at this speed (cycles per second).
+    var rainbowSpeed: Double = 0.0
+
     /// The start time for the animation.
     private let startDate = Date()
 
@@ -39,7 +45,9 @@ struct GlimmerModifier: ViewModifier {
                     pauseDuration: pauseDuration,
                     gradientWidth: gradientWidth,
                     maxLightness: maxLightness,
-                    angle: angle
+                    angle: angle,
+                    tintColor: tintColor,
+                    rainbowSpeed: rainbowSpeed
                 ))
         }
     }
@@ -53,6 +61,8 @@ private struct GlimmerShaderModifier: ViewModifier {
     let gradientWidth: Double
     let maxLightness: Double
     let angle: Double
+    let tintColor: Color?
+    let rainbowSpeed: Double
 
     func body(content: Content) -> some View {
         content
@@ -66,7 +76,9 @@ private struct GlimmerShaderModifier: ViewModifier {
                             .float(pauseDuration),
                             .float(gradientWidth),
                             .float(maxLightness),
-                            .float(angle * .pi / 180.0)
+                            .float(angle * .pi / 180.0),
+                            .color(tintColor ?? .white.opacity(rainbowSpeed > 0 ? 0.5 : 0)),
+                            .float(rainbowSpeed)
                         )
                     )
             }
@@ -93,6 +105,12 @@ struct GlimmerView<Content: View>: View {
     /// The angle of the glimmer sweep in degrees (0 = horizontal, 45 = diagonal).
     var angle: Double = 45.0
 
+    /// Optional tint color for the glimmer.
+    var tintColor: Color?
+
+    /// If > 0, cycles the tint through rainbow colors at this speed (cycles per second).
+    var rainbowSpeed: Double = 0.0
+
     var body: some View {
         content()
             .glimmer(
@@ -100,7 +118,9 @@ struct GlimmerView<Content: View>: View {
                 pauseDuration: pauseDuration,
                 gradientWidth: gradientWidth,
                 maxLightness: maxLightness,
-                angle: angle
+                angle: angle,
+                tintColor: tintColor,
+                rainbowSpeed: rainbowSpeed
             )
     }
 }
@@ -113,20 +133,26 @@ extension View {
     ///   - gradientWidth: The width of the glimmer as a fraction of view width (0-1). Default is 0.3.
     ///   - maxLightness: The maximum lightness boost (0-1). Default is 0.5.
     ///   - angle: The angle of the glimmer sweep in degrees. Default is 45.
+    ///   - tintColor: Optional tint color for the glimmer. Use opacity to control intensity.
+    ///   - rainbowSpeed: If > 0, cycles through rainbow colors at this speed (cycles/sec). Default is 0.
     /// - Returns: A view with the glimmer effect applied.
     func glimmer(
         sweepDuration: Double = 1.5,
         pauseDuration: Double = 3.0,
         gradientWidth: Double = 0.3,
         maxLightness: Double = 0.5,
-        angle: Double = 45.0
+        angle: Double = 45.0,
+        tintColor: Color? = nil,
+        rainbowSpeed: Double = 0.0
     ) -> some View {
         modifier(GlimmerModifier(
             sweepDuration: sweepDuration,
             pauseDuration: pauseDuration,
             gradientWidth: gradientWidth,
             maxLightness: maxLightness,
-            angle: angle
+            angle: angle,
+            tintColor: tintColor,
+            rainbowSpeed: rainbowSpeed
         ))
     }
 }
@@ -148,11 +174,11 @@ extension View {
                 .frame(width: 200, height: 100)
         }
 
-        Text("Glimmer Effect")
+        Text("Rainbow!")
             .font(.largeTitle)
             .fontWeight(.bold)
-            .foregroundStyle(.orange)
-            .glimmer(sweepDuration: 1.0, pauseDuration: 2.0, maxLightness: 0.7)
+            .foregroundStyle(.gray)
+            .glimmer(sweepDuration: 1.0, pauseDuration: 1.0, maxLightness: 0.3, rainbowSpeed: 0.5)
     }
     .padding(50)
 }

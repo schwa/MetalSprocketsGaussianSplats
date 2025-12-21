@@ -65,6 +65,8 @@ half3 hslToRGB(half3 hsl) {
 /// - Parameter gradientWidth: The width of the glimmer gradient in UV space (0-1).
 /// - Parameter maxLightness: The maximum lightness boost at the peak of the gradient (0-1).
 /// - Parameter angle: The angle of the glimmer sweep in radians.
+/// - Parameter tintColor: Optional tint color for the glimmer (use alpha to control blend amount).
+/// - Parameter rainbowSpeed: If > 0, cycles the tint through rainbow colors at this speed (cycles per second).
 /// - Returns: The new pixel color.
 [[ stitchable ]] half4 glimmer(
     float2 position,
@@ -75,7 +77,9 @@ half3 hslToRGB(half3 hsl) {
     float pauseDuration,
     float gradientWidth,
     float maxLightness,
-    float angle
+    float angle,
+    half4 tintColor,
+    float rainbowSpeed
 ) {
     if (color.a == 0.0h) {
         return color;
@@ -124,7 +128,21 @@ half3 hslToRGB(half3 hsl) {
         // Modify the lightness component based on intensity
         hsl[2] = hsl[2] + half(maxLightness * (1.0h - hsl[2])) * intensity;
         // Convert back to RGB
-        color.rgb = hslToRGB(hsl);
+        half3 resultRGB = hslToRGB(hsl);
+
+        // Blend in tint color if alpha > 0, or use rainbow if rainbowSpeed > 0
+        if (rainbowSpeed > 0.0h) {
+            // Cycle hue based on time
+            half hue = half(fmod(float(time * rainbowSpeed), 1.0f));
+            half3 rainbowRGB = hslToRGB(half3(hue, 1.0h, 0.6h));
+            half tintAmount = tintColor.a * intensity;
+            resultRGB = mix(resultRGB, rainbowRGB, tintAmount);
+        } else if (tintColor.a > 0.0h) {
+            half tintAmount = tintColor.a * intensity;
+            resultRGB = mix(resultRGB, tintColor.rgb, tintAmount);
+        }
+
+        color.rgb = resultRGB;
     }
     
     return color;
