@@ -1,6 +1,3 @@
-#if os(macOS)
-import AppKit
-#endif
 import SwiftUI
 
 #if os(macOS)
@@ -25,8 +22,9 @@ struct AboutView: View {
             VStack(spacing: 20) {
                 // App Icon and Name
                 VStack(spacing: 8) {
-                    appIcon
+                    Image(.splatCloud)
                         .resizable()
+                        .accessibilityLabel("App Icon")
                         .frame(width: 180, height: 180)
                         .glimmer(
                             sweepDuration: 1.5,
@@ -40,8 +38,7 @@ struct AboutView: View {
                         .font(.title)
                         .fontWeight(.bold)
 
-                    if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
-                       let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+                    if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
                         Text("Version \(version) (\(build))")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -77,16 +74,6 @@ struct AboutView: View {
         .onAppear {
             licenses = loadLicenses()
         }
-    }
-
-    private var appIcon: Image {
-        #if os(macOS)
-        if let nsImage = NSApplication.shared.applicationIconImage {
-            return Image(nsImage: nsImage)
-        }
-        #endif
-        // Fallback for iOS/visionOS - use the app icon from assets
-        return Image("AppIcon")
     }
 
     private func loadLicenses() -> [(name: String, text: String)] {

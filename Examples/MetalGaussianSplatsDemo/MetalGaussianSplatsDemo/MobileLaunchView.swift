@@ -26,7 +26,9 @@ struct MobileLaunchView: View {
                 }
             }
             .sheet(isPresented: $showSettings) {
-                MobileSettingsView()
+                NavigationStack {
+                    SettingsView()
+                }
             }
         }
     }

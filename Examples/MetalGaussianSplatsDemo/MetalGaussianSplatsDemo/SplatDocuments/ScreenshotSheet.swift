@@ -80,7 +80,7 @@ struct ScreenshotSheet: View {
 
                 Button("Save…") {
                     Task {
-                        await renderScreenshot()
+                        renderScreenshot()
                     }
                 }
                 .keyboardShortcut(.defaultAction)

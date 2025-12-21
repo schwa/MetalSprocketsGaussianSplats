@@ -5,6 +5,7 @@ import Sharp
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0
     @State private var errorMessage: String?
@@ -15,7 +16,31 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        form
+        #if !os(macOS)
+            .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        #endif
+    }
+
+    private var form: some View {
         Form {
+            #if !os(macOS)
+            Section {
+                NavigationLink {
+                    AboutView()
+                        .navigationTitle("About")
+                } label: {
+                    Label("About", systemImage: "info.circle")
+                }
+            }
+            #endif
             Section("Image to Gaussian Splat Conversion") {
                 Text("Sharp is an Apple ML model that converts images to Gaussian Splats.")
                 Link("apple/ml-sharp on GitHub", destination: URL(string: "https://github.com/apple/ml-sharp")!)
@@ -85,40 +110,3 @@ struct SettingsView: View {
         isDownloading = false
     }
 }
-
-/// A mobile-friendly settings view with navigation for iOS and visionOS
-#if !os(macOS)
-struct MobileSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    NavigationLink {
-                        SettingsView()
-                            .navigationTitle("Settings")
-                    } label: {
-                        Label("Settings", systemImage: "gear")
-                    }
-
-                    NavigationLink {
-                        AboutView()
-                            .navigationTitle("About")
-                    } label: {
-                        Label("About", systemImage: "info.circle")
-                    }
-                }
-            }
-            .navigationTitle("Gaussian Splats")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-#endif

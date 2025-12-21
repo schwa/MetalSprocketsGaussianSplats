@@ -195,10 +195,14 @@ struct SplatDocumentView: View {
             document: viewModel.convertedURL.map { PLYFileDocument(url: $0) },
             contentType: .ply,
             defaultFilename: viewModel.convertedURL?.deletingPathExtension().lastPathComponent
-        ) { _ in }
+        ) { _ in
+            // This line intentionally left blank.
+        }
         #if !os(macOS)
         .sheet(isPresented: $showSettings) {
-            MobileSettingsView()
+            NavigationStack {
+                SettingsView()
+            }
         }
         #endif
         .onChange(of: fileURL, initial: true) { _, newURL in

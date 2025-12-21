@@ -51,8 +51,10 @@ struct ImageConversionView: View {
 
     private func platformImage(_ image: PlatformImage) -> Image {
         #if os(macOS)
+        // swiftlint:disable:next accessibility_label_for_image
         Image(nsImage: image)
         #else
+        // swiftlint:disable:next accessibility_label_for_image
         Image(uiImage: image)
         #endif
     }
