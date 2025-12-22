@@ -64,12 +64,13 @@ struct SplatDocumentView: View {
                 if let descriptor = viewModel.descriptor, !needsConfirmation {
                     #if os(visionOS)
                     if immersiveState.isImmersive {
-                        ImmersiveModeControlsView(viewModel: viewModel) {
+                        ImmersiveModeControlsView {
                             Task {
                                 await dismissImmersiveSpace()
                                 immersiveState.isImmersive = false
                             }
                         }
+                        .environment(viewModel)
                     } else {
                         SplatDocumentRenderView(
                             rendererType: viewModel.rendererType,
@@ -143,8 +144,15 @@ struct SplatDocumentView: View {
                         } else {
                             showInspector = false
                             let result = await openImmersiveSpace(id: "GaussianSplatImmersive")
-                            if case .opened = result {
+                            switch result {
+                            case .opened:
                                 immersiveState.isImmersive = true
+                            case .userCancelled:
+                                immersiveState.isImmersive = false
+                            case .error:
+                                immersiveState.isImmersive = false
+                            @unknown default:
+                                immersiveState.isImmersive = false
                             }
                         }
                     }
@@ -211,6 +219,16 @@ struct SplatDocumentView: View {
         .onChange(of: fileURL, initial: true) { _, newURL in
             confirmedLoad = false
             Task {
+                #if os(visionOS)
+                // Dismiss immersive space when changing documents
+                if immersiveState.isImmersive {
+                    await dismissImmersiveSpace()
+                    immersiveState.isImmersive = false
+                }
+                // Reset immersive positioning for new document
+                immersiveState.translation = .zero
+                immersiveState.scale = 1.0
+                #endif
                 await viewModel.load(url: newURL, contentType: document.contentType)
             }
         }

@@ -2,7 +2,7 @@
 import SwiftUI
 
 struct ImmersiveModeControlsView: View {
-    @Bindable var viewModel: SplatDocumentViewModel
+    @Environment(SplatDocumentViewModel.self) private var viewModel
     @Bindable var immersiveState = ImmersiveState.shared
     let onExitImmersive: () -> Void
 
@@ -14,6 +14,7 @@ struct ImmersiveModeControlsView: View {
     ]
 
     var body: some View {
+        @Bindable var viewModel = viewModel
         VStack(spacing: 16) {
             HStack {
                 Image(systemName: "visionpro")
@@ -36,6 +37,7 @@ struct ImmersiveModeControlsView: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                 }
+
 
                 GridRow {
                     Text("Rotate Y")
@@ -95,5 +97,10 @@ struct ImmersiveModeControlsView: View {
         }
         .padding(24)
     }
+}
+
+#Preview {
+    ImmersiveModeControlsView(onExitImmersive: { })
+        .environment(SplatDocumentViewModel())
 }
 #endif
