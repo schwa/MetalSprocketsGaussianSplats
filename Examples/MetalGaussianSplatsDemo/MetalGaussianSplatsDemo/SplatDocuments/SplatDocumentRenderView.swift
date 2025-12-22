@@ -65,8 +65,14 @@ struct SplatDocumentRenderView: View {
 
     @ViewBuilder
     private func renderView(splatCloud: AnyGPUSplatCloud) -> some View {
+        // Capture values to avoid accessing bindings from render thread
+        let capturedCameraMatrix = cameraMatrix
+        let capturedModelMatrix = modelMatrix
+        let capturedProjection = projection
+        let capturedRendererType = rendererType
+
         let view = RenderView { context, drawableSize in
-            SplatRenderPass(rendererType: rendererType, splatCloud: splatCloud, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projection: projection, drawableSize: drawableSize, frame: context.frameUniforms.index)
+            SplatRenderPass(rendererType: capturedRendererType, splatCloud: splatCloud, cameraMatrix: capturedCameraMatrix, modelMatrix: capturedModelMatrix, projection: capturedProjection, drawableSize: drawableSize, frame: context.frameUniforms.index)
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
