@@ -18,10 +18,14 @@ struct MetalGaussianSplatsDemoApp: App {
         SplashScene()
         #endif
 
-        #if os(iOS) || os(visionOS)
+        #if os(iOS)
         WindowGroup {
             MobileLaunchView()
         }
+        #endif
+
+        #if os(visionOS)
+        DocumentGroupLaunchScene()
         #endif
 
         DocumentGroup(viewing: SplatDocument.self) { file in
