@@ -13,11 +13,24 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
     let context: ImmersiveContext
     let splatCloud: GPUSplatCloud<SparkSplat>?
     let modelMatrix: simd_float4x4
+    let scale: Float
+    let translation: SIMD3<Float>
 
     init(context: ImmersiveContext) throws {
         self.context = context
         self.splatCloud = ImmersiveState.shared.splatCloud
         self.modelMatrix = ImmersiveState.shared.modelMatrix
+        self.scale = ImmersiveState.shared.scale
+        self.translation = ImmersiveState.shared.translation
+
+        // Update head tracking info for recenter functionality
+        // Use the first eye's view matrix to get head position/orientation
+        let viewMatrix = context.viewMatrix(eye: 0)
+        let cameraMatrix = viewMatrix.inverse
+        let headPosition = SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z)
+        let headForward = -SIMD3<Float>(cameraMatrix.columns.2.x, cameraMatrix.columns.2.y, cameraMatrix.columns.2.z)
+        ImmersiveState.shared.headPosition = headPosition
+        ImmersiveState.shared.headForward = headForward
     }
 
     nonisolated var body: some Element {
@@ -28,9 +41,8 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
                 let projectionMatrices = (0 ..< context.viewCount).map { context.projectionMatrix(eye: $0) }
                 let cameraMatrices = viewMatrices.map(\.inverse)
 
-                // Position splat cloud in world space: 2m in front, 1.5m up, scaled to 30cm
-                let worldModelMatrix = simd_float4x4(translation: [0, 1.5, -2])
-                    * simd_float4x4(scale: [0.3, 0.3, 0.3])
+                let worldModelMatrix = simd_float4x4(translation: translation)
+                    * simd_float4x4(scale: SIMD3<Float>(repeating: scale))
                     * modelMatrix
 
                 let drawableSize = SIMD2<Float>(

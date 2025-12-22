@@ -64,10 +64,11 @@ struct SplatDocumentView: View {
                 if let descriptor = viewModel.descriptor, !needsConfirmation {
                     #if os(visionOS)
                     if immersiveState.isImmersive {
-                        ContentUnavailableView {
-                            Label("Immersive Mode Active", systemImage: "visionpro")
-                        } description: {
-                            Text("Look around you to see the splat cloud in immersive space.")
+                        ImmersiveModeControlsView(viewModel: viewModel) {
+                            Task {
+                                await dismissImmersiveSpace()
+                                immersiveState.isImmersive = false
+                            }
                         }
                     } else {
                         SplatDocumentRenderView(
@@ -140,6 +141,7 @@ struct SplatDocumentView: View {
                             await dismissImmersiveSpace()
                             immersiveState.isImmersive = false
                         } else {
+                            showInspector = false
                             let result = await openImmersiveSpace(id: "GaussianSplatImmersive")
                             if case .opened = result {
                                 immersiveState.isImmersive = true
@@ -150,13 +152,14 @@ struct SplatDocumentView: View {
                 .disabled(viewModel.loadingState != .ready)
             }
             ToolbarItem {
-                Button("Inspector", systemImage: "sidebar.right") {
+                Button("Inspector", systemImage: "slider.horizontal.3") {
                     showInspector.toggle()
                 }
+                .disabled(immersiveState.isImmersive)
                 .popover(isPresented: $showInspector) {
                     SplatDocumentInspectorView(tab: $inspectorTab)
                         .environment(viewModel)
-                        .frame(width: 320, height: 480)
+                        .frame(width: 420, height: 520)
                 }
             }
             ToolbarItem {
@@ -211,5 +214,10 @@ struct SplatDocumentView: View {
                 await viewModel.load(url: newURL, contentType: document.contentType)
             }
         }
+        #if os(visionOS)
+        .onChange(of: viewModel.modelMatrix, initial: true) {
+            ImmersiveState.shared.modelMatrix = viewModel.modelMatrix
+        }
+        #endif
     }
 }
