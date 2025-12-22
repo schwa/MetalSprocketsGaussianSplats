@@ -1,7 +1,8 @@
-#if os(iOS) || os(macOS)
+#if os(visionOS)
+import MetalSprocketsGaussianSplats
 import SwiftUI
 
-/// A view for displaying a single Gaussian Splat document (iOS/macOS)
+/// A visionOS-specific view for displaying a Gaussian Splat document with immersive support
 struct SplatDocumentView: View {
     let document: SplatDocument
     let fileURL: URL?
@@ -12,9 +13,11 @@ struct SplatDocumentView: View {
     @State private var confirmedLoad = false
     @State private var showScreenshotSheet = false
     @State private var showExportDialog = false
-    #if os(iOS)
     @State private var showSettings = false
-    #endif
+
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @State private var immersiveState = ImmersiveState.shared
 
     @Environment(\.displayScale) private var displayScale
 
@@ -55,10 +58,6 @@ struct SplatDocumentView: View {
             }
         }
         .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
-        .inspector(isPresented: $showInspector) {
-            SplatDocumentInspectorView(tab: $inspectorTab)
-                .environment(viewModel)
-        }
         .focusedSceneValue(\.inspectorVisibility, $showInspector)
         .focusedSceneValue(\.inspectorTab, $inspectorTab)
         .toolbar { toolbarContent }
@@ -75,33 +74,50 @@ struct SplatDocumentView: View {
             contentType: .ply,
             defaultFilename: viewModel.convertedURL?.deletingPathExtension().lastPathComponent
         ) { _ in }
-        #if os(iOS)
         .sheet(isPresented: $showSettings) {
             NavigationStack {
                 SettingsView()
             }
         }
-        #endif
         .onChange(of: fileURL, initial: true) { _, newURL in
             confirmedLoad = false
             Task {
+                if immersiveState.isImmersive {
+                    await dismissImmersiveSpace()
+                    immersiveState.isImmersive = false
+                }
+                immersiveState.translation = .zero
+                immersiveState.scale = 1.0
                 await viewModel.load(url: newURL, contentType: document.contentType)
             }
+        }
+        .onChange(of: viewModel.modelMatrix, initial: true) {
+            ImmersiveState.shared.modelMatrix = viewModel.modelMatrix
         }
     }
 
     @ViewBuilder
     private var readyContent: some View {
         if let descriptor = viewModel.descriptor, !needsConfirmation {
-            SplatDocumentRenderView(
-                rendererType: viewModel.rendererType,
-                descriptor: descriptor,
-                cameraMode: viewModel.cameraMode,
-                cameraMatrix: $viewModel.cameraMatrix,
-                modelMatrix: $viewModel.modelMatrix,
-                verticalAngleOfView: $viewModel.verticalAngleOfView
-            )
-            .ignoresSafeArea()
+            if immersiveState.isImmersive {
+                ImmersiveModeControlsView {
+                    Task {
+                        await dismissImmersiveSpace()
+                        immersiveState.isImmersive = false
+                    }
+                }
+                .environment(viewModel)
+            } else {
+                SplatDocumentRenderView(
+                    rendererType: viewModel.rendererType,
+                    descriptor: descriptor,
+                    cameraMode: viewModel.cameraMode,
+                    cameraMatrix: $viewModel.cameraMatrix,
+                    modelMatrix: $viewModel.modelMatrix,
+                    verticalAngleOfView: $viewModel.verticalAngleOfView
+                )
+                .ignoresSafeArea()
+            }
         } else if needsConfirmation {
             ContentUnavailableView {
                 Label("Large Splat Cloud", systemImage: "exclamationmark.triangle.fill")
@@ -132,10 +148,37 @@ struct SplatDocumentView: View {
                 showScreenshotSheet = true
             }
         }
-        #if os(iOS)
         ToolbarItem {
-            Button("Inspector", systemImage: "sidebar.right") {
+            Button(immersiveState.isImmersive ? "Exit Immersive" : "Enter Immersive", systemImage: "visionpro") {
+                Task {
+                    if immersiveState.isImmersive {
+                        await dismissImmersiveSpace()
+                        immersiveState.isImmersive = false
+                    } else {
+                        showInspector = false
+                        let result = await openImmersiveSpace(id: "GaussianSplatImmersive")
+                        switch result {
+                        case .opened:
+                            immersiveState.isImmersive = true
+                        case .userCancelled, .error:
+                            immersiveState.isImmersive = false
+                        @unknown default:
+                            immersiveState.isImmersive = false
+                        }
+                    }
+                }
+            }
+            .disabled(viewModel.loadingState != .ready)
+        }
+        ToolbarItem {
+            Button("Inspector", systemImage: "slider.horizontal.3") {
                 showInspector.toggle()
+            }
+            .disabled(immersiveState.isImmersive)
+            .popover(isPresented: $showInspector) {
+                SplatDocumentInspectorView(tab: $inspectorTab)
+                    .environment(viewModel)
+                    .frame(width: 420, height: 520)
             }
         }
         ToolbarItem {
@@ -143,13 +186,6 @@ struct SplatDocumentView: View {
                 showSettings = true
             }
         }
-        #else
-        ToolbarItem {
-            Button("Inspector", systemImage: "sidebar.right") {
-                showInspector.toggle()
-            }
-        }
-        #endif
     }
 }
 #endif
