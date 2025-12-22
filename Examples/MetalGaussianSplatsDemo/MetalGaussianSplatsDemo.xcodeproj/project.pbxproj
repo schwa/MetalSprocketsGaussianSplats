@@ -589,8 +589,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/schwa/GeometryLite3D";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.0;
+				branch = main;
+				kind = branch;
 			};
 		};
 		45B4CDD92EF86B8D00BFC1FC /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
@@ -613,8 +613,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/schwa/Interaction3D";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.1;
+				branch = main;
+				kind = branch;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

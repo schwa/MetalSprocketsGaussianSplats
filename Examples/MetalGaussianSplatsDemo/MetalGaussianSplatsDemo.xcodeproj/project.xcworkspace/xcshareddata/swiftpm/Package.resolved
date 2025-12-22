@@ -1,13 +1,13 @@
 {
-  "originHash" : "33fc1901e37bdbbc4e2e76c189a9928c36331e464ce45b323741be684b399c1a",
+  "originHash" : "8653e20c08b972e947c0a303cfd3fbe498a4cd248d53bb7822ad7f44c9be2e37",
   "pins" : [
     {
       "identity" : "geometrylite3d",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GeometryLite3D",
       "state" : {
-        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7",
-        "version" : "0.1.0"
+        "branch" : "main",
+        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/Interaction3D",
       "state" : {
-        "revision" : "20486647f04d66d4d297a3403cc3b6061be97de1",
-        "version" : "0.1.1"
+        "branch" : "main",
+        "revision" : "85b588ec9c43f0a65338327eda85780866eac221"
       }
     },
     {
