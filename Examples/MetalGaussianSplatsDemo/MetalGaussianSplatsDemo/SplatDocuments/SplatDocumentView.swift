@@ -12,9 +12,6 @@ struct SplatDocumentView: View {
     @State private var confirmedLoad = false
     @State private var showScreenshotSheet = false
     @State private var showExportDialog = false
-    #if os(iOS)
-    @State private var showSettings = false
-    #endif
 
     @Environment(\.displayScale) private var displayScale
 
@@ -75,13 +72,6 @@ struct SplatDocumentView: View {
             contentType: .ply,
             defaultFilename: viewModel.convertedURL?.deletingPathExtension().lastPathComponent
         ) { _ in }
-        #if os(iOS)
-        .sheet(isPresented: $showSettings) {
-            NavigationStack {
-                SettingsView()
-            }
-        }
-        #endif
         .onChange(of: fileURL, initial: true) { _, newURL in
             confirmedLoad = false
             Task {
@@ -136,11 +126,6 @@ struct SplatDocumentView: View {
         ToolbarItem {
             Button("Inspector", systemImage: "sidebar.right") {
                 showInspector.toggle()
-            }
-        }
-        ToolbarItem {
-            Button("Settings", systemImage: "gear") {
-                showSettings = true
             }
         }
         #else
