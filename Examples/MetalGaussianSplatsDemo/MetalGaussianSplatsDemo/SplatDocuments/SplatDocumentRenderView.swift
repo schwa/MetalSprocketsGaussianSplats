@@ -61,7 +61,7 @@ struct SplatDocumentRenderView: View {
                 }
             }
         }
-        .onChange(of: modelMatrix) {
+        .onChange(of: modelMatrix, initial: true) {
             #if os(visionOS)
             ImmersiveState.shared.modelMatrix = modelMatrix
             #endif
