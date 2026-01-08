@@ -214,24 +214,24 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         case "spz":
             let reader = try Splats.SPZReader(url: splatURL)
             var tempSplats: [GenericSplat] = []
-            try reader.read { _, splat in
-                tempSplats.append(splat)
+            try reader.read { _, extendedSplat in
+                tempSplats.append(extendedSplat.genericSplat)
             }
             return tempSplats
 
         case "ply":
             let reader = try PLYSplatReader(url: splatURL)
             var tempSplats: [GenericSplat] = []
-            try reader.read { _, splat in
-                tempSplats.append(splat)
+            try reader.read { _, extendedSplat in
+                tempSplats.append(extendedSplat.genericSplat)
             }
             return tempSplats
 
         case "splat":
             let reader = try Antimatter15Reader(url: splatURL)
             var tempSplats: [GenericSplat] = []
-            try reader.read { _, splat in
-                tempSplats.append(splat)
+            try reader.read { _, extendedSplat in
+                tempSplats.append(extendedSplat.genericSplat)
             }
             return tempSplats
 

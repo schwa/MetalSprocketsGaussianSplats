@@ -69,23 +69,23 @@ struct SplatCloudDescriptor: Sendable {
         switch contentType {
         case .spz:
             let reader = try SPZReader(url: url)
-            try reader.read { _, splat in
-                bounds.expand(by: splat.position)
+            try reader.read { _, extendedSplat in
+                bounds.expand(by: extendedSplat.genericSplat.position)
             }
         case .ply:
             let reader = try PLYSplatReader(url: url)
-            try reader.read { _, splat in
-                bounds.expand(by: splat.position)
+            try reader.read { _, extendedSplat in
+                bounds.expand(by: extendedSplat.genericSplat.position)
             }
         case .antimatter15Splat:
             let reader = try Antimatter15Reader(url: url)
-            try reader.read { _, splat in
-                bounds.expand(by: splat.position)
+            try reader.read { _, extendedSplat in
+                bounds.expand(by: extendedSplat.genericSplat.position)
             }
         case .sog:
             let reader = try SOGReaderCPU(url: url)
-            try reader.read { _, splat in
-                bounds.expand(by: splat.position)
+            try reader.read { _, extendedSplat in
+                bounds.expand(by: extendedSplat.genericSplat.position)
             }
         default:
             break
@@ -117,32 +117,69 @@ extension SplatCloudDescriptor {
         var splats: [S] = []
         splats.reserveCapacity(splatCount)
 
+        // Collect SH coefficients if available
+        // Each splat's SH is [[Float]] where inner array is [R, G, B] for each basis function
+        // We flatten to [Float] as: splat0_coeff0_R, splat0_coeff0_G, splat0_coeff0_B, splat0_coeff1_R, ...
+        var shCoefficients: [Float] = []
+        var effectiveSHDegree: UInt8 = 0
+
         switch contentType {
         case .spz:
             let reader = try SPZReader(url: url)
-            try reader.read { _, genericSplat in
-                splats.append(S(genericSplat))
+            effectiveSHDegree = reader.shDegree
+            let floatsPerSplat = Self.shFloatsPerSplat(degree: effectiveSHDegree)
+            if floatsPerSplat > 0 {
+                shCoefficients.reserveCapacity(splatCount * floatsPerSplat)
+            }
+            try reader.read { _, extendedSplat in
+                splats.append(S(extendedSplat.genericSplat))
+                if let sh = extendedSplat.sphericalHarmonics {
+                    // Flatten [[R,G,B], [R,G,B], ...] to [R,G,B,R,G,B,...]
+                    for coeff in sh {
+                        shCoefficients.append(contentsOf: coeff)
+                    }
+                }
             }
         case .ply:
             let reader = try PLYSplatReader(url: url)
-            try reader.read { _, genericSplat in
-                splats.append(S(genericSplat))
+            try reader.read { _, extendedSplat in
+                splats.append(S(extendedSplat.genericSplat))
             }
         case .antimatter15Splat:
             let reader = try Antimatter15Reader(url: url)
-            try reader.read { _, genericSplat in
-                splats.append(S(genericSplat))
+            try reader.read { _, extendedSplat in
+                splats.append(S(extendedSplat.genericSplat))
             }
         case .sog:
             let reader = try SOGReaderCPU(url: url)
-            try reader.read { _, genericSplat in
-                splats.append(S(genericSplat))
+            try reader.read { _, extendedSplat in
+                splats.append(S(extendedSplat.genericSplat))
             }
         default:
             throw NSError(domain: "SplatCloudDescriptor", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported content type: \(contentType?.identifier ?? "nil")"])
         }
 
-        return try GPUSplatCloud(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+        // Create GPU splat cloud
+        var splatCloud = try GPUSplatCloud(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+
+        // Attach SH buffer if we have SH data
+        if !shCoefficients.isEmpty && effectiveSHDegree > 0 {
+            splatCloud.shCoefficients = try device.makeTypedBuffer(values: shCoefficients, options: [])
+            splatCloud.shDegree = effectiveSHDegree
+        }
+
+        return splatCloud
+    }
+
+    /// Returns the number of floats per splat for a given SH degree
+    private static func shFloatsPerSplat(degree: UInt8) -> Int {
+        switch degree {
+        case 0: return 0
+        case 1: return 3 * 3   // 3 basis functions * 3 channels (RGB)
+        case 2: return 8 * 3   // 8 basis functions * 3 channels
+        case 3: return 15 * 3  // 15 basis functions * 3 channels
+        default: return 0
+        }
     }
 }
 #endif

@@ -13,8 +13,8 @@ extension Array: @retroactive Transferable where Element == Antimatter15Splat {
         DataRepresentation(importedContentType: .spz) { data in
             let reader = try SPZReader(data: data)
             var splats: [Antimatter15Splat] = []
-            try reader.read { _, genericSplat in
-                splats.append(Antimatter15Splat(genericSplat))
+            try reader.read { _, extendedSplat in
+                splats.append(Antimatter15Splat(extendedSplat.genericSplat))
             }
             return splats
         }
@@ -25,8 +25,8 @@ extension Array: @retroactive Transferable where Element == Antimatter15Splat {
         DataRepresentation(importedContentType: .ply) { data in
             let reader = try PLYSplatReader(data: data)
             var splats: [Antimatter15Splat] = []
-            try reader.read { _, genericSplat in
-                splats.append(Antimatter15Splat(genericSplat))
+            try reader.read { _, extendedSplat in
+                splats.append(Antimatter15Splat(extendedSplat.genericSplat))
             }
             return splats
         }

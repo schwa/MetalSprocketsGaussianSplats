@@ -35,9 +35,9 @@ struct SPZReaderTests {
         var count = 0
         var firstSplat: GenericSplat?
 
-        try reader.read { _, splat in
+        try reader.read { _, extendedSplat in
             if count == 0 {
-                firstSplat = splat
+                firstSplat = extendedSplat.genericSplat
             }
             count += 1
         }
@@ -83,10 +83,12 @@ struct SPZReaderTests {
         var sampleCount = 0
         let maxSamples = 100
 
-        try reader.read { _, splat in
+        try reader.read { _, extendedSplat in
             guard sampleCount < maxSamples else {
                 return
             }
+
+            let splat = extendedSplat.genericSplat
 
             // Position should be reasonable (not NaN or infinite)
             #expect(!splat.position.x.isNaN && !splat.position.x.isInfinite)
@@ -147,11 +149,11 @@ struct SPZReaderTests {
         var converted: [Antimatter15Splat] = []
         let maxConvert = 100
 
-        try reader.read { _, splat in
+        try reader.read { _, extendedSplat in
             guard converted.count < maxConvert else {
                 return
             }
-            let antimatter15 = Antimatter15Splat(splat)
+            let antimatter15 = Antimatter15Splat(extendedSplat.genericSplat)
             converted.append(antimatter15)
         }
 

@@ -5,7 +5,7 @@ public protocol SplatReader {
 
     init(url: URL) throws
     init(data: Data) throws
-    func read(_ handler: (Int, GenericSplat) throws -> Void) throws
+    func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws
 }
 
 public extension SplatReader {

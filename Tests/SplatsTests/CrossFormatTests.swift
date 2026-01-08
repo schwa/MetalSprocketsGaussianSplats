@@ -87,7 +87,7 @@ struct CrossFormatTests {
         let plyURL = Bundle.module.url(forResource: "test-grid", withExtension: "ply", subdirectory: "Fixtures")!
         let plyReader = try PLYSplatReader(url: plyURL)
         var plySplats: [GenericSplat] = []
-        try plyReader.read { _, splat in plySplats.append(splat) }
+        try plyReader.read { _, extendedSplat in plySplats.append(extendedSplat.genericSplat) }
         plySplats.sort { sortKey($0).lexicographicallyPrecedes(sortKey($1)) }
 
         #expect(plySplats.count == csvSplats.count, "Count mismatch: PLY=\(plySplats.count), CSV=\(csvSplats.count)")
@@ -129,7 +129,7 @@ struct CrossFormatTests {
         let sogURL = Bundle.module.url(forResource: "test-grid", withExtension: "sog", subdirectory: "Fixtures")!
         let sogReader = try SOGReaderCPU(url: sogURL)
         var sogSplats: [GenericSplat] = []
-        try sogReader.read { _, splat in sogSplats.append(splat) }
+        try sogReader.read { _, extendedSplat in sogSplats.append(extendedSplat.genericSplat) }
         sogSplats.sort { sortKey($0).lexicographicallyPrecedes(sortKey($1)) }
 
         #expect(sogSplats.count == csvSplats.count, "Count mismatch: SOG=\(sogSplats.count), CSV=\(csvSplats.count)")
@@ -167,7 +167,7 @@ struct CrossFormatTests {
         let spzURL = Bundle.module.url(forResource: "test-grid", withExtension: "spz", subdirectory: "Fixtures")!
         let spzReader = try SPZReader(url: spzURL)
         var spzSplats: [GenericSplat] = []
-        try spzReader.read { _, splat in spzSplats.append(splat) }
+        try spzReader.read { _, extendedSplat in spzSplats.append(extendedSplat.genericSplat) }
         spzSplats.sort { sortKey($0).lexicographicallyPrecedes(sortKey($1)) }
 
         #expect(spzSplats.count == csvSplats.count, "Count mismatch: SPZ=\(spzSplats.count), CSV=\(csvSplats.count)")
@@ -205,7 +205,7 @@ struct CrossFormatTests {
         let splatURL = Bundle.module.url(forResource: "test-grid", withExtension: "splat", subdirectory: "Fixtures")!
         let splatReader = try Antimatter15Reader(url: splatURL)
         var splatSplats: [GenericSplat] = []
-        try splatReader.read { _, splat in splatSplats.append(splat) }
+        try splatReader.read { _, extendedSplat in splatSplats.append(extendedSplat.genericSplat) }
         splatSplats.sort { sortKey($0).lexicographicallyPrecedes(sortKey($1)) }
 
         #expect(splatSplats.count == csvSplats.count, "Count mismatch: SPLAT=\(splatSplats.count), CSV=\(csvSplats.count)")

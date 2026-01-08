@@ -34,9 +34,10 @@ public struct SOGReaderCPU: SplatReader {
         self.splats = try Self.loadSplats(from: url)
     }
 
-    public func read(_ handler: (Int, GenericSplat) throws -> Void) throws {
+    public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {
         for (index, splat) in splats.enumerated() {
-            try handler(index, splat)
+            // SOG format only uses SH0 (base color), no higher-degree SH
+            try handler(index, ExtendedSplat(genericSplat: splat, sphericalHarmonics: nil))
         }
     }
 

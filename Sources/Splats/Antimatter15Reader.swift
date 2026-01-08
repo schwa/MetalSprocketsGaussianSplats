@@ -30,7 +30,7 @@ public struct Antimatter15Reader: SplatReader {
     }
 
     /// Read all splats using a callback
-    public func read(_ handler: (Int, GenericSplat) throws -> Void) throws {
+    public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {
         for i in 0..<splatCount {
             let offset = i * 32
 
@@ -60,11 +60,12 @@ public struct Antimatter15Reader: SplatReader {
             let rotZ = (Float(data[offset + 31]) - 128.0) / 128.0
             let rotation = simd_quatf(ix: rotX, iy: rotY, iz: rotZ, r: rotW)
 
-            let splat = GenericSplat(
+            let splat = ExtendedSplat(
                 position: position,
                 scale: scale,
                 color: color,
-                rotation: rotation
+                rotation: rotation,
+                sphericalHarmonics: nil
             )
 
             try handler(i, splat)

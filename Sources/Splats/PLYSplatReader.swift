@@ -14,13 +14,14 @@ public struct PLYSplatReader: SplatReader {
         self.plyReader = try PLYReader(data: data)
     }
 
-    public func read(_ handler: (Int, GenericSplat) throws -> Void) throws {
+    public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {
         var index = 0
         try plyReader.read { record in
             guard let splat = GenericSplat(plyRecord: record) else {
                 throw SplatsError.invalidRecord(index)
             }
-            try handler(index, splat)
+            // PLY reader doesn't currently extract SH coefficients
+            try handler(index, ExtendedSplat(genericSplat: splat, sphericalHarmonics: nil))
             index += 1
         }
     }

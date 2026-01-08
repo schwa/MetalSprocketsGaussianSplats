@@ -61,7 +61,7 @@ public struct SPZReader: SplatReader {
     }
 
     /// Read all splats using a callback
-    public func read(_ handler: (Int, GenericSplat) throws -> Void) throws {
+    public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {
         let count = splatCount
         var offset = headerSize
 
@@ -121,13 +121,13 @@ public struct SPZReader: SplatReader {
             // Convert alpha from logit space to probability using sigmoid
             let alphaProbability = 1.0 / (1.0 + exp(-alpha))
 
-            let splat = GenericSplat(
+            let splat = ExtendedSplat(
                 position: position,
                 scale: actualScale,
                 color: SIMD4<Float>(rgb.x, rgb.y, rgb.z, alphaProbability),
-                rotation: rotation
+                rotation: rotation,
+                sphericalHarmonics: sh
             )
-            // TODO: sphericalHarmonics (sh) data is available but not stored in GenericSplat
 
             try handler(i, splat)
         }

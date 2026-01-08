@@ -13,8 +13,8 @@ struct Antimatter15ReaderTests {
         #expect(reader.splatCount == 100)
 
         var splats: [GenericSplat] = []
-        try reader.read { _, splat in
-            splats.append(splat)
+        try reader.read { _, extendedSplat in
+            splats.append(extendedSplat.genericSplat)
         }
 
         #expect(splats.count == 100)
