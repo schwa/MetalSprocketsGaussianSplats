@@ -38,7 +38,6 @@ struct ImmersiveModeControlsView: View {
                     .labelsHidden()
                 }
 
-
                 GridRow {
                     Text("Rotate Y")
                     Picker("Rotate Y", selection: $viewModel.modelRotationY) {
@@ -100,7 +99,9 @@ struct ImmersiveModeControlsView: View {
 }
 
 #Preview {
-    ImmersiveModeControlsView(onExitImmersive: { })
-        .environment(SplatDocumentViewModel())
+    ImmersiveModeControlsView(onExitImmersive: {
+        // This line intentionally left blank.
+    })
+    .environment(SplatDocumentViewModel())
 }
 #endif

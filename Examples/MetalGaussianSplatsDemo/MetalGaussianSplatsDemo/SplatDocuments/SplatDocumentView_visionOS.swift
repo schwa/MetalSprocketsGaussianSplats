@@ -73,7 +73,9 @@ struct SplatDocumentView: View {
             document: viewModel.convertedURL.map { PLYFileDocument(url: $0) },
             contentType: .ply,
             defaultFilename: viewModel.convertedURL?.deletingPathExtension().lastPathComponent
-        ) { _ in }
+        ) { _ in
+            // This line intentionally left blank.
+        }
         .sheet(isPresented: $showSettings) {
             NavigationStack {
                 SettingsView()
