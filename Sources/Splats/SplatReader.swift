@@ -1,5 +1,4 @@
 import Foundation
-import MetalSprocketsGaussianSplatShaders
 
 public protocol SplatReader {
     var splatCount: Int { get }

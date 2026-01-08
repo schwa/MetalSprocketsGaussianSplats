@@ -1,19 +1,21 @@
-import MetalSprocketsGaussianSplatShaders
 import simd
 
-// GenericSplat is imported from MetalSprocketsGaussianSplatShaders C header
-extension GenericSplat: @retroactive Equatable, @unchecked @retroactive Sendable {
-    public static func == (lhs: GenericSplat, rhs: GenericSplat) -> Bool {
-        lhs.position == rhs.position &&
-            lhs.scale == rhs.scale &&
-            lhs.color == rhs.color &&
-            lhs.rotation == rhs.rotation
-    }
-}
+/// A generic splat representation used as an intermediate format when reading splat files.
+/// This is a CPU-side struct for file I/O - renderers convert this to their own GPU formats.
+public struct GenericSplat: Equatable, Sendable {
+    public var position: SIMD3<Float>
+    public var scale: SIMD3<Float>
+    public var color: SIMD4<Float>
+    public var rotation: SIMD4<Float>
 
-public extension GenericSplat {
-    init(position: SIMD3<Float>, scale: SIMD3<Float>, color: SIMD4<Float>, rotation: simd_quatf) {
-        self.init()
+    public init(position: SIMD3<Float> = .zero, scale: SIMD3<Float> = .zero, color: SIMD4<Float> = .zero, rotation: SIMD4<Float> = .init(0, 0, 0, 1)) {
+        self.position = position
+        self.scale = scale
+        self.color = color
+        self.rotation = rotation
+    }
+
+    public init(position: SIMD3<Float>, scale: SIMD3<Float>, color: SIMD4<Float>, rotation: simd_quatf) {
         self.position = position
         self.scale = scale
         self.color = color
@@ -21,15 +23,15 @@ public extension GenericSplat {
     }
 }
 
-// Decodable conformance for GenericSplat
-extension GenericSplat: @retroactive Decodable {
+// MARK: - Decodable
+
+extension GenericSplat: Decodable {
     enum CodingKeys: String, CodingKey {
         case position, scale, color, rotation
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init()
         self.position = try container.decode(SIMD3<Float>.self, forKey: .position)
         self.scale = try container.decode(SIMD3<Float>.self, forKey: .scale)
         self.color = try container.decode(SIMD4<Float>.self, forKey: .color)
@@ -37,7 +39,11 @@ extension GenericSplat: @retroactive Decodable {
     }
 }
 
-// ExtendedSplat includes spherical harmonics data
+// MARK: - ExtendedSplat
+
+/// ExtendedSplat includes spherical harmonics data.
+/// Each inner array in `sphericalHarmonics` contains 3 floats (RGB) for one SH basis function.
+/// For degree 1: 3 coefficients, degree 2: 8 coefficients, degree 3: 15 coefficients.
 public struct ExtendedSplat: Equatable, Sendable {
     public var genericSplat: GenericSplat
     public var sphericalHarmonics: [[Float]]?

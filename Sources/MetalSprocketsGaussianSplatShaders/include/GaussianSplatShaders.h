@@ -3,7 +3,5 @@
 #import "Antimatter15SplatSupport.h"
 #import "SparkSplatRenderShader.h"
 #import "SparkSplatSupport.h"
-#import "SOGSplatSupport.h"
-#import "GenericSplat.h"
 #import "TileSplatSupport.h"
 

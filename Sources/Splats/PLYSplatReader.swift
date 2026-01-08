@@ -1,5 +1,4 @@
 import Foundation
-import MetalSprocketsGaussianSplatShaders
 import simd
 
 /// Reader for PLY files containing Gaussian splat data

@@ -60,8 +60,11 @@ public struct StochasticSplatRenderPipeline: Element {
         // Load Stochastic shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("StochasticSplatRenderShader")
 
+        let useSH = splatCloud.shCoefficients != nil
+        logger?.info("StochasticSplatRenderPipeline: SH enabled=\(useSH), degree=\(splatCloud.shDegree)")
+
         var vertexConstants = FunctionConstants()
-        vertexConstants["use_sh"] = .bool(splatCloud.shCoefficients != nil)
+        vertexConstants["use_sh"] = .bool(useSH)
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)

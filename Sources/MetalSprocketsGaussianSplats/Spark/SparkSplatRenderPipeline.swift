@@ -45,8 +45,11 @@ public struct SparkSplatRenderPipeline: Element {
         // Load Spark shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 
+        let useSH = splatCloud.shCoefficients != nil
+        logger?.info("SparkSplatRenderPipeline: SH enabled=\(useSH), degree=\(splatCloud.shDegree)")
+
         var vertexConstants = FunctionConstants()
-        vertexConstants["use_sh"] = .bool(splatCloud.shCoefficients != nil)
+        vertexConstants["use_sh"] = .bool(useSH)
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)

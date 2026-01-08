@@ -1,7 +1,6 @@
 import CoreGraphics
 import Foundation
 import ImageIO
-import MetalSprocketsGaussianSplatShaders
 import simd
 import ZIPFoundation
 
