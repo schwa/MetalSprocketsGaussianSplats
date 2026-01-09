@@ -164,11 +164,38 @@ struct ModelDownloadView: View {
     }
 
     private func extract(zipURL: URL, to directory: URL) async throws {
+        let targetRoot = "\(modelName).mlmodelc"
         try await Task.detached {
-            try FileManager.default.unzipItem(at: zipURL, to: directory)
-            // Clean up macOS metadata folder
-            let macosxFolder = directory.appendingPathComponent("__MACOSX")
-            try? FileManager.default.removeItem(at: macosxFolder)
+            guard let archive = Archive(url: zipURL, accessMode: .read) else {
+                throw NSError(domain: "ModelDownload", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to open archive"]) }
+
+            // Remove any existing model directory before extraction to prevent conflicts
+            let targetURL = directory.appendingPathComponent(targetRoot, isDirectory: true)
+            try? FileManager.default.removeItem(at: targetURL)
+
+            for entry in archive {
+                let path = entry.path
+
+                // Skip macOS metadata entries
+                if path.hasPrefix("__MACOSX/") || path.contains("/.DS_Store") { continue }
+
+                // Only extract the desired model directory
+                let components = path.split(separator: "/", omittingEmptySubsequences: true)
+                guard let firstComponent = components.first, firstComponent == Substring(targetRoot) else { continue }
+
+                let relativePath = components.dropFirst().joined(separator: "/")
+                let destinationURL: URL
+                if relativePath.isEmpty {
+                    destinationURL = targetURL
+                } else {
+                    destinationURL = targetURL.appendingPathComponent(relativePath)
+                }
+
+                let parentDirectory = destinationURL.deletingLastPathComponent()
+                try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true)
+
+                _ = try archive.extract(entry, to: destinationURL)
+            }
         }.value
     }
 
