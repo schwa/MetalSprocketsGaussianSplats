@@ -19,41 +19,43 @@ Implement multi-cloud splat rendering support - allowing multiple splat clouds t
 - [x] Renamed `index` to `splatIndex` in `IndexedDistance` (header, Metal shaders, Swift)
 - [x] Added `modelTransform: simd_float4x4` property to `GPUSplatCloud` with `.identity` default
 - [x] Implemented two-level model transforms (scene `modelMatrix` + per-cloud `modelTransform`)
-- [x] Updated `AsyncSortManager` to combine `parameters.model * splatCloud.modelTransform`
 - [x] Moved `indexedDistances` from `GPUSplatCloud` to renderer-owned state (`@MSState private var sortedIndices`)
 - [x] Simplified `GPUSplatCloud` init (removed `cameraMatrix`/`modelMatrix` params, no initial sort)
 - [x] Added convenience init with SH data: `init(device:splats:modelTransform:shCoefficients:shDegree:)`
 - [x] Updated all callers: `PreviewViewController`, `SplatCloudDescriptor`, `SplatDocumentRenderView`, `ScreenshotSheet`, `gsplat-render`, `RenderingTests`
 - [x] Fixed black screen bug: `onChange` handlers must be attached to `Group { }` wrapping conditional content, not inside the conditional branch (like SwiftUI)
 - [x] Added synchronous initial sort so content renders on first frame (no race with async listener setup)
+- [x] **Multi-cloud sorter**: `CPUSplatRadixSorter.sort(clouds:camera:sceneModel:reversed:)` sorts all splats across clouds, populates `cloudIndex`
+- [x] **Multi-cloud AsyncSortManager**: Accepts `[GPUSplatCloud]`, uses multi-cloud sort path when count > 1
+- [x] Fixed preview extension version mismatch warning (0.1.2)
 
-## Remaining Work
+## Blocked
 
-### Phase 1: Multi-Cloud Sorter
-- [ ] Update `CPUSplatRadixSorter` to accept `[GPUSplatCloud]` instead of single cloud
-- [ ] Populate `cloudIndex` during sort based on which cloud the splat came from
-- [ ] Update `AsyncSortManager` to work with array of clouds
-- [ ] Total splat count = sum of all cloud counts
+### Phase 2: Multi-Cloud Renderer
+- **Blocker**: Need argument buffers from MetalSprocketsAddOns for arrays of buffer pointers
+- Metal doesn't support `device T* buffers[]` without argument buffers
+- MetalSprocketsAddOns has `BUFFER(ADDRESS_SPACE, TYPE)` macro and patterns for this
 
-### Phase 2: Multi-Cloud Renderer (SparkSplatRenderPipeline)
-- [ ] Accept `[GPUSplatCloud]` instead of single cloud
-- [ ] Use Metal argument buffers to pass array of cloud data pointers
-- [ ] Shader looks up splat data using `cloudIndex` from `IndexedDistance`
-- [ ] Handle per-cloud SH coefficients via argument buffers
+## Next Steps
 
-### Phase 3: API Cleanup
-- [ ] Single-cloud convenience wrappers that delegate to multi-cloud implementation
-- [ ] Update demo app and tests
+1. **Add MetalSprocketsAddOns as dependency** to this package
+2. Import the `BUFFER` macro / argument buffer support from AddOns shaders
+3. Define `SplatCloudData` and `MultiCloudArgumentBuffer` structs in shared header
+4. Update `vertex_main_multicloud` shader to use argument buffer
+5. Update `SparkSplatRenderPipeline` to:
+   - Accept `[GPUSplatCloud]`
+   - Build argument buffer with cloud data pointers
+   - Use `.useResource()` for all cloud buffers
+   - Use multi-cloud vertex shader
 
 ## Architecture Discussion: Where Should Sorting Live?
 
 ### Current State
 The render pipeline element (`SparkSplatRenderPipeline`) owns the sort manager, requests sorts, and listens for results. This works but has issues:
-- Race conditions between async listener setup and first sort
 - Complex state management inside what should be a simple render element
 - `onChange` handlers doing heavy lifting
 
-### Proposed Refactor
+### Proposed Refactor (Deferred)
 Sorting is a rendering concern, but it belongs at the **renderer/view layer**, not the **pipeline element layer**.
 
 ```
@@ -61,7 +63,7 @@ View/Renderer Layer (e.g., SplatDocumentRenderView)
   - owns splatCloud(s)
   - owns sortManager  
   - listens for sort results
-  - requests sorts when camera changes
+  - requests sorts when camera change
   - passes sortedIndices DOWN to pipeline
 
 Pipeline Element Layer (SparkSplatRenderPipeline)
@@ -70,14 +72,7 @@ Pipeline Element Layer (SparkSplatRenderPipeline)
   - no @MSState, no async, no sort management
 ```
 
-Benefits:
-- Pipeline element becomes simpler/pure
-- Parent has full control over when/how sorting happens
-- Easier multi-cloud: sort all clouds at parent level, pass unified buffer down
-- No race conditions inside pipeline
-- Easier to test (pass known indices)
-
-**Decision**: Hold off on this refactor for now. Current implementation works. Revisit after multi-cloud is functional.
+**Decision**: Revisit after multi-cloud is functional.
 
 ## Key Files
 
@@ -86,6 +81,7 @@ Benefits:
 - `Sources/MetalSprocketsGaussianSplats/Splats/GPUSplatCloud.swift`
 - `Sources/MetalSprocketsGaussianSplats/Spark/SparkSplatRenderPipeline.swift`
 - `Sources/MetalSprocketsGaussianSplatShaders/include/Antimatter15SplatRenderShader.h` (IndexedDistance struct)
+- `Sources/MetalSprocketsGaussianSplatShaders/include/SparkSplatRenderShader.h` (SparkSplat struct)
 
 ## Build & Test
 
@@ -93,3 +89,4 @@ Benefits:
 xcb build   # Build everything
 xcb test    # Run tests
 ```
+

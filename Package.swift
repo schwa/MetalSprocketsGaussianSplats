@@ -30,6 +30,7 @@ let package = Package(
         .package(url: "https://github.com/schwa/MetalCompilerPlugin", from: "0.1.4"),
 //        .package(path: "/Users/schwa/Projects/MetalSprockets"),
         .package(url: "https://github.com/schwa/MetalSprockets", branch: "main"),
+        .package(url: "https://github.com/schwa/MetalSprocketsAddOns", branch: "main"),
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
         .package(url: "https://github.com/schwa/GoldenImage", branch: "main"),
@@ -66,6 +67,9 @@ let package = Package(
         ),
         .target(
             name: "MetalSprocketsGaussianSplatShaders",
+            dependencies: [
+                .product(name: "MetalSprocketsAddOnsShaders", package: "MetalSprocketsAddOns"),
+            ],
             exclude: ["Metal"],
             plugins: [
                 .plugin(name: "MetalCompilerPlugin", package: "MetalCompilerPlugin")

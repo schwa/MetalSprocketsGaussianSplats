@@ -4,8 +4,7 @@
     "include-dependencies": true,
     "verbose-logging": true,
     "logging-prefix": "🔨",
-//    "dependency-path-suffix": "include",
+    "dependency-path-suffix": "include",
     "include-paths": ["include"],
-    "output": "default.metallib",
-
+    "output": "default.metallib"
 }
