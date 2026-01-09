@@ -101,8 +101,8 @@ public struct SOGReaderCPU: SplatReader {
         // Prepare SH storage if we have higher-order SH
         var sphericalHarmonics: [[[Float]]]? // [splat][coefficient][rgb]
         var shDegree = 0
-        if metadata.shN != nil, shCentroids != nil, shLabels != nil {
-            shDegree = metadata.shN!.bands // bands 1-3 correspond to degree 1-3
+        if let shN = metadata.shN, shCentroids != nil, shLabels != nil {
+            shDegree = shN.bands // bands 1-3 correspond to degree 1-3
             sphericalHarmonics = []
             sphericalHarmonics?.reserveCapacity(metadata.count)
         }

@@ -120,9 +120,7 @@ public struct PLYSplatReader: SplatReader {
             let gIndex = i + numCoeffs
             let bIndex = i + numCoeffs * 2
 
-            guard let r = record["f_rest_\(rIndex)"]?.floatValue,
-                  let g = record["f_rest_\(gIndex)"]?.floatValue,
-                  let b = record["f_rest_\(bIndex)"]?.floatValue else {
+            guard let r = record["f_rest_\(rIndex)"]?.floatValue, let g = record["f_rest_\(gIndex)"]?.floatValue, let b = record["f_rest_\(bIndex)"]?.floatValue else {
                 // If we can't get all values, return nil for this splat
                 return nil
             }
