@@ -8,7 +8,8 @@ struct BoundingBoxOverlay: View {
     let viewMatrix: simd_float4x4
     let projectionMatrix: simd_float4x4
     let viewportSize: CGSize
-    var onDrag: ((UUID, Int, CGSize) -> Void)? = nil // (cloudID, axis, screenDelta)
+    var onDragChange: ((UUID, Int, CGSize) -> Void)? = nil // (cloudID, axis, screenDelta) - called during drag
+    var onDragEnd: ((UUID) -> Void)? = nil // (cloudID) - called when drag ends, to commit
 
     struct BoundingBoxInfo: Identifiable {
         let id: UUID
@@ -40,8 +41,11 @@ struct BoundingBoxOverlay: View {
                     points: face.points,
                     color: face.color,
                     axisDirectionScreen: face.axisDirectionScreen,
-                    onDrag: { delta in
-                        onDrag?(face.cloudID, face.axis, delta)
+                    onDragChange: { delta in
+                        onDragChange?(face.cloudID, face.axis, delta)
+                    },
+                    onDragEnd: {
+                        onDragEnd?(face.cloudID)
                     }
                 )
                 .zIndex(Double(face.depth))
@@ -228,7 +232,8 @@ struct DraggableFace: View {
     let points: [CGPoint]
     let color: Color
     let axisDirectionScreen: CGVector
-    var onDrag: ((CGSize) -> Void)?
+    var onDragChange: ((CGSize) -> Void)?
+    var onDragEnd: (() -> Void)?
     
     @State private var isHovered = false
     @State private var isDragging = false
@@ -276,11 +281,12 @@ struct DraggableFace: View {
                         let dragVec = CGVector(dx: delta.width, dy: delta.height)
                         let dot = dragVec.dx * axisDirectionScreen.dx + dragVec.dy * axisDirectionScreen.dy
                         let projected = CGSize(width: dot * axisDirectionScreen.dx, height: dot * axisDirectionScreen.dy)
-                        onDrag?(projected)
+                        onDragChange?(projected)
                     }
                     .onEnded { _ in
                         isDragging = false
                         lastTranslation = .zero
+                        onDragEnd?()
                     }
             )
     }

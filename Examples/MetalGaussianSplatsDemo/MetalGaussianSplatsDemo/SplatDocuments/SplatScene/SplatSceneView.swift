@@ -21,6 +21,7 @@ struct SplatSceneView: View {
     @State private var inspectorTab: SceneInspectorTab = .cloud
     @State private var showBoundingBoxes = false
     @State private var viewportSize: CGSize = .zero
+    @State private var dragOffsets: [UUID: SIMD3<Float>] = [:] // Accumulated drag offset per cloud
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -123,9 +124,13 @@ struct SplatSceneView: View {
         let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
             .filter { enabledCloudIDs.contains($0.id) }
             .compactMap { loadedCloud in
-                // Get current transform from document
+                // Get current transform from document + any active drag offset
                 if let docCloud = document.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
-                    loadedCloud.cloud.modelTransform = docCloud.transform.matrix
+                    var transform = docCloud.transform
+                    if let dragOffset = dragOffsets[loadedCloud.id] {
+                        transform.translation += dragOffset
+                    }
+                    loadedCloud.cloud.modelTransform = transform.matrix
                 }
                 return loadedCloud.cloud
             }
@@ -182,8 +187,12 @@ struct SplatSceneView: View {
             }
             .compactMap { loadedCloud in
                 guard let bounds = loadedCloud.bounds else { return nil }
-                let docCloud = document.scene.clouds.first { $0.id == loadedCloud.id }
-                let modelMatrix = document.scene.sceneTransform.matrix * (docCloud?.transform.matrix ?? .identity)
+                guard var transform = document.scene.clouds.first(where: { $0.id == loadedCloud.id })?.transform else { return nil }
+                // Apply drag offset if active
+                if let dragOffset = dragOffsets[loadedCloud.id] {
+                    transform.translation += dragOffset
+                }
+                let modelMatrix = document.scene.sceneTransform.matrix * transform.matrix
                 return BoundingBoxOverlay.BoundingBoxInfo(
                     id: loadedCloud.id,
                     bounds: bounds,
@@ -197,8 +206,11 @@ struct SplatSceneView: View {
             viewMatrix: viewMatrix,
             projectionMatrix: projectionMatrix,
             viewportSize: viewportSize,
-            onDrag: { cloudID, axis, screenDelta in
+            onDragChange: { cloudID, axis, screenDelta in
                 handleAxisDrag(cloudID: cloudID, axis: axis, screenDelta: screenDelta, viewMatrix: viewMatrix, projectionMatrix: projectionMatrix)
+            },
+            onDragEnd: { cloudID in
+                commitDrag(cloudID: cloudID)
             }
         )
     }
@@ -243,11 +255,25 @@ struct SplatSceneView: View {
         let sign: Float = (screenDelta.width * (p1.x - p0.x) + screenDelta.height * (p1.y - p0.y)) > 0 ? 1 : -1
         let worldDelta = Float(screenMag) / Float(pixelsPerUnit) * sign
         
-        // Update the cloud's translation along the axis (in local space)
-        var transform = document.scene.clouds[cloudIndex].transform
+        // Accumulate drag offset (don't update document yet)
         let localAxis = axisVectors[axis]
-        transform.translation += localAxis * worldDelta
-        document.scene.clouds[cloudIndex].transform = transform
+        let offset = dragOffsets[cloudID] ?? .zero
+        dragOffsets[cloudID] = offset + localAxis * worldDelta
+        
+        // Update GPU cloud's transform directly (doesn't trigger SwiftUI)
+        let docTransform = document.scene.clouds[cloudIndex].transform
+        var newTransform = docTransform
+        newTransform.translation += dragOffsets[cloudID]!
+        loadedCloud.cloud.modelTransform = document.scene.sceneTransform.matrix * newTransform.matrix
+    }
+    
+    private func commitDrag(cloudID: UUID) {
+        guard let offset = dragOffsets[cloudID], offset != .zero else { return }
+        guard let cloudIndex = document.scene.clouds.firstIndex(where: { $0.id == cloudID }) else { return }
+        
+        // Commit accumulated offset to document
+        document.scene.clouds[cloudIndex].transform.translation += offset
+        dragOffsets[cloudID] = nil
     }
 
     // MARK: - Inspector
