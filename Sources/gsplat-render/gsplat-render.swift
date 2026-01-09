@@ -76,6 +76,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Reveal output file in Finder after rendering")
     var reveal: Bool = false
 
+    @Option(help: "Export splat data to CSV file")
+    var dumpCsv: String?
+
     mutating func run() async throws {
         try await _run()
     }
@@ -89,6 +92,13 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
         // Print splat info
         print("Loaded \(loadResult.splats.count) splats, SH degree: \(loadResult.shDegree), SH coefficients: \(loadResult.shCoefficients.count)")
+
+        // Export to CSV if requested
+        if let csvPath = dumpCsv {
+            try exportToCSV(loadResult: loadResult, path: csvPath)
+            print("Exported \(loadResult.splats.count) splats to \(csvPath)")
+            return
+        }
 
         let modelMatrix = try parseModelMatrix(from: renderConfig)
         let cameraMatrix = try parseCameraMatrix(from: renderConfig)
@@ -285,6 +295,23 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             throw ValidationError("Unsupported file format: .\(fileExtension)")
         }
 
+        // Debug: print SH coefficients for first few splats
+        if detectedSHDegree > 0 && !shCoefficients.isEmpty {
+            let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
+            print("SH Debug (\(fileExtension)): degree=\(detectedSHDegree), floatsPerSplat=\(floatsPerSplat)")
+            for splatIdx in [0, 1, 100, 1000] {
+                if splatIdx >= splats.count { continue }
+                let baseOffset = splatIdx * floatsPerSplat
+                print("  Splat \(splatIdx) first 3 coeffs:")
+                for i in 0..<min(3, floatsPerSplat / 3) {
+                    let r = shCoefficients[baseOffset + i * 3]
+                    let g = shCoefficients[baseOffset + i * 3 + 1]
+                    let b = shCoefficients[baseOffset + i * 3 + 2]
+                    print("    [\(i)]: R=\(String(format: "%+.4f", r)), G=\(String(format: "%+.4f", g)), B=\(String(format: "%+.4f", b))")
+                }
+            }
+        }
+
         return SplatLoadResult(splats: splats, shCoefficients: shCoefficients, shDegree: detectedSHDegree)
     }
 
@@ -297,6 +324,43 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         case 3: return 15 * 3  // 15 basis functions * 3 channels
         default: return 0
         }
+    }
+
+    // MARK: - CSV Export
+
+    func exportToCSV(loadResult: SplatLoadResult, path: String) throws {
+        var csv = "index,pos_x,pos_y,pos_z,scale_x,scale_y,scale_z,rot_x,rot_y,rot_z,rot_w,r,g,b,a"
+
+        // Add SH coefficient headers
+        let floatsPerSplat = Self.shFloatsPerSplat(degree: loadResult.shDegree)
+        let numCoeffs = floatsPerSplat / 3
+        for i in 0..<numCoeffs {
+            csv += ",sh\(i)_r,sh\(i)_g,sh\(i)_b"
+        }
+        csv += "\n"
+
+        for (index, splat) in loadResult.splats.enumerated() {
+            var row = "\(index)"
+            row += ",\(splat.position.x),\(splat.position.y),\(splat.position.z)"
+            row += ",\(splat.scale.x),\(splat.scale.y),\(splat.scale.z)"
+            row += ",\(splat.rotation.x),\(splat.rotation.y),\(splat.rotation.z),\(splat.rotation.w)"
+            row += ",\(splat.color.x),\(splat.color.y),\(splat.color.z),\(splat.color.w)"
+
+            // Add SH coefficients
+            if floatsPerSplat > 0 && !loadResult.shCoefficients.isEmpty {
+                let baseOffset = index * floatsPerSplat
+                for i in 0..<numCoeffs {
+                    let r = loadResult.shCoefficients[baseOffset + i * 3]
+                    let g = loadResult.shCoefficients[baseOffset + i * 3 + 1]
+                    let b = loadResult.shCoefficients[baseOffset + i * 3 + 2]
+                    row += ",\(r),\(g),\(b)"
+                }
+            }
+
+            csv += row + "\n"
+        }
+
+        try csv.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
     // MARK: - Splat Cloud Creation
