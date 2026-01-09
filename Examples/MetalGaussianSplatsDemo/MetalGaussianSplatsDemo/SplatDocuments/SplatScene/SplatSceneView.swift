@@ -188,7 +188,7 @@ struct SplatSceneView: View {
                     id: loadedCloud.id,
                     bounds: bounds,
                     modelMatrix: modelMatrix,
-                    color: .green
+                    color: .white
                 )
             }
         
