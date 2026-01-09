@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -28,6 +31,13 @@ struct SettingsView: View {
                 }
             }
             #endif
+            #if os(macOS)
+            Section("Application") {
+                Button("Reveal Application Support Folder", systemImage: "folder") {
+                    revealAppSupport()
+                }
+            }
+            #endif
             Section("Image to Gaussian Splat Conversion") {
                 Text("Sharp is an Apple ML model that converts images to Gaussian Splats.")
                 Link("apple/ml-sharp on GitHub", destination: URL(string: "https://github.com/apple/ml-sharp")!)
@@ -49,6 +59,15 @@ struct SettingsView: View {
         .frame(minWidth: 400, minHeight: 200)
         #endif
     }
+
+    #if os(macOS)
+    private func revealAppSupport() {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(bundleIdentifier, isDirectory: true)
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: appSupport.path)
+    }
+    #endif
 }
 
 enum SharpModelManager {
