@@ -85,7 +85,10 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         #if !arch(x86_64)
         let renderConfig = try loadConfig()
         let device = _MTLCreateSystemDefaultDevice()
-        let genericSplats = try loadSplats(from: renderConfig.splat)
+        let loadResult = try loadSplats(from: renderConfig.splat)
+
+        // Print splat info
+        print("Loaded \(loadResult.splats.count) splats, SH degree: \(loadResult.shDegree), SH coefficients: \(loadResult.shCoefficients.count)")
 
         let modelMatrix = try parseModelMatrix(from: renderConfig)
         let cameraMatrix = try parseCameraMatrix(from: renderConfig)
@@ -93,12 +96,14 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let useSrgbToLinear = renderConfig.srgbToLinear ?? false
 
         let (antimatter15GPUSplatCloud, sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree) = try createGPUSplatClouds(
-            genericSplats: genericSplats,
+            loadResult: loadResult,
             device: device,
             useSparkRenderer: useSparkRenderer,
             modelMatrix: modelMatrix,
             cameraMatrix: cameraMatrix
         )
+        
+        print("Effective SH degree: \(effectiveSHDegree), SH buffer: \(shCoefficientsBuffer != nil ? "yes" : "no")")
 
         let size = CGSize(width: renderConfig.width, height: renderConfig.height)
         let projection = try createProjection(from: renderConfig)
@@ -205,66 +210,135 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
     // MARK: - Splat Loading
 
+    /// Result of loading splats, including optional SH data
+    struct SplatLoadResult {
+        let splats: [GenericSplat]
+        let shCoefficients: [Float]
+        let shDegree: UInt8
+    }
+
     #if !arch(x86_64)
-    func loadSplats(from splatPath: String) throws -> [GenericSplat] {
+    func loadSplats(from splatPath: String) throws -> SplatLoadResult {
         let splatURL = URL(fileURLWithPath: splatPath)
         let fileExtension = splatURL.pathExtension.lowercased()
+
+        var splats: [GenericSplat] = []
+        var shCoefficients: [Float] = []
+        var detectedSHDegree: UInt8 = 0
 
         switch fileExtension {
         case "spz":
             let reader = try Splats.SPZReader(url: splatURL)
-            var tempSplats: [GenericSplat] = []
-            try reader.read { _, extendedSplat in
-                tempSplats.append(extendedSplat.genericSplat)
+            detectedSHDegree = reader.shDegree
+            let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
+            if floatsPerSplat > 0 {
+                shCoefficients.reserveCapacity(reader.splatCount * floatsPerSplat)
             }
-            return tempSplats
+            try reader.read { _, extendedSplat in
+                splats.append(extendedSplat.genericSplat)
+                if let sh = extendedSplat.sphericalHarmonics {
+                    for coeff in sh {
+                        shCoefficients.append(contentsOf: coeff)
+                    }
+                }
+            }
 
         case "ply":
             let reader = try PLYSplatReader(url: splatURL)
-            var tempSplats: [GenericSplat] = []
-            try reader.read { _, extendedSplat in
-                tempSplats.append(extendedSplat.genericSplat)
+            detectedSHDegree = reader.shDegree
+            let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
+            if floatsPerSplat > 0 {
+                shCoefficients.reserveCapacity(reader.splatCount * floatsPerSplat)
             }
-            return tempSplats
+            try reader.read { _, extendedSplat in
+                splats.append(extendedSplat.genericSplat)
+                if let sh = extendedSplat.sphericalHarmonics {
+                    for coeff in sh {
+                        shCoefficients.append(contentsOf: coeff)
+                    }
+                }
+            }
 
         case "splat":
             let reader = try Antimatter15Reader(url: splatURL)
-            var tempSplats: [GenericSplat] = []
             try reader.read { _, extendedSplat in
-                tempSplats.append(extendedSplat.genericSplat)
+                splats.append(extendedSplat.genericSplat)
             }
-            return tempSplats
+
+        case "sog":
+            let reader = try SOGReaderCPU(url: splatURL)
+            detectedSHDegree = UInt8(reader.shDegree)
+            let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
+            if floatsPerSplat > 0 {
+                shCoefficients.reserveCapacity(reader.splatCount * floatsPerSplat)
+            }
+            try reader.read { _, extendedSplat in
+                splats.append(extendedSplat.genericSplat)
+                if let sh = extendedSplat.sphericalHarmonics {
+                    for coeff in sh {
+                        shCoefficients.append(contentsOf: coeff)
+                    }
+                }
+            }
 
         default:
             throw ValidationError("Unsupported file format: .\(fileExtension)")
+        }
+
+        return SplatLoadResult(splats: splats, shCoefficients: shCoefficients, shDegree: detectedSHDegree)
+    }
+
+    /// Returns the number of floats per splat for a given SH degree
+    private static func shFloatsPerSplat(degree: UInt8) -> Int {
+        switch degree {
+        case 0: return 0
+        case 1: return 3 * 3   // 3 basis functions * 3 channels (RGB)
+        case 2: return 8 * 3   // 8 basis functions * 3 channels
+        case 3: return 15 * 3  // 15 basis functions * 3 channels
+        default: return 0
         }
     }
 
     // MARK: - Splat Cloud Creation
 
     func createGPUSplatClouds(
-        genericSplats: [GenericSplat],
+        loadResult: SplatLoadResult,
         device: MTLDevice,
         useSparkRenderer: Bool,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4
     ) throws -> (GPUSplatCloud<Antimatter15GPUSplat>?, GPUSplatCloud<SparkSplat>?, TypedMTLBuffer<Float>?, UInt8) {
-        let shCoefficientsBuffer: TypedMTLBuffer<Float>? = nil
-        let effectiveSHDegree: UInt8 = 0
+        // Apply --sh-degree override if specified
+        let effectiveSHDegree: UInt8
+        if let override = shDegree {
+            effectiveSHDegree = UInt8(override)
+        } else {
+            effectiveSHDegree = loadResult.shDegree
+        }
+
+        // Create SH buffer if we have SH data and it's enabled
+        var shCoefficientsBuffer: TypedMTLBuffer<Float>? = nil
+        if !loadResult.shCoefficients.isEmpty && effectiveSHDegree > 0 {
+            shCoefficientsBuffer = try device.makeTypedBuffer(values: loadResult.shCoefficients, options: [])
+        }
 
         if useSparkRenderer {
-            let gpuSplats = genericSplats.map { SparkSplat($0) }
-            _ = shDegree // Silence unused variable warning
+            let gpuSplats = loadResult.splats.map { SparkSplat($0) }
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-            let sparkGPUSplatCloud = try GPUSplatCloud<SparkSplat>(
+            var sparkGPUSplatCloud = try GPUSplatCloud<SparkSplat>(
                 device: device,
                 splats: splatBuffer,
                 cameraMatrix: cameraMatrix,
                 modelMatrix: modelMatrix
             )
+            // Attach SH data to the cloud
+            if let shBuffer = shCoefficientsBuffer {
+                sparkGPUSplatCloud.shCoefficients = shBuffer
+                sparkGPUSplatCloud.shDegree = effectiveSHDegree
+            }
             return (nil, sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
         }
-        let gpuSplats = genericSplats.map { Antimatter15GPUSplat($0) }
+        let gpuSplats = loadResult.splats.map { Antimatter15GPUSplat($0) }
         let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
         let antimatter15GPUSplatCloud = try GPUSplatCloud<Antimatter15GPUSplat>(
             device: device,
