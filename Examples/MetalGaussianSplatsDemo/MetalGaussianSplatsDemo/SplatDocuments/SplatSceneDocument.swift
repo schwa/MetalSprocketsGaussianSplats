@@ -22,7 +22,26 @@ struct SplatSceneDocument: FileDocument {
             throw CocoaError(.fileReadCorruptFile)
         }
         let decoder = JSONDecoder()
-        self.scene = try decoder.decode(SplatScene.self, from: data)
+        do {
+            self.scene = try decoder.decode(SplatScene.self, from: data)
+        } catch {
+            print("❌ Failed to decode SplatScene: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("  Key not found: \(key.stringValue), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+                case .typeMismatch(let type, let context):
+                    print("  Type mismatch: expected \(type), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+                case .valueNotFound(let type, let context):
+                    print("  Value not found: \(type), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+                case .dataCorrupted(let context):
+                    print("  Data corrupted: \(context.debugDescription)")
+                @unknown default:
+                    break
+                }
+            }
+            throw error
+        }
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {

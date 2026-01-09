@@ -11,6 +11,23 @@ struct SplatScene: Codable, Sendable {
     var clouds: [CloudReference] = []
     var sceneTransform: simd_float4x4 = .identity
     var camera: CameraState?
+    var renderSettings: RenderSettings = RenderSettings()
+
+    // Custom decoding to handle missing keys from older documents
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        clouds = try container.decodeIfPresent([CloudReference].self, forKey: .clouds) ?? []
+        sceneTransform = try container.decodeIfPresent(simd_float4x4.self, forKey: .sceneTransform) ?? .identity
+        camera = try container.decodeIfPresent(CameraState.self, forKey: .camera)
+        renderSettings = try container.decodeIfPresent(RenderSettings.self, forKey: .renderSettings) ?? RenderSettings()
+    }
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case version, clouds, sceneTransform, camera, renderSettings
+    }
 
     struct CloudReference: Codable, Identifiable, Sendable, Equatable {
         var id: UUID = UUID()
@@ -81,6 +98,11 @@ struct SplatScene: Codable, Sendable {
             self.matrix = matrix
             self.verticalAngleOfView = verticalAngleOfView
         }
+    }
+
+    struct RenderSettings: Codable, Sendable, Equatable {
+        /// Whether to use spherical harmonics (only applies if all clouds have SH data)
+        var useSphericalHarmonics: Bool = true
     }
 }
 

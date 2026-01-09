@@ -145,7 +145,8 @@ struct SplatSceneView: View {
             tab: $inspectorTab,
             cloud: selectedCloud,
             document: $document,
-            loadedCloud: selectedCloudID.flatMap { id in viewModel.loadedClouds.first { $0.id == id } }
+            loadedCloud: selectedCloudID.flatMap { id in viewModel.loadedClouds.first { $0.id == id } },
+            viewModel: viewModel
         )
     }
 
@@ -264,6 +265,7 @@ struct SplatSceneInspectorView: View {
     @Binding var cloud: SplatScene.CloudReference?
     @Binding var document: SplatSceneDocument
     let loadedCloud: SplatSceneViewModel.LoadedCloud?
+    let viewModel: SplatSceneViewModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -301,10 +303,10 @@ struct SplatSceneInspectorView: View {
                     .formStyle(.grouped)
                 case .render:
                     Form {
-                        Section("Render") {
-                            Text("Render settings coming soon")
-                                .foregroundStyle(.secondary)
-                        }
+                        RenderInspectorContent(
+                            renderSettings: $document.scene.renderSettings,
+                            allCloudsHaveSH: viewModel.allCloudsHaveSphericalHarmonics
+                        )
                     }
                     .formStyle(.grouped)
                 }
@@ -349,6 +351,24 @@ struct SceneInspectorContent: View {
 
         Section("Scene Transform") {
             TransformEditor(transform: $document.scene.sceneTransform)
+        }
+    }
+}
+
+struct RenderInspectorContent: View {
+    @Binding var renderSettings: SplatScene.RenderSettings
+    let allCloudsHaveSH: Bool
+
+    var body: some View {
+        Section("Spherical Harmonics") {
+            Toggle("Use Spherical Harmonics", isOn: $renderSettings.useSphericalHarmonics)
+                .disabled(!allCloudsHaveSH)
+
+            if !allCloudsHaveSH {
+                Label("Not all clouds have SH data", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 }
@@ -432,6 +452,12 @@ final class SplatSceneViewModel {
         let displayName: String
         let cloud: GPUSplatCloud<SparkSplat>
         let descriptor: SplatCloudDescriptor
+    }
+
+    /// Whether all loaded clouds have spherical harmonics data
+    var allCloudsHaveSphericalHarmonics: Bool {
+        guard !loadedClouds.isEmpty else { return false }
+        return loadedClouds.allSatisfy { $0.descriptor.hasSphericalHarmonics }
     }
 
     /// Check if we need to reload (structural change) vs just update properties
