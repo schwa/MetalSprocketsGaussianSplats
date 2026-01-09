@@ -54,7 +54,7 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
         let startTime = CFAbsoluteTimeGetCurrent()
         defer {
             let durationMS = (CFAbsoluteTimeGetCurrent() - startTime) * 1_000
-            logger?.debug("CPU multi-cloud splat sort: \(String(format: "%.2f", durationMS))ms (\(totalCount) splats across \(clouds.count) clouds)")
+            logger?.trace("CPU multi-cloud splat sort: \(String(format: "%.2f", durationMS))ms (\(totalCount) splats across \(clouds.count) clouds)")
         }
 
         return try signposter.withIntervalSignpost("CPUSplatRadixSorter.sortMultiCloud()", id: signpost) {
