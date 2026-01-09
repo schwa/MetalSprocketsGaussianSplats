@@ -150,11 +150,20 @@ public struct SOGReaderCPU: SplatReader {
                 exp(scalesCodebook[scaleZIndex])
             )
 
-            // Rotation from texture
-            let qx = (Float(quatsData[offset]) / 255.0) * 2.0 - 1.0
-            let qy = (Float(quatsData[offset + 1]) / 255.0) * 2.0 - 1.0
-            let qz = (Float(quatsData[offset + 2]) / 255.0) * 2.0 - 1.0
-            let qw = (Float(quatsData[offset + 3]) / 255.0) * 2.0 - 1.0
+            // Rotation from texture using smallest-3 encoding
+            // RGB stores 3 quaternion components, alpha (252-255) indicates which was dropped
+            let SQRT2: Float = 1.4142135623730951
+            let r0 = (Float(quatsData[offset]) / 255.0 - 0.5) * SQRT2
+            let r1 = (Float(quatsData[offset + 1]) / 255.0 - 0.5) * SQRT2
+            let r2 = (Float(quatsData[offset + 2]) / 255.0 - 0.5) * SQRT2
+            let rr = sqrt(max(0.0, 1.0 - r0 * r0 - r1 * r1 - r2 * r2))
+            let rOrder = Int(quatsData[offset + 3]) - 252
+
+            // Reconstruct quaternion based on which component was dropped (matching JS reference)
+            let qx = rOrder == 0 ? r0 : rOrder == 1 ? rr : r1
+            let qy = rOrder <= 1 ? r1 : rOrder == 2 ? rr : r2
+            let qz = rOrder <= 2 ? r2 : rr
+            let qw = rOrder == 0 ? rr : r0
             let rotation = simd_quatf(ix: qx, iy: qy, iz: qz, r: qw).normalized
 
             // Color from SH0 codebook
