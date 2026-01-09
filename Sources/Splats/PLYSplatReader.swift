@@ -87,7 +87,9 @@ public struct PLYSplatReader: SplatReader {
     /// Extracts SH coefficients from a PLY record
     /// Returns array of [R, G, B] for each basis function (excluding DC)
     private static func extractSphericalHarmonics(from record: PLYReader.Record, degree: UInt8) -> [[Float]]? {
-        guard degree > 0 else { return nil }
+        guard degree > 0 else {
+            return nil
+        }
 
         // Number of coefficients (basis functions) per degree, excluding DC:
         // Degree 1: 3 (l=1 has 3 basis functions)
@@ -95,10 +97,14 @@ public struct PLYSplatReader: SplatReader {
         // Degree 3: 3 + 5 + 7 = 15 (l=1 + l=2 + l=3)
         let numCoeffs: Int
         switch degree {
-        case 1: numCoeffs = 3
-        case 2: numCoeffs = 8
-        case 3: numCoeffs = 15
-        default: return nil
+        case 1:
+            numCoeffs = 3
+        case 2:
+            numCoeffs = 8
+        case 3:
+            numCoeffs = 15
+        default:
+            return nil
         }
 
         // PLY stores SH in a different order than we need

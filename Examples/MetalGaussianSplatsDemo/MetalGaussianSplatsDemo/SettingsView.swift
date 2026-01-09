@@ -62,7 +62,9 @@ struct SettingsView: View {
 
     #if os(macOS)
     private func revealAppSupport() {
-        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
+            return
+        }
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let containerURL = appSupport.appendingPathComponent(bundleIdentifier, isDirectory: true)
         try? FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)

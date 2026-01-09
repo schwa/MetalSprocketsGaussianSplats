@@ -166,8 +166,7 @@ struct ModelDownloadView: View {
     private func extract(zipURL: URL, to directory: URL) async throws {
         let targetRoot = "\(modelName).mlmodelc"
         try await Task.detached {
-            guard let archive = Archive(url: zipURL, accessMode: .read) else {
-                throw NSError(domain: "ModelDownload", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to open archive"]) }
+            let archive = try Archive(url: zipURL, accessMode: .read)
 
             // Remove any existing model directory before extraction to prevent conflicts
             let targetURL = directory.appendingPathComponent(targetRoot, isDirectory: true)

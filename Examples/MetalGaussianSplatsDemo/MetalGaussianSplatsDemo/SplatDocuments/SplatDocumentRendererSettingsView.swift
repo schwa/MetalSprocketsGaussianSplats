@@ -22,9 +22,6 @@ struct SplatDocumentRendererSettingsView: View {
             ColorPicker("Background", selection: $viewModel.backgroundColor)
             Toggle("Spherical Harmonics", isOn: $viewModel.useSphericalHarmonics)
                 .disabled(!viewModel.hasSphericalHarmonicsData)
-                .help(viewModel.hasSphericalHarmonicsData
-                        ? "Enable view-dependent lighting using spherical harmonics"
-                        : "This file does not contain spherical harmonics data")
         }
     }
 }

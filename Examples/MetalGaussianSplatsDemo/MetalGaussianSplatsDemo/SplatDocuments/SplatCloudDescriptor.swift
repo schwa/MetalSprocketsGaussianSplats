@@ -182,7 +182,7 @@ extension SplatCloudDescriptor {
         }
 
         // Create GPU splat cloud
-        var splatCloud = try GPUSplatCloud(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+        let splatCloud = try GPUSplatCloud(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
 
         // Attach SH buffer if we have SH data
         if !shCoefficients.isEmpty, effectiveSHDegree > 0 {
@@ -196,11 +196,16 @@ extension SplatCloudDescriptor {
     /// Returns the number of floats per splat for a given SH degree
     private static func shFloatsPerSplat(degree: UInt8) -> Int {
         switch degree {
-        case 0: return 0
-        case 1: return 3 * 3   // 3 basis functions * 3 channels (RGB)
-        case 2: return 8 * 3   // 8 basis functions * 3 channels
-        case 3: return 15 * 3  // 15 basis functions * 3 channels
-        default: return 0
+        case 0:
+            return 0
+        case 1:
+            return 3 * 3   // 3 basis functions * 3 channels (RGB)
+        case 2:
+            return 8 * 3   // 8 basis functions * 3 channels
+        case 3:
+            return 15 * 3  // 15 basis functions * 3 channels
+        default:
+            return 0
         }
     }
 }
