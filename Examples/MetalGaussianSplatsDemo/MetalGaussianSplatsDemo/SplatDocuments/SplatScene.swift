@@ -3,13 +3,49 @@ import GeometryLite3D
 import simd
 import UniformTypeIdentifiers
 
+// MARK: - Transform
+
+/// A transform stored as separate translation and rotation components
+struct Transform: Codable, Sendable, Equatable {
+    var translation: SIMD3<Float> = .zero
+    var rotation: SIMD3<Float> = .zero  // Euler angles in radians (x, y, z)
+
+    init(translation: SIMD3<Float> = .zero, rotation: SIMD3<Float> = .zero) {
+        self.translation = translation
+        self.rotation = rotation
+    }
+
+    /// Convert to a 4x4 matrix
+    var matrix: simd_float4x4 {
+        let rotX = simd_float4x4(xRotation: .radians(rotation.x))
+        let rotY = simd_float4x4(yRotation: .radians(rotation.y))
+        let rotZ = simd_float4x4(zRotation: .radians(rotation.z))
+        let trans = simd_float4x4(translation: translation)
+        return trans * rotZ * rotY * rotX
+    }
+
+    /// Create from a 4x4 matrix (decomposes it)
+    init(matrix: simd_float4x4) {
+        if let components = matrix.decompose {
+            self.translation = components.translate
+            let euler = Euler(components.rotation)
+            self.rotation = SIMD3<Float>(euler.roll, euler.pitch, euler.yaw)
+        } else {
+            self.translation = .zero
+            self.rotation = .zero
+        }
+    }
+
+    static let identity = Transform()
+}
+
 // MARK: - SplatScene Model
 
 /// A scene containing multiple splat clouds with their transforms
 struct SplatScene: Codable, Sendable {
     var version: Int = 1
     var clouds: [CloudReference] = []
-    var sceneTransform: simd_float4x4 = .identity
+    var sceneTransform: Transform = Transform(rotation: [.pi, 0, 0])  // Default X rotation of 180°
     var camera: CameraState?
     var renderSettings: RenderSettings = RenderSettings()
 
@@ -18,7 +54,14 @@ struct SplatScene: Codable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
         clouds = try container.decodeIfPresent([CloudReference].self, forKey: .clouds) ?? []
-        sceneTransform = try container.decodeIfPresent(simd_float4x4.self, forKey: .sceneTransform) ?? .identity
+        // Handle both old (matrix) and new (Transform) format
+        if let transform = try? container.decodeIfPresent(Transform.self, forKey: .sceneTransform) {
+            sceneTransform = transform
+        } else if let matrix = try? container.decodeIfPresent(simd_float4x4.self, forKey: .sceneTransform) {
+            sceneTransform = Transform(matrix: matrix)
+        } else {
+            sceneTransform = Transform(rotation: [.pi, 0, 0])
+        }
         camera = try container.decodeIfPresent(CameraState.self, forKey: .camera)
         renderSettings = try container.decodeIfPresent(RenderSettings.self, forKey: .renderSettings) ?? RenderSettings()
     }
@@ -34,7 +77,7 @@ struct SplatScene: Codable, Sendable {
         /// Security-scoped bookmark data for the splat file
         var bookmarkData: Data
         /// Per-cloud transform (applied before scene transform)
-        var transform: simd_float4x4 = .identity
+        var transform: Transform = .identity
         /// Whether this cloud should be rendered
         var enabled: Bool = true
         /// Display name (defaults to filename)
@@ -63,7 +106,7 @@ struct SplatScene: Codable, Sendable {
         }
 
         /// Create a cloud reference from a URL
-        init(url: URL, transform: simd_float4x4 = .identity, displayName: String? = nil) throws {
+        init(url: URL, transform: Transform = .identity, displayName: String? = nil) throws {
             self.id = UUID()
             #if os(macOS)
             // Use minimalBookmark for files from fileImporter - withSecurityScope requires

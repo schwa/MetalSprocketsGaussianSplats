@@ -106,7 +106,7 @@ struct SplatSceneView: View {
                     .compactMap { loadedCloud in
                         // Get current transform from document
                         if let docCloud = document.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
-                            loadedCloud.cloud.modelTransform = docCloud.transform
+                            loadedCloud.cloud.modelTransform = docCloud.transform.matrix
                         }
                         return loadedCloud.cloud
                     }
@@ -133,7 +133,7 @@ struct SplatSceneView: View {
                     MultiCloudRenderView(
                         clouds: enabledClouds,
                         cameraMatrix: $viewModel.cameraMatrix,
-                        sceneTransform: $viewModel.sceneTransform,
+                        sceneTransform: document.scene.sceneTransform.matrix,
                         verticalAngleOfView: $viewModel.verticalAngleOfView,
                         useSphericalHarmonics: useSH
                     )
@@ -225,7 +225,7 @@ struct SplatSceneView: View {
 
                 do {
                     let offset = calculateNextCloudOffset(additionalCount: cloudRefs.count)
-                    let transform = simd_float4x4(translation: offset)
+                    let transform = Transform(translation: offset)
                     let cloudRef = try SplatScene.CloudReference(url: url, transform: transform)
                     cloudRefs.append((cloudRef, didStartAccess))
                     print("  Created bookmark for: \(cloudRef.displayName ?? url.lastPathComponent)")
@@ -297,6 +297,7 @@ struct CloudListRow: View {
 enum SceneInspectorTab: String, CaseIterable {
     case cloud = "Cloud"
     case scene = "Scene"
+    case camera = "Camera"
     case render = "Render"
 }
 
@@ -341,7 +342,12 @@ struct SplatSceneInspectorView: View {
                     }
                 case .scene:
                     Form {
-                        SceneInspectorContent(document: $document)
+                        SceneInspectorContent(document: $document, viewModel: viewModel)
+                    }
+                    .formStyle(.grouped)
+                case .camera:
+                    Form {
+                        CameraInspectorContent(viewModel: viewModel)
                     }
                     .formStyle(.grouped)
                 case .render:
@@ -397,6 +403,14 @@ struct CloudInspectorContent: View {
 
 struct SceneInspectorContent: View {
     @Binding var document: SplatSceneDocument
+    let viewModel: SplatSceneViewModel
+
+    private static let rotationOptions: [(String, Float)] = [
+        ("0°", 0),
+        ("90°", .pi / 2),
+        ("180°", .pi),
+        ("270°", .pi * 3 / 2)
+    ]
 
     var body: some View {
         Section("Scene") {
@@ -406,6 +420,81 @@ struct SceneInspectorContent: View {
 
         Section("Scene Transform") {
             TransformEditor(transform: $document.scene.sceneTransform)
+        }
+
+        Section("Scene Orientation") {
+            RotationPicker(label: "Rotate X", value: $document.scene.sceneTransform.rotation.x)
+            RotationPicker(label: "Rotate Y", value: $document.scene.sceneTransform.rotation.y)
+            RotationPicker(label: "Rotate Z", value: $document.scene.sceneTransform.rotation.z)
+        }
+    }
+}
+
+struct CameraInspectorContent: View {
+    let viewModel: SplatSceneViewModel
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        Section("Field of View") {
+            Slider(value: viewModel.verticalAngleOfViewBinding, in: 30...120) {
+                Text("FOV")
+            }
+            LabeledContent("FOV", value: "\(Int(viewModel.verticalAngleOfView))°")
+        }
+
+        Section("Viewport") {
+            LabeledContent("Size", value: "\(formattedDimension(viewModel.viewSize.width)) × \(formattedDimension(viewModel.viewSize.height))")
+            LabeledContent("Aspect Ratio", value: aspectRatioString)
+            LabeledContent("Megapixels", value: megapixelsString)
+            if displayScale != 1 {
+                LabeledContent("Scale", value: "\(Int(displayScale))x")
+            }
+        }
+    }
+
+    private var aspectRatioString: String {
+        guard viewModel.viewSize.width > 0, viewModel.viewSize.height > 0 else {
+            return "—"
+        }
+        let ratio = viewModel.viewSize.width / viewModel.viewSize.height
+        return String(format: "%.2f:1", ratio)
+    }
+
+    private var megapixelsString: String {
+        guard viewModel.viewSize.width > 0, viewModel.viewSize.height > 0 else {
+            return "—"
+        }
+        let pixels = viewModel.viewSize.width * displayScale * viewModel.viewSize.height * displayScale
+        let megapixels = pixels / 1_000_000
+        return String(format: "%.2f MP", megapixels)
+    }
+
+    private func formattedDimension(_ value: CGFloat) -> String {
+        let pts = Int(value)
+        if displayScale == 1 {
+            return "\(pts)"
+        }
+        let px = Int(value * displayScale)
+        return "\(pts) (\(px))"
+    }
+}
+
+struct RotationPicker: View {
+    let label: String
+    @Binding var value: Float
+
+    private static let rotationOptions: [(String, Float)] = [
+        ("0°", 0),
+        ("90°", .pi / 2),
+        ("180°", .pi),
+        ("270°", .pi * 3 / 2)
+    ]
+
+    var body: some View {
+        Picker(label, selection: $value) {
+            ForEach(Self.rotationOptions, id: \.1) { optionLabel, optionValue in
+                Text(optionLabel).tag(optionValue)
+            }
         }
     }
 }
@@ -431,27 +520,15 @@ struct RenderInspectorContent: View {
 // MARK: - Transform Editor
 
 struct TransformEditor: View {
-    @Binding var transform: simd_float4x4
+    @Binding var transform: Transform
     var nudgeAmount: Float = 0.5
-
-    private var position: Binding<SIMD3<Float>> {
-        Binding(
-            get: {
-                SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
-            },
-            set: { newValue in
-                transform.columns.3 = SIMD4<Float>(newValue, 1)
-            }
-        )
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            NudgeableFloatField("X", value: position.x, nudgeAmount: nudgeAmount)
-            NudgeableFloatField("Y", value: position.y, nudgeAmount: nudgeAmount)
-            NudgeableFloatField("Z", value: position.z, nudgeAmount: nudgeAmount)
+            NudgeableFloatField("X", value: $transform.translation.x, nudgeAmount: nudgeAmount)
+            NudgeableFloatField("Y", value: $transform.translation.y, nudgeAmount: nudgeAmount)
+            NudgeableFloatField("Z", value: $transform.translation.z, nudgeAmount: nudgeAmount)
         }
-        // TODO: Add rotation and scale editors
     }
 }
 
@@ -531,10 +608,17 @@ final class SplatSceneViewModel {
 
     // Camera
     var cameraMatrix: simd_float4x4 = .init(translation: [0, 0, 10])
-    var sceneTransform: simd_float4x4 = simd_float4x4(xRotation: .radians(.pi))
     var verticalAngleOfView: Double = 90
 
     private var resourceAccess = ScopedResourceAccess()
+
+    // Binding helpers for use in views
+    var verticalAngleOfViewBinding: Binding<Double> {
+        Binding(
+            get: { self.verticalAngleOfView },
+            set: { self.verticalAngleOfView = $0 }
+        )
+    }
     
     /// Track which cloud IDs we've loaded to avoid reloading on property-only changes
     private var loadedCloudIDs: Set<UUID> = []
@@ -585,7 +669,7 @@ final class SplatSceneViewModel {
                 do {
                     let descriptor = try SplatCloudDescriptor(url: resolvedCloud.url)
                     let gpuCloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud(
-                        modelTransform: resolvedCloud.transform
+                        modelTransform: resolvedCloud.transform.matrix
                     )
                     loaded.append(LoadedCloud(
                         id: resolvedCloud.id,
@@ -600,7 +684,6 @@ final class SplatSceneViewModel {
 
             loadedClouds = loaded
             loadedCloudIDs = Set(loaded.map(\.id))
-            sceneTransform = scene.sceneTransform
 
             if let camera = scene.camera {
                 cameraMatrix = camera.matrix
@@ -624,7 +707,7 @@ struct MultiCloudRenderView: View {
     let clouds: [GPUSplatCloud<SparkSplat>]
 
     @Binding var cameraMatrix: simd_float4x4
-    @Binding var sceneTransform: simd_float4x4
+    let sceneTransform: simd_float4x4
     @Binding var verticalAngleOfView: Double
     let useSphericalHarmonics: Bool
 

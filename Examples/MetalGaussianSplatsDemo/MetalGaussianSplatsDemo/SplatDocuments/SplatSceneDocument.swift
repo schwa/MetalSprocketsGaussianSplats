@@ -105,7 +105,7 @@ final class ScopedResourceAccess {
 struct ResolvedCloud: Identifiable {
     let id: UUID
     let url: URL
-    let transform: simd_float4x4
+    let transform: Transform
     let displayName: String?
     let isStale: Bool
 }
