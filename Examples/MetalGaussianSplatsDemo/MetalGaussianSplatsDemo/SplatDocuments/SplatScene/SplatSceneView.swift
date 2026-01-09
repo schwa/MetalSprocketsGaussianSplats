@@ -181,7 +181,7 @@ struct SplatSceneView: View {
         let viewMatrix = viewModel.cameraMatrix.inverse
         
         // Build bounding box info for enabled clouds
-        let boxes: [BoundingBoxOverlay.BoundingBoxInfo] = viewModel.loadedClouds
+        let boxes: [BoundingBoxInfo] = viewModel.loadedClouds
             .filter { loadedCloud in
                 document.scene.clouds.first { $0.id == loadedCloud.id }?.enabled ?? false
             }
@@ -193,7 +193,7 @@ struct SplatSceneView: View {
                     transform.translation += dragOffset
                 }
                 let modelMatrix = document.scene.sceneTransform.matrix * transform.matrix
-                return BoundingBoxOverlay.BoundingBoxInfo(
+                return BoundingBoxInfo(
                     id: loadedCloud.id,
                     bounds: bounds,
                     modelMatrix: modelMatrix,
@@ -201,18 +201,29 @@ struct SplatSceneView: View {
                 )
             }
         
-        BoundingBoxOverlay(
-            boundingBoxes: boxes,
-            viewMatrix: viewMatrix,
-            projectionMatrix: projectionMatrix,
-            viewportSize: viewportSize,
-            onDragChange: { cloudID, axis, screenDelta in
-                handleAxisDrag(cloudID: cloudID, axis: axis, screenDelta: screenDelta, viewMatrix: viewMatrix, projectionMatrix: projectionMatrix)
-            },
-            onDragEnd: { cloudID in
-                commitDrag(cloudID: cloudID)
-            }
-        )
+        ZStack {
+            // Interactive faces (below wireframe)
+            BoundingBoxFaceInteraction(
+                boundingBoxes: boxes,
+                viewMatrix: viewMatrix,
+                projectionMatrix: projectionMatrix,
+                viewportSize: viewportSize,
+                onDragChange: { cloudID, axis, screenDelta in
+                    handleAxisDrag(cloudID: cloudID, axis: axis, screenDelta: screenDelta, viewMatrix: viewMatrix, projectionMatrix: projectionMatrix)
+                },
+                onDragEnd: { cloudID in
+                    commitDrag(cloudID: cloudID)
+                }
+            )
+            
+            // Wireframe (on top)
+            BoundingBoxWireframe(
+                boundingBoxes: boxes,
+                viewMatrix: viewMatrix,
+                projectionMatrix: projectionMatrix,
+                viewportSize: viewportSize
+            )
+        }
     }
     
     private func handleAxisDrag(cloudID: UUID, axis: Int, screenDelta: CGSize, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4) {
