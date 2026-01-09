@@ -38,6 +38,12 @@ struct MetalGaussianSplatsDemoApp: App {
             #endif
         }
 
+        #if os(macOS) || os(iOS)
+        DocumentGroup(newDocument: SplatSceneDocument()) { file in
+            SplatSceneView(document: file.$document)
+        }
+        #endif
+
         #if os(macOS)
         Window("About Gaussian Splats Demo", id: "about") {
             AboutView()
