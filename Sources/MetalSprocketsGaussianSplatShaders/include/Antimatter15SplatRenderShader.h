@@ -11,16 +11,16 @@ struct Antimatter15GPUSplat {
     simd_uchar4 color; // 4
 };
 
-// Metal debugger format: uint32_t Index, float distance
+// Metal debugger format: uint32_t splatIndex, uint16_t cloudIndex, half distanceToCamera
 #ifdef __METAL_VERSION__
 struct IndexedDistance {
-    unsigned int index;
+    unsigned int splatIndex;
     unsigned short cloudIndex;
     half distanceToCamera;
 };
 #else
 struct IndexedDistance {
-    unsigned int index;
+    unsigned int splatIndex;
     unsigned short cloudIndex;
     simd_half1 distanceToCamera;
 };

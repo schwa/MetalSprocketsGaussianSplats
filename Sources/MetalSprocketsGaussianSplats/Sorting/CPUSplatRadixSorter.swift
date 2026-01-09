@@ -68,7 +68,7 @@ private func cpuRadixSort<Splat>(splats: TypedMTLBuffer<Splat>, indexedDistances
             for index in 0..<splats.count {
                 let position = modelView * SIMD4<Float>(splats[index].floatPosition, 1.0)
                 let distance = position.z * (reversed ? -1.0 : 1.0)
-                indexedDistances[index] = .init(index: UInt32(index), cloudIndex: 0, distanceToCamera: Float16(distance))
+                indexedDistances[index] = .init(splatIndex: UInt32(index), cloudIndex: 0, distanceToCamera: Float16(distance))
             }
         }
         temporaryIndexedDistances.withUnsafeMutableBufferPointer { temporaryIndexedDistances in
@@ -99,7 +99,8 @@ extension IndexedDistance: RadixSortable {
 extension IndexedDistance: @retroactive Equatable {
     public static func == (lhs: IndexedDistance, rhs: IndexedDistance) -> Bool {
         lhs.distanceToCamera == rhs.distanceToCamera
-            && lhs.index == rhs.index
+            && lhs.splatIndex == rhs.splatIndex
+            && lhs.cloudIndex == rhs.cloudIndex
     }
 }
 

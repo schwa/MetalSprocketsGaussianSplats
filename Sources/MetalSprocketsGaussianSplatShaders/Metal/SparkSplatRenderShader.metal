@@ -61,7 +61,7 @@ namespace SparkSplatRenderShader {
         out.renderTargetArrayIndex = amplification_id;
 
         // Get sorted index
-        uint splatIndex = indexedDistances[instance_id].index;
+        uint splatIndex = indexedDistances[instance_id].splatIndex;
 
         // Fetch splat directly (no unpacking needed)
         SparkSplat splat = splats[splatIndex];

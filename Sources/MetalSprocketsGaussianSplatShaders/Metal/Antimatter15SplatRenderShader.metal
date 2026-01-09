@@ -39,7 +39,7 @@ namespace Antimatter15SplatRenderShader {
         constant float &scale [[buffer(9)]]
     ) {
         VertexOut out;
-        const uint splatIndex = indexedDistances[instance_id].index;
+        const uint splatIndex = indexedDistances[instance_id].splatIndex;
         const GPUSplat splat = splats[splatIndex];
         if (vertex_id == 0 && instance_id == 0) {
             os_log_default.log(
