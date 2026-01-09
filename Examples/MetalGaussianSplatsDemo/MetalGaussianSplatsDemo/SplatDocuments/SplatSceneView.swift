@@ -1,11 +1,14 @@
 #if os(iOS) || os(macOS)
 import GeometryLite3D
-import SwiftUI
-import UniformTypeIdentifiers
+import Interaction3D
+import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
+import MetalSprocketsUI
 import simd
+import SwiftUI
+import UniformTypeIdentifiers
 
 /// View for editing and rendering a splat scene with multiple clouds
 struct SplatSceneView: View {
@@ -49,8 +52,10 @@ struct SplatSceneView: View {
     private var cloudListSidebar: some View {
         List(selection: $selectedCloudID) {
             ForEach($document.scene.clouds) { $cloud in
-                CloudListRow(cloud: $cloud)
-                    .tag(cloud.id)
+                CloudListRow(cloud: $cloud) {
+                    document.scene.clouds.removeAll { $0.id == cloud.id }
+                }
+                .tag(cloud.id)
             }
             .onDelete { indexSet in
                 document.scene.clouds.remove(atOffsets: indexSet)
@@ -94,20 +99,44 @@ struct SplatSceneView: View {
             if viewModel.loadedClouds.isEmpty {
                 ContentUnavailableView("No clouds loaded", systemImage: "cube.transparent")
             } else {
-                // Count enabled clouds from document (source of truth for enabled state)
-                let enabledCount = document.scene.clouds.filter(\.enabled).count
-                
-                // Placeholder for actual rendering
-                ZStack {
-                    Color.black
-                    VStack {
-                        Text("Multi-cloud rendering")
-                            .font(.headline)
-                        Text("\(viewModel.loadedClouds.count) cloud(s) loaded")
-                        Text("\(enabledCount) enabled")
-                            .foregroundStyle(.secondary)
+                // Get enabled cloud IDs from document and sync transforms
+                let enabledCloudIDs = Set(document.scene.clouds.filter(\.enabled).map(\.id))
+                let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
+                    .filter { enabledCloudIDs.contains($0.id) }
+                    .compactMap { loadedCloud in
+                        // Get current transform from document
+                        if let docCloud = document.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
+                            loadedCloud.cloud.modelTransform = docCloud.transform
+                        }
+                        return loadedCloud.cloud
                     }
-                    .foregroundStyle(.white)
+                
+                if enabledClouds.isEmpty {
+                    // All clouds are hidden
+                    ZStack {
+                        Color.black
+                        VStack {
+                            Image(systemName: "eye.slash")
+                                .font(.largeTitle)
+                            Text("All clouds hidden")
+                                .font(.headline)
+                            Text("Enable clouds in the sidebar to view")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .foregroundStyle(.white)
+                    }
+                } else {
+                    // Determine if we should use SH
+                    let useSH = document.scene.renderSettings.useSphericalHarmonics && viewModel.allCloudsHaveSphericalHarmonics
+                    
+                    MultiCloudRenderView(
+                        clouds: enabledClouds,
+                        cameraMatrix: $viewModel.cameraMatrix,
+                        sceneTransform: $viewModel.sceneTransform,
+                        verticalAngleOfView: $viewModel.verticalAngleOfView,
+                        useSphericalHarmonics: useSH
+                    )
                 }
             }
         case .error(let message):
@@ -146,7 +175,13 @@ struct SplatSceneView: View {
             cloud: selectedCloud,
             document: $document,
             loadedCloud: selectedCloudID.flatMap { id in viewModel.loadedClouds.first { $0.id == id } },
-            viewModel: viewModel
+            viewModel: viewModel,
+            onDeleteCloud: {
+                if let id = selectedCloudID {
+                    document.scene.clouds.removeAll { $0.id == id }
+                    selectedCloudID = nil
+                }
+            }
         )
     }
 
@@ -233,6 +268,7 @@ struct SplatSceneView: View {
 
 struct CloudListRow: View {
     @Binding var cloud: SplatScene.CloudReference
+    var onDelete: () -> Void
 
     var body: some View {
         HStack {
@@ -246,6 +282,12 @@ struct CloudListRow: View {
         }
         .contextMenu {
             Toggle("Enabled", isOn: $cloud.enabled)
+            Divider()
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 }
@@ -266,6 +308,7 @@ struct SplatSceneInspectorView: View {
     @Binding var document: SplatSceneDocument
     let loadedCloud: SplatSceneViewModel.LoadedCloud?
     let viewModel: SplatSceneViewModel
+    var onDeleteCloud: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -290,7 +333,7 @@ struct SplatSceneInspectorView: View {
                             CloudInspectorContent(cloud: Binding(
                                 get: { cloudBinding },
                                 set: { cloudBinding = $0; cloud = $0 }
-                            ), loadedCloud: loadedCloud)
+                            ), loadedCloud: loadedCloud, onDelete: onDeleteCloud)
                         }
                         .formStyle(.grouped)
                     } else {
@@ -319,6 +362,7 @@ struct SplatSceneInspectorView: View {
 struct CloudInspectorContent: View {
     @Binding var cloud: SplatScene.CloudReference
     let loadedCloud: SplatSceneViewModel.LoadedCloud?
+    var onDelete: (() -> Void)?
 
     var body: some View {
         Section("Cloud") {
@@ -336,6 +380,17 @@ struct CloudInspectorContent: View {
 
         if let loaded = loadedCloud {
             SplatCloudInfoSections(descriptor: loaded.descriptor)
+        }
+
+        if let onDelete {
+            Section {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Remove Cloud", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                }
+            }
         }
     }
 }
@@ -377,6 +432,7 @@ struct RenderInspectorContent: View {
 
 struct TransformEditor: View {
     @Binding var transform: simd_float4x4
+    var nudgeAmount: Float = 0.5
 
     private var position: Binding<SIMD3<Float>> {
         Binding(
@@ -390,14 +446,50 @@ struct TransformEditor: View {
     }
 
     var body: some View {
-        LabeledContent("Position") {
-            HStack {
-                FloatField("X", value: position.x)
-                FloatField("Y", value: position.y)
-                FloatField("Z", value: position.z)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            NudgeableFloatField("X", value: position.x, nudgeAmount: nudgeAmount)
+            NudgeableFloatField("Y", value: position.y, nudgeAmount: nudgeAmount)
+            NudgeableFloatField("Z", value: position.z, nudgeAmount: nudgeAmount)
         }
         // TODO: Add rotation and scale editors
+    }
+}
+
+struct NudgeableFloatField: View {
+    let label: String
+    @Binding var value: Float
+    var nudgeAmount: Float = 0.5
+
+    init(_ label: String, value: Binding<Float>, nudgeAmount: Float = 0.5) {
+        self.label = label
+        self._value = value
+        self.nudgeAmount = nudgeAmount
+    }
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .frame(width: 20, alignment: .leading)
+            
+            Button {
+                value -= nudgeAmount
+            } label: {
+                Image(systemName: "minus")
+            }
+            .buttonStyle(.borderless)
+            
+            TextField("", value: $value, format: .number.precision(.fractionLength(2)))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 70)
+                .multilineTextAlignment(.trailing)
+            
+            Button {
+                value += nudgeAmount
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+        }
     }
 }
 
@@ -523,6 +615,63 @@ final class SplatSceneViewModel {
 
     deinit {
         resourceAccess.stopAccessing()
+    }
+}
+
+// MARK: - Multi-Cloud Render View
+
+struct MultiCloudRenderView: View {
+    let clouds: [GPUSplatCloud<SparkSplat>]
+
+    @Binding var cameraMatrix: simd_float4x4
+    @Binding var sceneTransform: simd_float4x4
+    @Binding var verticalAngleOfView: Double
+    let useSphericalHarmonics: Bool
+
+    @State private var projection: (any ProjectionProtocol) = PerspectiveProjection(verticalAngleOfView: .degrees(90), depthMode: .standard(zClip: 0.01 ... 1_000))
+
+    var body: some View {
+        RenderView { context, drawableSize in
+            MultiCloudRenderPass(
+                clouds: clouds,
+                cameraMatrix: cameraMatrix,
+                sceneTransform: sceneTransform,
+                projection: projection,
+                drawableSize: drawableSize,
+                useSphericalHarmonics: useSphericalHarmonics
+            )
+        }
+        .metalColorPixelFormat(.bgra8Unorm_srgb)
+        .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
+        .modifier(TurntableCameraController(transform: $cameraMatrix))
+        .onChange(of: verticalAngleOfView, initial: true) {
+            projection = PerspectiveProjection(verticalAngleOfView: .degrees(Float(verticalAngleOfView)), depthMode: .standard(zClip: 0.01 ... 1_000))
+        }
+    }
+}
+
+struct MultiCloudRenderPass: Element {
+    let clouds: [GPUSplatCloud<SparkSplat>]
+    let cameraMatrix: simd_float4x4
+    let sceneTransform: simd_float4x4
+    let projection: any ProjectionProtocol
+    let drawableSize: CGSize
+    let useSphericalHarmonics: Bool
+
+    var body: some Element {
+        get throws {
+            let projectionMatrix = projection.projectionMatrix(for: drawableSize)
+            try RenderPass {
+                try SparkSplatRenderPipeline(
+                    splatClouds: clouds,
+                    projectionMatrices: [projectionMatrix],
+                    modelMatrix: sceneTransform,
+                    cameraMatrices: [cameraMatrix],
+                    drawableSize: SIMD2<Float>(drawableSize),
+                    useSphericalHarmonics: useSphericalHarmonics
+                )
+            }
+        }
     }
 }
 #endif

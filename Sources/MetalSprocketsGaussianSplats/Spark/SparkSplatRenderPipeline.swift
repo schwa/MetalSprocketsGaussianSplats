@@ -27,6 +27,8 @@ public struct SparkSplatRenderPipeline: Element {
     var cameraMatrices: [simd_float4x4]
     var drawableSize: SIMD2<Float>
     var useSphericalHarmonics: Bool
+    /// Whether we're using the multi-cloud shader (set at init, not recomputed)
+    var isMultiCloudShader: Bool
 
     @MSState
     private var sortManager: AsyncSortManager<SparkSplat>?
@@ -101,8 +103,9 @@ public struct SparkSplatRenderPipeline: Element {
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
 
-        let vertexShaderName = splatClouds.count > 1 ? "vertex_main_multicloud" : "vertex_main"
-        self.vertexShader = try shaderLibrary.function(named: vertexShaderName, type: VertexShader.self, constants: vertexConstants)
+        // Always use multi-cloud shader - single cloud is just [cloud]
+        self.isMultiCloudShader = true
+        self.vertexShader = try shaderLibrary.function(named: "vertex_main_multicloud", type: VertexShader.self, constants: vertexConstants)
         self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
 
         // Setup vertex descriptor
@@ -124,11 +127,9 @@ public struct SparkSplatRenderPipeline: Element {
             // Amplification count for stereo rendering
             let amplificationCount = cameraMatrices.count
 
-            let isMultiCloud = splatClouds.count > 1
-
             try Group {
                 if let indexedDistancesBuffer = sortedIndices?.indices {
-                    if isMultiCloud {
+                    if isMultiCloudShader {
                         try multiCloudRenderPipeline(
                             indexedDistancesBuffer: indexedDistancesBuffer,
                             viewMatrices: viewMatrices,
