@@ -50,7 +50,9 @@ public struct PLYSplatReader: SplatReader {
     /// For degree 3 (15 basis functions total, minus 1 DC = 14 higher order):
     /// 14 coefficients * 3 channels = 42 values -> f_rest_0 to f_rest_44 (45 total, but some implementations vary)
     private static func detectSHDegree(from reader: PLYReader) -> UInt8 {
-        guard let element = reader.primaryElement else { return 0 }
+        guard let element = reader.primaryElement else {
+            return 0
+        }
 
         let propertyNames = Set(element.properties.map(\.name))
 

@@ -55,7 +55,7 @@ internal struct RadixSortCPU <T> where T: RadixSortable {
             countingSort(input: input, shift: phase * radixBits, output: temp)
             swap(&input, &temp)
         }
-        if phases % 2 == 0 {
+        if phases.isMultiple(of: 2) {
             for i in input.indices {
                 temp[i] = input[i]
             }
