@@ -56,7 +56,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         #if os(macOS)
-        .frame(minWidth: 400, minHeight: 200)
+        .frame(minWidth: 400, minHeight: 480)
         #endif
     }
 
@@ -64,8 +64,9 @@ struct SettingsView: View {
     private func revealAppSupport() {
         guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(bundleIdentifier, isDirectory: true)
-        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: appSupport.path)
+        let containerURL = appSupport.appendingPathComponent(bundleIdentifier, isDirectory: true)
+        try? FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
+        NSWorkspace.shared.activateFileViewerSelecting([containerURL])
     }
     #endif
 }
