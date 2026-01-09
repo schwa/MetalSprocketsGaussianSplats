@@ -47,7 +47,7 @@ struct SplatCloudDescriptor: Sendable {
             case .ply:
                 let reader = try PLYSplatReader(url: url)
                 splatCount = reader.splatCount
-                shDegree = 0
+                shDegree = reader.shDegree
             case .antimatter15Splat:
                 let reader = try Antimatter15Reader(url: url)
                 splatCount = reader.splatCount
@@ -142,8 +142,19 @@ extension SplatCloudDescriptor {
             }
         case .ply:
             let reader = try PLYSplatReader(url: url)
+            effectiveSHDegree = reader.shDegree
+            let floatsPerSplat = Self.shFloatsPerSplat(degree: effectiveSHDegree)
+            if floatsPerSplat > 0 {
+                shCoefficients.reserveCapacity(splatCount * floatsPerSplat)
+            }
             try reader.read { _, extendedSplat in
                 splats.append(S(extendedSplat.genericSplat))
+                if let sh = extendedSplat.sphericalHarmonics {
+                    // Flatten [[R,G,B], [R,G,B], ...] to [R,G,B,R,G,B,...]
+                    for coeff in sh {
+                        shCoefficients.append(contentsOf: coeff)
+                    }
+                }
             }
         case .antimatter15Splat:
             let reader = try Antimatter15Reader(url: url)
