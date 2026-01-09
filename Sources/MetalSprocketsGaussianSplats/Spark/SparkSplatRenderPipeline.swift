@@ -85,6 +85,9 @@ public struct SparkSplatRenderPipeline: Element {
             // Amplification count for stereo rendering
             let amplificationCount = cameraMatrices.count
 
+            // Concatenate outer modelMatrix with per-cloud transform
+            let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
+
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     let vertices: [SIMD2<Float>] = [
@@ -103,7 +106,7 @@ public struct SparkSplatRenderPipeline: Element {
                 }
                 .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
                 .parameter("indexedDistances", buffer: splatCloud.indexedDistances.indices.unsafeMTLBuffer)
-                .parameter("modelMatrix", value: modelMatrix)
+                .parameter("modelMatrix", value: combinedModelMatrix)
                 .parameter("viewMatrices", values: viewMatrices)
                 .parameter("projectionMatrices", values: projectionMatrices)
                 .parameter("drawableSize", value: drawableSize)
@@ -165,6 +168,7 @@ public struct SparkSplatRenderPipeline: Element {
             avgMatrix.columns.3 = SIMD4<Float>(avgPosition, 1.0)
             averageCameraMatrix = avgMatrix
         }
+        // Pass only the scene-level modelMatrix; sorter combines with cloud.modelTransform
         let parameters = SortParameters(camera: averageCameraMatrix, model: modelMatrix)
         sortManager.requestSort(parameters)
     }

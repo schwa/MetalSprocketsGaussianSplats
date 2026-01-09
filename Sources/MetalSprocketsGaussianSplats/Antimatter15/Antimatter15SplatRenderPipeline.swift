@@ -54,6 +54,9 @@ public struct Antimatter15SplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
+            // Concatenate outer modelMatrix with per-cloud transform
+            let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
+
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     let vertices: [SIMD2<Float>] = [
@@ -67,7 +70,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
                 }
                 .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
                 .parameter("indexedDistances", buffer: splatCloud.indexedDistances.indices.unsafeMTLBuffer)
-                .parameter("modelMatrix", value: modelMatrix)
+                .parameter("modelMatrix", value: combinedModelMatrix)
                 .parameter("viewMatrix", value: cameraMatrix.inverse)
                 .parameter("projectionMatrix", value: projectionMatrix)
                 .parameter("drawableSize", value: drawableSize)
@@ -122,6 +125,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
         guard let sortManager else {
             fatalError("No sort manager")
         }
+        // Pass only the scene-level modelMatrix; sorter combines with cloud.modelTransform
         let parameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
         sortManager.requestSort(parameters)
     }

@@ -1,5 +1,6 @@
 #if !arch(x86_64)
 internal import AsyncAlgorithms
+import GeometryLite3D
 import Metal
 import MetalSprocketsGaussianSplatShaders
 internal import os
@@ -12,6 +13,9 @@ public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where S
     public private(set) var splats: TypedMTLBuffer<Splat>
     internal var indexedDistances: SplatIndices
 
+    /// Per-cloud model transform
+    public var modelTransform: simd_float4x4
+
     /// Spherical harmonics coefficients buffer (optional, for view-dependent color)
     public var shCoefficients: TypedMTLBuffer<Float>?
 
@@ -20,16 +24,17 @@ public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where S
 
     // MARK: -
 
-    public init(splats: TypedMTLBuffer<Splat>, indexedDistances: SplatIndices, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) {
+    public init(splats: TypedMTLBuffer<Splat>, indexedDistances: SplatIndices, modelTransform: simd_float4x4 = .identity, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) {
         self.splats = splats
         self.indexedDistances = indexedDistances
+        self.modelTransform = modelTransform
         self.shCoefficients = shCoefficients
         self.shDegree = shDegree
     }
 
     public convenience init(device: MTLDevice, splats: TypedMTLBuffer<Splat>, cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4) throws {
         let indexedDistances = try CPUSplatRadixSorter.sort(device: device, splats: splats, camera: cameraMatrix, model: modelMatrix, reversed: false)
-        self.init(splats: splats, indexedDistances: indexedDistances)
+        self.init(splats: splats, indexedDistances: indexedDistances, modelTransform: modelMatrix)
     }
 
     public convenience init(device: MTLDevice, splats: [Splat], cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4) throws {
@@ -40,7 +45,7 @@ public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where S
     // MARK: -
 
     public static func == (lhs: GPUSplatCloud, rhs: GPUSplatCloud) -> Bool {
-        lhs.splats == rhs.splats && lhs.indexedDistances == rhs.indexedDistances && lhs.shCoefficients == rhs.shCoefficients && lhs.shDegree == rhs.shDegree
+        lhs.splats == rhs.splats && lhs.indexedDistances == rhs.indexedDistances && lhs.modelTransform == rhs.modelTransform && lhs.shCoefficients == rhs.shCoefficients && lhs.shDegree == rhs.shDegree
     }
 
     /// How many splats are currently in the splat cloud

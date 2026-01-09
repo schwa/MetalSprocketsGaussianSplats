@@ -46,7 +46,9 @@ internal actor AsyncSortManager <Splat> where Splat: SortableSplatProtocol {
 
         for await parameters in channel {
             let start = CFAbsoluteTimeGetCurrent()
-            let currentIndexedDistances = try sorter.sort(splats: splatCloud.splats, camera: parameters.camera, model: parameters.model, reversed: parameters.reversed)
+            // Combine scene-level model transform with per-cloud transform
+            let combinedModel = parameters.model * splatCloud.modelTransform
+            let currentIndexedDistances = try sorter.sort(splats: splatCloud.splats, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
             let end = CFAbsoluteTimeGetCurrent()
             let duration = end - start
             if duration > 0.033 {
