@@ -163,8 +163,19 @@ extension SplatCloudDescriptor {
             }
         case .sog:
             let reader = try SOGReaderCPU(url: url)
+            effectiveSHDegree = UInt8(reader.shDegree)
+            let floatsPerSplat = Self.shFloatsPerSplat(degree: effectiveSHDegree)
+            if floatsPerSplat > 0 {
+                shCoefficients.reserveCapacity(splatCount * floatsPerSplat)
+            }
             try reader.read { _, extendedSplat in
                 splats.append(S(extendedSplat.genericSplat))
+                if let sh = extendedSplat.sphericalHarmonics {
+                    // Flatten [[R,G,B], [R,G,B], ...] to [R,G,B,R,G,B,...]
+                    for coeff in sh {
+                        shCoefficients.append(contentsOf: coeff)
+                    }
+                }
             }
         default:
             throw NSError(domain: "SplatCloudDescriptor", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported content type: \(contentType?.identifier ?? "nil")"])
