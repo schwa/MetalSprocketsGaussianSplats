@@ -109,8 +109,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             loadResult: loadResult,
             device: device,
             useSparkRenderer: useSparkRenderer,
-            modelMatrix: modelMatrix,
-            cameraMatrix: cameraMatrix
+            modelMatrix: modelMatrix
         )
 
         print("Effective SH degree: \(effectiveSHDegree), SH buffer: \(shCoefficientsBuffer != nil ? "yes" : "no")")
@@ -374,8 +373,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         loadResult: SplatLoadResult,
         device: MTLDevice,
         useSparkRenderer: Bool,
-        modelMatrix: simd_float4x4,
-        cameraMatrix: simd_float4x4
+        modelMatrix: simd_float4x4
     ) throws -> (GPUSplatCloud<Antimatter15GPUSplat>?, GPUSplatCloud<SparkSplat>?, TypedMTLBuffer<Float>?, UInt8) {
         // Apply --sh-degree override if specified
         let effectiveSHDegree: UInt8
@@ -394,26 +392,28 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         if useSparkRenderer {
             let gpuSplats = loadResult.splats.map { SparkSplat($0) }
             let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-            var sparkGPUSplatCloud = try GPUSplatCloud<SparkSplat>(
-                device: device,
-                splats: splatBuffer,
-                cameraMatrix: cameraMatrix,
-                modelMatrix: modelMatrix
-            )
+            let sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>
             // Attach SH data to the cloud
             if let shBuffer = shCoefficientsBuffer {
-                sparkGPUSplatCloud.shCoefficients = shBuffer
-                sparkGPUSplatCloud.shDegree = effectiveSHDegree
+                sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(
+                    splats: splatBuffer,
+                    modelTransform: modelMatrix,
+                    shCoefficients: shBuffer,
+                    shDegree: effectiveSHDegree
+                )
+            } else {
+                sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(
+                    splats: splatBuffer,
+                    modelTransform: modelMatrix
+                )
             }
             return (nil, sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
         }
         let gpuSplats = loadResult.splats.map { Antimatter15GPUSplat($0) }
         let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-        let antimatter15GPUSplatCloud = try GPUSplatCloud<Antimatter15GPUSplat>(
-            device: device,
+        let antimatter15GPUSplatCloud = GPUSplatCloud<Antimatter15GPUSplat>(
             splats: splatBuffer,
-            cameraMatrix: cameraMatrix,
-            modelMatrix: modelMatrix
+            modelTransform: modelMatrix
         )
         return (antimatter15GPUSplatCloud, nil, shCoefficientsBuffer, effectiveSHDegree)
     }

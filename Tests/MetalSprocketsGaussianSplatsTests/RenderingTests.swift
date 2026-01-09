@@ -153,11 +153,8 @@ struct GPUSplatCloudTests {
         ]
 
         let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
-        let cloud = try GPUSplatCloud<Antimatter15GPUSplat>(
-            device: device,
-            splats: splatBuffer,
-            cameraMatrix: .identity,
-            modelMatrix: .identity
+        let cloud = GPUSplatCloud<Antimatter15GPUSplat>(
+            splats: splatBuffer
         )
 
         #expect(cloud.count == 2)
@@ -171,11 +168,8 @@ struct GPUSplatCloudTests {
         }
 
         let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
-        let cloud = try GPUSplatCloud<Antimatter15GPUSplat>(
-            device: device,
-            splats: splatBuffer,
-            cameraMatrix: .identity,
-            modelMatrix: .identity
+        let cloud = GPUSplatCloud<Antimatter15GPUSplat>(
+            splats: splatBuffer
         )
 
         #expect(cloud.count == 100)
@@ -238,11 +232,9 @@ struct SplatRenderingTests {
         let cameraMatrix = simd_float4x4.identity
         let modelMatrix = simd_float4x4.identity
 
-        let cloud = try GPUSplatCloud<Antimatter15GPUSplat>(
-            device: device,
+        let cloud = GPUSplatCloud<Antimatter15GPUSplat>(
             splats: splatBuffer,
-            cameraMatrix: cameraMatrix,
-            modelMatrix: modelMatrix
+            modelTransform: modelMatrix
         )
 
         // Create projection matrix

@@ -59,8 +59,7 @@ class PreviewViewController: NSViewController, QLPreviewingController {
         let splatCloud = try GPUSplatCloud(
             device: device,
             splats: splats,
-            cameraMatrix: cameraMatrix,
-            modelMatrix: modelMatrix
+            modelTransform: modelMatrix
         )
 
         // Create and host the SwiftUI view

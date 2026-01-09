@@ -35,7 +35,7 @@ struct SplatDocumentRenderView: View {
         .onChange(of: descriptor.url, initial: true) {
             let cameraMatrix = cameraMatrix
             Task {
-                let splatCloud = try! await loadSplatCloud(cameraMatrix: cameraMatrix)
+                let splatCloud = try! await loadSplatCloud()
                 Task { @MainActor in
                     self.splatCloud = splatCloud
                     #if os(visionOS)
@@ -50,7 +50,7 @@ struct SplatDocumentRenderView: View {
         .onChange(of: rendererType) {
             let cameraMatrix = cameraMatrix
             Task {
-                let splatCloud = try! await loadSplatCloud(cameraMatrix: cameraMatrix)
+                let splatCloud = try! await loadSplatCloud()
                 Task { @MainActor in
                     self.splatCloud = splatCloud
                     #if os(visionOS)
@@ -88,15 +88,15 @@ struct SplatDocumentRenderView: View {
     }
 
     @concurrent
-    private func loadSplatCloud(cameraMatrix: simd_float4x4) async throws -> AnyGPUSplatCloud {
+    private func loadSplatCloud() async throws -> AnyGPUSplatCloud {
         try await MainActor.run {
             try timeit("Load splat cloud") {
                 switch rendererType {
                 case .spark, .stochastic, .tileBased:
-                    let cloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud(cameraMatrix: cameraMatrix)
+                    let cloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud()
                     return AnyGPUSplatCloud(cloud)
                 case .antimatter15:
-                    let cloud: GPUSplatCloud<Antimatter15GPUSplat> = try descriptor.loadGPUSplatCloud(cameraMatrix: cameraMatrix)
+                    let cloud: GPUSplatCloud<Antimatter15GPUSplat> = try descriptor.loadGPUSplatCloud()
                     return AnyGPUSplatCloud(cloud)
                 }
             }

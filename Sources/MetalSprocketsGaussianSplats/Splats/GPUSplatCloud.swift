@@ -7,45 +7,43 @@ internal import os
 import simd
 import Splats
 
-// @unchecked Sendable required because indexedDistances is mutated from async sort tasks.
-// The mutation is coordinated through AsyncSortManager's actor isolation.
 public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
-    public private(set) var splats: TypedMTLBuffer<Splat>
-    internal var indexedDistances: SplatIndices
+    public let splats: TypedMTLBuffer<Splat>
 
     /// Per-cloud model transform
     public var modelTransform: simd_float4x4
 
     /// Spherical harmonics coefficients buffer (optional, for view-dependent color)
-    public var shCoefficients: TypedMTLBuffer<Float>?
+    public let shCoefficients: TypedMTLBuffer<Float>?
 
     /// Spherical harmonics degree (0 = no SH, 1-3 for increasing detail)
-    public var shDegree: UInt8
+    public let shDegree: UInt8
 
     // MARK: -
 
-    public init(splats: TypedMTLBuffer<Splat>, indexedDistances: SplatIndices, modelTransform: simd_float4x4 = .identity, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) {
+    public init(splats: TypedMTLBuffer<Splat>, modelTransform: simd_float4x4 = .identity, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) {
         self.splats = splats
-        self.indexedDistances = indexedDistances
         self.modelTransform = modelTransform
         self.shCoefficients = shCoefficients
         self.shDegree = shDegree
     }
 
-    public convenience init(device: MTLDevice, splats: TypedMTLBuffer<Splat>, cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4) throws {
-        let indexedDistances = try CPUSplatRadixSorter.sort(device: device, splats: splats, camera: cameraMatrix, model: modelMatrix, reversed: false)
-        self.init(splats: splats, indexedDistances: indexedDistances, modelTransform: modelMatrix)
+    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity) throws {
+        let splats = try device.makeTypedBuffer(values: splats, options: [])
+        self.init(splats: splats, modelTransform: modelTransform)
     }
 
-    public convenience init(device: MTLDevice, splats: [Splat], cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4) throws {
-        let splats = try device.makeTypedBuffer(values: splats, options: [])
-        try self.init(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
+    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, shCoefficients: [Float], shDegree: UInt8) throws {
+        let splatsBuffer = try device.makeTypedBuffer(values: splats, options: [])
+        let shBuffer = try device.makeTypedBuffer(values: shCoefficients, options: [])
+        self.init(splats: splatsBuffer, modelTransform: modelTransform, shCoefficients: shBuffer, shDegree: shDegree)
     }
 
     // MARK: -
 
     public static func == (lhs: GPUSplatCloud, rhs: GPUSplatCloud) -> Bool {
-        lhs.splats == rhs.splats && lhs.indexedDistances == rhs.indexedDistances && lhs.modelTransform == rhs.modelTransform && lhs.shCoefficients == rhs.shCoefficients && lhs.shDegree == rhs.shDegree
+        // Use reference equality - comparing buffer contents is too expensive for large splat clouds
+        lhs === rhs
     }
 
     /// How many splats are currently in the splat cloud

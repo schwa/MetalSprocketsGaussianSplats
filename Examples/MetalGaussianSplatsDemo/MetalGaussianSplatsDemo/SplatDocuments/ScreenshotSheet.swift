@@ -126,8 +126,7 @@ struct ScreenshotSheet: View {
 
             // Load splat cloud (always use SparkSplat)
             let splatCloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud(
-                cameraMatrix: cameraMatrix,
-                modelMatrix: modelMatrix
+                modelTransform: modelMatrix
             )
 
             // Create projection

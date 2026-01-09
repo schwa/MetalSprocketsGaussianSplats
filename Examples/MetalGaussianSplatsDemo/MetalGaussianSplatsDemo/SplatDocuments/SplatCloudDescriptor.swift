@@ -111,7 +111,7 @@ extension Antimatter15GPUSplat: SplatConvertible {}
 // MARK: - GPUSplatCloud Loading
 
 extension SplatCloudDescriptor {
-    func loadGPUSplatCloud<S>(cameraMatrix: simd_float4x4 = .identity, modelMatrix: simd_float4x4 = .identity) throws -> GPUSplatCloud<S> where S: SplatConvertible & SortableSplatProtocol {
+    func loadGPUSplatCloud<S>(modelTransform: simd_float4x4 = .identity) throws -> GPUSplatCloud<S> where S: SplatConvertible & SortableSplatProtocol {
         let device = _MTLCreateSystemDefaultDevice()
 
         var splats: [S] = []
@@ -181,13 +181,12 @@ extension SplatCloudDescriptor {
             throw NSError(domain: "SplatCloudDescriptor", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported content type: \(contentType?.identifier ?? "nil")"])
         }
 
-        // Create GPU splat cloud
-        let splatCloud = try GPUSplatCloud(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
-
-        // Attach SH buffer if we have SH data
+        // Create GPU splat cloud with or without SH data
+        let splatCloud: GPUSplatCloud<S>
         if !shCoefficients.isEmpty, effectiveSHDegree > 0 {
-            splatCloud.shCoefficients = try device.makeTypedBuffer(values: shCoefficients, options: [])
-            splatCloud.shDegree = effectiveSHDegree
+            splatCloud = try GPUSplatCloud(device: device, splats: splats, modelTransform: modelTransform, shCoefficients: shCoefficients, shDegree: effectiveSHDegree)
+        } else {
+            splatCloud = try GPUSplatCloud(device: device, splats: splats, modelTransform: modelTransform)
         }
 
         return splatCloud
