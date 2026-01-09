@@ -10,6 +10,10 @@ import ZIPFoundation
 /// Uses CPU-based conversion
 public struct SOGReaderCPU: SplatReader {
     private let splats: [GenericSplat]
+    private let sphericalHarmonics: [[[Float]]]? // Per-splat SH coefficients, or nil if no SH data. Each splat has [[r,g,b], [r,g,b], ...]
+    
+    /// The degree of spherical harmonics (0 = none, 1-3 = higher-order SH)
+    public let shDegree: Int
 
     public var splatCount: Int {
         splats.count
@@ -26,24 +30,36 @@ public struct SOGReaderCPU: SplatReader {
             try? FileManager.default.removeItem(at: tempURL)
         }
 
-        self.splats = try Self.loadSplats(from: tempURL)
+        let result = try Self.loadSplats(from: tempURL)
+        self.splats = result.splats
+        self.sphericalHarmonics = result.sphericalHarmonics
+        self.shDegree = result.shDegree
     }
 
     /// Load SOG file from URL
     public init(url: URL) throws {
-        self.splats = try Self.loadSplats(from: url)
+        let result = try Self.loadSplats(from: url)
+        self.splats = result.splats
+        self.sphericalHarmonics = result.sphericalHarmonics
+        self.shDegree = result.shDegree
     }
 
     public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {
         for (index, splat) in splats.enumerated() {
-            // SOG format only uses SH0 (base color), no higher-degree SH
-            try handler(index, ExtendedSplat(genericSplat: splat, sphericalHarmonics: nil))
+            let sh = sphericalHarmonics?[index]
+            try handler(index, ExtendedSplat(genericSplat: splat, sphericalHarmonics: sh))
         }
     }
 
     // MARK: - Private
 
-    private static func loadSplats(from url: URL) throws -> [GenericSplat] {
+    private struct LoadResult {
+        let splats: [GenericSplat]
+        let sphericalHarmonics: [[[Float]]]? // [splat][coefficient][rgb]
+        let shDegree: Int
+    }
+
+    private static func loadSplats(from url: URL) throws -> LoadResult {
         // Open archive
         let archive: Archive
         do {
@@ -63,6 +79,17 @@ public struct SOGReaderCPU: SplatReader {
         let quatsData = try loadImageData(from: archive, filename: metadata.quats.files[0])
         let sh0Data = try loadImageData(from: archive, filename: metadata.sh0.files[0])
 
+        // Load higher-order SH data if present
+        var shCentroids: [UInt8]?
+        var shLabels: [UInt8]?
+        var shCentroidsWidth: Int = 0
+        if let shN = metadata.shN, shN.files.count >= 2 {
+            let centroidsResult = try loadImageDataWithSize(from: archive, filename: shN.files[0])
+            shCentroids = centroidsResult.data
+            shCentroidsWidth = centroidsResult.width
+            shLabels = try loadImageData(from: archive, filename: shN.files[1])
+        }
+
         // Extract mins/maxs from metadata
         let mins = SIMD3<Float>(metadata.means.mins[0], metadata.means.mins[1], metadata.means.mins[2])
         let maxs = SIMD3<Float>(metadata.means.maxs[0], metadata.means.maxs[1], metadata.means.maxs[2])
@@ -71,8 +98,23 @@ public struct SOGReaderCPU: SplatReader {
         var splats = [GenericSplat]()
         splats.reserveCapacity(metadata.count)
 
+        // Prepare SH storage if we have higher-order SH
+        var sphericalHarmonics: [[[Float]]]? // [splat][coefficient][rgb]
+        var shDegree = 0
+        if metadata.shN != nil, shCentroids != nil, shLabels != nil {
+            shDegree = metadata.shN!.bands // bands 1-3 correspond to degree 1-3
+            sphericalHarmonics = []
+            sphericalHarmonics?.reserveCapacity(metadata.count)
+        }
+
         let scalesCodebook = metadata.scales.codebook
         let sh0Codebook = metadata.sh0.codebook
+
+        // Number of coefficients per band (excluding DC/SH0):
+        // Band 1 (degree 1): 3 coefficients
+        // Band 2 (degree 2): 5 coefficients (total 8 for bands 1-2)
+        // Band 3 (degree 3): 7 coefficients (total 15 for bands 1-3)
+        let coeffsPerBand = [3, 8, 15]
 
         for i in 0..<metadata.count {
             let offset = i * 4
@@ -135,9 +177,50 @@ public struct SOGReaderCPU: SplatReader {
                 rotation: rotation
             )
             splats.append(splat)
+
+            // Extract higher-order SH coefficients if present
+            if let shN = metadata.shN, let centroids = shCentroids, let labels = shLabels {
+                let numCoeffs = coeffsPerBand[shN.bands - 1]
+
+                // Get 16-bit palette index from labels (R + G << 8)
+                let paletteIndex = Int(labels[offset]) + (Int(labels[offset + 1]) << 8)
+
+                // Look up SH coefficients from centroids palette
+                // Palette layout: 64 entries per row, each entry has numCoeffs pixels (RGB per pixel)
+                // For palette entry n and coefficient c:
+                //   u = (n % 64) * numCoeffs + c
+                //   v = n / 64
+                let entriesPerRow = 64
+                let paletteU = (paletteIndex % entriesPerRow) * numCoeffs
+                let paletteV = paletteIndex / entriesPerRow
+
+                var shCoeffs = [[Float]]()
+                shCoeffs.reserveCapacity(numCoeffs)
+
+                // Read each coefficient (each is an RGB pixel in the centroids texture)
+                for c in 0..<numCoeffs {
+                    let pixelX = paletteU + c
+                    let pixelY = paletteV
+                    let pixelOffset = (pixelY * shCentroidsWidth + pixelX) * 4 // RGBA
+
+                    // RGB values are indices into the shN codebook
+                    let rIdx = Int(centroids[pixelOffset])
+                    let gIdx = Int(centroids[pixelOffset + 1])
+                    let bIdx = Int(centroids[pixelOffset + 2])
+
+                    // Look up actual SH values from codebook
+                    let shR = shN.codebook[rIdx]
+                    let shG = shN.codebook[gIdx]
+                    let shB = shN.codebook[bIdx]
+
+                    shCoeffs.append([shR, shG, shB])
+                }
+
+                sphericalHarmonics?.append(shCoeffs)
+            }
         }
 
-        return splats
+        return LoadResult(splats: splats, sphericalHarmonics: sphericalHarmonics, shDegree: shDegree)
     }
 
     private static func extractData(from archive: Archive, filename: String) throws -> Data {
@@ -153,6 +236,11 @@ public struct SOGReaderCPU: SplatReader {
     }
 
     private static func loadImageData(from archive: Archive, filename: String) throws -> [UInt8] {
+        let result = try loadImageDataWithSize(from: archive, filename: filename)
+        return result.data
+    }
+
+    private static func loadImageDataWithSize(from archive: Archive, filename: String) throws -> (data: [UInt8], width: Int, height: Int, bytesPerPixel: Int) {
         let imageData = try extractData(from: archive, filename: filename)
 
         guard let imageSource = CGImageSourceCreateWithData(imageData as CFData, nil), let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
@@ -161,6 +249,8 @@ public struct SOGReaderCPU: SplatReader {
 
         let width = cgImage.width
         let height = cgImage.height
+
+        // Always decode to RGBA for consistency
         var pixelData = [UInt8](repeating: 0, count: width * height * 4)
 
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -178,7 +268,7 @@ public struct SOGReaderCPU: SplatReader {
 
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-        return pixelData
+        return (pixelData, width, height, 4)
     }
 }
 
@@ -191,6 +281,7 @@ private struct SOGReaderCPUMetadata: Codable {
     let scales: CodebookMetadata
     let quats: QuatsMetadata
     let sh0: CodebookMetadata
+    let shN: SHNMetadata? // Optional higher-order spherical harmonics
 
     struct MeansMetadata: Codable {
         let files: [String]
@@ -205,5 +296,13 @@ private struct SOGReaderCPUMetadata: Codable {
 
     struct QuatsMetadata: Codable {
         let files: [String]
+    }
+
+    /// Higher-order SH metadata (bands 1-3, stored via palette/clustering)
+    struct SHNMetadata: Codable {
+        let count: Int      // Number of palette entries (1-64k)
+        let bands: Int      // Number of bands (1, 2, or 3)
+        let codebook: [Float] // 256 floats for decoding RGB values
+        let files: [String] // [centroids.webp, labels.webp]
     }
 }

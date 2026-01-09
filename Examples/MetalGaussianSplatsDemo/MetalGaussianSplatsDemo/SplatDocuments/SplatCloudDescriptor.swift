@@ -55,7 +55,7 @@ struct SplatCloudDescriptor: Sendable {
             case .sog:
                 let reader = try SOGReaderCPU(url: url)
                 splatCount = reader.splatCount
-                shDegree = 0
+                shDegree = UInt8(reader.shDegree)
             default:
                 splatCount = 0
                 shDegree = 0
