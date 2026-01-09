@@ -1,3 +1,4 @@
+#if !arch(x86_64)
 import GeometryLite3D
 import Interaction3D
 import MetalSprockets
@@ -35,3 +36,4 @@ struct SplatPreviewView: View {
         .modifier(TurntableCameraController(transform: $cameraMatrix))
     }
 }
+#endif

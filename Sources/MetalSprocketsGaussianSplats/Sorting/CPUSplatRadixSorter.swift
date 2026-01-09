@@ -1,3 +1,5 @@
+#if !arch(x86_64)
+
 internal import AsyncAlgorithms
 @preconcurrency import Metal
 import MetalSprocketsGaussianSplatShaders
@@ -117,3 +119,4 @@ internal extension CPUSplatRadixSorter {
         return .init(parameters: .init(camera: camera, model: model, reversed: reversed), indices: indices)
     }
 }
+#endif

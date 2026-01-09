@@ -1,3 +1,4 @@
+#if !arch(x86_64)
 /// A type-erased wrapper for `GPUSplatCloud<Splat>` that hides the splat type.
 ///
 /// Use `typed(as:)` to recover the underlying typed cloud when needed.
@@ -14,3 +15,4 @@ public struct AnyGPUSplatCloud: @unchecked Sendable {
         storage as? GPUSplatCloud<Splat>
     }
 }
+#endif

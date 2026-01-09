@@ -1,3 +1,4 @@
+#if !arch(x86_64)
 import Cocoa
 import GeometryLite3D
 import MetalSprocketsGaussianSplats
@@ -76,3 +77,4 @@ class PreviewViewController: NSViewController, QLPreviewingController {
         ])
     }
 }
+#endif

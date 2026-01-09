@@ -99,9 +99,9 @@ struct ImmersiveModeControlsView: View {
 }
 
 #Preview {
-    ImmersiveModeControlsView(onExitImmersive: {
+    ImmersiveModeControlsView {
         // This line intentionally left blank.
-    })
+    }
     .environment(SplatDocumentViewModel())
 }
 #endif

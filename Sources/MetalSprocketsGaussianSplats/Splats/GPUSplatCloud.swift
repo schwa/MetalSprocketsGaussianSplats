@@ -1,3 +1,4 @@
+#if !arch(x86_64)
 internal import AsyncAlgorithms
 import Metal
 import MetalSprocketsGaussianSplatShaders
@@ -75,3 +76,4 @@ public struct SortParameters: Sendable, Equatable {
         self.reversed = reversed
     }
 }
+#endif
