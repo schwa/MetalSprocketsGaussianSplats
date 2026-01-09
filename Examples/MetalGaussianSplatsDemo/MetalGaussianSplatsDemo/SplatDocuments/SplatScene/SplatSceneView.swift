@@ -19,6 +19,8 @@ struct SplatSceneView: View {
     @State private var showAddCloudPicker = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var inspectorTab: SceneInspectorTab = .cloud
+    @State private var showBoundingBoxes = false
+    @State private var viewportSize: CGSize = .zero
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -31,6 +33,7 @@ struct SplatSceneView: View {
             inspectorContent
                 .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
         }
+        .environment(viewModel)
         .toolbar { toolbarContent }
         .fileImporter(
             isPresented: $showAddCloudPicker,
@@ -113,6 +116,8 @@ struct SplatSceneView: View {
 
     @ViewBuilder
     private var renderView: some View {
+        @Bindable var viewModel = viewModel
+        
         // Get enabled cloud IDs from document and sync transforms
         let enabledCloudIDs = Set(document.scene.clouds.filter(\.enabled).map(\.id))
         let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
@@ -128,13 +133,24 @@ struct SplatSceneView: View {
         // Determine if we should use SH
         let useSH = document.scene.renderSettings.useSphericalHarmonics && viewModel.allCloudsHaveSphericalHarmonics
         
-        MultiCloudRenderView(
-            clouds: enabledClouds,
-            cameraMatrix: $viewModel.cameraMatrix,
-            sceneTransform: document.scene.sceneTransform.matrix,
-            verticalAngleOfView: $viewModel.verticalAngleOfView,
-            useSphericalHarmonics: useSH
-        )
+        ZStack {
+            MultiCloudRenderView(
+                clouds: enabledClouds,
+                cameraMatrix: $viewModel.cameraMatrix,
+                sceneTransform: document.scene.sceneTransform.matrix,
+                verticalAngleOfView: $viewModel.verticalAngleOfView,
+                useSphericalHarmonics: useSH
+            )
+            
+            if showBoundingBoxes {
+                boundingBoxOverlay
+            }
+        }
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { newSize in
+            viewportSize = newSize
+        }
         .overlay {
             if enabledClouds.isEmpty {
                 ContentUnavailableView {
@@ -145,6 +161,43 @@ struct SplatSceneView: View {
                 .background(.ultraThinMaterial)
             }
         }
+    }
+    
+    @ViewBuilder
+    private var boundingBoxOverlay: some View {
+        // Create projection using same approach as MultiCloudRenderView
+        let projection = PerspectiveProjection(
+            verticalAngleOfView: .degrees(Float(viewModel.verticalAngleOfView)),
+            depthMode: .standard(zClip: 0.01 ... 1000)
+        )
+        let projectionMatrix = projection.projectionMatrix(for: viewportSize)
+        
+        // View matrix is inverse of camera matrix
+        let viewMatrix = viewModel.cameraMatrix.inverse
+        
+        // Build bounding box info for enabled clouds
+        let boxes: [BoundingBoxOverlay.BoundingBoxInfo] = viewModel.loadedClouds
+            .filter { loadedCloud in
+                document.scene.clouds.first { $0.id == loadedCloud.id }?.enabled ?? false
+            }
+            .compactMap { loadedCloud in
+                guard let bounds = loadedCloud.bounds else { return nil }
+                let docCloud = document.scene.clouds.first { $0.id == loadedCloud.id }
+                let modelMatrix = document.scene.sceneTransform.matrix * (docCloud?.transform.matrix ?? .identity)
+                return BoundingBoxOverlay.BoundingBoxInfo(
+                    id: loadedCloud.id,
+                    bounds: bounds,
+                    modelMatrix: modelMatrix,
+                    color: .green
+                )
+            }
+        
+        BoundingBoxOverlay(
+            boundingBoxes: boxes,
+            viewMatrix: viewMatrix,
+            projectionMatrix: projectionMatrix,
+            viewportSize: viewportSize
+        )
     }
 
     // MARK: - Inspector
@@ -173,8 +226,6 @@ struct SplatSceneView: View {
             tab: $inspectorTab,
             cloud: selectedCloud,
             document: $document,
-            loadedCloud: selectedCloudID.flatMap { id in viewModel.loadedClouds.first { $0.id == id } },
-            viewModel: viewModel,
             onDeleteCloud: {
                 if let id = selectedCloudID {
                     document.scene.clouds.removeAll { $0.id == id }
@@ -194,6 +245,12 @@ struct SplatSceneView: View {
             }
         }
         #if os(macOS)
+        ToolbarItem(placement: .primaryAction) {
+            Toggle(isOn: $showBoundingBoxes) {
+                Label("Bounding Boxes", systemImage: "cube")
+            }
+            .toggleStyle(.button)
+        }
         ToolbarItem(placement: .primaryAction) {
             Button("Inspector", systemImage: "sidebar.right") {
                 withAnimation {

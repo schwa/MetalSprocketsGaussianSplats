@@ -17,9 +17,14 @@ struct SplatSceneInspectorView: View {
     @Binding var tab: SceneInspectorTab
     @Binding var cloud: SplatScene.CloudReference?
     @Binding var document: SplatSceneDocument
-    let loadedCloud: SplatSceneViewModel.LoadedCloud?
-    let viewModel: SplatSceneViewModel
     var onDeleteCloud: (() -> Void)?
+
+    @Environment(SplatSceneViewModel.self) private var viewModel
+
+    private var loadedCloud: SplatSceneViewModel.LoadedCloud? {
+        guard let cloudID = cloud?.id else { return nil }
+        return viewModel.loadedClouds.first { $0.id == cloudID }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,12 +57,12 @@ struct SplatSceneInspectorView: View {
                     }
                 case .scene:
                     Form {
-                        SceneInspectorContent(document: $document, viewModel: viewModel)
+                        SceneInspectorContent(document: $document)
                     }
                     .formStyle(.grouped)
                 case .camera:
                     Form {
-                        CameraInspectorContent(viewModel: viewModel)
+                        CameraInspectorContent()
                     }
                     .formStyle(.grouped)
                 case .render:
@@ -123,7 +128,7 @@ struct CloudInspectorContent: View {
 
 struct SceneInspectorContent: View {
     @Binding var document: SplatSceneDocument
-    let viewModel: SplatSceneViewModel
+    @Environment(SplatSceneViewModel.self) private var viewModel
 
     private var enabledSplatCount: Int {
         let enabledCloudIDs = Set(document.scene.clouds.filter(\.enabled).map(\.id))
@@ -154,12 +159,14 @@ struct SceneInspectorContent: View {
 // MARK: - Camera Inspector
 
 struct CameraInspectorContent: View {
-    let viewModel: SplatSceneViewModel
+    @Environment(SplatSceneViewModel.self) private var viewModel
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
+        @Bindable var viewModel = viewModel
+        
         Section("Field of View") {
-            Slider(value: viewModel.verticalAngleOfViewBinding, in: 30...120) {
+            Slider(value: $viewModel.verticalAngleOfView, in: 30...120) {
                 Text("FOV")
             }
             LabeledContent("FOV", value: "\(Int(viewModel.verticalAngleOfView))°")

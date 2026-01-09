@@ -24,14 +24,6 @@ final class SplatSceneViewModel {
     var verticalAngleOfView: Double = 90
 
     private var resourceAccess = ScopedResourceAccess()
-
-    // Binding helpers for use in views
-    var verticalAngleOfViewBinding: Binding<Double> {
-        Binding(
-            get: { self.verticalAngleOfView },
-            set: { self.verticalAngleOfView = $0 }
-        )
-    }
     
     /// Track which cloud IDs we've loaded to avoid reloading on property-only changes
     private var loadedCloudIDs: Set<UUID> = []
@@ -41,6 +33,7 @@ final class SplatSceneViewModel {
         let displayName: String
         let cloud: GPUSplatCloud<SparkSplat>
         let descriptor: SplatCloudDescriptor
+        var bounds: BoundingBox?
     }
 
     /// Whether all loaded clouds have spherical harmonics data
@@ -111,8 +104,28 @@ final class SplatSceneViewModel {
             }
 
             loadingState = loaded.isEmpty ? .idle : .ready
+            
+            // Compute bounds in background
+            Task {
+                await computeBoundsForLoadedClouds()
+            }
         } catch {
             loadingState = .error("Failed to load clouds: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Compute bounds for all loaded clouds that don't have them yet
+    @MainActor
+    func computeBoundsForLoadedClouds() async {
+        for i in loadedClouds.indices {
+            if loadedClouds[i].bounds == nil {
+                do {
+                    let bounds = try await loadedClouds[i].descriptor.computeBounds()
+                    loadedClouds[i].bounds = bounds
+                } catch {
+                    print("Failed to compute bounds for \(loadedClouds[i].displayName): \(error)")
+                }
+            }
         }
     }
 
