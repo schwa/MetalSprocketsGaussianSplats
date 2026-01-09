@@ -21,6 +21,7 @@ struct IndexedDistance {
 #else
 struct IndexedDistance {
     unsigned int index;
+    unsigned short cloudIndex;
     simd_half1 distanceToCamera;
 };
 #endif
