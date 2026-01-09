@@ -49,6 +49,7 @@ struct AboutView: View {
                     HStack(spacing: 16) {
                         Link("metalsprockets.com", destination: URL(string: "https://metalsprockets.com")!)
                         Link("schwa.io", destination: URL(string: "https://schwa.io")!)
+                        Link("github.com/schwa/MetalSprocketsGaussianSplats", destination: URL(string: "https://github.com/schwa/MetalSprocketsGaussianSplats")!)
                     }
                     .font(.subheadline)
                 }
