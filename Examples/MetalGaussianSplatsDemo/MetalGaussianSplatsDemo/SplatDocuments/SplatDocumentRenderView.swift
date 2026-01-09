@@ -33,7 +33,6 @@ struct SplatDocumentRenderView: View {
             projection = PerspectiveProjection(verticalAngleOfView: .degrees(Float(verticalAngleOfView)), depthMode: .standard(zClip: 0.01 ... 1_000))
         }
         .onChange(of: descriptor.url, initial: true) {
-            let cameraMatrix = cameraMatrix
             Task {
                 let splatCloud = try! await loadSplatCloud()
                 Task { @MainActor in
@@ -48,7 +47,6 @@ struct SplatDocumentRenderView: View {
             }
         }
         .onChange(of: rendererType) {
-            let cameraMatrix = cameraMatrix
             Task {
                 let splatCloud = try! await loadSplatCloud()
                 Task { @MainActor in

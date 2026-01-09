@@ -4,17 +4,19 @@ internal import AsyncAlgorithms
 import MetalSprocketsGaussianSplatShaders
 internal import os
 import simd
+import Splats
 
 internal actor AsyncSortManager <Splat> where Splat: SortableSplatProtocol {
-    private var splatCloud: GPUSplatCloud<Splat>
+    private var splatClouds: [GPUSplatCloud<Splat>]
     private var _sortRequestChannel: AsyncChannel<SortParameters> = .init()
     private var _sortedIndicesChannel: AsyncChannel<SplatIndices> = .init()
     private var logger: Logger?
     private var sorter: CPUSplatRadixSorter<Splat>
 
-    internal init(device: MTLDevice, splatCloud: GPUSplatCloud<Splat>, capacity: Int, logger: Logger? = nil) throws {
+    /// Initialize with multiple clouds
+    internal init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int, logger: Logger? = nil) throws {
         self.sorter = .init(device: device, capacity: capacity)
-        self.splatCloud = splatCloud
+        self.splatClouds = splatClouds
         self.logger = logger
         Task(priority: .high) {
             do {
@@ -25,6 +27,11 @@ internal actor AsyncSortManager <Splat> where Splat: SortableSplatProtocol {
                 logger?.log("Failed to sort splats: \(error)")
             }
         }
+    }
+
+    /// Convenience initializer for single cloud
+    internal init(device: MTLDevice, splatCloud: GPUSplatCloud<Splat>, capacity: Int, logger: Logger? = nil) throws {
+        try self.init(device: device, splatClouds: [splatCloud], capacity: capacity, logger: logger)
     }
 
     internal func sortedIndicesChannel() -> AsyncChannel<SplatIndices> {
@@ -46,9 +53,16 @@ internal actor AsyncSortManager <Splat> where Splat: SortableSplatProtocol {
 
         for await parameters in channel {
             let start = CFAbsoluteTimeGetCurrent()
-            // Combine scene-level model transform with per-cloud transform
-            let combinedModel = parameters.model * splatCloud.modelTransform
-            let currentIndexedDistances = try sorter.sort(splats: splatCloud.splats, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
+            let currentIndexedDistances: TypedMTLBuffer<IndexedDistance>
+            if splatClouds.count == 1 {
+                // Single cloud path - combine scene model with cloud transform
+                let cloud = splatClouds[0]
+                let combinedModel = parameters.model * cloud.modelTransform
+                currentIndexedDistances = try sorter.sort(splats: cloud.splats, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
+            } else {
+                // Multi-cloud path - sorter handles per-cloud transforms internally
+                currentIndexedDistances = try sorter.sort(clouds: splatClouds, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
+            }
             let end = CFAbsoluteTimeGetCurrent()
             let duration = end - start
             if duration > 0.033 {

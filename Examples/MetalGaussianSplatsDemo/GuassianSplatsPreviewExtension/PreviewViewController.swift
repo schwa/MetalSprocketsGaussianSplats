@@ -52,7 +52,6 @@ class PreviewViewController: NSViewController, QLPreviewingController {
         }
 
         // Create splat cloud
-        let cameraMatrix = simd_float4x4(translation: [0, 0, 5])
         let modelMatrix = simd_float4x4(xRotation: .radians(.pi))
 
         let device = _MTLCreateSystemDefaultDevice()
