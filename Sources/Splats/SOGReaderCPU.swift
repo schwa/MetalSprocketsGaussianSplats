@@ -254,6 +254,7 @@ public struct SOGReaderCPU: SplatReader {
         var pixelData = [UInt8](repeating: 0, count: width * height * 4)
 
         let colorSpace = CGColorSpaceCreateDeviceRGB()
+        // CGContext requires premultiplied alpha
         guard let context = CGContext(
             data: &pixelData,
             width: width,
@@ -267,6 +268,17 @@ public struct SOGReaderCPU: SplatReader {
         }
 
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        // Un-premultiply alpha to recover original RGB values
+        for i in stride(from: 0, to: pixelData.count, by: 4) {
+            let a = pixelData[i + 3]
+            if a > 0 && a < 255 {
+                let alphaF = Float(a) / 255.0
+                pixelData[i + 0] = UInt8(min(255, Float(pixelData[i + 0]) / alphaF))
+                pixelData[i + 1] = UInt8(min(255, Float(pixelData[i + 1]) / alphaF))
+                pixelData[i + 2] = UInt8(min(255, Float(pixelData[i + 2]) / alphaF))
+            }
+        }
 
         return (pixelData, width, height, 4)
     }
