@@ -196,8 +196,58 @@ struct SplatSceneView: View {
             boundingBoxes: boxes,
             viewMatrix: viewMatrix,
             projectionMatrix: projectionMatrix,
-            viewportSize: viewportSize
+            viewportSize: viewportSize,
+            onDrag: { cloudID, axis, screenDelta in
+                handleAxisDrag(cloudID: cloudID, axis: axis, screenDelta: screenDelta, viewMatrix: viewMatrix, projectionMatrix: projectionMatrix)
+            }
         )
+    }
+    
+    private func handleAxisDrag(cloudID: UUID, axis: Int, screenDelta: CGSize, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4) {
+        guard let cloudIndex = document.scene.clouds.firstIndex(where: { $0.id == cloudID }) else { return }
+        guard let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloudID }) else { return }
+        
+        // Get the cloud's center in world space
+        let bounds = loadedCloud.bounds ?? BoundingBox(min: .zero, max: .one)
+        let modelMatrix = document.scene.sceneTransform.matrix * document.scene.clouds[cloudIndex].transform.matrix
+        let worldCenter = modelMatrix * SIMD4<Float>(bounds.center, 1)
+        
+        // Compute pixels per world unit at this depth
+        let axisVectors: [SIMD3<Float>] = [SIMD3(1,0,0), SIMD3(0,1,0), SIMD3(0,0,1)]
+        let axisWorld = (modelMatrix * SIMD4<Float>(axisVectors[axis], 0)).xyz
+        let axisNorm = normalize(axisWorld)
+        
+        // Project center and center+axis to screen
+        let mvp = projectionMatrix * viewMatrix
+        func toScreen(_ p: SIMD4<Float>) -> CGPoint? {
+            let clip = mvp * p
+            guard clip.w > 0 else { return nil }
+            let ndc = SIMD3<Float>(clip.x, clip.y, clip.z) / clip.w
+            return CGPoint(
+                x: CGFloat((ndc.x + 1) * 0.5 * Float(viewportSize.width)),
+                y: CGFloat((1 - ndc.y) * 0.5 * Float(viewportSize.height))
+            )
+        }
+        
+        guard let p0 = toScreen(worldCenter),
+              let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0)) else { return }
+        
+        let screenDist = hypot(p1.x - p0.x, p1.y - p0.y)
+        guard screenDist > 0.001 else { return }
+        
+        // pixels per world unit
+        let pixelsPerUnit = screenDist
+        
+        // Convert screen delta magnitude to world units
+        let screenMag = hypot(screenDelta.width, screenDelta.height)
+        let sign: Float = (screenDelta.width * (p1.x - p0.x) + screenDelta.height * (p1.y - p0.y)) > 0 ? 1 : -1
+        let worldDelta = Float(screenMag) / Float(pixelsPerUnit) * sign
+        
+        // Update the cloud's translation along the axis (in local space)
+        var transform = document.scene.clouds[cloudIndex].transform
+        let localAxis = axisVectors[axis]
+        transform.translation += localAxis * worldDelta
+        document.scene.clouds[cloudIndex].transform = transform
     }
 
     // MARK: - Inspector

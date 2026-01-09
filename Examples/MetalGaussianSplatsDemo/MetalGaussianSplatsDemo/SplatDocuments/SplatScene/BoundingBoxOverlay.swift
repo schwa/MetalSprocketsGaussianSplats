@@ -8,6 +8,7 @@ struct BoundingBoxOverlay: View {
     let viewMatrix: simd_float4x4
     let projectionMatrix: simd_float4x4
     let viewportSize: CGSize
+    var onDrag: ((UUID, Int, CGSize) -> Void)? = nil // (cloudID, axis, screenDelta)
 
     struct BoundingBoxInfo: Identifiable {
         let id: UUID
@@ -18,9 +19,12 @@ struct BoundingBoxOverlay: View {
     
     struct FaceInfo: Identifiable {
         let id: String
+        let cloudID: UUID
         let points: [CGPoint]
         let color: Color
         let depth: Float
+        let axis: Int // 0=X, 1=Y, 2=Z
+        let axisDirectionScreen: CGVector // axis direction projected to screen space
     }
 
     var body: some View {
@@ -32,8 +36,15 @@ struct BoundingBoxOverlay: View {
         ZStack(alignment: .topLeading) {
             // Face fills with zIndex so front faces get hover priority
             ForEach(allFaces) { face in
-                HoverableFace(points: face.points, color: face.color)
-                    .zIndex(Double(face.depth))
+                DraggableFace(
+                    points: face.points,
+                    color: face.color,
+                    axisDirectionScreen: face.axisDirectionScreen,
+                    onDrag: { delta in
+                        onDrag?(face.cloudID, face.axis, delta)
+                    }
+                )
+                .zIndex(Double(face.depth))
             }
             
             // Wireframe edges (on top)
@@ -60,6 +71,11 @@ struct BoundingBoxOverlay: View {
     ]
     
     private static let axisColors: [Color] = [.red, .green, .blue]
+    private static let axisVectors: [SIMD3<Float>] = [
+        SIMD3(1, 0, 0), // X
+        SIMD3(0, 1, 0), // Y
+        SIMD3(0, 0, 1), // Z
+    ]
     
     private func computeFaces(box: BoundingBoxInfo) -> [FaceInfo] {
         let corners = box.bounds.corners
@@ -75,6 +91,20 @@ struct BoundingBoxOverlay: View {
         // Project corners to screen
         let screenPoints: [CGPoint?] = corners.map { corner in
             projectToScreen(point: corner, mvp: mvp, viewportSize: viewportSize)
+        }
+        
+        // Compute axis directions in screen space (for drag)
+        let center = box.bounds.center
+        let axisScreenDirs: [CGVector] = Self.axisVectors.map { axisVec in
+            let p0 = projectToScreen(point: center, mvp: mvp, viewportSize: viewportSize) ?? .zero
+            let p1 = projectToScreen(point: center + axisVec * 0.1, mvp: mvp, viewportSize: viewportSize) ?? .zero
+            let dx = p1.x - p0.x
+            let dy = p1.y - p0.y
+            let len = sqrt(dx*dx + dy*dy)
+            if len > 0.001 {
+                return CGVector(dx: dx/len, dy: dy/len)
+            }
+            return CGVector(dx: 1, dy: 0)
         }
         
         var faces: [FaceInfo] = []
@@ -99,9 +129,12 @@ struct BoundingBoxOverlay: View {
                 if faceScreenPoints.count == 4 {
                     faces.append(FaceInfo(
                         id: "\(box.id)-\(faceIdx)",
+                        cloudID: box.id,
                         points: faceScreenPoints,
                         color: Self.axisColors[def.axis],
-                        depth: center.z
+                        depth: center.z,
+                        axis: def.axis,
+                        axisDirectionScreen: axisScreenDirs[def.axis]
                     ))
                 }
             }
@@ -189,13 +222,17 @@ struct BoundingBoxOverlay: View {
     }
 }
 
-// MARK: - Hoverable Face
+// MARK: - Draggable Face
 
-struct HoverableFace: View {
+struct DraggableFace: View {
     let points: [CGPoint]
     let color: Color
+    let axisDirectionScreen: CGVector
+    var onDrag: ((CGSize) -> Void)?
     
     @State private var isHovered = false
+    @State private var isDragging = false
+    @State private var lastTranslation: CGSize = .zero
     
     private var boundingRect: CGRect {
         let xs = points.map(\.x)
@@ -215,7 +252,7 @@ struct HoverableFace: View {
     var body: some View {
         let rect = boundingRect
         QuadShape(points: localPoints)
-            .fill(color.opacity(isHovered ? 0.5 : 0))
+            .fill(color.opacity(isDragging ? 0.7 : (isHovered ? 0.5 : 0)))
             .frame(width: rect.width, height: rect.height)
             .contentShape(QuadShape(points: localPoints))
             .offset(x: rect.minX, y: rect.minY)
@@ -224,6 +261,28 @@ struct HoverableFace: View {
                     isHovered = hovering
                 }
             }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        isDragging = true
+                        // Compute delta from last position
+                        let delta = CGSize(
+                            width: value.translation.width - lastTranslation.width,
+                            height: value.translation.height - lastTranslation.height
+                        )
+                        lastTranslation = value.translation
+                        
+                        // Project drag onto axis direction
+                        let dragVec = CGVector(dx: delta.width, dy: delta.height)
+                        let dot = dragVec.dx * axisDirectionScreen.dx + dragVec.dy * axisDirectionScreen.dy
+                        let projected = CGSize(width: dot * axisDirectionScreen.dx, height: dot * axisDirectionScreen.dy)
+                        onDrag?(projected)
+                    }
+                    .onEnded { _ in
+                        isDragging = false
+                        lastTranslation = .zero
+                    }
+            )
     }
 }
 
