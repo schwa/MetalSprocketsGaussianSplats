@@ -29,6 +29,11 @@ final class SplatDocumentViewModel {
     }
     var rendererType: SplatRendererType = .spark
     var backgroundColor: Color = .black
+    var useSphericalHarmonics: Bool = true
+
+    var hasSphericalHarmonicsData: Bool {
+        descriptor?.hasSphericalHarmonics ?? false
+    }
     var loadingState: LoadingState = .idle
     var convertedURL: URL?
 

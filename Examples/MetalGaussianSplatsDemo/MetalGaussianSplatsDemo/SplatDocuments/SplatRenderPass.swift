@@ -17,6 +17,7 @@ struct SplatRenderPass: Element {
     var projection: any ProjectionProtocol
     var drawableSize: CGSize
     var frame: UInt32
+    var useSphericalHarmonics: Bool
 
     var body: some Element {
         get throws {
@@ -30,7 +31,8 @@ struct SplatRenderPass: Element {
                             projectionMatrix: projectionMatrix,
                             modelMatrix: modelMatrix,
                             cameraMatrix: cameraMatrix,
-                            drawableSize: SIMD2<Float>(drawableSize)
+                            drawableSize: SIMD2<Float>(drawableSize),
+                            useSphericalHarmonics: useSphericalHarmonics
                         )
                     }
                 }
@@ -43,7 +45,8 @@ struct SplatRenderPass: Element {
                             modelMatrix: modelMatrix,
                             cameraMatrix: cameraMatrix,
                             drawableSize: SIMD2<Float>(drawableSize),
-                            frameTime: frame
+                            frameTime: frame,
+                            useSphericalHarmonics: useSphericalHarmonics
                         )
                     }
                 }

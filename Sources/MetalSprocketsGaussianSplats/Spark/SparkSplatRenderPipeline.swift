@@ -11,6 +11,7 @@ public struct SparkSplatRenderPipeline: Element {
     var modelMatrix: simd_float4x4
     var cameraMatrices: [simd_float4x4]
     var drawableSize: SIMD2<Float>
+    var useSphericalHarmonics: Bool
 
     @MSState
     private var sortManager: AsyncSortManager<SparkSplat>?
@@ -21,19 +22,21 @@ public struct SparkSplatRenderPipeline: Element {
     var vertexDescriptor: MTLVertexDescriptor
 
     /// Convenience initializer for single-view rendering (non-stereo)
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil) throws {
         try self.init(
             splatCloud: splatCloud,
             projectionMatrices: [projectionMatrix],
             modelMatrix: modelMatrix,
             cameraMatrices: [cameraMatrix],
             drawableSize: drawableSize,
-            convertSRGBToLinear: convertSRGBToLinear
+            convertSRGBToLinear: convertSRGBToLinear,
+            useSphericalHarmonics: useSphericalHarmonics
         )
     }
 
     /// Full initializer supporting stereo/amplification rendering
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true) throws {
+    /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when data is available.
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
         self.splatCloud = splatCloud
@@ -42,14 +45,19 @@ public struct SparkSplatRenderPipeline: Element {
         self.cameraMatrices = cameraMatrices
         self.drawableSize = drawableSize
 
+        // Determine if SH should be used: explicit override, or auto-detect from data
+        let hasSHData = splatCloud.shCoefficients != nil
+        let useSH = useSphericalHarmonics ?? hasSHData
+        let effectiveUseSH = useSH && hasSHData // Can only use SH if data exists
+        self.useSphericalHarmonics = effectiveUseSH
+
         // Load Spark shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 
-        let useSH = splatCloud.shCoefficients != nil
-        logger?.info("SparkSplatRenderPipeline: SH enabled=\(useSH), degree=\(splatCloud.shDegree)")
+        logger?.info("SparkSplatRenderPipeline: SH enabled=\(effectiveUseSH), degree=\(splatCloud.shDegree), hasSHData=\(hasSHData)")
 
         var vertexConstants = FunctionConstants()
-        vertexConstants["use_sh"] = .bool(useSH)
+        vertexConstants["use_sh"] = .bool(effectiveUseSH)
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
@@ -67,8 +75,8 @@ public struct SparkSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            let shBuffer = splatCloud.shCoefficients
-            let degree = splatCloud.shDegree
+            let shBuffer = useSphericalHarmonics ? splatCloud.shCoefficients : nil
+            let degree = useSphericalHarmonics ? splatCloud.shDegree : 0
 
             // Compute view matrices (inverse of camera matrices)
             let viewMatrices = cameraMatrices.map(\.inverse)

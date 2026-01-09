@@ -14,6 +14,7 @@ public struct StochasticSplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var frameTime: UInt32
     var alphaThreshold: Float
+    var useSphericalHarmonics: Bool
 
     // Noise method
     var useBlueNoise: Bool
@@ -26,6 +27,7 @@ public struct StochasticSplatRenderPipeline: Element {
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
 
+    /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when data is available.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
@@ -35,7 +37,8 @@ public struct StochasticSplatRenderPipeline: Element {
         frameTime: UInt32,
         alphaThreshold: Float = 0.95,
         convertSRGBToLinear: Bool = true,
-        useBlueNoise: Bool = true
+        useBlueNoise: Bool = true,
+        useSphericalHarmonics: Bool? = nil
     ) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
@@ -45,6 +48,12 @@ public struct StochasticSplatRenderPipeline: Element {
         self.frameTime = frameTime
         self.alphaThreshold = alphaThreshold
         self.useBlueNoise = useBlueNoise
+
+        // Determine if SH should be used: explicit override, or auto-detect from data
+        let hasSHData = splatCloud.shCoefficients != nil
+        let useSH = useSphericalHarmonics ?? hasSHData
+        let effectiveUseSH = useSH && hasSHData // Can only use SH if data exists
+        self.useSphericalHarmonics = effectiveUseSH
 
         // Load blue noise texture
         guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {
@@ -60,11 +69,10 @@ public struct StochasticSplatRenderPipeline: Element {
         // Load Stochastic shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("StochasticSplatRenderShader")
 
-        let useSH = splatCloud.shCoefficients != nil
-        logger?.info("StochasticSplatRenderPipeline: SH enabled=\(useSH), degree=\(splatCloud.shDegree)")
+        logger?.info("StochasticSplatRenderPipeline: SH enabled=\(effectiveUseSH), degree=\(splatCloud.shDegree), hasSHData=\(hasSHData)")
 
         var vertexConstants = FunctionConstants()
-        vertexConstants["use_sh"] = .bool(useSH)
+        vertexConstants["use_sh"] = .bool(effectiveUseSH)
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
@@ -83,8 +91,8 @@ public struct StochasticSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            let shBuffer = splatCloud.shCoefficients
-            let degree = splatCloud.shDegree
+            let shBuffer = useSphericalHarmonics ? splatCloud.shCoefficients : nil
+            let degree = useSphericalHarmonics ? splatCloud.shDegree : 0
             var time = frameTime
             var threshold = alphaThreshold
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {

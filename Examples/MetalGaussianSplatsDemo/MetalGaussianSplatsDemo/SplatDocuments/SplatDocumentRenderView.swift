@@ -12,6 +12,7 @@ struct SplatDocumentRenderView: View {
     let rendererType: SplatRendererType
     let descriptor: SplatCloudDescriptor
     let cameraMode: SplatDocumentViewModel.CameraMode
+    let useSphericalHarmonics: Bool
 
     @Binding var cameraMatrix: simd_float4x4
     @Binding var modelMatrix: simd_float4x4
@@ -70,9 +71,10 @@ struct SplatDocumentRenderView: View {
         let capturedModelMatrix = modelMatrix
         let capturedProjection = projection
         let capturedRendererType = rendererType
+        let capturedUseSphericalHarmonics = useSphericalHarmonics
 
         let view = RenderView { context, drawableSize in
-            SplatRenderPass(rendererType: capturedRendererType, splatCloud: splatCloud, cameraMatrix: capturedCameraMatrix, modelMatrix: capturedModelMatrix, projection: capturedProjection, drawableSize: drawableSize, frame: context.frameUniforms.index)
+            SplatRenderPass(rendererType: capturedRendererType, splatCloud: splatCloud, cameraMatrix: capturedCameraMatrix, modelMatrix: capturedModelMatrix, projection: capturedProjection, drawableSize: drawableSize, frame: context.frameUniforms.index, useSphericalHarmonics: capturedUseSphericalHarmonics)
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
