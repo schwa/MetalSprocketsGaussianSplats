@@ -38,28 +38,26 @@ struct SplatCloudDescriptor: Sendable {
 
         contentType = UTType(filenameExtension: url.pathExtension)
 
-        try timeit("Count calculation.") {
-            switch contentType {
-            case .spz:
-                let reader = try SPZReader(url: url)
-                splatCount = reader.splatCount
-                shDegree = reader.shDegree
-            case .ply:
-                let reader = try PLYSplatReader(url: url)
-                splatCount = reader.splatCount
-                shDegree = reader.shDegree
-            case .antimatter15Splat:
-                let reader = try Antimatter15Reader(url: url)
-                splatCount = reader.splatCount
-                shDegree = 0
-            case .sog:
-                let reader = try SOGReaderCPU(url: url)
-                splatCount = reader.splatCount
-                shDegree = UInt8(reader.shDegree)
-            default:
-                splatCount = 0
-                shDegree = 0
-            }
+        switch contentType {
+        case .spz:
+            let reader = try SPZReader(url: url)
+            splatCount = reader.splatCount
+            shDegree = reader.shDegree
+        case .ply:
+            let reader = try PLYSplatReader(url: url)
+            splatCount = reader.splatCount
+            shDegree = reader.shDegree
+        case .antimatter15Splat:
+            let reader = try Antimatter15Reader(url: url)
+            splatCount = reader.splatCount
+            shDegree = 0
+        case .sog:
+            let reader = try SOGReaderCPU(url: url)
+            splatCount = reader.splatCount
+            shDegree = UInt8(reader.shDegree)
+        default:
+            splatCount = 0
+            shDegree = 0
         }
     }
 

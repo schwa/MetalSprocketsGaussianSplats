@@ -67,10 +67,13 @@ final class SplatSceneViewModel {
             return
         }
         
+        // Set target IDs immediately to prevent re-entry during async loading
+        let targetCloudIDs = Set(scene.clouds.map(\.id))
+        loadedCloudIDs = targetCloudIDs
+        
         if scene.clouds.isEmpty {
             loadingState = .idle
             loadedClouds = []
-            loadedCloudIDs = []
             return
         }
 
@@ -101,7 +104,6 @@ final class SplatSceneViewModel {
             }
 
             loadedClouds = loaded
-            loadedCloudIDs = Set(loaded.map(\.id))
 
             if let camera = scene.camera {
                 cameraMatrix = camera.matrix

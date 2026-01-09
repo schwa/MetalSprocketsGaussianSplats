@@ -67,7 +67,7 @@
          <EnvironmentVariable
             key = "VERBOSE"
             value = "YES"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "MS_DUMP_SNAPSHOTS"
