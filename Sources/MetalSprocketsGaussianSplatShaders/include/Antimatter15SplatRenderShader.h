@@ -12,10 +12,18 @@ struct Antimatter15GPUSplat {
 };
 
 // Metal debugger format: uint32_t Index, float distance
+#ifdef __METAL_VERSION__
 struct IndexedDistance {
     unsigned int index;
-    float distanceToCamera;
+    unsigned short cloudIndex;
+    half distanceToCamera;
 };
+#else
+struct IndexedDistance {
+    unsigned int index;
+    simd_half1 distanceToCamera;
+};
+#endif
 
 #ifdef __METAL_VERSION__
 // For Metal shaders, provide a convenient typedef

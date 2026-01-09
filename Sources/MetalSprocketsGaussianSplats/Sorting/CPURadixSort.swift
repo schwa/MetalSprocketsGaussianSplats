@@ -11,7 +11,10 @@ extension BinaryInteger {
 // MARK: -
 
 internal protocol RadixSortable {
+    /// Returns an 8-bit chunk of the sortable key for the given shift (in bits).
     func key(shift: Int) -> Int
+    /// Total number of bits required to represent the sortable key.
+    static var totalKeyBitWidth: Int { get }
 }
 
 internal struct RadixSortCPU <T> where T: RadixSortable {
@@ -46,9 +49,16 @@ internal struct RadixSortCPU <T> where T: RadixSortable {
     internal func radixSort(input: UnsafeMutableBufferPointer<T>, temp: UnsafeMutableBufferPointer<T>) {
         var input = input
         var temp = temp
-        for phase in 0..<4 {
-            countingSort(input: input, shift: phase * 8, output: temp)
+        let radixBits = 8
+        let phases = (T.totalKeyBitWidth + radixBits - 1) / radixBits
+        for phase in 0..<phases {
+            countingSort(input: input, shift: phase * radixBits, output: temp)
             swap(&input, &temp)
+        }
+        if phases % 2 == 0 {
+            for i in input.indices {
+                temp[i] = input[i]
+            }
         }
     }
 }

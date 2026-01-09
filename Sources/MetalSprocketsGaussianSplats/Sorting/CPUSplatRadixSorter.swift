@@ -66,7 +66,7 @@ private func cpuRadixSort<Splat>(splats: TypedMTLBuffer<Splat>, indexedDistances
             for index in 0..<splats.count {
                 let position = modelView * SIMD4<Float>(splats[index].floatPosition, 1.0)
                 let distance = position.z * (reversed ? -1.0 : 1.0)
-                indexedDistances[index] = .init(index: UInt32(index), distanceToCamera: distance)
+                indexedDistances[index] = .init(index: UInt32(index), distanceToCamera: Float16(distance))
             }
         }
         temporaryIndexedDistances.withUnsafeMutableBufferPointer { temporaryIndexedDistances in
@@ -84,10 +84,12 @@ private func cpuRadixSort<Splat>(splats: TypedMTLBuffer<Splat>, indexedDistances
 extension IndexedDistance: RadixSortable {
     func key(shift: Int) -> Int {
         let bits = distanceToCamera.bitPattern
-        let signMask: UInt32 = 0x80000000
-        let key: UInt32 = (bits & signMask != 0) ? ~bits : bits ^ signMask
+        let signMask: UInt16 = 0x8000
+        let key: UInt16 = (bits & signMask != 0) ? ~bits : bits ^ signMask
         return (Int(key) >> shift) & 0xFF
     }
+
+    static var totalKeyBitWidth: Int { 16 }
 }
 
 // MARK: -
