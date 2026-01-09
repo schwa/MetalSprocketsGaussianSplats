@@ -14,17 +14,19 @@ struct SplatSceneView: View {
     @State private var viewModel = SplatSceneViewModel()
     @State private var selectedCloudID: UUID?
     @State private var showAddCloudPicker = false
-    @State private var showInspector = true
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var inspectorTab: SceneInspectorTab = .cloud
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             cloudListSidebar
-        } detail: {
+                .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 300)
+        } content: {
             renderContent
-        }
-        .inspector(isPresented: $showInspector) {
+                .navigationSplitViewColumnWidth(min: 400, ideal: 600)
+        } detail: {
             inspectorContent
-                .inspectorColumnWidth(min: 250, ideal: 300, max: 400)
+                .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
         }
         .toolbar { toolbarContent }
         .fileImporter(
@@ -121,18 +123,30 @@ struct SplatSceneView: View {
 
     @ViewBuilder
     private var inspectorContent: some View {
-        Group {
-            if let selectedID = selectedCloudID,
-               let index = document.scene.clouds.firstIndex(where: { $0.id == selectedID }) {
-                CloudInspectorView(
-                    cloud: $document.scene.clouds[index],
-                    loadedCloud: viewModel.loadedClouds.first { $0.id == selectedID }
-                )
-            } else {
-                ContentUnavailableView("No Selection", systemImage: "sidebar.right", description: Text("Select a cloud to view its details"))
+        let selectedCloud: Binding<SplatScene.CloudReference?> = Binding(
+            get: {
+                guard let selectedID = selectedCloudID,
+                      let index = document.scene.clouds.firstIndex(where: { $0.id == selectedID }) else {
+                    return nil
+                }
+                return document.scene.clouds[index]
+            },
+            set: { newValue in
+                guard let newValue,
+                      let selectedID = selectedCloudID,
+                      let index = document.scene.clouds.firstIndex(where: { $0.id == selectedID }) else {
+                    return
+                }
+                document.scene.clouds[index] = newValue
             }
-        }
-        .navigationTitle("Inspector")
+        )
+        
+        SplatSceneInspectorView(
+            tab: $inspectorTab,
+            cloud: selectedCloud,
+            document: $document,
+            loadedCloud: selectedCloudID.flatMap { id in viewModel.loadedClouds.first { $0.id == id } }
+        )
     }
 
     // MARK: - Toolbar
@@ -147,7 +161,13 @@ struct SplatSceneView: View {
         #if os(macOS)
         ToolbarItem(placement: .primaryAction) {
             Button("Inspector", systemImage: "sidebar.right") {
-                showInspector.toggle()
+                withAnimation {
+                    if columnVisibility == .all {
+                        columnVisibility = .doubleColumn
+                    } else {
+                        columnVisibility = .all
+                    }
+                }
             }
         }
         #endif
@@ -229,32 +249,107 @@ struct CloudListRow: View {
     }
 }
 
-// MARK: - Cloud Inspector View
+// MARK: - Scene Inspector Tab
 
-struct CloudInspectorView: View {
+enum SceneInspectorTab: String, CaseIterable {
+    case cloud = "Cloud"
+    case scene = "Scene"
+    case render = "Render"
+}
+
+// MARK: - Inspector Content
+
+struct SplatSceneInspectorView: View {
+    @Binding var tab: SceneInspectorTab
+    @Binding var cloud: SplatScene.CloudReference?
+    @Binding var document: SplatSceneDocument
+    let loadedCloud: SplatSceneViewModel.LoadedCloud?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Tab picker at top
+            Picker("Tab", selection: $tab) {
+                ForEach(SceneInspectorTab.allCases, id: \.self) { tab in
+                    Text(tab.rawValue).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding()
+
+            Divider()
+
+            // Content
+            Group {
+                switch tab {
+                case .cloud:
+                    if var cloudBinding = cloud {
+                        Form {
+                            CloudInspectorContent(cloud: Binding(
+                                get: { cloudBinding },
+                                set: { cloudBinding = $0; cloud = $0 }
+                            ), loadedCloud: loadedCloud)
+                        }
+                        .formStyle(.grouped)
+                    } else {
+                        ContentUnavailableView("No Selection", systemImage: "cube.transparent", description: Text("Select a cloud to view its details"))
+                    }
+                case .scene:
+                    Form {
+                        SceneInspectorContent(document: $document)
+                    }
+                    .formStyle(.grouped)
+                case .render:
+                    Form {
+                        Section("Render") {
+                            Text("Render settings coming soon")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .formStyle(.grouped)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+struct CloudInspectorContent: View {
     @Binding var cloud: SplatScene.CloudReference
     let loadedCloud: SplatSceneViewModel.LoadedCloud?
 
     var body: some View {
-        Form {
-            Section("Cloud") {
-                TextField("Name", text: Binding(
-                    get: { cloud.displayName ?? "" },
-                    set: { cloud.displayName = $0.isEmpty ? nil : $0 }
-                ))
+        Section("Cloud") {
+            TextField("Name", text: Binding(
+                get: { cloud.displayName ?? "" },
+                set: { cloud.displayName = $0.isEmpty ? nil : $0 }
+            ))
 
-                Toggle("Enabled", isOn: $cloud.enabled)
-            }
-
-            Section("Transform") {
-                TransformEditor(transform: $cloud.transform)
-            }
-
-            if let loaded = loadedCloud {
-                SplatCloudInfoSections(descriptor: loaded.descriptor)
-            }
+            Toggle("Enabled", isOn: $cloud.enabled)
         }
-        .formStyle(.grouped)
+
+        Section("Transform") {
+            TransformEditor(transform: $cloud.transform)
+        }
+
+        if let loaded = loadedCloud {
+            SplatCloudInfoSections(descriptor: loaded.descriptor)
+        }
+    }
+}
+
+struct SceneInspectorContent: View {
+    @Binding var document: SplatSceneDocument
+
+    var body: some View {
+        Section("Scene") {
+            LabeledContent("Clouds", value: "\(document.scene.clouds.count)")
+            LabeledContent("Enabled", value: "\(document.scene.clouds.filter(\.enabled).count)")
+        }
+
+        Section("Scene Transform") {
+            TransformEditor(transform: $document.scene.sceneTransform)
+        }
     }
 }
 
