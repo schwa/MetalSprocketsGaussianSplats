@@ -11,7 +11,7 @@ import ZIPFoundation
 public struct SOGReaderCPU: SplatReader {
     private let splats: [GenericSplat]
     private let sphericalHarmonics: [[[Float]]]? // Per-splat SH coefficients, or nil if no SH data. Each splat has [[r,g,b], [r,g,b], ...]
-    
+
     /// The degree of spherical harmonics (0 = none, 1-3 = higher-order SH)
     public let shDegree: Int
 
@@ -281,7 +281,7 @@ public struct SOGReaderCPU: SplatReader {
         // Un-premultiply alpha to recover original RGB values
         for i in stride(from: 0, to: pixelData.count, by: 4) {
             let a = pixelData[i + 3]
-            if a > 0 && a < 255 {
+            if a > 0, a < 255 {
                 let alphaF = Float(a) / 255.0
                 pixelData[i + 0] = UInt8(min(255, Float(pixelData[i + 0]) / alphaF))
                 pixelData[i + 1] = UInt8(min(255, Float(pixelData[i + 1]) / alphaF))

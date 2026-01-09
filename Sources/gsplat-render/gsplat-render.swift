@@ -112,7 +112,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             modelMatrix: modelMatrix,
             cameraMatrix: cameraMatrix
         )
-        
+
         print("Effective SH degree: \(effectiveSHDegree), SH buffer: \(shCoefficientsBuffer != nil ? "yes" : "no")")
 
         let size = CGSize(width: renderConfig.width, height: renderConfig.height)
@@ -296,10 +296,10 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         }
 
         // Debug: print SH coefficients for first few splats
-        if detectedSHDegree > 0 && !shCoefficients.isEmpty {
+        if detectedSHDegree > 0, !shCoefficients.isEmpty {
             let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
             print("SH Debug (\(fileExtension)): degree=\(detectedSHDegree), floatsPerSplat=\(floatsPerSplat)")
-            for splatIdx in [0, 1, 100, 1000] {
+            for splatIdx in [0, 1, 100, 1_000] {
                 if splatIdx >= splats.count { continue }
                 let baseOffset = splatIdx * floatsPerSplat
                 print("  Splat \(splatIdx) first 3 coeffs:")
@@ -347,7 +347,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             row += ",\(splat.color.x),\(splat.color.y),\(splat.color.z),\(splat.color.w)"
 
             // Add SH coefficients
-            if floatsPerSplat > 0 && !loadResult.shCoefficients.isEmpty {
+            if floatsPerSplat > 0, !loadResult.shCoefficients.isEmpty {
                 let baseOffset = index * floatsPerSplat
                 for i in 0..<numCoeffs {
                     let r = loadResult.shCoefficients[baseOffset + i * 3]
@@ -381,8 +381,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         }
 
         // Create SH buffer if we have SH data and it's enabled
-        var shCoefficientsBuffer: TypedMTLBuffer<Float>? = nil
-        if !loadResult.shCoefficients.isEmpty && effectiveSHDegree > 0 {
+        var shCoefficientsBuffer: TypedMTLBuffer<Float>?
+        if !loadResult.shCoefficients.isEmpty, effectiveSHDegree > 0 {
             shCoefficientsBuffer = try device.makeTypedBuffer(values: loadResult.shCoefficients, options: [])
         }
 

@@ -185,7 +185,7 @@ extension SplatCloudDescriptor {
         var splatCloud = try GPUSplatCloud(device: device, splats: splats, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
 
         // Attach SH buffer if we have SH data
-        if !shCoefficients.isEmpty && effectiveSHDegree > 0 {
+        if !shCoefficients.isEmpty, effectiveSHDegree > 0 {
             splatCloud.shCoefficients = try device.makeTypedBuffer(values: shCoefficients, options: [])
             splatCloud.shDegree = effectiveSHDegree
         }

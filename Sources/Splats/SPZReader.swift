@@ -237,11 +237,11 @@ public struct SPZReader: SplatReader {
 
     private func unpackSphericalHarmonics(at offset: Int, coeffCount: Int) throws -> [[Float]] {
         var result: [[Float]] = []
-        
+
         // SPZ SH coefficients are stored as unsigned bytes
         // Reference implementation: (float(x) - 128.0) / 128.0
         // This gives range approximately [-1, ~0.99]
-        
+
         for i in 0..<coeffCount {
             var coeff = [Float](repeating: 0, count: 3)
             for channel in 0..<3 {
