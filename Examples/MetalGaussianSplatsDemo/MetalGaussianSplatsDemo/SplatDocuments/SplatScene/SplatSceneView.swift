@@ -88,62 +88,61 @@ struct SplatSceneView: View {
     private var renderContent: some View {
         switch viewModel.loadingState {
         case .idle:
-            ContentUnavailableView {
-                Label("Empty Scene", systemImage: "cube.transparent")
-            } description: {
-                Text("Add splat clouds to start")
+            if document.scene.clouds.isEmpty {
+                ContentUnavailableView {
+                    Label("Empty Scene", systemImage: "cube.transparent")
+                } description: {
+                    Text("Add splat clouds to start")
+                }
+            } else {
+                // Have clouds in document but not loaded yet (all disabled case on fresh load)
+                renderView
             }
         case .loading:
             ProgressView("Loading clouds...")
         case .ready:
-            if viewModel.loadedClouds.isEmpty {
-                ContentUnavailableView("No clouds loaded", systemImage: "cube.transparent")
-            } else {
-                // Get enabled cloud IDs from document and sync transforms
-                let enabledCloudIDs = Set(document.scene.clouds.filter(\.enabled).map(\.id))
-                let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
-                    .filter { enabledCloudIDs.contains($0.id) }
-                    .compactMap { loadedCloud in
-                        // Get current transform from document
-                        if let docCloud = document.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
-                            loadedCloud.cloud.modelTransform = docCloud.transform.matrix
-                        }
-                        return loadedCloud.cloud
-                    }
-                
-                if enabledClouds.isEmpty {
-                    // All clouds are hidden
-                    ZStack {
-                        Color.black
-                        VStack {
-                            Image(systemName: "eye.slash")
-                                .font(.largeTitle)
-                            Text("All clouds hidden")
-                                .font(.headline)
-                            Text("Enable clouds in the sidebar to view")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .foregroundStyle(.white)
-                    }
-                } else {
-                    // Determine if we should use SH
-                    let useSH = document.scene.renderSettings.useSphericalHarmonics && viewModel.allCloudsHaveSphericalHarmonics
-                    
-                    MultiCloudRenderView(
-                        clouds: enabledClouds,
-                        cameraMatrix: $viewModel.cameraMatrix,
-                        sceneTransform: document.scene.sceneTransform.matrix,
-                        verticalAngleOfView: $viewModel.verticalAngleOfView,
-                        useSphericalHarmonics: useSH
-                    )
-                }
-            }
+            renderView
         case .error(let message):
             ContentUnavailableView {
                 Label("Error", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(message)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var renderView: some View {
+        // Get enabled cloud IDs from document and sync transforms
+        let enabledCloudIDs = Set(document.scene.clouds.filter(\.enabled).map(\.id))
+        let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
+            .filter { enabledCloudIDs.contains($0.id) }
+            .compactMap { loadedCloud in
+                // Get current transform from document
+                if let docCloud = document.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
+                    loadedCloud.cloud.modelTransform = docCloud.transform.matrix
+                }
+                return loadedCloud.cloud
+            }
+        
+        // Determine if we should use SH
+        let useSH = document.scene.renderSettings.useSphericalHarmonics && viewModel.allCloudsHaveSphericalHarmonics
+        
+        MultiCloudRenderView(
+            clouds: enabledClouds,
+            cameraMatrix: $viewModel.cameraMatrix,
+            sceneTransform: document.scene.sceneTransform.matrix,
+            verticalAngleOfView: $viewModel.verticalAngleOfView,
+            useSphericalHarmonics: useSH
+        )
+        .overlay {
+            if enabledClouds.isEmpty {
+                ContentUnavailableView {
+                    Label("All Clouds Hidden", systemImage: "eye.slash")
+                } description: {
+                    Text("Enable clouds in the sidebar to view")
+                }
+                .background(.ultraThinMaterial)
             }
         }
     }

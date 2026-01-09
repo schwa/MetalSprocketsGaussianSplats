@@ -50,16 +50,23 @@ struct MultiCloudRenderPass: Element {
 
     var body: some Element {
         get throws {
-            let projectionMatrix = projection.projectionMatrix(for: drawableSize)
-            try RenderPass {
-                try SparkSplatRenderPipeline(
-                    splatClouds: clouds,
-                    projectionMatrices: [projectionMatrix],
-                    modelMatrix: sceneTransform,
-                    cameraMatrices: [cameraMatrix],
-                    drawableSize: SIMD2<Float>(drawableSize),
-                    useSphericalHarmonics: useSphericalHarmonics
-                )
+            if !clouds.isEmpty {
+                let projectionMatrix = projection.projectionMatrix(for: drawableSize)
+                try RenderPass {
+                    try SparkSplatRenderPipeline(
+                        splatClouds: clouds,
+                        projectionMatrices: [projectionMatrix],
+                        modelMatrix: sceneTransform,
+                        cameraMatrices: [cameraMatrix],
+                        drawableSize: SIMD2<Float>(drawableSize),
+                        useSphericalHarmonics: useSphericalHarmonics
+                    )
+                }
+            }
+            else {
+                // Empty render pass - just to get the clear color.
+                try RenderPass {
+                }
             }
         }
     }
