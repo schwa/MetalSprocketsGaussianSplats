@@ -146,22 +146,27 @@ struct BoundingBoxFaceInteraction: View {
         let allFaces = boundingBoxes.flatMap { computeFaces(box: $0) }
             .sorted { $0.depth > $1.depth }
         
-        ZStack(alignment: .topLeading) {
-            ForEach(allFaces) { face in
-                DraggableFace(
-                    points: face.points,
-                    color: face.color,
-                    axisDirectionScreen: face.axisDirectionScreen,
-                    onDragChange: { delta in
-                        onDragChange?(face.cloudID, face.axis, delta)
-                    },
-                    onDragEnd: {
-                        onDragEnd?(face.cloudID)
+        Color.clear
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .topLeading) {
+                ZStack(alignment: .topLeading) {
+                    ForEach(allFaces) { face in
+                        DraggableFace(
+                            points: face.points,
+                            color: face.color,
+                            axisDirectionScreen: face.axisDirectionScreen,
+                            onDragChange: { delta in
+                                onDragChange?(face.cloudID, face.axis, delta)
+                            },
+                            onDragEnd: {
+                                onDragEnd?(face.cloudID)
+                            }
+                        )
+                        .zIndex(Double(face.depth))
                     }
-                )
-                .zIndex(Double(face.depth))
+                }
             }
-        }
+            .allowsHitTesting(true)
     }
     
     private func computeFaces(box: BoundingBoxInfo) -> [FaceInfo] {
