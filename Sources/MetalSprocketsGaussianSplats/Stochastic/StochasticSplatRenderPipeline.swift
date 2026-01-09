@@ -69,8 +69,6 @@ public struct StochasticSplatRenderPipeline: Element {
         // Load Stochastic shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("StochasticSplatRenderShader")
 
-        logger?.info("StochasticSplatRenderPipeline: SH enabled=\(effectiveUseSH), degree=\(splatCloud.shDegree), hasSHData=\(hasSHData)")
-
         var vertexConstants = FunctionConstants()
         vertexConstants["use_sh"] = .bool(effectiveUseSH)
 

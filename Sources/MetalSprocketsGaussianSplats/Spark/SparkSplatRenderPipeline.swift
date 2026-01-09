@@ -54,8 +54,6 @@ public struct SparkSplatRenderPipeline: Element {
         // Load Spark shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 
-        logger?.info("SparkSplatRenderPipeline: SH enabled=\(effectiveUseSH), degree=\(splatCloud.shDegree), hasSHData=\(hasSHData)")
-
         var vertexConstants = FunctionConstants()
         vertexConstants["use_sh"] = .bool(effectiveUseSH)
 
