@@ -97,6 +97,7 @@ struct SplashView: View {
                     } description: {
                         Text("Documents you open will appear here")
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List(selection: $selectedURL) {
                         ForEach(Array(recentDocumentURLs.enumerated()), id: \.element) { index, url in
