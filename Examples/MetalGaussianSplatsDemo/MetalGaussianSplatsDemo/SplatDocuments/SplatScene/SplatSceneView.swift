@@ -144,7 +144,8 @@ struct SplatSceneView: View {
                 cameraMatrix: $viewModel.cameraMatrix,
                 sceneTransform: document.scene.sceneTransform.matrix,
                 verticalAngleOfView: $viewModel.verticalAngleOfView,
-                useSphericalHarmonics: useSH
+                useSphericalHarmonics: useSH,
+                backgroundColor: document.scene.renderSettings.backgroundColor
             )
             
             if showBoundingBoxes {
