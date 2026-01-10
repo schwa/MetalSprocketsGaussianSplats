@@ -27,8 +27,6 @@ public struct SparkSplatRenderPipeline: Element {
     var cameraMatrices: [simd_float4x4]
     var drawableSize: SIMD2<Float>
     var useSphericalHarmonics: Bool
-    /// Whether we're using the multi-cloud shader (set at init, not recomputed)
-    var isMultiCloudShader: Bool
 
     @MSState
     private var sortManager: AsyncSortManager<SparkSplat>?
@@ -103,9 +101,7 @@ public struct SparkSplatRenderPipeline: Element {
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
 
-        // Always use multi-cloud shader - single cloud is just [cloud]
-        self.isMultiCloudShader = true
-        self.vertexShader = try shaderLibrary.function(named: "vertex_main_multicloud", type: VertexShader.self, constants: vertexConstants)
+        self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
         self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
 
         // Setup vertex descriptor
@@ -129,21 +125,12 @@ public struct SparkSplatRenderPipeline: Element {
 
             try Group {
                 if let indexedDistancesBuffer = sortedIndices?.indices {
-                    if isMultiCloudShader {
-                        try multiCloudRenderPipeline(
-                            indexedDistancesBuffer: indexedDistancesBuffer,
-                            viewMatrices: viewMatrices,
-                            cameraPositions: cameraPositions,
-                            amplificationCount: amplificationCount
-                        )
-                    } else {
-                        try singleCloudRenderPipeline(
-                            indexedDistancesBuffer: indexedDistancesBuffer,
-                            viewMatrices: viewMatrices,
-                            cameraPositions: cameraPositions,
-                            amplificationCount: amplificationCount
-                        )
-                    }
+                    try renderPipeline(
+                        indexedDistancesBuffer: indexedDistancesBuffer,
+                        viewMatrices: viewMatrices,
+                        cameraPositions: cameraPositions,
+                        amplificationCount: amplificationCount
+                    )
                 }
             }
             .onChange(of: splatClouds, initial: true) { _, _ in
@@ -192,59 +179,9 @@ public struct SparkSplatRenderPipeline: Element {
         }
     }
 
-    // MARK: - Single Cloud Render Pipeline
+    // MARK: - Render Pipeline
 
-    private func singleCloudRenderPipeline(
-        indexedDistancesBuffer: TypedMTLBuffer<IndexedDistance>,
-        viewMatrices: [simd_float4x4],
-        cameraPositions: [SIMD3<Float>],
-        amplificationCount: Int
-    ) throws -> some Element {
-        let splatCloud = splatClouds[0]
-        let shBuffer = useSphericalHarmonics ? splatCloud.shCoefficients : nil
-        let degree = useSphericalHarmonics ? splatCloud.shDegree : 0
-        let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
-
-        return try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-            Draw { commandEncoder in
-                let vertices: [SIMD2<Float>] = [
-                    [-1, -1], [-1, 1], [1, -1], [1, 1]
-                ]
-                commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                if let buffer = shBuffer {
-                    var shDegreeValue = UInt32(degree)
-                    commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
-                    commandEncoder.setVertexBuffer(buffer.unsafeMTLBuffer, offset: 0, index: 12)
-                }
-                commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
-                commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
-            }
-            .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
-            .parameter("indexedDistances", buffer: indexedDistancesBuffer.unsafeMTLBuffer)
-            .parameter("modelMatrix", value: combinedModelMatrix)
-            .parameter("viewMatrices", values: viewMatrices)
-            .parameter("projectionMatrices", values: projectionMatrices)
-            .parameter("drawableSize", value: drawableSize)
-            .parameter("scale", value: Float(2.0))
-            .parameter("cameraPositions", values: cameraPositions)
-        }
-        .vertexDescriptor(vertexDescriptor)
-        .renderPipelineDescriptorModifier { [amplificationCount] renderPipelineDescriptor in
-            renderPipelineDescriptor.inputPrimitiveTopology = .triangle
-            renderPipelineDescriptor.maxVertexAmplificationCount = amplificationCount
-            renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
-            renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
-            renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
-            renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
-            renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-            renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-            renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        }
-    }
-
-    // MARK: - Multi-Cloud Render Pipeline
-
-    private func multiCloudRenderPipeline(
+    private func renderPipeline(
         indexedDistancesBuffer: TypedMTLBuffer<IndexedDistance>,
         viewMatrices: [simd_float4x4],
         cameraPositions: [SIMD3<Float>],
