@@ -13,6 +13,7 @@ struct SplatDocumentRenderView: View {
     let descriptor: SplatCloudDescriptor
     let cameraMode: SplatDocumentViewModel.CameraMode
     let useSphericalHarmonics: Bool
+    let backgroundColor: Color
 
     @Binding var cameraMatrix: simd_float4x4
     @Binding var modelMatrix: simd_float4x4
@@ -71,11 +72,20 @@ struct SplatDocumentRenderView: View {
         let capturedRendererType = rendererType
         let capturedUseSphericalHarmonics = useSphericalHarmonics
 
+        // Convert SwiftUI Color to MTLClearColor
+        let resolvedColor = backgroundColor.resolve(in: EnvironmentValues())
+        let clearColor = MTLClearColor(
+            red: Double(resolvedColor.red),
+            green: Double(resolvedColor.green),
+            blue: Double(resolvedColor.blue),
+            alpha: Double(resolvedColor.opacity)
+        )
+
         let view = RenderView { context, drawableSize in
             SplatRenderPass(rendererType: capturedRendererType, splatCloud: splatCloud, cameraMatrix: capturedCameraMatrix, modelMatrix: capturedModelMatrix, projection: capturedProjection, drawableSize: drawableSize, frame: context.frameUniforms.index, useSphericalHarmonics: capturedUseSphericalHarmonics)
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
-        .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
+        .metalClearColor(clearColor)
 
         switch cameraMode {
         case .spatialScene:

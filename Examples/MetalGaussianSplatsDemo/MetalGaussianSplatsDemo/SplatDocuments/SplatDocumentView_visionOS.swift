@@ -115,6 +115,7 @@ struct SplatDocumentView: View {
                     descriptor: descriptor,
                     cameraMode: viewModel.cameraMode,
                     useSphericalHarmonics: viewModel.useSphericalHarmonics,
+                    backgroundColor: viewModel.backgroundColor,
                     cameraMatrix: $viewModel.cameraMatrix,
                     modelMatrix: $viewModel.modelMatrix,
                     verticalAngleOfView: $viewModel.verticalAngleOfView

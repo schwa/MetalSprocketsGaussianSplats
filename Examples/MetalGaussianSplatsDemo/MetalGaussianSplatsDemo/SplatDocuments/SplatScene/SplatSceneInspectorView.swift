@@ -215,7 +215,30 @@ struct RenderInspectorContent: View {
     @Binding var renderSettings: SplatScene.RenderSettings
     let allCloudsHaveSH: Bool
 
+    private var backgroundColorBinding: Binding<Color> {
+        Binding(
+            get: {
+                let c = renderSettings.backgroundColor
+                guard c.count == 4 else { return .black }
+                return Color(red: Double(c[0]), green: Double(c[1]), blue: Double(c[2]), opacity: Double(c[3]))
+            },
+            set: { newColor in
+                let resolved = newColor.resolve(in: EnvironmentValues())
+                renderSettings.backgroundColor = [
+                    Float(resolved.red),
+                    Float(resolved.green),
+                    Float(resolved.blue),
+                    Float(resolved.opacity)
+                ]
+            }
+        )
+    }
+
     var body: some View {
+        Section("Renderer") {
+            ColorPicker("Background", selection: backgroundColorBinding)
+        }
+
         Section("Spherical Harmonics") {
             Toggle("Use Spherical Harmonics", isOn: $renderSettings.useSphericalHarmonics)
                 .disabled(!allCloudsHaveSH)

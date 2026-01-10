@@ -146,6 +146,8 @@ struct SplatScene: Codable, Sendable {
     struct RenderSettings: Codable, Sendable, Equatable {
         /// Whether to use spherical harmonics (only applies if all clouds have SH data)
         var useSphericalHarmonics: Bool = true
+        /// Background color RGBA components (0-1 range)
+        var backgroundColor: [Float] = [0, 0, 0, 1]
     }
 }
 
