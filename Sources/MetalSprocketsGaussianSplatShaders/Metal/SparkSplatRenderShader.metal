@@ -72,6 +72,7 @@ namespace SparkSplatRenderShader {
         SplatCloudData cloudData = clouds.clouds[cloudIndex];
         device const SparkSplat* splats = cloudData.splats;
         float4x4 modelMatrix = cloudData.modelMatrix;
+        float cloudOpacity = cloudData.opacity;
 
         // Fetch splat
         SparkSplat splat = splats[splatIndex];
@@ -80,6 +81,9 @@ namespace SparkSplatRenderShader {
         float3 scales = float3(splat.scale);
         float4 quaternion = float4(splat.rotation);
         float4 rgba = float4(splat.color) / 255.0;
+
+        // Apply cloud-level opacity
+        rgba.a *= cloudOpacity;
 
         // Cull by alpha
         if (rgba.a < MIN_ALPHA) {

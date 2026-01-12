@@ -24,6 +24,7 @@ struct SplatCloudData {
     BUFFER(device, struct SparkSplat *) splats;
     float4x4 modelMatrix;
     BUFFER(device, float *) shCoefficients;  // Can be null if no SH for this cloud
+    float opacity;  // Cloud-level opacity multiplier (0.0 - 1.0)
 };
 
 /// Argument buffer containing array of cloud data

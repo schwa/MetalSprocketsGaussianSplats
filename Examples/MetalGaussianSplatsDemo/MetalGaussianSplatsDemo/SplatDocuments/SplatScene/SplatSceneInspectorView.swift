@@ -95,6 +95,16 @@ struct CloudInspectorContent: View {
             ))
 
             Toggle("Enabled", isOn: $cloud.enabled)
+
+            VStack(alignment: .leading) {
+                HStack {
+                    Text("Opacity")
+                    Spacer()
+                    Text("\(Int(cloud.opacity * 100))%")
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: $cloud.opacity, in: 0...1)
+            }
         }
 
         Section("Transform") {

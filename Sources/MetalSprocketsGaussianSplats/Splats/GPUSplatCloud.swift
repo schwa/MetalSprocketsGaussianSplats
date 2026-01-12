@@ -19,24 +19,28 @@ public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where S
     /// Spherical harmonics degree (0 = no SH, 1-3 for increasing detail)
     public let shDegree: UInt8
 
+    /// Cloud-level opacity multiplier (0.0 - 1.0)
+    public var opacity: Float
+
     // MARK: -
 
-    public init(splats: TypedMTLBuffer<Splat>, modelTransform: simd_float4x4 = .identity, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0) {
+    public init(splats: TypedMTLBuffer<Splat>, modelTransform: simd_float4x4 = .identity, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0, opacity: Float = 1.0) {
         self.splats = splats
         self.modelTransform = modelTransform
         self.shCoefficients = shCoefficients
         self.shDegree = shDegree
+        self.opacity = opacity
     }
 
-    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity) throws {
+    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, opacity: Float = 1.0) throws {
         let splats = try device.makeTypedBuffer(values: splats, options: [])
-        self.init(splats: splats, modelTransform: modelTransform)
+        self.init(splats: splats, modelTransform: modelTransform, opacity: opacity)
     }
 
-    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, shCoefficients: [Float], shDegree: UInt8) throws {
+    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, shCoefficients: [Float], shDegree: UInt8, opacity: Float = 1.0) throws {
         let splatsBuffer = try device.makeTypedBuffer(values: splats, options: [])
         let shBuffer = try device.makeTypedBuffer(values: shCoefficients, options: [])
-        self.init(splats: splatsBuffer, modelTransform: modelTransform, shCoefficients: shBuffer, shDegree: shDegree)
+        self.init(splats: splatsBuffer, modelTransform: modelTransform, shCoefficients: shBuffer, shDegree: shDegree, opacity: opacity)
     }
 
     // MARK: -

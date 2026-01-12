@@ -124,13 +124,14 @@ struct SplatSceneView: View {
         let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
             .filter { enabledCloudIDs.contains($0.id) }
             .compactMap { loadedCloud in
-                // Get current transform from document + any active drag offset
+                // Get current transform and opacity from document + any active drag offset
                 if let docCloud = document.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
                     var transform = docCloud.transform
                     if let dragOffset = dragOffsets[loadedCloud.id] {
                         transform.translation += dragOffset
                     }
                     loadedCloud.cloud.modelTransform = transform.matrix
+                    loadedCloud.cloud.opacity = docCloud.opacity
                 }
                 return loadedCloud.cloud
             }

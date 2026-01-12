@@ -82,6 +82,8 @@ struct SplatScene: Codable, Sendable {
         var enabled: Bool = true
         /// Display name (defaults to filename)
         var displayName: String?
+        /// Cloud opacity (0.0 - 1.0)
+        var opacity: Float = 1.0
 
         /// Resolve bookmark to URL
         /// - Returns: The resolved URL and whether the bookmark was stale
@@ -129,7 +131,7 @@ struct SplatScene: Codable, Sendable {
 
         // Codable with custom keys for transform
         enum CodingKeys: String, CodingKey {
-            case id, bookmarkData, transform, enabled, displayName
+            case id, bookmarkData, transform, enabled, displayName, opacity
         }
     }
 

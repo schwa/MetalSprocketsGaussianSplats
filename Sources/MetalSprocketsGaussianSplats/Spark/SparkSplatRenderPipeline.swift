@@ -196,7 +196,8 @@ public struct SparkSplatRenderPipeline: Element {
             let cloudData = SplatCloudData(
                 splats: cloud.splats.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SparkSplat.self),
                 modelMatrix: combinedModel,
-                shCoefficients: cloud.shCoefficients?.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: Float.self)
+                shCoefficients: cloud.shCoefficients?.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: Float.self),
+                opacity: cloud.opacity
             )
             cloudDataArray.append(cloudData)
         }
