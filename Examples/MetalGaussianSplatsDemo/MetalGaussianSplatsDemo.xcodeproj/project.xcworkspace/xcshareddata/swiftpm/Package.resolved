@@ -1,5 +1,5 @@
 {
-  "originHash" : "8653e20c08b972e947c0a303cfd3fbe498a4cd248d53bb7822ad7f44c9be2e37",
+  "originHash" : "9bf7244aae2ed1773257498c276624a63e88859ae1d6b0d983930c23ec1504de",
   "pins" : [
     {
       "identity" : "earcut-swift",
@@ -16,16 +16,7 @@
       "location" : "https://github.com/schwa/GeometryLite3D",
       "state" : {
         "branch" : "main",
-        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7"
-      }
-    },
-    {
-      "identity" : "interaction3d",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/Interaction3D",
-      "state" : {
-        "branch" : "main",
-        "revision" : "85b588ec9c43f0a65338327eda85780866eac221"
+        "revision" : "554f96b2465e8bd52305ce4abf8709bd05b60208"
       }
     },
     {
