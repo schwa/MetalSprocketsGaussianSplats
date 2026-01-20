@@ -33,7 +33,7 @@ struct SplatPreviewView: View {
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
-        .modifier(TurntableCameraController(transform: $cameraMatrix))
+//        .modifier(TurntableCameraController(transform: $cameraMatrix))
     }
 }
 #endif

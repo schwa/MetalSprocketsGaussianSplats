@@ -1,0 +1,5 @@
+repos:
+  - repo: /Users/schwa/Projects/pre-commit-hooks
+    rev: HEAD
+    hooks:
+      - id: check-swift-local-deps
