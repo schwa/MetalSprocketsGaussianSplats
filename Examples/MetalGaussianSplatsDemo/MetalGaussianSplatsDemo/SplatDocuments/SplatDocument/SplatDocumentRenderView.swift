@@ -91,7 +91,7 @@ struct SplatDocumentRenderView: View {
         case .spatialScene:
             view.modifier(SpatialSceneCameraController(transform: $cameraMatrix))
         case .object, .room:
-            view.modifier(TurntableCameraController(transform: $cameraMatrix))
+            view.interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
         }
     }
 
