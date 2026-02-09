@@ -14,6 +14,7 @@ struct SplatDocumentRenderView: View {
     let cameraMode: SplatDocumentViewModel.CameraMode
     let useSphericalHarmonics: Bool
     let backgroundColor: Color
+    var cullBoundingBox: BoundingBox3D?
 
     @Binding var cameraMatrix: simd_float4x4
     @Binding var modelMatrix: simd_float4x4
@@ -31,6 +32,7 @@ struct SplatDocumentRenderView: View {
                     cameraMode: cameraMode,
                     useSphericalHarmonics: useSphericalHarmonics,
                     backgroundColor: backgroundColor,
+                    cullBoundingBox: cullBoundingBox,
                     cameraMatrix: $cameraMatrix,
                     modelMatrix: modelMatrix,
                     projection: projection
@@ -95,6 +97,7 @@ private struct SplatRenderContent: View {
     let cameraMode: SplatDocumentViewModel.CameraMode
     let useSphericalHarmonics: Bool
     let backgroundColor: Color
+    let cullBoundingBox: BoundingBox3D?
     @Binding var cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
     let projection: any ProjectionProtocol
@@ -108,7 +111,7 @@ private struct SplatRenderContent: View {
             alpha: Double(resolvedColor.opacity)
         )
 
-        RenderView { [splatCloud, rendererType, cameraMatrix, modelMatrix, projection, useSphericalHarmonics] context, drawableSize in
+        RenderView { [splatCloud, rendererType, cameraMatrix, modelMatrix, projection, useSphericalHarmonics, cullBoundingBox] context, drawableSize in
             SplatRenderPass(
                 rendererType: rendererType,
                 splatCloud: splatCloud,
@@ -117,7 +120,8 @@ private struct SplatRenderContent: View {
                 projection: projection,
                 drawableSize: drawableSize,
                 frame: context.frameUniforms.index,
-                useSphericalHarmonics: useSphericalHarmonics
+                useSphericalHarmonics: useSphericalHarmonics,
+                cullBoundingBox: cullBoundingBox
             )
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)

@@ -18,6 +18,7 @@ struct SplatRenderPass: Element {
     var drawableSize: CGSize
     var frame: UInt32
     var useSphericalHarmonics: Bool
+    var cullBoundingBox: BoundingBox3D?
 
     var body: some Element {
         get throws {
@@ -32,7 +33,8 @@ struct SplatRenderPass: Element {
                             modelMatrix: modelMatrix,
                             cameraMatrix: cameraMatrix,
                             drawableSize: SIMD2<Float>(drawableSize),
-                            useSphericalHarmonics: useSphericalHarmonics
+                            useSphericalHarmonics: useSphericalHarmonics,
+                            boundingBox: cullBoundingBox
                         )
                     }
                 }

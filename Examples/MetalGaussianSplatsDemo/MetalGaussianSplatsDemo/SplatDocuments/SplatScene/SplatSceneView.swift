@@ -23,6 +23,11 @@ struct SplatSceneView: View {
     @State private var viewportSize: CGSize = .zero
     @State private var dragOffsets: [UUID: SIMD3<Float>] = [:] // Accumulated drag offset per cloud
 
+    // Culling bounding box
+    @State private var cullBoundingBoxEnabled = false
+    @State private var cullMinBounds: SIMD3<Float> = SIMD3(-5, -5, -5)
+    @State private var cullMaxBounds: SIMD3<Float> = SIMD3(5, 5, 5)
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             cloudListSidebar
@@ -139,6 +144,11 @@ struct SplatSceneView: View {
         // Determine if we should use SH
         let useSH = document.scene.renderSettings.useSphericalHarmonics && viewModel.allCloudsHaveSphericalHarmonics
         
+        // Build culling bounding box if enabled
+        let cullBoundingBox: BoundingBox3D? = cullBoundingBoxEnabled
+            ? BoundingBox3D(minBounds: cullMinBounds, maxBounds: cullMaxBounds)
+            : nil
+
         ZStack {
             MultiCloudRenderView(
                 clouds: enabledClouds,
@@ -146,7 +156,8 @@ struct SplatSceneView: View {
                 sceneTransform: document.scene.sceneTransform.matrix,
                 verticalAngleOfView: $viewModel.verticalAngleOfView,
                 useSphericalHarmonics: useSH,
-                backgroundColor: document.scene.renderSettings.backgroundColor
+                backgroundColor: document.scene.renderSettings.backgroundColor,
+                cullBoundingBox: cullBoundingBox
             )
             
             if showBoundingBoxes {
@@ -320,7 +331,10 @@ struct SplatSceneView: View {
                     document.scene.clouds.removeAll { $0.id == id }
                     selectedCloudID = nil
                 }
-            }
+            },
+            cullBoundingBoxEnabled: $cullBoundingBoxEnabled,
+            cullMinBounds: $cullMinBounds,
+            cullMaxBounds: $cullMaxBounds
         )
     }
 

@@ -18,6 +18,7 @@ struct MultiCloudRenderView: View {
     @Binding var verticalAngleOfView: Double
     let useSphericalHarmonics: Bool
     let backgroundColor: [Float]
+    var cullBoundingBox: BoundingBox3D?
 
     @State private var projection: (any ProjectionProtocol) = PerspectiveProjection(verticalAngleOfView: .degrees(90), depthMode: .standard(zClip: 0.01 ... 1_000))
 
@@ -41,7 +42,8 @@ struct MultiCloudRenderView: View {
                 sceneTransform: sceneTransform,
                 projection: projection,
                 drawableSize: drawableSize,
-                useSphericalHarmonics: useSphericalHarmonics
+                useSphericalHarmonics: useSphericalHarmonics,
+                cullBoundingBox: cullBoundingBox
             )
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
@@ -60,6 +62,7 @@ struct MultiCloudRenderPass: Element {
     let projection: any ProjectionProtocol
     let drawableSize: CGSize
     let useSphericalHarmonics: Bool
+    var cullBoundingBox: BoundingBox3D?
 
     var body: some Element {
         get throws {
@@ -72,7 +75,8 @@ struct MultiCloudRenderPass: Element {
                         modelMatrix: sceneTransform,
                         cameraMatrices: [cameraMatrix],
                         drawableSize: SIMD2<Float>(drawableSize),
-                        useSphericalHarmonics: useSphericalHarmonics
+                        useSphericalHarmonics: useSphericalHarmonics,
+                        boundingBox: cullBoundingBox
                     )
                 }
             }

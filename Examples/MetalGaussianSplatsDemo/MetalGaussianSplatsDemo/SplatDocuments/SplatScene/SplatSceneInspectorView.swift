@@ -19,6 +19,11 @@ struct SplatSceneInspectorView: View {
     @Binding var document: SplatSceneDocument
     var onDeleteCloud: (() -> Void)?
 
+    // Culling bounding box bindings
+    @Binding var cullBoundingBoxEnabled: Bool
+    @Binding var cullMinBounds: SIMD3<Float>
+    @Binding var cullMaxBounds: SIMD3<Float>
+
     @Environment(SplatSceneViewModel.self) private var viewModel
 
     private var loadedCloud: SplatSceneViewModel.LoadedCloud? {
@@ -69,7 +74,10 @@ struct SplatSceneInspectorView: View {
                     Form {
                         RenderInspectorContent(
                             renderSettings: $document.scene.renderSettings,
-                            allCloudsHaveSH: viewModel.allCloudsHaveSphericalHarmonics
+                            allCloudsHaveSH: viewModel.allCloudsHaveSphericalHarmonics,
+                            cullBoundingBoxEnabled: $cullBoundingBoxEnabled,
+                            cullMinBounds: $cullMinBounds,
+                            cullMaxBounds: $cullMaxBounds
                         )
                     }
                     .formStyle(.grouped)
@@ -225,6 +233,11 @@ struct RenderInspectorContent: View {
     @Binding var renderSettings: SplatScene.RenderSettings
     let allCloudsHaveSH: Bool
 
+    // Culling bounding box bindings
+    @Binding var cullBoundingBoxEnabled: Bool
+    @Binding var cullMinBounds: SIMD3<Float>
+    @Binding var cullMaxBounds: SIMD3<Float>
+
     private var backgroundColorBinding: Binding<Color> {
         Binding(
             get: {
@@ -258,6 +271,42 @@ struct RenderInspectorContent: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
+        }
+
+        Section("Culling Bounding Box") {
+            Toggle("Enable Culling", isOn: $cullBoundingBoxEnabled)
+
+            if cullBoundingBoxEnabled {
+                Group {
+                    BoundsSlider(label: "Min X", value: $cullMinBounds.x, range: -20...20)
+                    BoundsSlider(label: "Min Y", value: $cullMinBounds.y, range: -20...20)
+                    BoundsSlider(label: "Min Z", value: $cullMinBounds.z, range: -20...20)
+                    BoundsSlider(label: "Max X", value: $cullMaxBounds.x, range: -20...20)
+                    BoundsSlider(label: "Max Y", value: $cullMaxBounds.y, range: -20...20)
+                    BoundsSlider(label: "Max Z", value: $cullMaxBounds.z, range: -20...20)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Bounds Slider
+
+private struct BoundsSlider: View {
+    let label: String
+    @Binding var value: Float
+    let range: ClosedRange<Float>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text(String(format: "%.2f", value))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Slider(value: $value, in: range)
         }
     }
 }

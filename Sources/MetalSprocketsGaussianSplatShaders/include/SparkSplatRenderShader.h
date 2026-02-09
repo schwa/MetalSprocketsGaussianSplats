@@ -4,6 +4,14 @@
 #import <simd/simd.h>
 #import "Support.h"
 
+// MARK: - Bounding Box structure
+
+/// Axis-aligned bounding box for splat culling (world space)
+struct BoundingBox3D {
+    simd_float3 minBounds;
+    simd_float3 maxBounds;
+};
+
 // MARK: - SparkSplat structure
 
 /// SparkSplat - 32-byte format using half-floats

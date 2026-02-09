@@ -31,6 +31,11 @@ final class SplatDocumentViewModel {
     var backgroundColor: Color = .black
     var useSphericalHarmonics: Bool = true
 
+    // Culling bounding box
+    var cullBoundingBoxEnabled: Bool = false
+    var cullMinBounds: SIMD3<Float> = SIMD3(-5, -5, -5)
+    var cullMaxBounds: SIMD3<Float> = SIMD3(5, 5, 5)
+
     var hasSphericalHarmonicsData: Bool {
         descriptor?.hasSphericalHarmonics ?? false
     }

@@ -27,6 +27,7 @@ public struct SparkSplatRenderPipeline: Element {
     var cameraMatrices: [simd_float4x4]
     var drawableSize: SIMD2<Float>
     var useSphericalHarmonics: Bool
+    var boundingBox: BoundingBox3D?
 
     @MSState
     private var sortManager: AsyncSortManager<SparkSplat>?
@@ -46,7 +47,7 @@ public struct SparkSplatRenderPipeline: Element {
     // MARK: - Single Cloud Convenience Initializers
 
     /// Convenience initializer for single cloud, single-view rendering (non-stereo)
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil) throws {
         try self.init(
             splatClouds: [splatCloud],
             projectionMatrices: [projectionMatrix],
@@ -54,12 +55,13 @@ public struct SparkSplatRenderPipeline: Element {
             cameraMatrices: [cameraMatrix],
             drawableSize: drawableSize,
             convertSRGBToLinear: convertSRGBToLinear,
-            useSphericalHarmonics: useSphericalHarmonics
+            useSphericalHarmonics: useSphericalHarmonics,
+            boundingBox: boundingBox
         )
     }
 
     /// Convenience initializer for single cloud, stereo/amplification rendering
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil) throws {
         try self.init(
             splatClouds: [splatCloud],
             projectionMatrices: projectionMatrices,
@@ -67,7 +69,8 @@ public struct SparkSplatRenderPipeline: Element {
             cameraMatrices: cameraMatrices,
             drawableSize: drawableSize,
             convertSRGBToLinear: convertSRGBToLinear,
-            useSphericalHarmonics: useSphericalHarmonics
+            useSphericalHarmonics: useSphericalHarmonics,
+            boundingBox: boundingBox
         )
     }
 
@@ -75,7 +78,8 @@ public struct SparkSplatRenderPipeline: Element {
 
     /// Full initializer supporting multiple clouds and stereo/amplification rendering
     /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when any cloud has SH data.
-    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil) throws {
+    /// - Parameter boundingBox: Optional world-space bounding box. Splats outside this box are culled.
+    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
         precondition(!splatClouds.isEmpty, "Must have at least one splat cloud")
@@ -85,6 +89,7 @@ public struct SparkSplatRenderPipeline: Element {
         self.modelMatrix = modelMatrix
         self.cameraMatrices = cameraMatrices
         self.drawableSize = drawableSize
+        self.boundingBox = boundingBox
 
         // Determine if SH should be used: explicit override, or auto-detect from any cloud having SH data
         let hasSHData = splatClouds.contains { $0.shCoefficients != nil }
@@ -97,6 +102,7 @@ public struct SparkSplatRenderPipeline: Element {
 
         var vertexConstants = FunctionConstants()
         vertexConstants["use_sh"] = .bool(effectiveUseSH)
+        vertexConstants["use_bounding_box"] = .bool(boundingBox != nil)
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
@@ -225,7 +231,7 @@ public struct SparkSplatRenderPipeline: Element {
         }
 
         return try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-            Draw { [argumentBuffer, maxSHDegree] commandEncoder in
+            Draw { [argumentBuffer, maxSHDegree, boundingBox] commandEncoder in
                 let vertices: [SIMD2<Float>] = [
                     [-1, -1], [-1, 1], [1, -1], [1, 1]
                 ]
@@ -234,6 +240,10 @@ public struct SparkSplatRenderPipeline: Element {
                 if useSphericalHarmonics {
                     var shDegreeValue = UInt32(maxSHDegree)
                     commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
+                }
+                // Set bounding box for culling
+                if var bbox = boundingBox {
+                    commandEncoder.setVertexBytes(&bbox, length: MemoryLayout<BoundingBox3D>.size, index: 12)
                 }
                 commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
                 commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)

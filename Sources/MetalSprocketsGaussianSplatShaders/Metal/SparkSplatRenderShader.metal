@@ -30,6 +30,7 @@ namespace SparkSplatRenderShader {
     // Function constants
     constant bool convert_srgb_to_linear [[function_constant(0)]];
     constant bool use_sh [[function_constant(1)]];
+    constant bool use_bounding_box [[function_constant(2)]];
 
     // MARK: - Vertex Shader
 
@@ -45,6 +46,7 @@ namespace SparkSplatRenderShader {
         constant float &scale [[buffer(9)]],
         constant float3 *cameraPositions [[buffer(10)]],
         constant uint &shDegree [[buffer(11), function_constant(use_sh)]],
+        constant BoundingBox3D &boundingBox [[buffer(12), function_constant(use_bounding_box)]],
         constant MultiCloudArgumentBuffer &clouds [[buffer(14)]]
     ) {
         // Select matrices based on amplification_id (0 for mono, 0/1 for stereo)
@@ -97,6 +99,16 @@ namespace SparkSplatRenderShader {
 
         // Transform center to world space
         float4 worldCenter = modelMatrix * float4(center, 1.0);
+
+        // Cull by bounding box (world space)
+        if (use_bounding_box) {
+            float3 worldPos = worldCenter.xyz;
+            if (worldPos.x < boundingBox.minBounds.x || worldPos.x > boundingBox.maxBounds.x ||
+                worldPos.y < boundingBox.minBounds.y || worldPos.y > boundingBox.maxBounds.y ||
+                worldPos.z < boundingBox.minBounds.z || worldPos.z > boundingBox.maxBounds.z) {
+                return out;
+            }
+        }
 
         // Evaluate spherical harmonics for view-dependent color
         if (use_sh && shDegree > 0) {

@@ -1,4 +1,5 @@
 #if os(iOS) || os(macOS)
+import MetalSprocketsGaussianSplatShaders
 import SwiftUI
 
 /// A view for displaying a single Gaussian Splat document (iOS/macOS)
@@ -91,6 +92,9 @@ struct SplatDocumentView: View {
                 cameraMode: viewModel.cameraMode,
                 useSphericalHarmonics: viewModel.useSphericalHarmonics,
                 backgroundColor: viewModel.backgroundColor,
+                cullBoundingBox: viewModel.cullBoundingBoxEnabled
+                    ? BoundingBox3D(minBounds: viewModel.cullMinBounds, maxBounds: viewModel.cullMaxBounds)
+                    : nil,
                 cameraMatrix: $viewModel.cameraMatrix,
                 modelMatrix: $viewModel.modelMatrix,
                 verticalAngleOfView: $viewModel.verticalAngleOfView

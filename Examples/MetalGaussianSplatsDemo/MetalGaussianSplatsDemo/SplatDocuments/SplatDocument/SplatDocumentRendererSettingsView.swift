@@ -1,3 +1,4 @@
+import simd
 import SwiftUI
 
 enum SplatRendererType: String, CaseIterable {
@@ -22,6 +23,45 @@ struct SplatDocumentRendererSettingsView: View {
             ColorPicker("Background", selection: $viewModel.backgroundColor)
             Toggle("Spherical Harmonics", isOn: $viewModel.useSphericalHarmonics)
                 .disabled(!viewModel.hasSphericalHarmonicsData)
+        }
+
+        Section("Culling Bounding Box") {
+            Toggle("Enable Culling", isOn: $viewModel.cullBoundingBoxEnabled)
+                .disabled(viewModel.rendererType != .spark)
+
+            if viewModel.cullBoundingBoxEnabled && viewModel.rendererType == .spark {
+                CullBoundsSlider(label: "Min X", value: $viewModel.cullMinBounds.x)
+                CullBoundsSlider(label: "Min Y", value: $viewModel.cullMinBounds.y)
+                CullBoundsSlider(label: "Min Z", value: $viewModel.cullMinBounds.z)
+                CullBoundsSlider(label: "Max X", value: $viewModel.cullMaxBounds.x)
+                CullBoundsSlider(label: "Max Y", value: $viewModel.cullMaxBounds.y)
+                CullBoundsSlider(label: "Max Z", value: $viewModel.cullMaxBounds.z)
+            }
+
+            if viewModel.rendererType != .spark {
+                Text("Culling only available with Spark renderer")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct CullBoundsSlider: View {
+    let label: String
+    @Binding var value: Float
+    var range: ClosedRange<Float> = -20...20
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text(String(format: "%.2f", value))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Slider(value: $value, in: range)
         }
     }
 }

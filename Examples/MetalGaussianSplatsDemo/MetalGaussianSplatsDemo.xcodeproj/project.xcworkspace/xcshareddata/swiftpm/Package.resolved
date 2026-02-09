@@ -1,5 +1,5 @@
 {
-  "originHash" : "745ecbaa92b23bd8589c3f60775fbea196c71fffcbdb1126b1a3f78a977b53c5",
+  "originHash" : "8653e20c08b972e947c0a303cfd3fbe498a4cd248d53bb7822ad7f44c9be2e37",
   "pins" : [
     {
       "identity" : "earcut-swift",
@@ -17,6 +17,15 @@
       "state" : {
         "branch" : "main",
         "revision" : "554f96b2465e8bd52305ce4abf8709bd05b60208"
+      }
+    },
+    {
+      "identity" : "interaction3d",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/Interaction3D",
+      "state" : {
+        "branch" : "main",
+        "revision" : "b8a08213091674c7e85c566a1eeec86ef1bbd25c"
       }
     },
     {
@@ -53,6 +62,15 @@
       "state" : {
         "branch" : "main",
         "revision" : "3b97ab7a48f7f163906657d1ebab05196a329a74"
+      }
+    },
+    {
+      "identity" : "swift-algorithms",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-algorithms",
+      "state" : {
+        "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
+        "version" : "1.2.1"
       }
     },
     {
@@ -98,6 +116,15 @@
       "state" : {
         "revision" : "0687f71944021d616d34d922343dcef086855920",
         "version" : "600.0.1"
+      }
+    },
+    {
+      "identity" : "swiftformats",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/SwiftFormats",
+      "state" : {
+        "revision" : "6b51ccec7fccf2f1d4f28f03def6c6b97d17c05b",
+        "version" : "0.3.6"
       }
     },
     {
