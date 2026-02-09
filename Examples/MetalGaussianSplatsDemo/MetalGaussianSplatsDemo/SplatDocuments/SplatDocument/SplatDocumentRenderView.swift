@@ -14,7 +14,6 @@ struct SplatDocumentRenderView: View {
     let cameraMode: SplatDocumentViewModel.CameraMode
     let useSphericalHarmonics: Bool
     let backgroundColor: Color
-    var cullBoundingBox: BoundingBox3D?
 
     @Binding var cameraMatrix: simd_float4x4
     @Binding var modelMatrix: simd_float4x4
@@ -22,12 +21,6 @@ struct SplatDocumentRenderView: View {
 
     @State private var projection: (any ProjectionProtocol) = PerspectiveProjection(verticalAngleOfView: .degrees(90), depthMode: .standard(zClip: 0.01 ... 1_000))
     @State private var splatCloud: AnyGPUSplatCloud?
-
-    /// Generate a stable ID for the render view based on culling parameters
-    private var cullBoundingBoxID: String {
-        guard let box = cullBoundingBox else { return "none" }
-        return "\(box.minBounds.x),\(box.minBounds.y),\(box.minBounds.z),\(box.maxBounds.x),\(box.maxBounds.y),\(box.maxBounds.z)"
-    }
 
     var body: some View {
         Group {
@@ -38,12 +31,10 @@ struct SplatDocumentRenderView: View {
                     cameraMode: cameraMode,
                     useSphericalHarmonics: useSphericalHarmonics,
                     backgroundColor: backgroundColor,
-                    cullBoundingBox: cullBoundingBox,
                     cameraMatrix: $cameraMatrix,
                     modelMatrix: modelMatrix,
                     projection: projection
                 )
-                    .id(cullBoundingBoxID)
             } else {
                 ProgressView("Loading splat cloud...")
             }
@@ -104,12 +95,23 @@ private struct SplatRenderContent: View {
     let cameraMode: SplatDocumentViewModel.CameraMode
     let useSphericalHarmonics: Bool
     let backgroundColor: Color
-    let cullBoundingBox: BoundingBox3D?
     @Binding var cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
     let projection: any ProjectionProtocol
+    
+    // Read from environment so observation works
+    @Environment(SplatDocumentViewModel.self)
+    private var viewModel: SplatDocumentViewModel?
 
+    // Stable ID based on whether culling is enabled (not the actual values)
+    private var cullingStateID: Bool {
+        viewModel?.cullBoundingBoxEnabled ?? false
+    }
+    
     var body: some View {
+        // Read cullBoundingBox to trigger observation when it changes
+        let cullBoundingBox = viewModel?.cullBoundingBox
+        
         let resolvedColor = backgroundColor.resolve(in: EnvironmentValues())
         let clearColor = MTLClearColor(
             red: Double(resolvedColor.red),
@@ -133,6 +135,7 @@ private struct SplatRenderContent: View {
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(clearColor)
+        .id(cullingStateID) // Only recreate when culling toggles on/off
         .modifier(CameraControllerModifier(cameraMode: cameraMode, cameraMatrix: $cameraMatrix))
     }
 }

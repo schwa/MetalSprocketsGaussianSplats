@@ -92,11 +92,11 @@ struct SplatDocumentView: View {
                 cameraMode: viewModel.cameraMode,
                 useSphericalHarmonics: viewModel.useSphericalHarmonics,
                 backgroundColor: viewModel.backgroundColor,
-                cullBoundingBox: viewModel.cullBoundingBox,
                 cameraMatrix: $viewModel.cameraMatrix,
                 modelMatrix: $viewModel.modelMatrix,
                 verticalAngleOfView: $viewModel.verticalAngleOfView
             )
+            .environment(viewModel)
             .ignoresSafeArea()
         } else if needsConfirmation {
             ContentUnavailableView {
