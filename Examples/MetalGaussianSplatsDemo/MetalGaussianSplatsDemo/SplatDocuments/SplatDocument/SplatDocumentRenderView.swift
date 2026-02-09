@@ -25,7 +25,16 @@ struct SplatDocumentRenderView: View {
     var body: some View {
         Group {
             if let splatCloud {
-                renderView(splatCloud: splatCloud)
+                SplatRenderContent(
+                    splatCloud: splatCloud,
+                    rendererType: rendererType,
+                    cameraMode: cameraMode,
+                    useSphericalHarmonics: useSphericalHarmonics,
+                    backgroundColor: backgroundColor,
+                    cameraMatrix: $cameraMatrix,
+                    modelMatrix: modelMatrix,
+                    projection: projection
+                )
             } else {
                 ProgressView("Loading splat cloud...")
             }
@@ -39,7 +48,6 @@ struct SplatDocumentRenderView: View {
                 Task { @MainActor in
                     self.splatCloud = splatCloud
                     #if os(visionOS)
-                    // Also update ImmersiveState with the SparkSplat cloud
                     if let sparkCloud = splatCloud.typed(as: SparkSplat.self) {
                         ImmersiveState.shared.splatCloud = sparkCloud
                     }
@@ -53,45 +61,12 @@ struct SplatDocumentRenderView: View {
                 Task { @MainActor in
                     self.splatCloud = splatCloud
                     #if os(visionOS)
-                    // Also update ImmersiveState with the SparkSplat cloud
                     if let sparkCloud = splatCloud.typed(as: SparkSplat.self) {
                         ImmersiveState.shared.splatCloud = sparkCloud
                     }
                     #endif
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private func renderView(splatCloud: AnyGPUSplatCloud) -> some View {
-        // Capture values to avoid accessing bindings from render thread
-        let capturedCameraMatrix = cameraMatrix
-        let capturedModelMatrix = modelMatrix
-        let capturedProjection = projection
-        let capturedRendererType = rendererType
-        let capturedUseSphericalHarmonics = useSphericalHarmonics
-
-        // Convert SwiftUI Color to MTLClearColor
-        let resolvedColor = backgroundColor.resolve(in: EnvironmentValues())
-        let clearColor = MTLClearColor(
-            red: Double(resolvedColor.red),
-            green: Double(resolvedColor.green),
-            blue: Double(resolvedColor.blue),
-            alpha: Double(resolvedColor.opacity)
-        )
-
-        let view = RenderView { context, drawableSize in
-            SplatRenderPass(rendererType: capturedRendererType, splatCloud: splatCloud, cameraMatrix: capturedCameraMatrix, modelMatrix: capturedModelMatrix, projection: capturedProjection, drawableSize: drawableSize, frame: context.frameUniforms.index, useSphericalHarmonics: capturedUseSphericalHarmonics)
-        }
-        .metalColorPixelFormat(.bgra8Unorm_srgb)
-        .metalClearColor(clearColor)
-
-        switch cameraMode {
-        case .spatialScene:
-            view.modifier(SpatialSceneCameraController(transform: $cameraMatrix))
-        case .object, .room:
-            view.interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
         }
     }
 
@@ -108,6 +83,61 @@ struct SplatDocumentRenderView: View {
                     return AnyGPUSplatCloud(cloud)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Render Content View
+
+private struct SplatRenderContent: View {
+    let splatCloud: AnyGPUSplatCloud
+    let rendererType: SplatRendererType
+    let cameraMode: SplatDocumentViewModel.CameraMode
+    let useSphericalHarmonics: Bool
+    let backgroundColor: Color
+    @Binding var cameraMatrix: simd_float4x4
+    let modelMatrix: simd_float4x4
+    let projection: any ProjectionProtocol
+
+    var body: some View {
+        let resolvedColor = backgroundColor.resolve(in: EnvironmentValues())
+        let clearColor = MTLClearColor(
+            red: Double(resolvedColor.red),
+            green: Double(resolvedColor.green),
+            blue: Double(resolvedColor.blue),
+            alpha: Double(resolvedColor.opacity)
+        )
+
+        RenderView { [splatCloud, rendererType, cameraMatrix, modelMatrix, projection, useSphericalHarmonics] context, drawableSize in
+            SplatRenderPass(
+                rendererType: rendererType,
+                splatCloud: splatCloud,
+                cameraMatrix: cameraMatrix,
+                modelMatrix: modelMatrix,
+                projection: projection,
+                drawableSize: drawableSize,
+                frame: context.frameUniforms.index,
+                useSphericalHarmonics: useSphericalHarmonics
+            )
+        }
+        .metalColorPixelFormat(.bgra8Unorm_srgb)
+        .metalClearColor(clearColor)
+        .modifier(CameraControllerModifier(cameraMode: cameraMode, cameraMatrix: $cameraMatrix))
+    }
+}
+
+// MARK: - Camera Controller Modifier
+
+private struct CameraControllerModifier: ViewModifier {
+    let cameraMode: SplatDocumentViewModel.CameraMode
+    @Binding var cameraMatrix: simd_float4x4
+
+    func body(content: Content) -> some View {
+        switch cameraMode {
+        case .spatialScene:
+            content.modifier(SpatialSceneCameraController(transform: $cameraMatrix))
+        case .object, .room:
+            content.interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
         }
     }
 }
