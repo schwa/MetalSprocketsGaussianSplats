@@ -27,15 +27,15 @@ struct SplatDocumentRendererSettingsView: View {
 
         Section("Culling Bounding Box") {
             Toggle("Enable Culling", isOn: $viewModel.cullBoundingBoxEnabled)
-                .disabled(viewModel.rendererType != .spark)
+                .disabled(viewModel.rendererType != .spark || viewModel.boundsSize == .zero)
 
-            if viewModel.cullBoundingBoxEnabled && viewModel.rendererType == .spark {
-                CullBoundsSlider(label: "Min X", value: $viewModel.cullMinBounds.x)
-                CullBoundsSlider(label: "Min Y", value: $viewModel.cullMinBounds.y)
-                CullBoundsSlider(label: "Min Z", value: $viewModel.cullMinBounds.z)
-                CullBoundsSlider(label: "Max X", value: $viewModel.cullMaxBounds.x)
-                CullBoundsSlider(label: "Max Y", value: $viewModel.cullMaxBounds.y)
-                CullBoundsSlider(label: "Max Z", value: $viewModel.cullMaxBounds.z)
+            if viewModel.cullBoundingBoxEnabled, viewModel.rendererType == .spark {
+                CullBoundsSlider(label: "Min X", value: $viewModel.cullMinNormalized.x)
+                CullBoundsSlider(label: "Min Y", value: $viewModel.cullMinNormalized.y)
+                CullBoundsSlider(label: "Min Z", value: $viewModel.cullMinNormalized.z)
+                CullBoundsSlider(label: "Max X", value: $viewModel.cullMaxNormalized.x)
+                CullBoundsSlider(label: "Max Y", value: $viewModel.cullMaxNormalized.y)
+                CullBoundsSlider(label: "Max Z", value: $viewModel.cullMaxNormalized.z)
             }
 
             if viewModel.rendererType != .spark {
@@ -50,18 +50,17 @@ struct SplatDocumentRendererSettingsView: View {
 private struct CullBoundsSlider: View {
     let label: String
     @Binding var value: Float
-    var range: ClosedRange<Float> = -20...20
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
                 Spacer()
-                Text(String(format: "%.2f", value))
+                Text(String(format: "%.0f%%", value * 100))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-            Slider(value: $value, in: range)
+            Slider(value: $value, in: 0...1)
         }
     }
 }

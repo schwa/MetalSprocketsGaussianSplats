@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import GeometryLite3D
+import MetalSprocketsGaussianSplatShaders
 import Observation
 import Sharp
 import simd
@@ -31,10 +32,19 @@ final class SplatDocumentViewModel {
     var backgroundColor: Color = .black
     var useSphericalHarmonics: Bool = true
 
-    // Culling bounding box
+    // Culling bounding box (normalized 0...1 values)
     var cullBoundingBoxEnabled: Bool = false
-    var cullMinBounds: SIMD3<Float> = SIMD3(-5, -5, -5)
-    var cullMaxBounds: SIMD3<Float> = SIMD3(5, 5, 5)
+    var cullMinNormalized: SIMD3<Float> = SIMD3(0, 0, 0)
+    var cullMaxNormalized: SIMD3<Float> = SIMD3(1, 1, 1)
+
+    /// Compute actual world-space bounding box from normalized values
+    var cullBoundingBox: BoundingBox3D? {
+        guard cullBoundingBoxEnabled, boundsSize != .zero else { return nil }
+        let actualMin = boundsCenter - boundsSize / 2
+        let minBounds = actualMin + cullMinNormalized * boundsSize
+        let maxBounds = actualMin + cullMaxNormalized * boundsSize
+        return BoundingBox3D(minBounds: minBounds, maxBounds: maxBounds)
+    }
 
     var hasSphericalHarmonicsData: Bool {
         descriptor?.hasSphericalHarmonics ?? false

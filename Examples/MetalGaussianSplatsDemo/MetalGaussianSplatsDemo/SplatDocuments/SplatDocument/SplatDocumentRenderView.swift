@@ -23,6 +23,12 @@ struct SplatDocumentRenderView: View {
     @State private var projection: (any ProjectionProtocol) = PerspectiveProjection(verticalAngleOfView: .degrees(90), depthMode: .standard(zClip: 0.01 ... 1_000))
     @State private var splatCloud: AnyGPUSplatCloud?
 
+    /// Generate a stable ID for the render view based on culling parameters
+    private var cullBoundingBoxID: String {
+        guard let box = cullBoundingBox else { return "none" }
+        return "\(box.minBounds.x),\(box.minBounds.y),\(box.minBounds.z),\(box.maxBounds.x),\(box.maxBounds.y),\(box.maxBounds.z)"
+    }
+
     var body: some View {
         Group {
             if let splatCloud {
@@ -37,6 +43,7 @@ struct SplatDocumentRenderView: View {
                     modelMatrix: modelMatrix,
                     projection: projection
                 )
+                    .id(cullBoundingBoxID)
             } else {
                 ProgressView("Loading splat cloud...")
             }

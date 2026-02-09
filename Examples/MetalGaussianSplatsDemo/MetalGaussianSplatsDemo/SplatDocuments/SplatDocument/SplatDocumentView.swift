@@ -92,9 +92,7 @@ struct SplatDocumentView: View {
                 cameraMode: viewModel.cameraMode,
                 useSphericalHarmonics: viewModel.useSphericalHarmonics,
                 backgroundColor: viewModel.backgroundColor,
-                cullBoundingBox: viewModel.cullBoundingBoxEnabled
-                    ? BoundingBox3D(minBounds: viewModel.cullMinBounds, maxBounds: viewModel.cullMaxBounds)
-                    : nil,
+                cullBoundingBox: viewModel.cullBoundingBox,
                 cameraMatrix: $viewModel.cameraMatrix,
                 modelMatrix: $viewModel.modelMatrix,
                 verticalAngleOfView: $viewModel.verticalAngleOfView
