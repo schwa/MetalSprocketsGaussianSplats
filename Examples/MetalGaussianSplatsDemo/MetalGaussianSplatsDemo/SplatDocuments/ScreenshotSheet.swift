@@ -125,9 +125,8 @@ struct ScreenshotSheet: View {
             let modelMatrix = viewModel.modelMatrix
 
             // Load splat cloud (always use SparkSplat)
-            let splatCloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud(
-                modelTransform: modelMatrix
-            )
+            // Note: Don't pass modelTransform here - it's handled by the render pipeline
+            let splatCloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud()
 
             // Create projection
             let projection = PerspectiveProjection(

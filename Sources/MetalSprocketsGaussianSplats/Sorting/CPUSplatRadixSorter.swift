@@ -38,6 +38,8 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
             signposter.withIntervalSignpost("CPUSplatRadixSorter.cpuRadixSort()", id: signpost) {
                 cpuRadixSort(splats: splats, indexedDistances: &currentIndexedDistances, temporaryIndexedDistances: &temporaryIndexedDistances, camera: camera, model: model, reversed: reversed)
             }
+            // Update count after sorting - the buffer now contains splats.count sorted indices
+            currentIndexedDistances.count = splats.count
             return currentIndexedDistances
         }
     }
@@ -67,6 +69,8 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
             signposter.withIntervalSignpost("CPUSplatRadixSorter.cpuRadixSortMultiCloud()", id: signpost) {
                 cpuRadixSortMultiCloud(clouds: clouds, indexedDistances: &currentIndexedDistances, temporaryIndexedDistances: &temporaryIndexedDistances, camera: camera, sceneModel: sceneModel, reversed: reversed, totalCount: totalCount)
             }
+            // Update count after sorting - the buffer now contains totalCount sorted indices
+            currentIndexedDistances.count = totalCount
             return currentIndexedDistances
         }
     }

@@ -120,6 +120,9 @@ public struct SparkSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
+            // Do initial sort if needed - this ensures we have indices on first render
+            let _ = try ensureInitialSort()
+            
             // Compute view matrices (inverse of camera matrices)
             let viewMatrices = cameraMatrices.map(\.inverse)
 
@@ -140,29 +143,8 @@ public struct SparkSplatRenderPipeline: Element {
                 }
             }
             .onChange(of: splatClouds, initial: true) { _, _ in
-                // Do a synchronous initial sort so we have content immediately
+                // Initial sort is done in body. Here we just set up the async sort manager for subsequent updates.
                 let device = _MTLCreateSystemDefaultDevice()
-                let initialSort: SplatIndices
-                if splatClouds.count == 1 {
-                    initialSort = try! CPUSplatRadixSorter.sort(
-                        device: device,
-                        splats: splatClouds[0].splats,
-                        camera: cameraMatrices[0],
-                        model: modelMatrix * splatClouds[0].modelTransform,
-                        reversed: false
-                    )
-                } else {
-                    initialSort = try! CPUSplatRadixSorter.sort(
-                        device: device,
-                        clouds: splatClouds,
-                        camera: cameraMatrices[0],
-                        sceneModel: modelMatrix,
-                        reversed: false
-                    )
-                }
-                sortedIndices = initialSort
-
-                // Now set up the async sort manager for subsequent updates
                 let newSortManager = try! AsyncSortManager(device: device, splatClouds: splatClouds, capacity: totalSplatCount, logger: logger)
                 sortManager = newSortManager
                 nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
@@ -269,6 +251,33 @@ public struct SparkSplatRenderPipeline: Element {
             renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
+    }
+
+    @discardableResult
+    private func ensureInitialSort() throws -> Bool {
+        guard sortedIndices == nil else { return false }
+        
+        let device = _MTLCreateSystemDefaultDevice()
+        let initialSort: SplatIndices
+        if splatClouds.count == 1 {
+            initialSort = try CPUSplatRadixSorter.sort(
+                device: device,
+                splats: splatClouds[0].splats,
+                camera: cameraMatrices[0],
+                model: modelMatrix * splatClouds[0].modelTransform,
+                reversed: false
+            )
+        } else {
+            initialSort = try CPUSplatRadixSorter.sort(
+                device: device,
+                clouds: splatClouds,
+                camera: cameraMatrices[0],
+                sceneModel: modelMatrix,
+                reversed: false
+            )
+        }
+        sortedIndices = initialSort
+        return true
     }
 
     func requestSort() {

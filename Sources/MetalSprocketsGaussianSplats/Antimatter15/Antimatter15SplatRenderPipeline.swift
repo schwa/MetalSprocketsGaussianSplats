@@ -56,6 +56,9 @@ public struct Antimatter15SplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
+            // Do initial sort if needed - this ensures we have indices on first render
+            let _ = try ensureInitialSort()
+            
             // Concatenate outer modelMatrix with per-cloud transform
             let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
 
@@ -105,17 +108,8 @@ public struct Antimatter15SplatRenderPipeline: Element {
                 }
             }
             .onChange(of: splatCloud, initial: true) { _, _ in
-                // Do a synchronous initial sort so we have content immediately
+                // Initial sort is done in body. Here we just set up the async sort manager for subsequent updates.
                 let device = _MTLCreateSystemDefaultDevice()
-                let initialSort = try! CPUSplatRadixSorter.sort(
-                    device: device,
-                    splats: splatCloud.splats,
-                    camera: cameraMatrix,
-                    model: modelMatrix * splatCloud.modelTransform,
-                    reversed: false
-                )
-                sortedIndices = initialSort
-
                 // Now set up the async sort manager for subsequent updates
                 let newSortManager = try! AsyncSortManager(device: device, splatCloud: splatCloud, capacity: splatCloud.count, logger: logger)
                 sortManager = newSortManager
@@ -137,6 +131,22 @@ public struct Antimatter15SplatRenderPipeline: Element {
                 requestSort()
             }
         }
+    }
+
+    @discardableResult
+    private func ensureInitialSort() throws -> Bool {
+        guard sortedIndices == nil else { return false }
+        
+        let device = _MTLCreateSystemDefaultDevice()
+        let initialSort = try CPUSplatRadixSorter.sort(
+            device: device,
+            splats: splatCloud.splats,
+            camera: cameraMatrix,
+            model: modelMatrix * splatCloud.modelTransform,
+            reversed: false
+        )
+        sortedIndices = initialSort
+        return true
     }
 
     func requestSort() {
