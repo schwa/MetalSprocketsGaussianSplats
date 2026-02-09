@@ -97,18 +97,17 @@ namespace SparkSplatRenderShader {
             return out;
         }
 
-        // Transform center to world space
-        float4 worldCenter = modelMatrix * float4(center, 1.0);
-
-        // Cull by bounding box (world space)
+        // Cull by bounding box (model space, before any transforms)
         if (use_bounding_box) {
-            float3 worldPos = worldCenter.xyz;
-            if (worldPos.x < boundingBox.minBounds.x || worldPos.x > boundingBox.maxBounds.x ||
-                worldPos.y < boundingBox.minBounds.y || worldPos.y > boundingBox.maxBounds.y ||
-                worldPos.z < boundingBox.minBounds.z || worldPos.z > boundingBox.maxBounds.z) {
+            if (center.x < boundingBox.minBounds.x || center.x > boundingBox.maxBounds.x ||
+                center.y < boundingBox.minBounds.y || center.y > boundingBox.maxBounds.y ||
+                center.z < boundingBox.minBounds.z || center.z > boundingBox.maxBounds.z) {
                 return out;
             }
         }
+
+        // Transform center to world space
+        float4 worldCenter = modelMatrix * float4(center, 1.0);
 
         // Evaluate spherical harmonics for view-dependent color
         if (use_sh && shDegree > 0) {

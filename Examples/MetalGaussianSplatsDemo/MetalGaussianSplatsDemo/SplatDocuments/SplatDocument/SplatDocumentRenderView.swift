@@ -103,13 +103,12 @@ private struct SplatRenderContent: View {
     @Environment(SplatDocumentViewModel.self)
     private var viewModel: SplatDocumentViewModel?
 
-    // Stable ID based on whether culling is enabled (not the actual values)
+    // Only recreate when culling toggles on/off, not on every slider change
     private var cullingStateID: Bool {
         viewModel?.cullBoundingBoxEnabled ?? false
     }
     
     var body: some View {
-        // Read cullBoundingBox to trigger observation when it changes
         let cullBoundingBox = viewModel?.cullBoundingBox
         
         let resolvedColor = backgroundColor.resolve(in: EnvironmentValues())

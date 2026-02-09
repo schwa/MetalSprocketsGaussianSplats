@@ -241,7 +241,7 @@ public struct SparkSplatRenderPipeline: Element {
                     var shDegreeValue = UInt32(maxSHDegree)
                     commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
                 }
-                // Set bounding box for culling
+                // Set bounding box for vertex culling
                 if var bbox = boundingBox {
                     commandEncoder.setVertexBytes(&bbox, length: MemoryLayout<BoundingBox3D>.size, index: 12)
                 }

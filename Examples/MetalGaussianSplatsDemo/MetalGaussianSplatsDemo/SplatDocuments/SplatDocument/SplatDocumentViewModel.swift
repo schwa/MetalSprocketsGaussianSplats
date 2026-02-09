@@ -37,9 +37,10 @@ final class SplatDocumentViewModel {
     var cullMinNormalized: SIMD3<Float> = SIMD3(0, 0, 0)
     var cullMaxNormalized: SIMD3<Float> = SIMD3(1, 1, 1)
 
-    /// Compute actual world-space bounding box from normalized values
+    /// Compute model-space bounding box from normalized values
     var cullBoundingBox: BoundingBox3D? {
         guard cullBoundingBoxEnabled, boundsSize != .zero else { return nil }
+        // Bounding box is in model space (original splat coordinates, before any transforms)
         let actualMin = boundsCenter - boundsSize / 2
         let minBounds = actualMin + cullMinNormalized * boundsSize
         let maxBounds = actualMin + cullMaxNormalized * boundsSize
