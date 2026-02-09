@@ -98,7 +98,7 @@ private struct SplatRenderContent: View {
     @Binding var cameraMatrix: simd_float4x4
     let modelMatrix: simd_float4x4
     let projection: any ProjectionProtocol
-    
+
     // Read from environment so observation works
     @Environment(SplatDocumentViewModel.self)
     private var viewModel: SplatDocumentViewModel?
@@ -107,10 +107,10 @@ private struct SplatRenderContent: View {
     private var cullingStateID: Bool {
         viewModel?.cullBoundingBoxEnabled ?? false
     }
-    
+
     var body: some View {
         let cullBoundingBox = viewModel?.cullBoundingBox
-        
+
         let resolvedColor = backgroundColor.resolve(in: EnvironmentValues())
         let clearColor = MTLClearColor(
             red: Double(resolvedColor.red),

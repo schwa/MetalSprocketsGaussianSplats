@@ -35,7 +35,7 @@ struct MultiCloudRenderView: View {
     }
 
     var body: some View {
-        RenderView { context, drawableSize in
+        RenderView { _, drawableSize in
             MultiCloudRenderPass(
                 clouds: clouds,
                 cameraMatrix: cameraMatrix,
@@ -48,7 +48,7 @@ struct MultiCloudRenderView: View {
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(clearColor)
-//        .modifier(TurntableCameraController(transform: $cameraMatrix))
+        //        .modifier(TurntableCameraController(transform: $cameraMatrix))
         .onChange(of: verticalAngleOfView, initial: true) {
             projection = PerspectiveProjection(verticalAngleOfView: .degrees(Float(verticalAngleOfView)), depthMode: .standard(zClip: 0.01 ... 1_000))
         }
@@ -79,10 +79,9 @@ struct MultiCloudRenderPass: Element {
                         boundingBox: cullBoundingBox
                     )
                 }
-            }
-            else {
-                // Empty render pass - just to get the clear color.
+            } else {
                 try RenderPass {
+                    // Empty render pass - just to get the clear color.
                 }
             }
         }

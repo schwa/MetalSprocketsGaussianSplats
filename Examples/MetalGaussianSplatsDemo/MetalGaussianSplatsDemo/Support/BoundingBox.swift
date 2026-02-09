@@ -24,7 +24,7 @@ struct BoundingBox {
             SIMD3(min.x, max.y, min.z), // 4: top-left-front
             SIMD3(max.x, max.y, min.z), // 5: top-right-front
             SIMD3(min.x, max.y, max.z), // 6: top-left-back
-            SIMD3(max.x, max.y, max.z), // 7: top-right-back
+            SIMD3(max.x, max.y, max.z) // 7: top-right-back
         ]
     }
 

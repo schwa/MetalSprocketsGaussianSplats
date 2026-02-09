@@ -24,7 +24,7 @@ final class SplatSceneViewModel {
     var verticalAngleOfView: Double = 90
 
     private var resourceAccess = ScopedResourceAccess()
-    
+
     /// Track which cloud IDs we've loaded to avoid reloading on property-only changes
     private var loadedCloudIDs: Set<UUID> = []
 
@@ -38,8 +38,10 @@ final class SplatSceneViewModel {
 
     /// Whether all loaded clouds have spherical harmonics data
     var allCloudsHaveSphericalHarmonics: Bool {
-        guard !loadedClouds.isEmpty else { return false }
-        return loadedClouds.allSatisfy { $0.descriptor.hasSphericalHarmonics }
+        guard !loadedClouds.isEmpty else {
+            return false
+        }
+        return loadedClouds.allSatisfy(\.descriptor.hasSphericalHarmonics)
     }
 
     /// Total splat count across all loaded clouds
@@ -54,16 +56,16 @@ final class SplatSceneViewModel {
     }
 
     @MainActor
-    func loadClouds(from scene: SplatScene) async {
+    func loadClouds(from scene: SplatScene) {
         // Only reload if structural change (add/remove clouds)
         guard needsReload(for: scene) else {
             return
         }
-        
+
         // Set target IDs immediately to prevent re-entry during async loading
         let targetCloudIDs = Set(scene.clouds.map(\.id))
         loadedCloudIDs = targetCloudIDs
-        
+
         if scene.clouds.isEmpty {
             loadingState = .idle
             loadedClouds = []
@@ -104,7 +106,7 @@ final class SplatSceneViewModel {
             }
 
             loadingState = loaded.isEmpty ? .idle : .ready
-            
+
             // Compute bounds in background
             Task {
                 await computeBoundsForLoadedClouds()
@@ -113,18 +115,16 @@ final class SplatSceneViewModel {
             loadingState = .error("Failed to load clouds: \(error.localizedDescription)")
         }
     }
-    
+
     /// Compute bounds for all loaded clouds that don't have them yet
     @MainActor
     func computeBoundsForLoadedClouds() async {
-        for i in loadedClouds.indices {
-            if loadedClouds[i].bounds == nil {
-                do {
-                    let bounds = try await loadedClouds[i].descriptor.computeBounds()
-                    loadedClouds[i].bounds = bounds
-                } catch {
-                    print("Failed to compute bounds for \(loadedClouds[i].displayName): \(error)")
-                }
+        for i in loadedClouds.indices where loadedClouds[i].bounds == nil {
+            do {
+                let bounds = try await loadedClouds[i].descriptor.computeBounds()
+                loadedClouds[i].bounds = bounds
+            } catch {
+                print("Failed to compute bounds for \(loadedClouds[i].displayName): \(error)")
             }
         }
     }

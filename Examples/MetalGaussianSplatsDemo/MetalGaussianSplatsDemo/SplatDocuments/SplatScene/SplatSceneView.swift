@@ -123,7 +123,7 @@ struct SplatSceneView: View {
     @ViewBuilder
     private var renderView: some View {
         @Bindable var viewModel = viewModel
-        
+
         // Get enabled cloud IDs from document and sync transforms
         let enabledCloudIDs = Set(document.scene.clouds.filter(\.enabled).map(\.id))
         let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
@@ -140,10 +140,10 @@ struct SplatSceneView: View {
                 }
                 return loadedCloud.cloud
             }
-        
+
         // Determine if we should use SH
         let useSH = document.scene.renderSettings.useSphericalHarmonics && viewModel.allCloudsHaveSphericalHarmonics
-        
+
         // Build culling bounding box if enabled
         let cullBoundingBox: BoundingBox3D? = cullBoundingBoxEnabled
             ? BoundingBox3D(minBounds: cullMinBounds, maxBounds: cullMaxBounds)
@@ -159,7 +159,7 @@ struct SplatSceneView: View {
                 backgroundColor: document.scene.renderSettings.backgroundColor,
                 cullBoundingBox: cullBoundingBox
             )
-            
+
             if showBoundingBoxes {
                 boundingBoxOverlay
             }
@@ -180,27 +180,31 @@ struct SplatSceneView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var boundingBoxOverlay: some View {
         // Create projection using same approach as MultiCloudRenderView
         let projection = PerspectiveProjection(
             verticalAngleOfView: .degrees(Float(viewModel.verticalAngleOfView)),
-            depthMode: .standard(zClip: 0.01 ... 1000)
+            depthMode: .standard(zClip: 0.01 ... 1_000)
         )
         let projectionMatrix = projection.projectionMatrix(for: viewportSize)
-        
+
         // View matrix is inverse of camera matrix
         let viewMatrix = viewModel.cameraMatrix.inverse
-        
+
         // Build bounding box info for enabled clouds
         let boxes: [BoundingBoxInfo] = viewModel.loadedClouds
             .filter { loadedCloud in
                 document.scene.clouds.first { $0.id == loadedCloud.id }?.enabled ?? false
             }
             .compactMap { loadedCloud in
-                guard let bounds = loadedCloud.bounds else { return nil }
-                guard var transform = document.scene.clouds.first(where: { $0.id == loadedCloud.id })?.transform else { return nil }
+                guard let bounds = loadedCloud.bounds else {
+                    return nil
+                }
+                guard var transform = document.scene.clouds.first(where: { $0.id == loadedCloud.id })?.transform else {
+                    return nil
+                }
                 // Apply drag offset if active
                 if let dragOffset = dragOffsets[loadedCloud.id] {
                     transform.translation += dragOffset
@@ -213,7 +217,7 @@ struct SplatSceneView: View {
                     color: .white
                 )
             }
-        
+
         ZStack {
             // Interactive faces (below wireframe)
             BoundingBoxFaceInteraction(
@@ -228,7 +232,7 @@ struct SplatSceneView: View {
                     commitDrag(cloudID: cloudID)
                 }
             )
-            
+
             // Wireframe (on top)
             BoundingBoxWireframe(
                 boundingBoxes: boxes,
@@ -238,63 +242,77 @@ struct SplatSceneView: View {
             )
         }
     }
-    
+
     private func handleAxisDrag(cloudID: UUID, axis: Int, screenDelta: CGSize, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4) {
-        guard let cloudIndex = document.scene.clouds.firstIndex(where: { $0.id == cloudID }) else { return }
-        guard let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloudID }) else { return }
-        
+        guard let cloudIndex = document.scene.clouds.firstIndex(where: { $0.id == cloudID }) else {
+            return
+        }
+        guard let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloudID }) else {
+            return
+        }
+
         // Get the cloud's center in world space
         let bounds = loadedCloud.bounds ?? BoundingBox(min: .zero, max: .one)
         let modelMatrix = document.scene.sceneTransform.matrix * document.scene.clouds[cloudIndex].transform.matrix
         let worldCenter = modelMatrix * SIMD4<Float>(bounds.center, 1)
-        
+
         // Compute pixels per world unit at this depth
-        let axisVectors: [SIMD3<Float>] = [SIMD3(1,0,0), SIMD3(0,1,0), SIMD3(0,0,1)]
+        let axisVectors: [SIMD3<Float>] = [SIMD3(1, 0, 0), SIMD3(0, 1, 0), SIMD3(0, 0, 1)]
         let axisWorld = (modelMatrix * SIMD4<Float>(axisVectors[axis], 0)).xyz
         let axisNorm = normalize(axisWorld)
-        
+
         // Project center and center+axis to screen
         let mvp = projectionMatrix * viewMatrix
         func toScreen(_ p: SIMD4<Float>) -> CGPoint? {
             let clip = mvp * p
-            guard clip.w > 0 else { return nil }
+            guard clip.w > 0 else {
+                return nil
+            }
             let ndc = SIMD3<Float>(clip.x, clip.y, clip.z) / clip.w
             return CGPoint(
                 x: CGFloat((ndc.x + 1) * 0.5 * Float(viewportSize.width)),
                 y: CGFloat((1 - ndc.y) * 0.5 * Float(viewportSize.height))
             )
         }
-        
+
         guard let p0 = toScreen(worldCenter),
-              let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0)) else { return }
-        
+              let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0)) else {
+            return
+        }
+
         let screenDist = hypot(p1.x - p0.x, p1.y - p0.y)
-        guard screenDist > 0.001 else { return }
-        
+        guard screenDist > 0.001 else {
+            return
+        }
+
         // pixels per world unit
         let pixelsPerUnit = screenDist
-        
+
         // Convert screen delta magnitude to world units
         let screenMag = hypot(screenDelta.width, screenDelta.height)
         let sign: Float = (screenDelta.width * (p1.x - p0.x) + screenDelta.height * (p1.y - p0.y)) > 0 ? 1 : -1
         let worldDelta = Float(screenMag) / Float(pixelsPerUnit) * sign
-        
+
         // Accumulate drag offset (don't update document yet)
         let localAxis = axisVectors[axis]
         let offset = dragOffsets[cloudID] ?? .zero
         dragOffsets[cloudID] = offset + localAxis * worldDelta
-        
+
         // Update GPU cloud's transform directly (doesn't trigger SwiftUI)
         let docTransform = document.scene.clouds[cloudIndex].transform
         var newTransform = docTransform
         newTransform.translation += dragOffsets[cloudID]!
         loadedCloud.cloud.modelTransform = document.scene.sceneTransform.matrix * newTransform.matrix
     }
-    
+
     private func commitDrag(cloudID: UUID) {
-        guard let offset = dragOffsets[cloudID], offset != .zero else { return }
-        guard let cloudIndex = document.scene.clouds.firstIndex(where: { $0.id == cloudID }) else { return }
-        
+        guard let offset = dragOffsets[cloudID], offset != .zero else {
+            return
+        }
+        guard let cloudIndex = document.scene.clouds.firstIndex(where: { $0.id == cloudID }) else {
+            return
+        }
+
         // Commit accumulated offset to document
         document.scene.clouds[cloudIndex].transform.translation += offset
         dragOffsets[cloudID] = nil
@@ -321,7 +339,7 @@ struct SplatSceneView: View {
                 document.scene.clouds[index] = newValue
             }
         )
-        
+
         SplatSceneInspectorView(
             tab: $inspectorTab,
             cloud: selectedCloud,
@@ -404,7 +422,7 @@ struct SplatSceneView: View {
 
             // Stop accessing all URLs
             for (index, url) in urls.enumerated() {
-                if index < cloudRefs.count && cloudRefs[index].didAccess {
+                if index < cloudRefs.count, cloudRefs[index].didAccess {
                     url.stopAccessingSecurityScopedResource()
                 }
             }

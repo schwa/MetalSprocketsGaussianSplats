@@ -1,6 +1,6 @@
+import simd
 import SwiftUI
 import UniformTypeIdentifiers
-import simd
 
 /// A document representing a splat scene with multiple clouds
 struct SplatSceneDocument: FileDocument {
@@ -28,11 +28,11 @@ struct SplatSceneDocument: FileDocument {
             print("❌ Failed to decode SplatScene: \(error)")
             if let decodingError = error as? DecodingError {
                 switch decodingError {
-                case .keyNotFound(let key, let context):
+                case let .keyNotFound(key, context):
                     print("  Key not found: \(key.stringValue), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-                case .typeMismatch(let type, let context):
+                case let .typeMismatch(type, context):
                     print("  Type mismatch: expected \(type), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-                case .valueNotFound(let type, let context):
+                case let .valueNotFound(type, context):
                     print("  Value not found: \(type), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
                 case .dataCorrupted(let context):
                     print("  Data corrupted: \(context.debugDescription)")
@@ -44,7 +44,7 @@ struct SplatSceneDocument: FileDocument {
         }
     }
 
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+    func fileWrapper(configuration _: WriteConfiguration) throws -> FileWrapper {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(scene)

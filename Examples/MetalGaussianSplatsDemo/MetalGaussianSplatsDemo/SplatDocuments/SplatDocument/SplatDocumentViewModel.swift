@@ -39,7 +39,9 @@ final class SplatDocumentViewModel {
 
     /// Compute model-space bounding box from normalized values
     var cullBoundingBox: BoundingBox3D? {
-        guard cullBoundingBoxEnabled, boundsSize != .zero else { return nil }
+        guard cullBoundingBoxEnabled, boundsSize != .zero else {
+            return nil
+        }
         // Bounding box is in model space (original splat coordinates, before any transforms)
         let actualMin = boundsCenter - boundsSize / 2
         let minBounds = actualMin + cullMinNormalized * boundsSize

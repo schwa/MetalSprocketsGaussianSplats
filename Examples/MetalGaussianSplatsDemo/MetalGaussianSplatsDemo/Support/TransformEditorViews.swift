@@ -55,23 +55,25 @@ struct NudgeableFloatField: View {
         HStack {
             Text(label)
                 .frame(width: 20, alignment: .leading)
-            
+
             Button {
                 value -= nudgeAmount
             } label: {
                 Image(systemName: "minus")
+                    .accessibilityLabel("Decrease")
             }
             .buttonStyle(.borderless)
-            
+
             TextField("", value: $value, format: .number.precision(.fractionLength(2)))
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 70)
                 .multilineTextAlignment(.trailing)
-            
+
             Button {
                 value += nudgeAmount
             } label: {
                 Image(systemName: "plus")
+                    .accessibilityLabel("Increase")
             }
             .buttonStyle(.borderless)
         }

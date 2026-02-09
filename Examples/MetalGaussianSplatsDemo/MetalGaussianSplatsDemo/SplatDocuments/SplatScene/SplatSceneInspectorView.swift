@@ -27,7 +27,9 @@ struct SplatSceneInspectorView: View {
     @Environment(SplatSceneViewModel.self) private var viewModel
 
     private var loadedCloud: SplatSceneViewModel.LoadedCloud? {
-        guard let cloudID = cloud?.id else { return nil }
+        guard let cloudID = cloud?.id else {
+            return nil
+        }
         return viewModel.loadedClouds.first { $0.id == cloudID }
     }
 
@@ -51,10 +53,14 @@ struct SplatSceneInspectorView: View {
                 case .cloud:
                     if var cloudBinding = cloud {
                         Form {
-                            CloudInspectorContent(cloud: Binding(
-                                get: { cloudBinding },
-                                set: { cloudBinding = $0; cloud = $0 }
-                            ), loadedCloud: loadedCloud, onDelete: onDeleteCloud)
+                            CloudInspectorContent(
+                                cloud: Binding(
+                                    get: { cloudBinding },
+                                    set: { cloudBinding = $0; cloud = $0 }
+                                ),
+                                loadedCloud: loadedCloud,
+                                onDelete: onDeleteCloud
+                            )
                         }
                         .formStyle(.grouped)
                     } else {
@@ -182,7 +188,7 @@ struct CameraInspectorContent: View {
 
     var body: some View {
         @Bindable var viewModel = viewModel
-        
+
         Section("Field of View") {
             Slider(value: $viewModel.verticalAngleOfView, in: 30...120) {
                 Text("FOV")
@@ -242,7 +248,9 @@ struct RenderInspectorContent: View {
         Binding(
             get: {
                 let c = renderSettings.backgroundColor
-                guard c.count == 4 else { return .black }
+                guard c.count == 4 else {
+                    return .black
+                }
                 return Color(red: Double(c[0]), green: Double(c[1]), blue: Double(c[2]), opacity: Double(c[3]))
             },
             set: { newColor in

@@ -36,7 +36,7 @@ struct Transform: Codable, Sendable, Equatable {
         }
     }
 
-    static let identity = Transform()
+    static let identity = Self()
 }
 
 // MARK: - SplatScene Model
@@ -45,9 +45,9 @@ struct Transform: Codable, Sendable, Equatable {
 struct SplatScene: Codable, Sendable {
     var version: Int = 1
     var clouds: [CloudReference] = []
-    var sceneTransform: Transform = Transform(rotation: [.pi, 0, 0])  // Default X rotation of 180°
+    var sceneTransform = Transform(rotation: [.pi, 0, 0])  // Default X rotation of 180°
     var camera: CameraState?
-    var renderSettings: RenderSettings = RenderSettings()
+    var renderSettings = RenderSettings()
 
     // Custom decoding to handle missing keys from older documents
     init(from decoder: Decoder) throws {
@@ -66,14 +66,16 @@ struct SplatScene: Codable, Sendable {
         renderSettings = try container.decodeIfPresent(RenderSettings.self, forKey: .renderSettings) ?? RenderSettings()
     }
 
-    init() {}
+    init() {
+        // Default initializer
+    }
 
     private enum CodingKeys: String, CodingKey {
         case version, clouds, sceneTransform, camera, renderSettings
     }
 
     struct CloudReference: Codable, Identifiable, Sendable, Equatable {
-        var id: UUID = UUID()
+        var id = UUID()
         /// Security-scoped bookmark data for the splat file
         var bookmarkData: Data
         /// Per-cloud transform (applied before scene transform)
@@ -130,6 +132,7 @@ struct SplatScene: Codable, Sendable {
         }
 
         // Codable with custom keys for transform
+        // swiftlint:disable:next nesting
         enum CodingKeys: String, CodingKey {
             case id, bookmarkData, transform, enabled, displayName, opacity
         }
@@ -138,11 +141,6 @@ struct SplatScene: Codable, Sendable {
     struct CameraState: Codable, Sendable {
         var matrix: simd_float4x4
         var verticalAngleOfView: Double
-
-        init(matrix: simd_float4x4, verticalAngleOfView: Double) {
-            self.matrix = matrix
-            self.verticalAngleOfView = verticalAngleOfView
-        }
     }
 
     struct RenderSettings: Codable, Sendable, Equatable {
