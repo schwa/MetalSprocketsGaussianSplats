@@ -230,7 +230,7 @@
 				451155A22EC3EF9700C04880 /* XCRemoteSwiftPackageReference "GeometryLite3D" */,
 				45E9BB742EF519850016C77E /* XCRemoteSwiftPackageReference "Sharp" */,
 				45B4CDD92EF86B8D00BFC1FC /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
-				452D31AE2F15791E0034906D /* XCLocalSwiftPackageReference "../../../Interaction3D" */,
+				455EE9212F3A679900A753D3 /* XCRemoteSwiftPackageReference "Interaction3D" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 457A34562EB3D9AE0001F508 /* Products */;
@@ -575,10 +575,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		452D31AE2F15791E0034906D /* XCLocalSwiftPackageReference "../../../Interaction3D" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../../Interaction3D;
-		};
 		457A346B2EB3DBF20001F508 /* XCLocalSwiftPackageReference "../../../MetalSprocketsGaussianSplats" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../MetalSprocketsGaussianSplats;
@@ -589,6 +585,14 @@
 		451155A22EC3EF9700C04880 /* XCRemoteSwiftPackageReference "GeometryLite3D" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/schwa/GeometryLite3D";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		455EE9212F3A679900A753D3 /* XCRemoteSwiftPackageReference "Interaction3D" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/schwa/Interaction3D";
 			requirement = {
 				branch = main;
 				kind = branch;

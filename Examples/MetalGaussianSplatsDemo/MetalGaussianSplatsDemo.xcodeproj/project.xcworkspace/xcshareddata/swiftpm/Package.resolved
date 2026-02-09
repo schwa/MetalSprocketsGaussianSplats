@@ -1,5 +1,5 @@
 {
-  "originHash" : "9bf7244aae2ed1773257498c276624a63e88859ae1d6b0d983930c23ec1504de",
+  "originHash" : "745ecbaa92b23bd8589c3f60775fbea196c71fffcbdb1126b1a3f78a977b53c5",
   "pins" : [
     {
       "identity" : "earcut-swift",
@@ -56,15 +56,6 @@
       }
     },
     {
-      "identity" : "swift-algorithms",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-algorithms",
-      "state" : {
-        "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
-        "version" : "1.2.1"
-      }
-    },
-    {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser",
@@ -107,15 +98,6 @@
       "state" : {
         "revision" : "0687f71944021d616d34d922343dcef086855920",
         "version" : "600.0.1"
-      }
-    },
-    {
-      "identity" : "swiftformats",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/SwiftFormats",
-      "state" : {
-        "revision" : "6b51ccec7fccf2f1d4f28f03def6c6b97d17c05b",
-        "version" : "0.3.6"
       }
     },
     {
