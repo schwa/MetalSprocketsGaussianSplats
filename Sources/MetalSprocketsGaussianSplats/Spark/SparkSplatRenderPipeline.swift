@@ -34,6 +34,8 @@ public struct SparkSplatRenderPipeline: Element {
     @MSState
     private var sortedIndices: SplatIndices?
     @MSState
+    private var lastSortedClouds: [GPUSplatCloud<SparkSplat>]?
+    @MSState
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
@@ -143,7 +145,11 @@ public struct SparkSplatRenderPipeline: Element {
                 }
             }
             .onChange(of: splatClouds, initial: true) { _, _ in
-                // Initial sort is done in body. Here we just set up the async sort manager for subsequent updates.
+                // Invalidate old sorted indices so ensureInitialSort() runs for the new cloud
+                sortedIndices = nil
+                lastSortedClouds = nil
+                
+                // Set up the async sort manager for subsequent updates.
                 let device = _MTLCreateSystemDefaultDevice()
                 let newSortManager = try! AsyncSortManager(device: device, splatClouds: splatClouds, capacity: totalSplatCount, logger: logger)
                 sortManager = newSortManager
@@ -160,8 +166,14 @@ public struct SparkSplatRenderPipeline: Element {
                         sortedIndicesRef.wrappedValue = sort
                     }
                 }
+                
+                // Request immediate sort for new clouds
+                requestSort()
             }
             .onChange(of: cameraMatrices) {
+                requestSort()
+            }
+            .onChange(of: modelMatrix) {
                 requestSort()
             }
         }
@@ -239,6 +251,9 @@ public struct SparkSplatRenderPipeline: Element {
             .parameter("clouds", value: argumentBuffer)
         }
         .vertexDescriptor(vertexDescriptor)
+        .renderPassDescriptorModifier { descriptor in
+            descriptor.renderTargetArrayLength = 1
+        }
         .renderPipelineDescriptorModifier { [amplificationCount] renderPipelineDescriptor in
             renderPipelineDescriptor.inputPrimitiveTopology = .triangle
             renderPipelineDescriptor.maxVertexAmplificationCount = amplificationCount
@@ -255,6 +270,12 @@ public struct SparkSplatRenderPipeline: Element {
 
     @discardableResult
     private func ensureInitialSort() throws -> Bool {
+        // Invalidate if clouds have changed (onChange runs after body, so check here too)
+        if lastSortedClouds != splatClouds {
+            sortedIndices = nil
+            lastSortedClouds = splatClouds
+        }
+        
         guard sortedIndices == nil else { return false }
         
         let device = _MTLCreateSystemDefaultDevice()

@@ -22,6 +22,8 @@ public struct Antimatter15SplatRenderPipeline: Element {
     private var sortManager: AsyncSortManager<Antimatter15GPUSplat>?
     @MSState
     private var sortedIndices: SplatIndices?
+    @MSState
+    private var lastSortedCloud: GPUSplatCloud<Antimatter15GPUSplat>?
 
     var vertexDescriptor: MTLVertexDescriptor
     var projectionMatrix: simd_float4x4
@@ -108,9 +110,12 @@ public struct Antimatter15SplatRenderPipeline: Element {
                 }
             }
             .onChange(of: splatCloud, initial: true) { _, _ in
-                // Initial sort is done in body. Here we just set up the async sort manager for subsequent updates.
+                // Invalidate old sorted indices so ensureInitialSort() runs for the new cloud
+                sortedIndices = nil
+                lastSortedCloud = nil
+                
+                // Set up the async sort manager for subsequent updates.
                 let device = _MTLCreateSystemDefaultDevice()
-                // Now set up the async sort manager for subsequent updates
                 let newSortManager = try! AsyncSortManager(device: device, splatCloud: splatCloud, capacity: splatCloud.count, logger: logger)
                 sortManager = newSortManager
                 nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
@@ -126,8 +131,14 @@ public struct Antimatter15SplatRenderPipeline: Element {
                         sortedIndicesRef.wrappedValue = sort
                     }
                 }
+                
+                // Request immediate sort for new cloud
+                requestSort()
             }
             .onChange(of: cameraMatrix) {
+                requestSort()
+            }
+            .onChange(of: modelMatrix) {
                 requestSort()
             }
         }
@@ -135,6 +146,12 @@ public struct Antimatter15SplatRenderPipeline: Element {
 
     @discardableResult
     private func ensureInitialSort() throws -> Bool {
+        // Invalidate if cloud has changed (onChange runs after body, so check here too)
+        if lastSortedCloud != splatCloud {
+            sortedIndices = nil
+            lastSortedCloud = splatCloud
+        }
+        
         guard sortedIndices == nil else { return false }
         
         let device = _MTLCreateSystemDefaultDevice()
