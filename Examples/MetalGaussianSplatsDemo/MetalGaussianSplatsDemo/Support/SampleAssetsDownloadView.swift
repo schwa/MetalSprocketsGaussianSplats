@@ -7,9 +7,6 @@ import AppKit
 struct SampleAssetsDownloadView: View {
     @State private var state: DownloadState = .idle
     @State private var showFolderPicker = false
-    @State private var assets: [AssetInfo] = []
-    @State private var currentAssetIndex = 0
-    @State private var currentAssetProgress: Double = 0
     @State private var downloadTask: URLSessionDownloadTask?
 
     private let assetsURL = URL(string: "https://raw.githubusercontent.com/sparkjsdev/spark/main/examples/assets.json")!

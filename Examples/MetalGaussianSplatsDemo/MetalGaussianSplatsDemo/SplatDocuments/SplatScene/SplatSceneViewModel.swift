@@ -8,7 +8,7 @@ import SwiftUI
 
 @Observable
 final class SplatSceneViewModel {
-    enum LoadingState {
+    enum LoadingState: Equatable {
         case idle
         case loading
         case ready
@@ -17,11 +17,103 @@ final class SplatSceneViewModel {
 
     var loadingState: LoadingState = .idle
     var loadedClouds: [LoadedCloud] = []
-    var viewSize: CGSize = .zero
+    var viewSize: CGSize = .zero {
+        didSet { updateCameraForZoomToFit() }
+    }
 
     // Camera
-    var cameraMatrix: simd_float4x4 = .init(translation: [0, 0, 10])
-    var verticalAngleOfView: Double = 90
+    var cameraMode: CameraMode = .object {
+        didSet {
+            if !zoomToFit {
+                cameraMatrix = .init(translation: cameraMode.initialPosition)
+            }
+        }
+    }
+    var cameraMatrix: simd_float4x4 = .init(translation: [0, 0, 5])
+    var verticalAngleOfView: Double = 90 {
+        didSet { updateCameraForZoomToFit() }
+    }
+    var zoomToFit: Bool = false {
+        didSet {
+            if zoomToFit {
+                updateCameraForZoomToFit()
+            } else {
+                cameraMatrix = .init(translation: cameraMode.initialPosition)
+            }
+        }
+    }
+
+    /// Combined bounds of all enabled clouds (computed when bounds change)
+    var combinedBoundsCenter: SIMD3<Float> = .zero
+    var combinedBoundsSize: SIMD3<Float> = .zero
+
+    /// Incremented when individual cloud bounds are computed
+    var boundsUpdateCount: Int = 0
+
+    /// Update camera to fit all enabled clouds
+    func updateCameraForZoomToFit() {
+        guard zoomToFit, cameraMode == .object else { return }
+        guard viewSize.width > 0, viewSize.height > 0 else { return }
+        guard combinedBoundsSize != .zero else { return }
+
+        let screenAspect = Float(viewSize.width / viewSize.height)
+        let fovRadians = Float(verticalAngleOfView) * .pi / 180
+        let halfFovTan = tan(fovRadians / 2)
+
+        let modelWidth = combinedBoundsSize.x
+        let modelHeight = combinedBoundsSize.y
+        let modelDepth = combinedBoundsSize.z
+
+        let distanceForHeight = (modelHeight / 2) / halfFovTan
+        let distanceForWidth = (modelWidth / 2) / (halfFovTan * screenAspect)
+
+        let distance = (max(distanceForHeight, distanceForWidth) + modelDepth / 2) / 0.9
+
+        cameraMatrix = .init(translation: [combinedBoundsCenter.x, combinedBoundsCenter.y, combinedBoundsCenter.z + distance])
+    }
+
+    /// Compute combined bounds from enabled clouds with their transforms
+    func updateCombinedBounds(for scene: SplatScene) {
+        var minBounds = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var maxBounds = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        var hasBounds = false
+
+        for cloud in scene.clouds where cloud.enabled {
+            guard let loadedCloud = loadedClouds.first(where: { $0.id == cloud.id }),
+                  let bounds = loadedCloud.bounds else { continue }
+
+            let transform = scene.sceneTransform.matrix * cloud.transform.matrix
+            let corners: [SIMD3<Float>] = [
+                SIMD3(bounds.min.x, bounds.min.y, bounds.min.z),
+                SIMD3(bounds.max.x, bounds.min.y, bounds.min.z),
+                SIMD3(bounds.min.x, bounds.max.y, bounds.min.z),
+                SIMD3(bounds.max.x, bounds.max.y, bounds.min.z),
+                SIMD3(bounds.min.x, bounds.min.y, bounds.max.z),
+                SIMD3(bounds.max.x, bounds.min.y, bounds.max.z),
+                SIMD3(bounds.min.x, bounds.max.y, bounds.max.z),
+                SIMD3(bounds.max.x, bounds.max.y, bounds.max.z)
+            ]
+
+            for corner in corners {
+                let transformed = (transform * SIMD4<Float>(corner, 1)).xyz
+                minBounds = min(minBounds, transformed)
+                maxBounds = max(maxBounds, transformed)
+            }
+            hasBounds = true
+        }
+
+        if hasBounds {
+            combinedBoundsCenter = (minBounds + maxBounds) / 2
+            combinedBoundsSize = maxBounds - minBounds
+        } else {
+            combinedBoundsCenter = .zero
+            combinedBoundsSize = .zero
+        }
+
+        if zoomToFit {
+            updateCameraForZoomToFit()
+        }
+    }
 
     private var resourceAccess = ScopedResourceAccess()
 
@@ -42,11 +134,6 @@ final class SplatSceneViewModel {
             return false
         }
         return loadedClouds.allSatisfy(\.descriptor.hasSphericalHarmonics)
-    }
-
-    /// Total splat count across all loaded clouds
-    var totalSplatCount: Int {
-        loadedClouds.reduce(into: 0) { $0 += $1.cloud.count }
     }
 
     /// Check if we need to reload (structural change) vs just update properties
@@ -119,13 +206,18 @@ final class SplatSceneViewModel {
     /// Compute bounds for all loaded clouds that don't have them yet
     @MainActor
     func computeBoundsForLoadedClouds() async {
+        var didComputeAny = false
         for i in loadedClouds.indices where loadedClouds[i].bounds == nil {
             do {
                 let bounds = try await loadedClouds[i].descriptor.computeBounds()
                 loadedClouds[i].bounds = bounds
+                didComputeAny = true
             } catch {
                 print("Failed to compute bounds for \(loadedClouds[i].displayName): \(error)")
             }
+        }
+        if didComputeAny {
+            boundsUpdateCount += 1
         }
     }
 

@@ -1,15 +1,18 @@
 #if os(visionOS)
 import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatShaders
+import simd
 import SwiftUI
 
 /// A visionOS-specific view for displaying a Gaussian Splat document with immersive support
+/// Uses the unified content view infrastructure shared with multi-cloud scenes
 struct SplatDocumentView: View {
     let document: SplatDocument
     let fileURL: URL?
 
     @State private var viewModel = SplatDocumentViewModel()
     @State private var showInspector = false
-    @State private var inspectorTab: InspectorTab = .info
+    @State private var inspectorTab: UnifiedInspectorTab = .cloud
     @State private var confirmedLoad = false
     @State private var showScreenshotSheet = false
     @State private var showExportDialog = false
@@ -59,7 +62,6 @@ struct SplatDocumentView: View {
         }
         .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
         .focusedSceneValue(\.inspectorVisibility, $showInspector)
-        .focusedSceneValue(\.inspectorTab, $inspectorTab)
         .toolbar { toolbarContent }
         .sheet(isPresented: $showScreenshotSheet) {
             ScreenshotSheet(
@@ -100,7 +102,7 @@ struct SplatDocumentView: View {
 
     @ViewBuilder
     private var readyContent: some View {
-        if let descriptor = viewModel.descriptor, !needsConfirmation {
+        if let splatCloud = viewModel.splatCloud, !needsConfirmation {
             if immersiveState.isImmersive {
                 ImmersiveModeControlsView {
                     Task {
@@ -110,15 +112,23 @@ struct SplatDocumentView: View {
                 }
                 .environment(viewModel)
             } else {
-                SplatDocumentRenderView(
-                    rendererType: viewModel.rendererType,
-                    descriptor: descriptor,
-                    cameraMode: viewModel.cameraMode,
-                    useSphericalHarmonics: viewModel.useSphericalHarmonics,
-                    backgroundColor: viewModel.backgroundColor,
+                let bgColor = viewModel.backgroundColor.resolve(in: EnvironmentValues())
+                let bgColorArray: [Float] = [
+                    Float(bgColor.red),
+                    Float(bgColor.green),
+                    Float(bgColor.blue),
+                    Float(bgColor.opacity)
+                ]
+
+                UnifiedSplatContentView(
+                    mode: .single,
+                    clouds: [splatCloud],
+                    sceneTransform: viewModel.modelMatrix,
+                    useSphericalHarmonics: viewModel.useSphericalHarmonics && viewModel.hasSphericalHarmonicsData,
+                    backgroundColor: bgColorArray,
                     cameraMatrix: $viewModel.cameraMatrix,
-                    modelMatrix: $viewModel.modelMatrix,
-                    verticalAngleOfView: $viewModel.verticalAngleOfView
+                    verticalAngleOfView: $viewModel.verticalAngleOfView,
+                    cullBoundingBox: viewModel.cullBoundingBox
                 )
                 .ignoresSafeArea()
             }
@@ -130,6 +140,7 @@ struct SplatDocumentView: View {
             } actions: {
                 Button("Load Anyway") {
                     confirmedLoad = true
+                    viewModel.loadSplatCloud()
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -180,9 +191,11 @@ struct SplatDocumentView: View {
             }
             .disabled(immersiveState.isImmersive)
             .popover(isPresented: $showInspector) {
-                SplatDocumentInspectorView(tab: $inspectorTab)
-                    .environment(viewModel)
-                    .frame(width: 420, height: 520)
+                UnifiedInspectorView(
+                    singleViewModel: viewModel,
+                    tab: $inspectorTab
+                )
+                .frame(width: 420, height: 520)
             }
         }
         ToolbarItem {

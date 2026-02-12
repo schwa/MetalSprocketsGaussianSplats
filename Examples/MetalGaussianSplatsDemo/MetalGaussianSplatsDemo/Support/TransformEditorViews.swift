@@ -80,21 +80,4 @@ struct NudgeableFloatField: View {
     }
 }
 
-// MARK: - Float Field
-
-struct FloatField: View {
-    let label: String
-    @Binding var value: Float
-
-    var body: some View {
-        HStack {
-            Text(label)
-            Spacer()
-            TextField("", value: $value, format: .number.precision(.fractionLength(3)))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 100)
-                .multilineTextAlignment(.trailing)
-        }
-    }
-}
 #endif

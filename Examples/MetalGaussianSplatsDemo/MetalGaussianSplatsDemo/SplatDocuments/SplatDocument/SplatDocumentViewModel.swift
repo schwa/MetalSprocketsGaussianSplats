@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import GeometryLite3D
+import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import Observation
 import Sharp
@@ -25,10 +26,12 @@ enum LoadingState: Equatable {
 @Observable
 final class SplatDocumentViewModel {
     var descriptor: SplatCloudDescriptor?
+
+    /// The loaded GPU splat cloud for rendering (uses unified multi-cloud infrastructure)
+    var splatCloud: GPUSplatCloud<SparkSplat>?
     var viewSize: CGSize = .zero {
         didSet { updateCameraForZoomToFit() }
     }
-    var rendererType: SplatRendererType = .spark
     var backgroundColor: Color = .black
     var useSphericalHarmonics: Bool = true
 
@@ -60,23 +63,6 @@ final class SplatDocumentViewModel {
     var isImageConversion: Bool = false
 
     // Camera
-    enum CameraMode: String, CaseIterable {
-        case object = "Object"
-        case room = "Room"
-        case spatialScene = "Spatial Scene"
-
-        var initialPosition: SIMD3<Float> {
-            switch self {
-            case .object:
-                [0, 0, 5]
-            case .room:
-                [0, 0, 0]
-            case .spatialScene:
-                [0, 0, 0.2]
-            }
-        }
-    }
-
     var cameraMode: CameraMode = .object {
         didSet { cameraMatrix = .init(translation: cameraMode.initialPosition) }
     }
@@ -205,6 +191,7 @@ final class SplatDocumentViewModel {
     func load(url: URL?, contentType: UTType?) async {
         guard let url else {
             descriptor = nil
+            splatCloud = nil
             convertedURL = nil
             sourceImage = nil
             isImageConversion = false
@@ -228,6 +215,7 @@ final class SplatDocumentViewModel {
         } else {
             isImageConversion = false
             sourceImage = nil
+            splatCloud = nil
             loadingState = .loading
             descriptor = try? SplatCloudDescriptor(url: url)
             convertedURL = nil
@@ -236,10 +224,30 @@ final class SplatDocumentViewModel {
                     boundsCenter = bounds.center
                     boundsSize = bounds.size
                 }
+                // Only auto-load if not a large file (< 1M splats)
+                if descriptor.splatCount < 1_000_000 {
+                    loadSplatCloud()
+                }
                 loadingState = .ready
             } else {
                 loadingState = .error("Failed to load splat file")
             }
+        }
+    }
+
+    /// Load the GPU splat cloud from the current descriptor
+    @MainActor
+    func loadSplatCloud() {
+        guard let descriptor else {
+            return
+        }
+        do {
+            splatCloud = try descriptor.loadGPUSplatCloud()
+            #if os(visionOS)
+            ImmersiveState.shared.splatCloud = splatCloud
+            #endif
+        } catch {
+            loadingState = .error("Failed to load splat cloud: \(error.localizedDescription)")
         }
     }
 
@@ -286,6 +294,8 @@ final class SplatDocumentViewModel {
                 boundsCenter = bounds.center
                 boundsSize = bounds.size
             }
+            // Load the splat cloud for rendering
+            loadSplatCloud()
             loadingState = .ready
         } catch {
             loadingState = .error("Conversion failed: \(error.localizedDescription)")
