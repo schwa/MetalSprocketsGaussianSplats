@@ -52,9 +52,15 @@ final class SplatSceneViewModel {
 
     /// Update camera to fit all enabled clouds
     func updateCameraForZoomToFit() {
-        guard zoomToFit, cameraMode == .object else { return }
-        guard viewSize.width > 0, viewSize.height > 0 else { return }
-        guard combinedBoundsSize != .zero else { return }
+        guard zoomToFit, cameraMode == .object else {
+            return
+        }
+        guard viewSize.width > 0, viewSize.height > 0 else {
+            return
+        }
+        guard combinedBoundsSize != .zero else {
+            return
+        }
 
         let screenAspect = Float(viewSize.width / viewSize.height)
         let fovRadians = Float(verticalAngleOfView) * .pi / 180
@@ -80,7 +86,10 @@ final class SplatSceneViewModel {
 
         for cloud in scene.clouds where cloud.enabled {
             guard let loadedCloud = loadedClouds.first(where: { $0.id == cloud.id }),
-                  let bounds = loadedCloud.bounds else { continue }
+                let bounds = loadedCloud.bounds
+            else {
+                continue
+            }
 
             let transform = scene.sceneTransform.matrix * cloud.transform.matrix
             let corners: [SIMD3<Float>] = [

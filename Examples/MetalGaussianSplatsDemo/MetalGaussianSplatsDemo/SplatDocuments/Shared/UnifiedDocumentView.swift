@@ -30,10 +30,10 @@ struct UnifiedDocumentView: View {
 
     @State private var selectedCloudID: UUID?
     @State private var inspectorTab: UnifiedInspectorTab = .cloud
-    
+
     // Single mode: inspector visibility
     @State private var showInspector = true
-    
+
     // Multi mode: column visibility
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
@@ -80,8 +80,8 @@ struct UnifiedDocumentView: View {
         mainContent
             .inspector(isPresented: $showInspector) {
                 inspectorContent
-                #if !os(visionOS)
-                .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
+                    #if !os(visionOS)
+                    .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
                 #endif
             }
             .focusedSceneValue(\.inspectorVisibility, $showInspector)
@@ -97,7 +97,9 @@ struct UnifiedDocumentView: View {
                 document: singleViewModel.convertedURL.map { PLYFileDocument(url: $0) },
                 contentType: .ply,
                 defaultFilename: singleViewModel.convertedURL?.deletingPathExtension().lastPathComponent
-            ) { _ in }
+            ) { _ in
+                // Export completion handled by system
+            }
             .onChange(of: fileURL, initial: true) { _, newURL in
                 confirmedLoad = false
                 Task {
@@ -135,22 +137,30 @@ struct UnifiedDocumentView: View {
             onCompletion: handleAddClouds
         )
         .onChange(of: multiDocument?.scene.clouds, initial: true) {
-            guard let doc = multiDocument else { return }
+            guard let doc = multiDocument else {
+                return
+            }
             Task {
                 await multiViewModel.loadClouds(from: doc.scene)
                 multiViewModel.updateCombinedBounds(for: doc.scene)
             }
         }
         .onChange(of: multiDocument?.scene.sceneTransform) {
-            guard let doc = multiDocument else { return }
+            guard let doc = multiDocument else {
+                return
+            }
             multiViewModel.updateCombinedBounds(for: doc.scene)
         }
         .onChange(of: multiViewModel.loadingState) {
-            guard let doc = multiDocument, multiViewModel.loadingState == .ready else { return }
+            guard let doc = multiDocument, multiViewModel.loadingState == .ready else {
+                return
+            }
             multiViewModel.updateCombinedBounds(for: doc.scene)
         }
         .onChange(of: multiViewModel.boundsUpdateCount) {
-            guard let doc = multiDocument else { return }
+            guard let doc = multiDocument else {
+                return
+            }
             multiViewModel.updateCombinedBounds(for: doc.scene)
         }
     }
@@ -271,18 +281,21 @@ struct UnifiedDocumentView: View {
     }
 
     private var singleModeBoundingBoxInfos: [BoundingBoxInfo] {
-        guard showBoundingBoxes,
-              singleViewModel.boundsSize != .zero else { return [] }
+        guard showBoundingBoxes, singleViewModel.boundsSize != .zero else {
+            return []
+        }
         let bounds = BoundingBox(
             min: singleViewModel.boundsCenter - singleViewModel.boundsSize / 2,
             max: singleViewModel.boundsCenter + singleViewModel.boundsSize / 2
         )
-        return [BoundingBoxInfo(
-            id: UUID(),
-            bounds: bounds,
-            modelMatrix: singleViewModel.modelMatrix,
-            color: .white
-        )]
+        return [
+            BoundingBoxInfo(
+                id: UUID(),
+                bounds: bounds,
+                modelMatrix: singleViewModel.modelMatrix,
+                color: .white
+            )
+        ]
     }
 
     @ViewBuilder
@@ -341,15 +354,17 @@ struct UnifiedDocumentView: View {
             let selectedCloud: Binding<SplatScene.CloudReference?> = Binding(
                 get: {
                     guard let selectedID = selectedCloudID,
-                          let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID }) else {
+                        let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID })
+                    else {
                         return nil
                     }
                     return multiDocument?.scene.clouds[index]
                 },
                 set: { newValue in
                     guard let newValue,
-                          let selectedID = selectedCloudID,
-                          let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID }) else {
+                        let selectedID = selectedCloudID,
+                        let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID })
+                    else {
                         return
                     }
                     multiDocument?.scene.clouds[index] = newValue
@@ -458,8 +473,12 @@ struct UnifiedDocumentView: View {
     }
 
     private var needsConfirmation: Bool {
-        guard let descriptor = singleViewModel.descriptor else { return false }
-        if singleViewModel.isImageConversion { return false }
+        guard let descriptor = singleViewModel.descriptor else {
+            return false
+        }
+        if singleViewModel.isImageConversion {
+            return false
+        }
         return descriptor.splatCount >= 1_000_000 && !confirmedLoad
     }
 
@@ -481,14 +500,20 @@ struct UnifiedDocumentView: View {
     // MARK: - Multi Mode Helpers
 
     private func buildBoundingBoxInfos() -> [BoundingBoxInfo] {
-        guard let doc = multiDocument else { return [] }
+        guard let doc = multiDocument else {
+            return []
+        }
         return multiViewModel.loadedClouds
             .filter { loadedCloud in
                 doc.scene.clouds.first { $0.id == loadedCloud.id }?.enabled ?? false
             }
             .compactMap { loadedCloud in
-                guard let bounds = loadedCloud.bounds else { return nil }
-                guard var transform = doc.scene.clouds.first(where: { $0.id == loadedCloud.id })?.transform else { return nil }
+                guard let bounds = loadedCloud.bounds else {
+                    return nil
+                }
+                guard var transform = doc.scene.clouds.first(where: { $0.id == loadedCloud.id })?.transform else {
+                    return nil
+                }
                 if let dragOffset = dragOffsets[loadedCloud.id] {
                     transform.translation += dragOffset
                 }
@@ -499,8 +524,11 @@ struct UnifiedDocumentView: View {
 
     private func handleAxisDrag(cloudID: UUID, axis: Int, screenDelta: CGSize, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4) {
         guard let doc = multiDocument,
-              let cloudIndex = doc.scene.clouds.firstIndex(where: { $0.id == cloudID }),
-              let loadedCloud = multiViewModel.loadedClouds.first(where: { $0.id == cloudID }) else { return }
+            let cloudIndex = doc.scene.clouds.firstIndex(where: { $0.id == cloudID }),
+            let loadedCloud = multiViewModel.loadedClouds.first(where: { $0.id == cloudID })
+        else {
+            return
+        }
 
         let bounds = loadedCloud.bounds ?? BoundingBox(min: .zero, max: .one)
         let modelMatrix = doc.scene.sceneTransform.matrix * doc.scene.clouds[cloudIndex].transform.matrix
@@ -513,9 +541,11 @@ struct UnifiedDocumentView: View {
         let mvp = projectionMatrix * viewMatrix
         let viewportSize = multiViewModel.viewSize
 
-        func toScreen(_ p: SIMD4<Float>) -> CGPoint? {
-            let clip = mvp * p
-            guard clip.w > 0 else { return nil }
+        func toScreen(_ point: SIMD4<Float>) -> CGPoint? {
+            let clip = mvp * point
+            guard clip.w > 0 else {
+                return nil
+            }
             let ndc = SIMD3<Float>(clip.x, clip.y, clip.z) / clip.w
             return CGPoint(
                 x: CGFloat((ndc.x + 1) * 0.5 * Float(viewportSize.width)),
@@ -524,10 +554,15 @@ struct UnifiedDocumentView: View {
         }
 
         guard let p0 = toScreen(worldCenter),
-              let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0)) else { return }
+            let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0))
+        else {
+            return
+        }
 
         let screenDist = hypot(p1.x - p0.x, p1.y - p0.y)
-        guard screenDist > 0.001 else { return }
+        guard screenDist > 0.001 else {
+            return
+        }
 
         let pixelsPerUnit = screenDist
         let screenMag = hypot(screenDelta.width, screenDelta.height)
@@ -546,13 +581,18 @@ struct UnifiedDocumentView: View {
 
     private func commitDrag(cloudID: UUID) {
         guard let offset = dragOffsets[cloudID], offset != .zero,
-              let cloudIndex = multiDocument?.scene.clouds.firstIndex(where: { $0.id == cloudID }) else { return }
+            let cloudIndex = multiDocument?.scene.clouds.firstIndex(where: { $0.id == cloudID })
+        else {
+            return
+        }
         multiDocument?.scene.clouds[cloudIndex].transform.translation += offset
         dragOffsets[cloudID] = nil
     }
 
     private func handleAddClouds(_ result: Result<[URL], Error>) {
-        guard case .success(let urls) = result else { return }
+        guard case .success(let urls) = result else {
+            return
+        }
 
         var cloudRefs: [(ref: SplatScene.CloudReference, didAccess: Bool)] = []
 

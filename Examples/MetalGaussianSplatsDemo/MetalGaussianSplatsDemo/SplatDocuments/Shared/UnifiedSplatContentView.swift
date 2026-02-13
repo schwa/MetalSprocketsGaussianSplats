@@ -226,7 +226,7 @@ struct UnifiedInspectorView: View {
 
     @ViewBuilder
     private var cloudContent: some View {
-        if mode == .multi && selectedCloud == nil {
+        if mode == .multi, selectedCloud == nil {
             ContentUnavailableView("No Selection", systemImage: "cube.transparent", description: Text("Select a cloud to view its details"))
         } else {
             UnifiedCloudInfoContent(
@@ -253,7 +253,8 @@ struct UnifiedInspectorView: View {
     private var cloudDescriptor: SplatCloudDescriptor? {
         if let singleViewModel {
             return singleViewModel.descriptor
-        } else if let cloud = selectedCloud {
+        }
+        if let cloud = selectedCloud {
             return multiViewModel?.loadedClouds.first { $0.id == cloud.id }?.descriptor
         }
         return nil
@@ -262,34 +263,31 @@ struct UnifiedInspectorView: View {
     private var cloudRotationXBinding: Binding<Float> {
         if let singleViewModel {
             return Binding(get: { singleViewModel.modelRotationX }, set: { singleViewModel.modelRotationX = $0 })
-        } else {
-            return Binding(
-                get: { selectedCloud?.transform.rotation.x ?? 0 },
-                set: { selectedCloud?.transform.rotation.x = $0 }
-            )
         }
+        return Binding(
+            get: { selectedCloud?.transform.rotation.x ?? 0 },
+            set: { selectedCloud?.transform.rotation.x = $0 }
+        )
     }
 
     private var cloudRotationYBinding: Binding<Float> {
         if let singleViewModel {
             return Binding(get: { singleViewModel.modelRotationY }, set: { singleViewModel.modelRotationY = $0 })
-        } else {
-            return Binding(
-                get: { selectedCloud?.transform.rotation.y ?? 0 },
-                set: { selectedCloud?.transform.rotation.y = $0 }
-            )
         }
+        return Binding(
+            get: { selectedCloud?.transform.rotation.y ?? 0 },
+            set: { selectedCloud?.transform.rotation.y = $0 }
+        )
     }
 
     private var cloudRotationZBinding: Binding<Float> {
         if let singleViewModel {
             return Binding(get: { singleViewModel.modelRotationZ }, set: { singleViewModel.modelRotationZ = $0 })
-        } else {
-            return Binding(
-                get: { selectedCloud?.transform.rotation.z ?? 0 },
-                set: { selectedCloud?.transform.rotation.z = $0 }
-            )
         }
+        return Binding(
+            get: { selectedCloud?.transform.rotation.z ?? 0 },
+            set: { selectedCloud?.transform.rotation.z = $0 }
+        )
     }
 
     private var cloudCenterModelBinding: Binding<Bool> {
@@ -351,7 +349,8 @@ struct UnifiedInspectorView: View {
     private var cameraModeBinding: Binding<CameraMode> {
         if let singleViewModel {
             return Binding(get: { singleViewModel.cameraMode }, set: { singleViewModel.cameraMode = $0 })
-        } else if let multiViewModel {
+        }
+        if let multiViewModel {
             return Binding(get: { multiViewModel.cameraMode }, set: { multiViewModel.cameraMode = $0 })
         }
         return .constant(.object)
@@ -360,7 +359,8 @@ struct UnifiedInspectorView: View {
     private var zoomToFitBinding: Binding<Bool> {
         if let singleViewModel {
             return Binding(get: { singleViewModel.zoomToFit }, set: { singleViewModel.zoomToFit = $0 })
-        } else if let multiViewModel {
+        }
+        if let multiViewModel {
             return Binding(get: { multiViewModel.zoomToFit }, set: { multiViewModel.zoomToFit = $0 })
         }
         return .constant(false)
@@ -369,7 +369,8 @@ struct UnifiedInspectorView: View {
     private var verticalAngleOfViewBinding: Binding<Double> {
         if let singleViewModel {
             return Binding(get: { singleViewModel.verticalAngleOfView }, set: { singleViewModel.verticalAngleOfView = $0 })
-        } else if let multiViewModel {
+        }
+        if let multiViewModel {
             return Binding(get: { multiViewModel.verticalAngleOfView }, set: { multiViewModel.verticalAngleOfView = $0 })
         }
         return .constant(90)
@@ -382,7 +383,8 @@ struct UnifiedInspectorView: View {
     private var zoomToFitIsDisabled: Bool {
         if singleViewModel != nil {
             return false
-        } else if let multiViewModel {
+        }
+        if let multiViewModel {
             return multiViewModel.combinedBoundsSize == .zero
         }
         return false
@@ -407,43 +409,45 @@ struct UnifiedInspectorView: View {
     private var backgroundColorBinding: Binding<Color> {
         if let singleViewModel {
             return Binding(get: { singleViewModel.backgroundColor }, set: { singleViewModel.backgroundColor = $0 })
-        } else {
-            return Binding(
-                get: {
-                    guard let c = document?.scene.renderSettings.backgroundColor, c.count == 4 else { return .black }
-                    return Color(red: Double(c[0]), green: Double(c[1]), blue: Double(c[2]), opacity: Double(c[3]))
-                },
-                set: { newColor in
-                    let resolved = newColor.resolve(in: EnvironmentValues())
-                    document?.scene.renderSettings.backgroundColor = [Float(resolved.red), Float(resolved.green), Float(resolved.blue), Float(resolved.opacity)]
-                }
-            )
         }
+        return Binding(
+            get: {
+                guard let c = document?.scene.renderSettings.backgroundColor, c.count == 4 else {
+                    return .black
+                }
+                return Color(red: Double(c[0]), green: Double(c[1]), blue: Double(c[2]), opacity: Double(c[3]))
+            },
+            set: { newColor in
+                let resolved = newColor.resolve(in: EnvironmentValues())
+                document?.scene.renderSettings.backgroundColor = [
+                    Float(resolved.red), Float(resolved.green), Float(resolved.blue), Float(resolved.opacity)
+                ]
+            }
+        )
     }
 
     private var useSphericalHarmonicsBinding: Binding<Bool> {
         if let singleViewModel {
             return Binding(get: { singleViewModel.useSphericalHarmonics }, set: { singleViewModel.useSphericalHarmonics = $0 })
-        } else {
-            return Binding(
-                get: { document?.scene.renderSettings.useSphericalHarmonics ?? false },
-                set: { document?.scene.renderSettings.useSphericalHarmonics = $0 }
-            )
         }
+        return Binding(
+            get: { document?.scene.renderSettings.useSphericalHarmonics ?? false },
+            set: { document?.scene.renderSettings.useSphericalHarmonics = $0 }
+        )
     }
 
     private var sphericalHarmonicsIsDisabled: Bool {
         if let singleViewModel {
             return !singleViewModel.hasSphericalHarmonicsData
-        } else {
-            return !(multiViewModel?.allCloudsHaveSphericalHarmonics ?? false)
         }
+        return !(multiViewModel?.allCloudsHaveSphericalHarmonics ?? false)
     }
 
     private var sphericalHarmonicsWarning: String? {
         if singleViewModel != nil {
             return nil
-        } else if !(multiViewModel?.allCloudsHaveSphericalHarmonics ?? true) {
+        }
+        if !(multiViewModel?.allCloudsHaveSphericalHarmonics ?? true) {
             return "Not all clouds have SH data"
         }
         return nil

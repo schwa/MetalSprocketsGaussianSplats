@@ -206,13 +206,17 @@ struct UnifiedCameraContent: View {
     }
 
     private func aspectRatioString(for size: CGSize) -> String {
-        guard size.width > 0, size.height > 0 else { return "—" }
+        guard size.width > 0, size.height > 0 else {
+            return "—"
+        }
         let ratio = size.width / size.height
         return String(format: "%.2f:1", ratio)
     }
 
     private func megapixelsString(for size: CGSize) -> String {
-        guard size.width > 0, size.height > 0 else { return "—" }
+        guard size.width > 0, size.height > 0 else {
+            return "—"
+        }
         let pixels = size.width * displayScale * size.height * displayScale
         let megapixels = pixels / 1_000_000
         return String(format: "%.2f MP", megapixels)
@@ -235,7 +239,7 @@ struct UnifiedRenderContent<CullingContent: View>: View {
     @Binding var backgroundColor: Color
     @Binding var useSphericalHarmonics: Bool
     var sphericalHarmonicsDisabled: Bool = false
-    var sphericalHarmonicsWarning: String? = nil
+    var sphericalHarmonicsWarning: String?
     @ViewBuilder var cullingContent: () -> CullingContent
 
     var body: some View {
