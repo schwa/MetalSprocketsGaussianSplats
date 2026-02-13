@@ -122,9 +122,6 @@ public struct SparkSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            // Do initial sort if needed - this ensures we have indices on first render
-            let _ = try ensureInitialSort()
-            
             // Compute view matrices (inverse of camera matrices)
             let viewMatrices = cameraMatrices.map(\.inverse)
 
@@ -145,12 +142,33 @@ public struct SparkSplatRenderPipeline: Element {
                 }
             }
             .onChange(of: splatClouds, initial: true) { _, _ in
-                // Invalidate old sorted indices so ensureInitialSort() runs for the new cloud
+                // Invalidate old sorted indices
                 sortedIndices = nil
-                lastSortedClouds = nil
-                
-                // Set up the async sort manager for subsequent updates.
+                lastSortedClouds = splatClouds
+
+                // Do initial synchronous sort so we have indices for first render
                 let device = _MTLCreateSystemDefaultDevice()
+                let initialSort: SplatIndices
+                if splatClouds.count == 1 {
+                    initialSort = try! CPUSplatRadixSorter.sort(
+                        device: device,
+                        splats: splatClouds[0].splats,
+                        camera: cameraMatrices[0],
+                        model: modelMatrix * splatClouds[0].modelTransform,
+                        reversed: false
+                    )
+                } else {
+                    initialSort = try! CPUSplatRadixSorter.sort(
+                        device: device,
+                        clouds: splatClouds,
+                        camera: cameraMatrices[0],
+                        sceneModel: modelMatrix,
+                        reversed: false
+                    )
+                }
+                sortedIndices = initialSort
+
+                // Set up the async sort manager for subsequent updates
                 let newSortManager = try! AsyncSortManager(device: device, splatClouds: splatClouds, capacity: totalSplatCount, logger: logger)
                 sortManager = newSortManager
                 nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
@@ -166,7 +184,7 @@ public struct SparkSplatRenderPipeline: Element {
                         sortedIndicesRef.wrappedValue = sort
                     }
                 }
-                
+
                 // Request immediate sort for new clouds
                 requestSort()
             }
@@ -266,39 +284,6 @@ public struct SparkSplatRenderPipeline: Element {
             renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
-    }
-
-    @discardableResult
-    private func ensureInitialSort() throws -> Bool {
-        // Invalidate if clouds have changed (onChange runs after body, so check here too)
-        if lastSortedClouds != splatClouds {
-            sortedIndices = nil
-            lastSortedClouds = splatClouds
-        }
-        
-        guard sortedIndices == nil else { return false }
-        
-        let device = _MTLCreateSystemDefaultDevice()
-        let initialSort: SplatIndices
-        if splatClouds.count == 1 {
-            initialSort = try CPUSplatRadixSorter.sort(
-                device: device,
-                splats: splatClouds[0].splats,
-                camera: cameraMatrices[0],
-                model: modelMatrix * splatClouds[0].modelTransform,
-                reversed: false
-            )
-        } else {
-            initialSort = try CPUSplatRadixSorter.sort(
-                device: device,
-                clouds: splatClouds,
-                camera: cameraMatrices[0],
-                sceneModel: modelMatrix,
-                reversed: false
-            )
-        }
-        sortedIndices = initialSort
-        return true
     }
 
     func requestSort() {

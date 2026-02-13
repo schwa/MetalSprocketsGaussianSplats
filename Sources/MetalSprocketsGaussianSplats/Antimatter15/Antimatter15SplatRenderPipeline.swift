@@ -58,9 +58,6 @@ public struct Antimatter15SplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            // Do initial sort if needed - this ensures we have indices on first render
-            let _ = try ensureInitialSort()
-            
             // Concatenate outer modelMatrix with per-cloud transform
             let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
 
@@ -110,12 +107,23 @@ public struct Antimatter15SplatRenderPipeline: Element {
                 }
             }
             .onChange(of: splatCloud, initial: true) { _, _ in
-                // Invalidate old sorted indices so ensureInitialSort() runs for the new cloud
+                // Invalidate old sorted indices
                 sortedIndices = nil
-                lastSortedCloud = nil
-                
-                // Set up the async sort manager for subsequent updates.
+                lastSortedCloud = splatCloud
+
+                // Do initial synchronous sort so we have indices for first render
                 let device = _MTLCreateSystemDefaultDevice()
+                let combinedModel = modelMatrix * splatCloud.modelTransform
+                let initialSort = try! CPUSplatRadixSorter.sort(
+                    device: device,
+                    splats: splatCloud.splats,
+                    camera: cameraMatrix,
+                    model: combinedModel,
+                    reversed: false
+                )
+                sortedIndices = initialSort
+
+                // Set up the async sort manager for subsequent updates
                 let newSortManager = try! AsyncSortManager(device: device, splatCloud: splatCloud, capacity: splatCloud.count, logger: logger)
                 sortManager = newSortManager
                 nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
@@ -131,7 +139,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
                         sortedIndicesRef.wrappedValue = sort
                     }
                 }
-                
+
                 // Request immediate sort for new cloud
                 requestSort()
             }
@@ -142,28 +150,6 @@ public struct Antimatter15SplatRenderPipeline: Element {
                 requestSort()
             }
         }
-    }
-
-    @discardableResult
-    private func ensureInitialSort() throws -> Bool {
-        // Invalidate if cloud has changed (onChange runs after body, so check here too)
-        if lastSortedCloud != splatCloud {
-            sortedIndices = nil
-            lastSortedCloud = splatCloud
-        }
-        
-        guard sortedIndices == nil else { return false }
-        
-        let device = _MTLCreateSystemDefaultDevice()
-        let initialSort = try CPUSplatRadixSorter.sort(
-            device: device,
-            splats: splatCloud.splats,
-            camera: cameraMatrix,
-            model: modelMatrix * splatCloud.modelTransform,
-            reversed: false
-        )
-        sortedIndices = initialSort
-        return true
     }
 
     func requestSort() {
