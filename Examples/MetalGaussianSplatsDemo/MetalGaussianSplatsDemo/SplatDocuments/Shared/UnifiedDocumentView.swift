@@ -274,10 +274,39 @@ struct UnifiedDocumentView: View {
             verticalAngleOfView: $singleViewModel.verticalAngleOfView,
             cullBoundingBox: singleViewModel.cullBoundingBox,
             showBoundingBoxes: showBoundingBoxes,
-            boundingBoxInfos: singleModeBoundingBoxInfos
+            boundingBoxInfos: singleModeBoundingBoxInfos,
+            debugParams: singleViewModel.debugModeEnabled ? computeDebugParams(
+                mode: singleViewModel.debugMode,
+                boundsCenter: singleViewModel.boundsCenter,
+                boundsSize: singleViewModel.boundsSize
+            ) : nil
         )
         .ignoresSafeArea()
         .onGeometryChange(for: CGSize.self, of: \.size) { singleViewModel.viewSize = $0 }
+    }
+
+    /// Compute debug shader parameters based on mode and bounds
+    private func computeDebugParams(mode: SplatDebugMode, boundsCenter: SIMD3<Float>, boundsSize: SIMD3<Float>, cloudCount: UInt32 = 1) -> DebugParams {
+        let maxExtent = max(boundsSize.x, max(boundsSize.y, boundsSize.z))
+        switch mode {
+        case .distanceFromCenter:
+            return .distance(DebugDistanceParams(center: boundsCenter, maxDistance: maxExtent / 2))
+        case .splatSize:
+            // Heuristic: max splat size is roughly 1/50th of the scene size
+            return .size(DebugSizeParams(minSize: 0, maxSize: maxExtent / 50))
+        case .depth:
+            // Use reasonable depth range based on scene size
+            return .depth(DebugDepthParams(minDepth: 0, maxDepth: maxExtent * 2))
+        case .opacity:
+            return .opacity
+        case .normal:
+            return .normal
+        case .aspectRatio:
+            // Aspect ratio: 1.0 = circular, higher = more elongated
+            return .aspectRatio(DebugAspectRatioParams(minRatio: 1.0, maxRatio: 10.0))
+        case .cloudIndex:
+            return .cloudIndex(DebugCloudIndexParams(cloudCount: cloudCount))
+        }
     }
 
     private var singleModeBoundingBoxInfos: [BoundingBoxInfo] {
@@ -332,6 +361,12 @@ struct UnifiedDocumentView: View {
                 cullBoundingBox: cullBoundingBox,
                 showBoundingBoxes: showBoundingBoxes,
                 boundingBoxInfos: buildBoundingBoxInfos(),
+                debugParams: multiViewModel.debugModeEnabled ? computeDebugParams(
+                    mode: multiViewModel.debugMode,
+                    boundsCenter: multiViewModel.combinedBoundsCenter,
+                    boundsSize: multiViewModel.combinedBoundsSize,
+                    cloudCount: UInt32(multiViewModel.loadedClouds.count)
+                ) : nil,
                 onDragChange: handleAxisDrag,
                 onDragEnd: commitDrag
             )

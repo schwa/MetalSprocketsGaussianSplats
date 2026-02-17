@@ -35,6 +35,10 @@ final class SplatDocumentViewModel {
     var backgroundColor: Color = .black
     var useSphericalHarmonics: Bool = true
 
+    // Debug rendering mode
+    var debugModeEnabled: Bool = false
+    var debugMode: SplatDebugMode = .distanceFromCenter
+
     // Culling bounding box (normalized 0...1 values)
     var cullBoundingBoxEnabled: Bool = false
     var cullMinNormalized: SIMD3<Float> = SIMD3(0, 0, 0)

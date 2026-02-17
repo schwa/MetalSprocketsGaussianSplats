@@ -21,6 +21,10 @@ final class SplatSceneViewModel {
         didSet { updateCameraForZoomToFit() }
     }
 
+    // Debug rendering mode
+    var debugModeEnabled: Bool = false
+    var debugMode: SplatDebugMode = .distanceFromCenter
+
     // Camera
     var cameraMode: CameraMode = .object {
         didSet {

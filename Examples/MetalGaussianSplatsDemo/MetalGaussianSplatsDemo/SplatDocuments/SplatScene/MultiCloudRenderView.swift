@@ -20,6 +20,9 @@ struct MultiCloudRenderView: View {
     let backgroundColor: [Float]
     var cullBoundingBox: BoundingBox3D?
 
+    // Debug rendering
+    var debugParams: DebugParams?
+
     @State private var projection: (any ProjectionProtocol) = PerspectiveProjection(verticalAngleOfView: .degrees(90), depthMode: .standard(zClip: 0.01 ... 1_000))
 
     private var clearColor: MTLClearColor {
@@ -43,7 +46,8 @@ struct MultiCloudRenderView: View {
                 projection: projection,
                 drawableSize: drawableSize,
                 useSphericalHarmonics: useSphericalHarmonics,
-                cullBoundingBox: cullBoundingBox
+                cullBoundingBox: cullBoundingBox,
+                debugParams: debugParams
             )
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
@@ -64,20 +68,35 @@ struct MultiCloudRenderPass: Element {
     let useSphericalHarmonics: Bool
     var cullBoundingBox: BoundingBox3D?
 
+    // Debug rendering
+    var debugParams: DebugParams?
+
     var body: some Element {
         get throws {
             if !clouds.isEmpty {
                 let projectionMatrix = projection.projectionMatrix(for: drawableSize)
                 try RenderPass {
-                    try SparkSplatRenderPipeline(
-                        splatClouds: clouds,
-                        projectionMatrices: [projectionMatrix],
-                        modelMatrix: sceneTransform,
-                        cameraMatrices: [cameraMatrix],
-                        drawableSize: SIMD2<Float>(drawableSize),
-                        useSphericalHarmonics: useSphericalHarmonics,
-                        boundingBox: cullBoundingBox
-                    )
+                    if let debugParams {
+                        try SparkSplatDebugRenderPipeline(
+                            splatClouds: clouds,
+                            projectionMatrices: [projectionMatrix],
+                            modelMatrix: sceneTransform,
+                            cameraMatrices: [cameraMatrix],
+                            drawableSize: SIMD2<Float>(drawableSize),
+                            debugParams: debugParams,
+                            boundingBox: cullBoundingBox
+                        )
+                    } else {
+                        try SparkSplatRenderPipeline(
+                            splatClouds: clouds,
+                            projectionMatrices: [projectionMatrix],
+                            modelMatrix: sceneTransform,
+                            cameraMatrices: [cameraMatrix],
+                            drawableSize: SIMD2<Float>(drawableSize),
+                            useSphericalHarmonics: useSphericalHarmonics,
+                            boundingBox: cullBoundingBox
+                        )
+                    }
                 }
             } else {
                 try RenderPass {

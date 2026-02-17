@@ -55,6 +55,9 @@ struct UnifiedSplatContentView: View {
     var showBoundingBoxes: Bool = false
     var boundingBoxInfos: [BoundingBoxInfo] = []
 
+    // Debug rendering (nil = normal rendering, non-nil = debug mode)
+    var debugParams: DebugParams?
+
     // Drag handling for multi-cloud mode
     var onDragChange: ((UUID, Int, CGSize, simd_float4x4, simd_float4x4) -> Void)?
     var onDragEnd: ((UUID) -> Void)?
@@ -71,7 +74,8 @@ struct UnifiedSplatContentView: View {
                 verticalAngleOfView: $verticalAngleOfView,
                 useSphericalHarmonics: useSphericalHarmonics,
                 backgroundColor: backgroundColor,
-                cullBoundingBox: cullBoundingBox
+                cullBoundingBox: cullBoundingBox,
+                debugParams: debugParams
             )
             .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
 
@@ -398,10 +402,34 @@ struct UnifiedInspectorView: View {
             backgroundColor: backgroundColorBinding,
             useSphericalHarmonics: useSphericalHarmonicsBinding,
             sphericalHarmonicsDisabled: sphericalHarmonicsIsDisabled,
-            sphericalHarmonicsWarning: sphericalHarmonicsWarning
+            sphericalHarmonicsWarning: sphericalHarmonicsWarning,
+            debugModeEnabled: debugModeEnabledBinding,
+            debugMode: debugModeBinding
         ) {
             cullingSection
         }
+    }
+
+    // MARK: - Debug Mode Bindings
+
+    private var debugModeEnabledBinding: Binding<Bool> {
+        if let singleViewModel {
+            return Binding(get: { singleViewModel.debugModeEnabled }, set: { singleViewModel.debugModeEnabled = $0 })
+        }
+        if let multiViewModel {
+            return Binding(get: { multiViewModel.debugModeEnabled }, set: { multiViewModel.debugModeEnabled = $0 })
+        }
+        return .constant(false)
+    }
+
+    private var debugModeBinding: Binding<SplatDebugMode> {
+        if let singleViewModel {
+            return Binding(get: { singleViewModel.debugMode }, set: { singleViewModel.debugMode = $0 })
+        }
+        if let multiViewModel {
+            return Binding(get: { multiViewModel.debugMode }, set: { multiViewModel.debugMode = $0 })
+        }
+        return .constant(.distanceFromCenter)
     }
 
     // MARK: - Unified Render Bindings

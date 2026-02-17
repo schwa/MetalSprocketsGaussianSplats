@@ -12,6 +12,37 @@ struct BoundingBox3D {
     simd_float3 maxBounds;
 };
 
+// MARK: - Debug shader parameters
+
+/// Parameters for distance-from-center debug visualization
+struct DebugDistanceParams {
+    simd_float3 center;     // Center point to measure distance from
+    float maxDistance;      // Distance at which color is fully red
+};
+
+/// Parameters for splat-size debug visualization
+struct DebugSizeParams {
+    float minSize;          // Size at which color is fully blue
+    float maxSize;          // Size at which color is fully red
+};
+
+/// Parameters for depth debug visualization
+struct DebugDepthParams {
+    float minDepth;         // Depth at which color is fully blue
+    float maxDepth;         // Depth at which color is fully red
+};
+
+/// Parameters for aspect ratio debug visualization
+struct DebugAspectRatioParams {
+    float minRatio;         // Ratio at which color is fully blue (1.0 = circular)
+    float maxRatio;         // Ratio at which color is fully red (elongated)
+};
+
+/// Parameters for cloud index debug visualization
+struct DebugCloudIndexParams {
+    unsigned int cloudCount;  // Total number of clouds (for color cycling)
+};
+
 // MARK: - SparkSplat structure
 
 /// SparkSplat - 32-byte format using half-floats

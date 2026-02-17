@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4502C67F2F451AE10030C282 /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 4502C67E2F451AE10030C282 /* Interaction3D */; };
 		451155A42EC3EF9700C04880 /* GeometryLite3D in Frameworks */ = {isa = PBXBuildFile; productRef = 451155A32EC3EF9700C04880 /* GeometryLite3D */; };
 		452D31B02F15791E0034906D /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 452D31AF2F15791E0034906D /* Interaction3D */; };
 		454CBDFB2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 454CBDEC2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex */; platformFilters = (macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -93,6 +94,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4502C67F2F451AE10030C282 /* Interaction3D in Frameworks */,
 				454CBE022EF7576300A16AD0 /* MetalSprocketsGaussianSplats in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -162,6 +164,7 @@
 			name = GuassianSplatsPreviewExtension;
 			packageProductDependencies = (
 				454CBE012EF7576300A16AD0 /* MetalSprocketsGaussianSplats */,
+				4502C67E2F451AE10030C282 /* Interaction3D */,
 			);
 			productName = GuassianSplatsPreviewExtension;
 			productReference = 454CBDEC2EF753EC00A16AD0 /* GuassianSplatsPreviewExtension.appex */;
@@ -617,6 +620,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4502C67E2F451AE10030C282 /* Interaction3D */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 455EE9212F3A679900A753D3 /* XCRemoteSwiftPackageReference "Interaction3D" */;
+			productName = Interaction3D;
+		};
 		451155A32EC3EF9700C04880 /* GeometryLite3D */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 451155A22EC3EF9700C04880 /* XCRemoteSwiftPackageReference "GeometryLite3D" */;

@@ -16,6 +16,12 @@ namespace SparkSplatRenderShader {
         float4 position [[position]];
         float2 splatUv;          // Relative position on splat ellipse
         float4 rgba;
+        float3 worldPosition;    // World-space position of the splat center (for debug shaders)
+        float splatSize;         // Maximum scale of the splat (for debug shaders)
+        float depth;             // View-space depth (for debug shaders)
+        float3 normal;           // World-space normal direction (for debug shaders)
+        float aspectRatio;       // Ratio of max to min scale (for debug shaders)
+        uint cloudIndex;         // Which cloud this splat belongs to (for debug shaders)
         ushort renderTargetArrayIndex [[render_target_array_index]];
     };
 
@@ -58,6 +64,12 @@ namespace SparkSplatRenderShader {
         out.position = float4(0.0, 0.0, 2.0, 1.0);
         out.splatUv = float2(0.0);
         out.rgba = float4(0.0);
+        out.worldPosition = float3(0.0);
+        out.splatSize = 0.0;
+        out.depth = 0.0;
+        out.normal = float3(0.0);
+        out.aspectRatio = 1.0;
+        out.cloudIndex = 0;
         out.renderTargetArrayIndex = amplification_id;
 
         // Get sorted index and cloud index
@@ -69,6 +81,9 @@ namespace SparkSplatRenderShader {
         if (cloudIndex >= clouds.cloudCount) {
             return out;
         }
+
+        // Store cloud index for debug shaders
+        out.cloudIndex = cloudIndex;
 
         // Get per-cloud data from argument buffer
         SplatCloudData cloudData = clouds.clouds[cloudIndex];
@@ -97,6 +112,17 @@ namespace SparkSplatRenderShader {
             return out;
         }
 
+        // Store debug values for fragment shaders
+        float maxScale = max(scales.x, max(scales.y, scales.z));
+        float minScale = min(scales.x, min(scales.y, scales.z));
+        out.splatSize = maxScale;
+        out.aspectRatio = (minScale > 0.0) ? (maxScale / minScale) : 1.0;
+        
+        // Compute normal from quaternion (local Z axis transformed to world space)
+        float3 localNormal = float3(0.0, 0.0, 1.0);
+        float3 modelNormal = quatVec(quaternion, localNormal);
+        out.normal = normalize((modelMatrix * float4(modelNormal, 0.0)).xyz);
+
         // Cull by bounding box (model space, before any transforms)
         if (use_bounding_box) {
             if (center.x < boundingBox.minBounds.x || center.x > boundingBox.maxBounds.x ||
@@ -108,6 +134,9 @@ namespace SparkSplatRenderShader {
 
         // Transform center to world space
         float4 worldCenter = modelMatrix * float4(center, 1.0);
+
+        // Store world position for debug fragment shaders
+        out.worldPosition = worldCenter.xyz;
 
         // Evaluate spherical harmonics for view-dependent color
         if (use_sh && shDegree > 0) {
@@ -122,6 +151,9 @@ namespace SparkSplatRenderShader {
         // Transform to view space
         float4 viewCenter4 = viewMatrix * worldCenter;
         float3 viewCenter = viewCenter4.xyz;
+
+        // Store depth for debug shaders (negative z in view space = positive depth)
+        out.depth = -viewCenter.z;
 
         // Cull splats behind camera
         if (viewCenter.z >= 0.0) {
@@ -208,6 +240,223 @@ namespace SparkSplatRenderShader {
 
         // Output premultiplied alpha
         return float4(rgba.rgb * rgba.a, rgba.a);
+    }
+
+    // MARK: - Debug Helper: Heat Map Color
+
+    /// Convert a normalized value (0-1) to a heat map color (blue -> cyan -> green -> yellow -> red)
+    inline float3 heatMapColor(float t) {
+        t = clamp(t, 0.0, 1.0);
+        if (t < 0.25) {
+            return mix(float3(0.0, 0.0, 1.0), float3(0.0, 1.0, 1.0), t / 0.25);
+        } else if (t < 0.5) {
+            return mix(float3(0.0, 1.0, 1.0), float3(0.0, 1.0, 0.0), (t - 0.25) / 0.25);
+        } else if (t < 0.75) {
+            return mix(float3(0.0, 1.0, 0.0), float3(1.0, 1.0, 0.0), (t - 0.5) / 0.25);
+        } else {
+            return mix(float3(1.0, 1.0, 0.0), float3(1.0, 0.0, 0.0), (t - 0.75) / 0.25);
+        }
+    }
+
+    // MARK: - Debug Fragment Shader: Distance from Cloud Center
+
+    /// Fragment shader that colorizes splats by distance from cloud center
+    [[fragment]] float4 fragment_debug_distance(
+        FragmentIn in [[stage_in]],
+        constant DebugDistanceParams &params [[buffer(0)]]
+    ) {
+        float z = dot(in.splatUv, in.splatUv);
+        if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
+            discard_fragment();
+        }
+
+        float alpha = in.rgba.a * exp(-0.5 * z);
+        if (alpha < MIN_ALPHA) {
+            discard_fragment();
+        }
+
+        float distance = length(in.worldPosition - params.center);
+        float t = clamp(distance / params.maxDistance, 0.0, 1.0);
+        float3 color = heatMapColor(t);
+
+        return float4(color * alpha, alpha);
+    }
+
+    // MARK: - Debug Fragment Shader: Splat Size
+
+    /// Fragment shader that colorizes splats by their size (max scale)
+    [[fragment]] float4 fragment_debug_size(
+        FragmentIn in [[stage_in]],
+        constant DebugSizeParams &params [[buffer(0)]]
+    ) {
+        // Debug logging
+        if (in.position.x < 1 && in.position.y < 1) {
+            os_log_default.log("fragment_debug_size: minSize=%f, maxSize=%f, splatSize=%f",
+                params.minSize, params.maxSize, in.splatSize);
+        }
+
+        float z = dot(in.splatUv, in.splatUv);
+        if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
+            discard_fragment();
+        }
+
+        float alpha = in.rgba.a * exp(-0.5 * z);
+        if (alpha < MIN_ALPHA) {
+            discard_fragment();
+        }
+
+        float range = params.maxSize - params.minSize;
+        float t = (range > 0.0) ? clamp((in.splatSize - params.minSize) / range, 0.0, 1.0) : 0.5;
+        float3 color = heatMapColor(t);
+
+        return float4(color * alpha, alpha);
+    }
+
+    // MARK: - Debug Fragment Shader: Depth
+
+    /// Fragment shader that colorizes splats by their depth (distance from camera)
+    [[fragment]] float4 fragment_debug_depth(
+        FragmentIn in [[stage_in]],
+        constant DebugDepthParams &params [[buffer(0)]]
+    ) {
+        float z = dot(in.splatUv, in.splatUv);
+        if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
+            discard_fragment();
+        }
+
+        float alpha = in.rgba.a * exp(-0.5 * z);
+        if (alpha < MIN_ALPHA) {
+            discard_fragment();
+        }
+
+        float range = params.maxDepth - params.minDepth;
+        float t = (range > 0.0) ? clamp((in.depth - params.minDepth) / range, 0.0, 1.0) : 0.5;
+        float3 color = heatMapColor(t);
+
+        return float4(color * alpha, alpha);
+    }
+
+    // MARK: - Debug Fragment Shader: Opacity
+
+    /// Fragment shader that colorizes splats by their opacity value
+    [[fragment]] float4 fragment_debug_opacity(
+        FragmentIn in [[stage_in]]
+    ) {
+        float z = dot(in.splatUv, in.splatUv);
+        if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
+            discard_fragment();
+        }
+
+        float alpha = in.rgba.a * exp(-0.5 * z);
+        if (alpha < MIN_ALPHA) {
+            discard_fragment();
+        }
+
+        // Use the original rgba.a (before gaussian falloff) for visualization
+        float t = clamp(in.rgba.a, 0.0, 1.0);
+        float3 color = heatMapColor(t);
+
+        return float4(color * alpha, alpha);
+    }
+
+    // MARK: - Debug Fragment Shader: Normal
+
+    /// Fragment shader that colorizes splats by their normal direction
+    [[fragment]] float4 fragment_debug_normal(
+        FragmentIn in [[stage_in]]
+    ) {
+        float z = dot(in.splatUv, in.splatUv);
+        if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
+            discard_fragment();
+        }
+
+        float alpha = in.rgba.a * exp(-0.5 * z);
+        if (alpha < MIN_ALPHA) {
+            discard_fragment();
+        }
+
+        // Map normal from [-1,1] to [0,1] for RGB visualization
+        float3 color = in.normal * 0.5 + 0.5;
+
+        return float4(color * alpha, alpha);
+    }
+
+    // MARK: - Debug Fragment Shader: Aspect Ratio
+
+    /// Fragment shader that colorizes splats by their aspect ratio (elongation)
+    [[fragment]] float4 fragment_debug_aspect_ratio(
+        FragmentIn in [[stage_in]],
+        constant DebugAspectRatioParams &params [[buffer(0)]]
+    ) {
+        float z = dot(in.splatUv, in.splatUv);
+        if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
+            discard_fragment();
+        }
+
+        float alpha = in.rgba.a * exp(-0.5 * z);
+        if (alpha < MIN_ALPHA) {
+            discard_fragment();
+        }
+
+        float range = params.maxRatio - params.minRatio;
+        float t = (range > 0.0) ? clamp((in.aspectRatio - params.minRatio) / range, 0.0, 1.0) : 0.5;
+        float3 color = heatMapColor(t);
+
+        return float4(color * alpha, alpha);
+    }
+
+    // MARK: - Debug Fragment Shader: Cloud Index
+
+    /// Generate a distinct color for each cloud index using golden ratio hue spacing
+    inline float3 cloudIndexColor(uint index, uint count) {
+        // Use golden ratio for well-distributed hues
+        float goldenRatio = 0.618033988749895;
+        float hue = fract(float(index) * goldenRatio);
+        
+        // Convert HSV to RGB (saturation = 0.8, value = 1.0)
+        float saturation = 0.8;
+        float value = 1.0;
+        
+        float c = value * saturation;
+        float x = c * (1.0 - abs(fmod(hue * 6.0, 2.0) - 1.0));
+        float m = value - c;
+        
+        float3 rgb;
+        if (hue < 1.0/6.0) {
+            rgb = float3(c, x, 0);
+        } else if (hue < 2.0/6.0) {
+            rgb = float3(x, c, 0);
+        } else if (hue < 3.0/6.0) {
+            rgb = float3(0, c, x);
+        } else if (hue < 4.0/6.0) {
+            rgb = float3(0, x, c);
+        } else if (hue < 5.0/6.0) {
+            rgb = float3(x, 0, c);
+        } else {
+            rgb = float3(c, 0, x);
+        }
+        
+        return rgb + m;
+    }
+
+    /// Fragment shader that colorizes splats by which cloud they belong to
+    [[fragment]] float4 fragment_debug_cloud_index(
+        FragmentIn in [[stage_in]],
+        constant DebugCloudIndexParams &params [[buffer(0)]]
+    ) {
+        float z = dot(in.splatUv, in.splatUv);
+        if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
+            discard_fragment();
+        }
+
+        float alpha = in.rgba.a * exp(-0.5 * z);
+        if (alpha < MIN_ALPHA) {
+            discard_fragment();
+        }
+
+        float3 color = cloudIndexColor(in.cloudIndex, params.cloudCount);
+
+        return float4(color * alpha, alpha);
     }
 
 }; // namespace SparkSplatRenderShader

@@ -240,6 +240,8 @@ struct UnifiedRenderContent<CullingContent: View>: View {
     @Binding var useSphericalHarmonics: Bool
     var sphericalHarmonicsDisabled: Bool = false
     var sphericalHarmonicsWarning: String?
+    @Binding var debugModeEnabled: Bool
+    @Binding var debugMode: SplatDebugMode
     @ViewBuilder var cullingContent: () -> CullingContent
 
     var body: some View {
@@ -247,12 +249,28 @@ struct UnifiedRenderContent<CullingContent: View>: View {
             LabeledContent("Type", value: "Spark")
             ColorPicker("Background", selection: $backgroundColor)
             Toggle("Spherical Harmonics", isOn: $useSphericalHarmonics)
-                .disabled(sphericalHarmonicsDisabled)
+                .disabled(sphericalHarmonicsDisabled || debugModeEnabled)
 
             if let warning = sphericalHarmonicsWarning {
                 Label(warning, systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.orange)
+            }
+        }
+
+        Section("Debug Visualization") {
+            Toggle("Enable Debug Mode", isOn: $debugModeEnabled)
+
+            if debugModeEnabled {
+                Picker("Mode", selection: $debugMode) {
+                    ForEach(SplatDebugMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+
+                Text(debugMode.colorDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
 
