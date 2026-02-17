@@ -279,7 +279,8 @@ struct UnifiedDocumentView: View {
                 mode: singleViewModel.debugMode,
                 boundsCenter: singleViewModel.boundsCenter,
                 boundsSize: singleViewModel.boundsSize
-            ) : nil
+            ) : nil,
+            cameraMode: singleViewModel.cameraMode
         )
         .ignoresSafeArea()
         .onGeometryChange(for: CGSize.self, of: \.size) { singleViewModel.viewSize = $0 }
@@ -367,6 +368,7 @@ struct UnifiedDocumentView: View {
                     boundsSize: multiViewModel.combinedBoundsSize,
                     cloudCount: UInt32(multiViewModel.loadedClouds.count)
                 ) : nil,
+                cameraMode: multiViewModel.cameraMode,
                 onDragChange: handleAxisDrag,
                 onDragEnd: commitDrag
             )

@@ -128,7 +128,8 @@ struct SplatDocumentView: View {
                     backgroundColor: bgColorArray,
                     cameraMatrix: $viewModel.cameraMatrix,
                     verticalAngleOfView: $viewModel.verticalAngleOfView,
-                    cullBoundingBox: viewModel.cullBoundingBox
+                    cullBoundingBox: viewModel.cullBoundingBox,
+                    cameraMode: viewModel.cameraMode
                 )
                 .ignoresSafeArea()
             }

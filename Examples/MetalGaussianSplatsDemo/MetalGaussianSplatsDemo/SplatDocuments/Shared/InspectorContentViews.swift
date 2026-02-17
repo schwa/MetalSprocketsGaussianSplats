@@ -1,5 +1,6 @@
 #if os(iOS) || os(macOS)
 import MetalSprocketsGaussianSplats
+import simd
 import SwiftUI
 
 // MARK: - Shared Cloud Inspector Components
@@ -166,6 +167,7 @@ struct UnifiedCameraContent: View {
     @Binding var cameraMode: CameraMode
     @Binding var zoomToFit: Bool
     @Binding var verticalAngleOfView: Double
+    @Binding var cameraMatrix: simd_float4x4
     var viewSize: CGSize
     var zoomToFitDisabled: Bool = false
 
@@ -183,6 +185,8 @@ struct UnifiedCameraContent: View {
                 .disabled(cameraMode != .object || zoomToFitDisabled)
         }
 
+        cameraTransformSection
+
         Section("Field of View") {
             Slider(value: $verticalAngleOfView, in: 30...120) {
                 Text("FOV")
@@ -191,6 +195,53 @@ struct UnifiedCameraContent: View {
         }
 
         viewportSection
+    }
+
+    @ViewBuilder
+    private var cameraTransformSection: some View {
+        let position = cameraPosition
+        let rotation = cameraRotationDegrees
+
+        Section("Position") {
+            LabeledContent("X", value: String(format: "%.3f", position.x))
+            LabeledContent("Y", value: String(format: "%.3f", position.y))
+            LabeledContent("Z", value: String(format: "%.3f", position.z))
+        }
+
+        Section("Rotation") {
+            LabeledContent("Pitch", value: String(format: "%.1f°", rotation.x))
+            LabeledContent("Yaw", value: String(format: "%.1f°", rotation.y))
+            LabeledContent("Roll", value: String(format: "%.1f°", rotation.z))
+        }
+    }
+
+    /// Extract camera position from the matrix
+    private var cameraPosition: SIMD3<Float> {
+        SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z)
+    }
+
+    /// Extract camera rotation as Euler angles in degrees (pitch, yaw, roll)
+    private var cameraRotationDegrees: SIMD3<Float> {
+        // Extract rotation matrix (upper-left 3x3)
+        let m = cameraMatrix
+
+        // Extract Euler angles (assuming YXZ order: yaw, pitch, roll)
+        let pitch = asin(-m.columns.2.y)
+        let yaw: Float
+        let roll: Float
+
+        if cos(pitch) > 0.0001 {
+            yaw = atan2(m.columns.2.x, m.columns.2.z)
+            roll = atan2(m.columns.0.y, m.columns.1.y)
+        } else {
+            // Gimbal lock
+            yaw = atan2(-m.columns.0.z, m.columns.0.x)
+            roll = 0
+        }
+
+        // Convert to degrees
+        let toDegrees: Float = 180.0 / .pi
+        return SIMD3<Float>(pitch * toDegrees, yaw * toDegrees, roll * toDegrees)
     }
 
     @ViewBuilder

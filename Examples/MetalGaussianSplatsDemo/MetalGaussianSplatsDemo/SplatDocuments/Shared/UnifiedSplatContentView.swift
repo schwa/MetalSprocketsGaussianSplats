@@ -58,6 +58,9 @@ struct UnifiedSplatContentView: View {
     // Debug rendering (nil = normal rendering, non-nil = debug mode)
     var debugParams: DebugParams?
 
+    // Camera mode for selecting the appropriate controller
+    var cameraMode: CameraMode = .object
+
     // Drag handling for multi-cloud mode
     var onDragChange: ((UUID, Int, CGSize, simd_float4x4, simd_float4x4) -> Void)?
     var onDragEnd: ((UUID) -> Void)?
@@ -67,17 +70,7 @@ struct UnifiedSplatContentView: View {
     var body: some View {
         ZStack {
             // Main render view
-            MultiCloudRenderView(
-                clouds: clouds,
-                cameraMatrix: $cameraMatrix,
-                sceneTransform: sceneTransform,
-                verticalAngleOfView: $verticalAngleOfView,
-                useSphericalHarmonics: useSphericalHarmonics,
-                backgroundColor: backgroundColor,
-                cullBoundingBox: cullBoundingBox,
-                debugParams: debugParams
-            )
-            .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+            cameraControlledRenderView
 
             // Bounding box overlay (multi-cloud mode only)
             if showBoundingBoxes, mode == .multi {
@@ -93,6 +86,30 @@ struct UnifiedSplatContentView: View {
             if clouds.isEmpty {
                 emptyStateOverlay
             }
+        }
+    }
+
+    /// Render view with the appropriate camera controller applied based on camera mode
+    @ViewBuilder
+    private var cameraControlledRenderView: some View {
+        let renderView = MultiCloudRenderView(
+            clouds: clouds,
+            cameraMatrix: $cameraMatrix,
+            sceneTransform: sceneTransform,
+            verticalAngleOfView: $verticalAngleOfView,
+            useSphericalHarmonics: useSphericalHarmonics,
+            backgroundColor: backgroundColor,
+            cullBoundingBox: cullBoundingBox,
+            debugParams: debugParams
+        )
+
+        switch cameraMode {
+        case .object:
+            renderView.interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+        case .room:
+            renderView.roomCameraController(cameraMatrix: $cameraMatrix, cameraHeight: 0)
+        case .spatialScene:
+            renderView.modifier(SpatialSceneCameraController(transform: $cameraMatrix))
         }
     }
 
@@ -343,9 +360,20 @@ struct UnifiedInspectorView: View {
             cameraMode: cameraModeBinding,
             zoomToFit: zoomToFitBinding,
             verticalAngleOfView: verticalAngleOfViewBinding,
+            cameraMatrix: cameraMatrixBinding,
             viewSize: currentViewSize,
             zoomToFitDisabled: zoomToFitIsDisabled
         )
+    }
+
+    private var cameraMatrixBinding: Binding<simd_float4x4> {
+        if let singleViewModel {
+            return Binding(get: { singleViewModel.cameraMatrix }, set: { singleViewModel.cameraMatrix = $0 })
+        }
+        if let multiViewModel {
+            return Binding(get: { multiViewModel.cameraMatrix }, set: { multiViewModel.cameraMatrix = $0 })
+        }
+        return .constant(.identity)
     }
 
     // MARK: - Unified Camera Bindings
