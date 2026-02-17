@@ -70,11 +70,17 @@ struct SplashView: View {
                 .controlSize(.large)
                 .fileImporter(
                     isPresented: $isFileImporterPresented,
-                    allowedContentTypes: SplatDocument.readableContentTypes,
+                    allowedContentTypes: SplatDocument.readableContentTypes + SplatSceneDocument.readableContentTypes,
                     allowsMultipleSelection: false
                 ) { result in
                     if case let .success(urls) = result, let url = urls.first {
+                        // Start accessing the security-scoped resource
+                        guard url.startAccessingSecurityScopedResource() else {
+                            print("❌ Failed to access security-scoped resource: \(url)")
+                            return
+                        }
                         openFile(at: url)
+                        // Note: We don't stop accessing here because the document system needs continued access
                     }
                 }
                 .padding(.bottom, 40)
@@ -128,7 +134,7 @@ struct SplashView: View {
                 try await openDocument(at: url)
                 dismissWindow(id: "splash")
             } catch {
-                // Handle error if needed
+                print("❌ Failed to open document at \(url): \(error)")
             }
         }
     }

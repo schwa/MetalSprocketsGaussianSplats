@@ -6,8 +6,6 @@ created: 2026-02-09
 updated: 2026-02-12
 closed: 2026-02-12
 
-- 2026-02-12: Combined single and multi-splat document views by refactoring SplatDocumentView to use the same MultiCloudRenderView infrastructure as SplatSceneView. Changes include:
-
 1. Modified SplatDocumentView (iOS/macOS) to use new UnifiedSplatRenderView that wraps MultiCloudRenderView
 2. Modified SplatDocumentView (visionOS) to use the same unified infrastructure
 3. Updated SplatDocumentViewModel to directly load GPUSplatCloud<SparkSplat>
@@ -21,14 +19,19 @@ Benefits:
 - Reduced code duplication
 - Easier to maintain single rendering pipeline
 
+- 2026-02-12: Combined single and multi-splat document views by refactoring SplatDocumentView to use the same MultiCloudRenderView infrastructure as SplatSceneView. Changes include:
+
 ---
 
 ## 2: Fix the splash screen open button to load all file types
-status: new
+status: closed
 priority: medium
 kind: none
 created: 2026-02-09
+updated: 2026-02-17
+closed: 2026-02-17
 
+- 2026-02-17: Fixed by adding SplatSceneDocument types to allowedContentTypes and properly accessing security-scoped resources from fileImporter
 
 ---
 
