@@ -43,7 +43,7 @@
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
         "branch" : "main",
-        "revision" : "8d5954abe1987b39586f1320664d6458e6e010c2"
+        "revision" : "89fceee0837b755bb2606c417bb5c34f7273bdad"
       }
     },
     {
@@ -52,7 +52,7 @@
       "location" : "https://github.com/schwa/MetalSprocketsAddOns",
       "state" : {
         "branch" : "main",
-        "revision" : "0ba51c5319fae4729a2a469437c2b25b76dc9301"
+        "revision" : "625b73a349c6ef0914d1febf4607ce571a91a09b"
       }
     },
     {
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms",
       "state" : {
-        "revision" : "6c050d5ef8e1aa6342528460db614e9770d7f804",
-        "version" : "1.1.1"
+        "revision" : "2971dd5d9f6e0515664b01044826bcea16e59fac",
+        "version" : "1.1.2"
       }
     },
     {

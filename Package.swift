@@ -5,8 +5,8 @@ import PackageDescription
 let package = Package(
     name: "MetalSprocketsGaussianSplats",
     platforms: [
-        .macOS(.v26),
-        .iOS(.v26),
+        .macOS(.v15),
+        .iOS(.v18),
         .visionOS(.v26),
     ],
     products: [

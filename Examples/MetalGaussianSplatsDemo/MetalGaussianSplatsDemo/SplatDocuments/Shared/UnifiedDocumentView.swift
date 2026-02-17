@@ -141,7 +141,7 @@ struct UnifiedDocumentView: View {
                 return
             }
             Task {
-                await multiViewModel.loadClouds(from: doc.scene)
+                multiViewModel.loadClouds(from: doc.scene)
                 multiViewModel.updateCombinedBounds(for: doc.scene)
             }
         }
