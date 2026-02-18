@@ -39,7 +39,10 @@ public struct SparkSplatRenderPipeline: Element {
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
+    @MSState
+    private var lastUseBoundingBox: Bool = false
     var vertexDescriptor: MTLVertexDescriptor
+    var convertSRGBToLinear: Bool
 
     /// Total splat count across all clouds
     var totalSplatCount: Int {
@@ -92,6 +95,7 @@ public struct SparkSplatRenderPipeline: Element {
         self.cameraMatrices = cameraMatrices
         self.drawableSize = drawableSize
         self.boundingBox = boundingBox
+        self.convertSRGBToLinear = convertSRGBToLinear
 
         // Determine if SH should be used: explicit override, or auto-detect from any cloud having SH data
         let hasSHData = splatClouds.contains { $0.shCoefficients != nil }
@@ -193,6 +197,27 @@ public struct SparkSplatRenderPipeline: Element {
             }
             .onChange(of: modelMatrix) {
                 requestSort()
+            }
+            .onChange(of: boundingBox != nil, initial: true) { _, useBoundingBox in
+                // Recreate shaders when bounding box presence changes (function constant changes)
+                if useBoundingBox != lastUseBoundingBox {
+                    lastUseBoundingBox = useBoundingBox
+                    do {
+                        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
+
+                        var vertexConstants = FunctionConstants()
+                        vertexConstants["use_sh"] = .bool(useSphericalHarmonics)
+                        vertexConstants["use_bounding_box"] = .bool(useBoundingBox)
+
+                        var fragmentConstants = FunctionConstants()
+                        fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
+
+                        vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
+                        fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
+                    } catch {
+                        fatalError("Failed to recreate shaders: \(error)")
+                    }
+                }
             }
         }
     }
