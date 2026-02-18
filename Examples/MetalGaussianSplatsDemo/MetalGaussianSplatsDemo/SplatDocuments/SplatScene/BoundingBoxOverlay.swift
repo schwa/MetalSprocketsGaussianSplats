@@ -278,7 +278,7 @@ struct DraggableFace: View {
         let xs = points.map(\.x)
         let ys = points.map(\.y)
         guard let minX = xs.min(), let maxX = xs.max(),
-            let minY = ys.min(), let maxY = ys.max()
+              let minY = ys.min(), let maxY = ys.max()
         else {
             return .zero
         }

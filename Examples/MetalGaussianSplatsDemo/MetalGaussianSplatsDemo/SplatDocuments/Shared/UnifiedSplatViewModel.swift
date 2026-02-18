@@ -90,7 +90,7 @@ final class UnifiedSplatViewModel {
     }
 
     /// Computed scene transform matrix
-    private(set) var sceneTransform: simd_float4x4 = simd_float4x4(xRotation: .radians(.pi))
+    private(set) var sceneTransform = simd_float4x4(xRotation: .radians(.pi))
 
     private func updateSceneTransform() {
         let rotX = simd_float4x4(xRotation: .radians(modelRotationX))
@@ -209,9 +209,8 @@ final class UnifiedSplatViewModel {
             return loadedClouds
                 .filter { enabledIDs.contains($0.id) && $0.cloud != nil }
                 .compactMap(\.cloud)
-        } else {
-            return loadedClouds.compactMap(\.cloud)
         }
+        return loadedClouds.compactMap(\.cloud)
     }
 
     /// Background color as float array for renderer
@@ -289,10 +288,7 @@ final class UnifiedSplatViewModel {
 
     /// Force load the splat cloud (for large files that weren't auto-loaded)
     func loadSplatCloud() {
-        guard loadedClouds.count == 1,
-              var first = loadedClouds.first,
-              first.cloud == nil
-        else {
+        guard loadedClouds.count == 1, var first = loadedClouds.first, first.cloud == nil else {
             return
         }
 
@@ -452,9 +448,7 @@ final class UnifiedSplatViewModel {
         var hasBounds = false
 
         for cloud in scene.clouds where cloud.enabled {
-            guard let loadedCloud = loadedClouds.first(where: { $0.id == cloud.id }),
-                  let bounds = loadedCloud.bounds
-            else {
+            guard let loadedCloud = loadedClouds.first(where: { $0.id == cloud.id }), let bounds = loadedCloud.bounds else {
                 continue
             }
 

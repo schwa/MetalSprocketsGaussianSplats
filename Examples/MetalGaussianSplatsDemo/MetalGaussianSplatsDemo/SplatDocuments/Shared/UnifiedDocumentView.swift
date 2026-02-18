@@ -124,7 +124,7 @@ struct UnifiedDocumentView: View {
                     inspectorContent
                         #if !os(visionOS)
                         .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
-                        #endif
+                    #endif
                 }
         }
         .focusedSceneValue(\.inspectorVisibility, $showInspector)
@@ -337,7 +337,9 @@ struct UnifiedDocumentView: View {
             let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
                 .filter { enabledCloudIDs.contains($0.id) }
                 .compactMap { loadedCloud in
-                    guard let cloud = loadedCloud.cloud else { return nil }
+                    guard let cloud = loadedCloud.cloud else {
+                        return nil
+                    }
                     if let docCloud = doc.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
                         var transform = docCloud.transform
                         if let dragOffset = dragOffsets[loadedCloud.id] {
@@ -391,7 +393,7 @@ struct UnifiedDocumentView: View {
             let selectedCloud: Binding<SplatScene.CloudReference?> = Binding(
                 get: {
                     guard let selectedID = selectedCloudID,
-                        let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID })
+                          let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID })
                     else {
                         return nil
                     }
@@ -399,8 +401,8 @@ struct UnifiedDocumentView: View {
                 },
                 set: { newValue in
                     guard let newValue,
-                        let selectedID = selectedCloudID,
-                        let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID })
+                          let selectedID = selectedCloudID,
+                          let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID })
                     else {
                         return
                     }
@@ -408,18 +410,12 @@ struct UnifiedDocumentView: View {
                 }
             )
 
-            UnifiedInspectorView(
-                multiViewModel: viewModel,
-                document: $multiDocument,
-                selectedCloud: selectedCloud,
-                tab: $inspectorTab,
-                onDeleteCloud: {
-                    if let id = selectedCloudID {
-                        multiDocument?.scene.clouds.removeAll { $0.id == id }
-                        selectedCloudID = nil
-                    }
+            UnifiedInspectorView(multiViewModel: viewModel, document: $multiDocument, selectedCloud: selectedCloud, tab: $inspectorTab) {
+                if let id = selectedCloudID {
+                    multiDocument?.scene.clouds.removeAll { $0.id == id }
+                    selectedCloudID = nil
                 }
-            )
+            }
         }
     }
 
@@ -539,8 +535,8 @@ struct UnifiedDocumentView: View {
 
     private func handleAxisDrag(cloudID: UUID, axis: Int, screenDelta: CGSize, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4) {
         guard let doc = multiDocument,
-            let cloudIndex = doc.scene.clouds.firstIndex(where: { $0.id == cloudID }),
-            let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloudID })
+              let cloudIndex = doc.scene.clouds.firstIndex(where: { $0.id == cloudID }),
+              let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloudID })
         else {
             return
         }
@@ -569,7 +565,7 @@ struct UnifiedDocumentView: View {
         }
 
         guard let p0 = toScreen(worldCenter),
-            let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0))
+              let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0))
         else {
             return
         }
@@ -598,7 +594,7 @@ struct UnifiedDocumentView: View {
 
     private func commitDrag(cloudID: UUID) {
         guard let offset = dragOffsets[cloudID], offset != .zero,
-            let cloudIndex = multiDocument?.scene.clouds.firstIndex(where: { $0.id == cloudID })
+              let cloudIndex = multiDocument?.scene.clouds.firstIndex(where: { $0.id == cloudID })
         else {
             return
         }

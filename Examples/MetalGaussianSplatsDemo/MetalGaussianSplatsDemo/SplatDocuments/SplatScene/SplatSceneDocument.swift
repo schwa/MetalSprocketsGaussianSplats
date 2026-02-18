@@ -43,7 +43,7 @@ final class ScopedResourceAccess {
     func startAccessing(scene: SplatScene) throws -> [ResolvedCloud] {
         var resolved: [ResolvedCloud] = []
 
-        for cloud in scene.clouds where cloud.enabled {
+        for cloud in scene.clouds {
             do {
                 let (url, isStale) = try cloud.resolveURL()
                 #if os(macOS)
