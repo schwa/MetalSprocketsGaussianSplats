@@ -25,8 +25,7 @@ struct UnifiedDocumentView: View {
 
     // MARK: - State
 
-    @State private var singleViewModel = SplatDocumentViewModel()
-    @State private var multiViewModel = SplatSceneViewModel()
+    @State private var viewModel: UnifiedSplatViewModel
 
     @State private var selectedCloudID: UUID?
     @State private var inspectorTab: UnifiedInspectorTab = .cloud
@@ -44,15 +43,19 @@ struct UnifiedDocumentView: View {
 
     // Multi mode specific
     @State private var showAddCloudPicker = false
-    @State private var showBoundingBoxes = false
     @State private var dragOffsets: [UUID: SIMD3<Float>] = [:]
 
-    // Culling (multi mode uses state, single mode uses view model)
-    @State private var cullBoundingBoxEnabled = false
-    @State private var cullMinBounds: SIMD3<Float> = SIMD3(-5, -5, -5)
-    @State private var cullMaxBounds: SIMD3<Float> = SIMD3(5, 5, 5)
-
     @Environment(\.displayScale) private var displayScale
+
+    // MARK: - Initialization
+
+    private init(mode: SplatContentMode, singleDocument: SplatDocument?, fileURL: URL?, multiDocument: Binding<SplatSceneDocument?>) {
+        self.mode = mode
+        self.singleDocument = singleDocument
+        self.fileURL = fileURL
+        self._multiDocument = multiDocument
+        self._viewModel = State(initialValue: UnifiedSplatViewModel(mode: mode == .single ? .single : .multi))
+    }
 
     // MARK: - Body
 
@@ -87,23 +90,23 @@ struct UnifiedDocumentView: View {
             .focusedSceneValue(\.inspectorVisibility, $showInspector)
             .sheet(isPresented: $showScreenshotSheet) {
                 ScreenshotSheet(
-                    defaultWidth: Int(singleViewModel.viewSize.width * displayScale),
-                    defaultHeight: Int(singleViewModel.viewSize.height * displayScale)
+                    defaultWidth: Int(viewModel.viewSize.width * displayScale),
+                    defaultHeight: Int(viewModel.viewSize.height * displayScale)
                 )
-                .environment(singleViewModel)
+                .environment(viewModel)
             }
             .fileExporter(
                 isPresented: $showExportDialog,
-                document: singleViewModel.convertedURL.map { PLYFileDocument(url: $0) },
+                document: viewModel.convertedURL.map { PLYFileDocument(url: $0) },
                 contentType: .ply,
-                defaultFilename: singleViewModel.convertedURL?.deletingPathExtension().lastPathComponent
+                defaultFilename: viewModel.convertedURL?.deletingPathExtension().lastPathComponent
             ) { _ in
                 // Export completion handled by system
             }
             .onChange(of: fileURL, initial: true) { _, newURL in
                 confirmedLoad = false
                 Task {
-                    await singleViewModel.load(url: newURL, contentType: singleDocument?.contentType)
+                    await viewModel.load(url: newURL, contentType: singleDocument?.contentType)
                 }
             }
     }
@@ -122,13 +125,13 @@ struct UnifiedDocumentView: View {
             inspectorContent
                 .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
         }
-        .environment(multiViewModel)
+        .environment(viewModel)
         .sheet(isPresented: $showScreenshotSheet) {
             ScreenshotSheet(
-                defaultWidth: Int(multiViewModel.viewSize.width * displayScale),
-                defaultHeight: Int(multiViewModel.viewSize.height * displayScale)
+                defaultWidth: Int(viewModel.viewSize.width * displayScale),
+                defaultHeight: Int(viewModel.viewSize.height * displayScale)
             )
-            .environment(multiViewModel)
+            .environment(viewModel)
         }
         .fileImporter(
             isPresented: $showAddCloudPicker,
@@ -141,27 +144,27 @@ struct UnifiedDocumentView: View {
                 return
             }
             Task {
-                multiViewModel.loadClouds(from: doc.scene)
-                multiViewModel.updateCombinedBounds(for: doc.scene)
+                viewModel.loadClouds(from: doc.scene)
+                viewModel.updateCombinedBounds(for: doc.scene)
             }
         }
         .onChange(of: multiDocument?.scene.sceneTransform) {
             guard let doc = multiDocument else {
                 return
             }
-            multiViewModel.updateCombinedBounds(for: doc.scene)
+            viewModel.updateCombinedBounds(for: doc.scene)
         }
-        .onChange(of: multiViewModel.loadingState) {
-            guard let doc = multiDocument, multiViewModel.loadingState == .ready else {
+        .onChange(of: viewModel.loadingState) {
+            guard let doc = multiDocument, viewModel.loadingState == .ready else {
                 return
             }
-            multiViewModel.updateCombinedBounds(for: doc.scene)
+            viewModel.updateCombinedBounds(for: doc.scene)
         }
-        .onChange(of: multiViewModel.boundsUpdateCount) {
+        .onChange(of: viewModel.boundsUpdateCount) {
             guard let doc = multiDocument else {
                 return
             }
-            multiViewModel.updateCombinedBounds(for: doc.scene)
+            viewModel.updateCombinedBounds(for: doc.scene)
         }
     }
 
@@ -217,7 +220,7 @@ struct UnifiedDocumentView: View {
 
     @ViewBuilder
     private var singleModeMainContent: some View {
-        switch singleViewModel.loadingState {
+        switch viewModel.loadingState {
         case .idle, .loading:
             ContentUnavailableView("Loading…", systemImage: "circle.dotted")
         case .converting(let status):
@@ -227,7 +230,7 @@ struct UnifiedDocumentView: View {
         case .ready:
             if needsConfirmation {
                 confirmationContent
-            } else if let splatCloud = singleViewModel.splatCloud {
+            } else if let splatCloud = viewModel.splatCloud {
                 singleRenderView(cloud: splatCloud)
             } else {
                 ContentUnavailableView("No file to render", systemImage: "questionmark")
@@ -237,7 +240,7 @@ struct UnifiedDocumentView: View {
 
     @ViewBuilder
     private var multiModeMainContent: some View {
-        switch multiViewModel.loadingState {
+        switch viewModel.loadingState {
         case .idle:
             if multiDocument?.scene.clouds.isEmpty ?? true {
                 ContentUnavailableView {
@@ -252,6 +255,8 @@ struct UnifiedDocumentView: View {
             ProgressView("Loading clouds...")
         case .ready:
             multiRenderView
+        case .converting:
+            ProgressView("Converting...")
         case .error(let message):
             errorContent(message: message)
         }
@@ -261,29 +266,26 @@ struct UnifiedDocumentView: View {
 
     @ViewBuilder
     private func singleRenderView(cloud: GPUSplatCloud<SparkSplat>) -> some View {
-        let bgColor = singleViewModel.backgroundColor.resolve(in: EnvironmentValues())
-        let bgColorArray: [Float] = [Float(bgColor.red), Float(bgColor.green), Float(bgColor.blue), Float(bgColor.opacity)]
-
         UnifiedSplatContentView(
             mode: .single,
             clouds: [cloud],
-            sceneTransform: singleViewModel.modelMatrix,
-            useSphericalHarmonics: singleViewModel.useSphericalHarmonics && singleViewModel.hasSphericalHarmonicsData,
-            backgroundColor: bgColorArray,
-            cameraMatrix: $singleViewModel.cameraMatrix,
-            verticalAngleOfView: $singleViewModel.verticalAngleOfView,
-            cullBoundingBox: singleViewModel.cullBoundingBox,
-            showBoundingBoxes: showBoundingBoxes,
+            sceneTransform: viewModel.sceneTransform,
+            useSphericalHarmonics: viewModel.effectiveUseSphericalHarmonics,
+            backgroundColor: viewModel.backgroundColorArray,
+            cameraMatrix: $viewModel.cameraMatrix,
+            verticalAngleOfView: $viewModel.verticalAngleOfView,
+            cullBoundingBox: viewModel.cullBoundingBox,
+            showBoundingBoxes: viewModel.showBoundingBoxes,
             boundingBoxInfos: singleModeBoundingBoxInfos,
-            debugParams: singleViewModel.debugModeEnabled ? computeDebugParams(
-                mode: singleViewModel.debugMode,
-                boundsCenter: singleViewModel.boundsCenter,
-                boundsSize: singleViewModel.boundsSize
+            debugParams: viewModel.debugModeEnabled ? computeDebugParams(
+                mode: viewModel.debugMode,
+                boundsCenter: viewModel.boundsCenter,
+                boundsSize: viewModel.boundsSize
             ) : nil,
-            cameraMode: singleViewModel.cameraMode
+            cameraMode: viewModel.cameraMode
         )
         .ignoresSafeArea()
-        .onGeometryChange(for: CGSize.self, of: \.size) { singleViewModel.viewSize = $0 }
+        .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
     }
 
     /// Compute debug shader parameters based on mode and bounds
@@ -293,17 +295,14 @@ struct UnifiedDocumentView: View {
         case .distanceFromCenter:
             return .distance(DebugDistanceParams(center: boundsCenter, maxDistance: maxExtent / 2))
         case .splatSize:
-            // Heuristic: max splat size is roughly 1/50th of the scene size
             return .size(DebugSizeParams(minSize: 0, maxSize: maxExtent / 50))
         case .depth:
-            // Use reasonable depth range based on scene size
             return .depth(DebugDepthParams(minDepth: 0, maxDepth: maxExtent * 2))
         case .opacity:
             return .opacity
         case .normal:
             return .normal
         case .aspectRatio:
-            // Aspect ratio: 1.0 = circular, higher = more elongated
             return .aspectRatio(DebugAspectRatioParams(minRatio: 1.0, maxRatio: 10.0))
         case .cloudIndex:
             return .cloudIndex(DebugCloudIndexParams(cloudCount: cloudCount))
@@ -311,18 +310,18 @@ struct UnifiedDocumentView: View {
     }
 
     private var singleModeBoundingBoxInfos: [BoundingBoxInfo] {
-        guard showBoundingBoxes, singleViewModel.boundsSize != .zero else {
+        guard viewModel.showBoundingBoxes, viewModel.boundsSize != .zero else {
             return []
         }
         let bounds = BoundingBox(
-            min: singleViewModel.boundsCenter - singleViewModel.boundsSize / 2,
-            max: singleViewModel.boundsCenter + singleViewModel.boundsSize / 2
+            min: viewModel.boundsCenter - viewModel.boundsSize / 2,
+            max: viewModel.boundsCenter + viewModel.boundsSize / 2
         )
         return [
             BoundingBoxInfo(
                 id: UUID(),
                 bounds: bounds,
-                modelMatrix: singleViewModel.modelMatrix,
+                modelMatrix: viewModel.sceneTransform,
                 color: .white
             )
         ]
@@ -332,24 +331,22 @@ struct UnifiedDocumentView: View {
     private var multiRenderView: some View {
         if let doc = multiDocument {
             let enabledCloudIDs = Set(doc.scene.clouds.filter(\.enabled).map(\.id))
-            let enabledClouds: [GPUSplatCloud<SparkSplat>] = multiViewModel.loadedClouds
+            let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
                 .filter { enabledCloudIDs.contains($0.id) }
                 .compactMap { loadedCloud in
+                    guard let cloud = loadedCloud.cloud else { return nil }
                     if let docCloud = doc.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
                         var transform = docCloud.transform
                         if let dragOffset = dragOffsets[loadedCloud.id] {
                             transform.translation += dragOffset
                         }
-                        loadedCloud.cloud.modelTransform = transform.matrix
-                        loadedCloud.cloud.opacity = docCloud.opacity
+                        cloud.modelTransform = transform.matrix
+                        cloud.opacity = docCloud.opacity
                     }
-                    return loadedCloud.cloud
+                    return cloud
                 }
 
-            let useSH = doc.scene.renderSettings.useSphericalHarmonics && multiViewModel.allCloudsHaveSphericalHarmonics
-            let cullBoundingBox: BoundingBox3D? = cullBoundingBoxEnabled
-                ? BoundingBox3D(minBounds: cullMinBounds, maxBounds: cullMaxBounds)
-                : nil
+            let useSH = doc.scene.renderSettings.useSphericalHarmonics && viewModel.hasSphericalHarmonicsData
 
             UnifiedSplatContentView(
                 mode: .multi,
@@ -357,22 +354,22 @@ struct UnifiedDocumentView: View {
                 sceneTransform: doc.scene.sceneTransform.matrix,
                 useSphericalHarmonics: useSH,
                 backgroundColor: doc.scene.renderSettings.backgroundColor,
-                cameraMatrix: $multiViewModel.cameraMatrix,
-                verticalAngleOfView: $multiViewModel.verticalAngleOfView,
-                cullBoundingBox: cullBoundingBox,
-                showBoundingBoxes: showBoundingBoxes,
+                cameraMatrix: $viewModel.cameraMatrix,
+                verticalAngleOfView: $viewModel.verticalAngleOfView,
+                cullBoundingBox: viewModel.cullBoundingBox,
+                showBoundingBoxes: viewModel.showBoundingBoxes,
                 boundingBoxInfos: buildBoundingBoxInfos(),
-                debugParams: multiViewModel.debugModeEnabled ? computeDebugParams(
-                    mode: multiViewModel.debugMode,
-                    boundsCenter: multiViewModel.combinedBoundsCenter,
-                    boundsSize: multiViewModel.combinedBoundsSize,
-                    cloudCount: UInt32(multiViewModel.loadedClouds.count)
+                debugParams: viewModel.debugModeEnabled ? computeDebugParams(
+                    mode: viewModel.debugMode,
+                    boundsCenter: viewModel.boundsCenter,
+                    boundsSize: viewModel.boundsSize,
+                    cloudCount: UInt32(viewModel.loadedClouds.count)
                 ) : nil,
-                cameraMode: multiViewModel.cameraMode,
+                cameraMode: viewModel.cameraMode,
                 onDragChange: handleAxisDrag,
                 onDragEnd: commitDrag
             )
-            .onGeometryChange(for: CGSize.self, of: \.size) { multiViewModel.viewSize = $0 }
+            .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
         }
     }
 
@@ -383,9 +380,8 @@ struct UnifiedDocumentView: View {
         switch mode {
         case .single:
             UnifiedInspectorView(
-                singleViewModel: singleViewModel,
-                tab: $inspectorTab,
-                showBoundingBoxes: $showBoundingBoxes
+                singleViewModel: viewModel,
+                tab: $inspectorTab
             )
 
         case .multi:
@@ -410,7 +406,7 @@ struct UnifiedDocumentView: View {
             )
 
             UnifiedInspectorView(
-                multiViewModel: multiViewModel,
+                multiViewModel: viewModel,
                 document: $multiDocument,
                 selectedCloud: selectedCloud,
                 tab: $inspectorTab,
@@ -419,11 +415,7 @@ struct UnifiedDocumentView: View {
                         multiDocument?.scene.clouds.removeAll { $0.id == id }
                         selectedCloudID = nil
                     }
-                },
-                showBoundingBoxes: $showBoundingBoxes,
-                cullBoundingBoxEnabled: $cullBoundingBoxEnabled,
-                cullMinBounds: $cullMinBounds,
-                cullMaxBounds: $cullMaxBounds
+                }
             )
         }
     }
@@ -442,7 +434,7 @@ struct UnifiedDocumentView: View {
         }
 
         // Export PLY (single mode, image conversion only - specific workflow)
-        if mode == .single, singleViewModel.isImageConversion, singleViewModel.convertedURL != nil {
+        if mode == .single, viewModel.isImageConversion, viewModel.convertedURL != nil {
             ToolbarItem(placement: .primaryAction) {
                 Button("Export PLY", systemImage: "square.and.arrow.down") {
                     showExportDialog = true
@@ -480,7 +472,7 @@ struct UnifiedDocumentView: View {
 
     @ViewBuilder
     private func conversionContent(status: String) -> some View {
-        if let sourceImage = singleViewModel.sourceImage {
+        if let sourceImage = viewModel.sourceImage {
             ImageConversionView(sourceImage: sourceImage, statusMessage: status)
         } else {
             VStack(spacing: 16) {
@@ -502,10 +494,10 @@ struct UnifiedDocumentView: View {
     }
 
     private var needsConfirmation: Bool {
-        guard let descriptor = singleViewModel.descriptor else {
+        guard let descriptor = viewModel.descriptor else {
             return false
         }
-        if singleViewModel.isImageConversion {
+        if viewModel.isImageConversion {
             return false
         }
         return descriptor.splatCount >= 1_000_000 && !confirmedLoad
@@ -516,11 +508,11 @@ struct UnifiedDocumentView: View {
         ContentUnavailableView {
             Label("Large Splat Cloud", systemImage: "exclamationmark.triangle.fill")
         } description: {
-            Text("This file contains \(singleViewModel.descriptor!.splatCount.formatted()) splats which may take a while to load and could impact performance.")
+            Text("This file contains \(viewModel.descriptor!.splatCount.formatted()) splats which may take a while to load and could impact performance.")
         } actions: {
             Button("Load Anyway") {
                 confirmedLoad = true
-                singleViewModel.loadSplatCloud()
+                viewModel.loadSplatCloud()
             }
             .buttonStyle(.borderedProminent)
         }
@@ -532,7 +524,7 @@ struct UnifiedDocumentView: View {
         guard let doc = multiDocument else {
             return []
         }
-        return multiViewModel.loadedClouds
+        return viewModel.loadedClouds
             .filter { loadedCloud in
                 doc.scene.clouds.first { $0.id == loadedCloud.id }?.enabled ?? false
             }
@@ -554,7 +546,7 @@ struct UnifiedDocumentView: View {
     private func handleAxisDrag(cloudID: UUID, axis: Int, screenDelta: CGSize, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4) {
         guard let doc = multiDocument,
             let cloudIndex = doc.scene.clouds.firstIndex(where: { $0.id == cloudID }),
-            let loadedCloud = multiViewModel.loadedClouds.first(where: { $0.id == cloudID })
+            let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloudID })
         else {
             return
         }
@@ -568,7 +560,7 @@ struct UnifiedDocumentView: View {
         let axisNorm = normalize(axisWorld)
 
         let mvp = projectionMatrix * viewMatrix
-        let viewportSize = multiViewModel.viewSize
+        let viewportSize = viewModel.viewSize
 
         func toScreen(_ point: SIMD4<Float>) -> CGPoint? {
             let clip = mvp * point
@@ -602,10 +594,12 @@ struct UnifiedDocumentView: View {
         let offset = dragOffsets[cloudID] ?? .zero
         dragOffsets[cloudID] = offset + localAxis * worldDelta
 
-        let docTransform = doc.scene.clouds[cloudIndex].transform
-        var newTransform = docTransform
-        newTransform.translation += dragOffsets[cloudID]!
-        loadedCloud.cloud.modelTransform = doc.scene.sceneTransform.matrix * newTransform.matrix
+        if let cloud = loadedCloud.cloud {
+            let docTransform = doc.scene.clouds[cloudIndex].transform
+            var newTransform = docTransform
+            newTransform.translation += dragOffsets[cloudID]!
+            cloud.modelTransform = doc.scene.sceneTransform.matrix * newTransform.matrix
+        }
     }
 
     private func commitDrag(cloudID: UUID) {
@@ -656,20 +650,24 @@ struct UnifiedDocumentView: View {
 extension UnifiedDocumentView {
     /// Create view for single splat document
     init(document: SplatDocument, fileURL: URL?) {
-        self.mode = .single
-        self.singleDocument = document
-        self.fileURL = fileURL
-        self._multiDocument = .constant(nil)
+        self.init(
+            mode: .single,
+            singleDocument: document,
+            fileURL: fileURL,
+            multiDocument: .constant(nil)
+        )
     }
 
     /// Create view for multi-cloud scene document
     init(document: Binding<SplatSceneDocument>) {
-        self.mode = .multi
-        self.singleDocument = nil
-        self.fileURL = nil
-        self._multiDocument = Binding(
-            get: { document.wrappedValue },
-            set: { document.wrappedValue = $0! }
+        self.init(
+            mode: .multi,
+            singleDocument: nil,
+            fileURL: nil,
+            multiDocument: Binding(
+                get: { document.wrappedValue },
+                set: { document.wrappedValue = $0! }
+            )
         )
     }
 }

@@ -186,24 +186,13 @@ enum UnifiedInspectorTab: String, CaseIterable {
 
 struct UnifiedInspectorView: View {
     let mode: SplatContentMode
+    @Bindable var viewModel: UnifiedSplatViewModel
     @Binding var tab: UnifiedInspectorTab
 
-    // Single-mode bindings
-    var singleViewModel: SplatDocumentViewModel?
-
-    // Multi-mode bindings
-    var multiViewModel: SplatSceneViewModel?
+    // Multi-mode only: document and selection
     @Binding var document: SplatSceneDocument?
     @Binding var selectedCloud: SplatScene.CloudReference?
     var onDeleteCloud: (() -> Void)?
-
-    // Shared render state
-    @Binding var showBoundingBoxes: Bool
-
-    // Shared culling state
-    @Binding var cullBoundingBoxEnabled: Bool
-    @Binding var cullMinBounds: SIMD3<Float>
-    @Binding var cullMaxBounds: SIMD3<Float>
 
     var body: some View {
         VStack(spacing: 0) {
@@ -226,12 +215,12 @@ struct UnifiedInspectorView: View {
                     cloudContent
 
                 case .scene:
-                    if let multiViewModel, var doc = document {
+                    if var doc = document {
                         SceneInspectorContent(document: Binding(
                             get: { doc },
                             set: { doc = $0; document = $0 }
                         ))
-                        .environment(multiViewModel)
+                        .environment(viewModel)
                     }
 
                 case .camera:
@@ -259,7 +248,7 @@ struct UnifiedInspectorView: View {
                 rotationY: cloudRotationYBinding,
                 rotationZ: cloudRotationZBinding,
                 rotationSectionTitle: mode == .single ? "Model Orientation" : "Rotation",
-                centerModel: cloudCenterModelBinding,
+                centerModel: $viewModel.centerModel,
                 showCenterModel: mode == .single,
                 displayName: cloudDisplayNameBinding,
                 enabled: cloudEnabledBinding,
@@ -272,21 +261,20 @@ struct UnifiedInspectorView: View {
         }
     }
 
-    // MARK: - Unified Cloud Bindings
-
     private var cloudDescriptor: SplatCloudDescriptor? {
-        if let singleViewModel {
-            return singleViewModel.descriptor
+        if mode == .single {
+            return viewModel.descriptor
         }
         if let cloud = selectedCloud {
-            return multiViewModel?.loadedClouds.first { $0.id == cloud.id }?.descriptor
+            return viewModel.loadedClouds.first { $0.id == cloud.id }?.descriptor
         }
         return nil
     }
 
+    // Cloud bindings - single mode uses viewModel, multi mode uses selectedCloud
     private var cloudRotationXBinding: Binding<Float> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.modelRotationX }, set: { singleViewModel.modelRotationX = $0 })
+        if mode == .single {
+            return $viewModel.modelRotationX
         }
         return Binding(
             get: { selectedCloud?.transform.rotation.x ?? 0 },
@@ -295,8 +283,8 @@ struct UnifiedInspectorView: View {
     }
 
     private var cloudRotationYBinding: Binding<Float> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.modelRotationY }, set: { singleViewModel.modelRotationY = $0 })
+        if mode == .single {
+            return $viewModel.modelRotationY
         }
         return Binding(
             get: { selectedCloud?.transform.rotation.y ?? 0 },
@@ -305,20 +293,13 @@ struct UnifiedInspectorView: View {
     }
 
     private var cloudRotationZBinding: Binding<Float> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.modelRotationZ }, set: { singleViewModel.modelRotationZ = $0 })
+        if mode == .single {
+            return $viewModel.modelRotationZ
         }
         return Binding(
             get: { selectedCloud?.transform.rotation.z ?? 0 },
             set: { selectedCloud?.transform.rotation.z = $0 }
         )
-    }
-
-    private var cloudCenterModelBinding: Binding<Bool> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.centerModel }, set: { singleViewModel.centerModel = $0 })
-        }
-        return .constant(false)
     }
 
     private var cloudDisplayNameBinding: Binding<String?> {
@@ -329,7 +310,7 @@ struct UnifiedInspectorView: View {
     }
 
     private var cloudEnabledBinding: Binding<Bool> {
-        if singleViewModel != nil {
+        if mode == .single {
             return .constant(true)
         }
         return Binding(
@@ -339,7 +320,7 @@ struct UnifiedInspectorView: View {
     }
 
     private var cloudOpacityBinding: Binding<Float> {
-        if singleViewModel != nil {
+        if mode == .single {
             return .constant(1)
         }
         return Binding(
@@ -360,69 +341,13 @@ struct UnifiedInspectorView: View {
     @ViewBuilder
     private var cameraContent: some View {
         UnifiedCameraContent(
-            cameraMode: cameraModeBinding,
-            zoomToFit: zoomToFitBinding,
-            verticalAngleOfView: verticalAngleOfViewBinding,
-            cameraMatrix: cameraMatrixBinding,
-            viewSize: currentViewSize,
-            zoomToFitDisabled: zoomToFitIsDisabled
+            cameraMode: $viewModel.cameraMode,
+            zoomToFit: $viewModel.zoomToFit,
+            verticalAngleOfView: $viewModel.verticalAngleOfView,
+            cameraMatrix: $viewModel.cameraMatrix,
+            viewSize: viewModel.viewSize,
+            zoomToFitDisabled: viewModel.boundsSize == .zero
         )
-    }
-
-    private var cameraMatrixBinding: Binding<simd_float4x4> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.cameraMatrix }, set: { singleViewModel.cameraMatrix = $0 })
-        }
-        if let multiViewModel {
-            return Binding(get: { multiViewModel.cameraMatrix }, set: { multiViewModel.cameraMatrix = $0 })
-        }
-        return .constant(.identity)
-    }
-
-    // MARK: - Unified Camera Bindings
-
-    private var cameraModeBinding: Binding<CameraMode> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.cameraMode }, set: { singleViewModel.cameraMode = $0 })
-        }
-        if let multiViewModel {
-            return Binding(get: { multiViewModel.cameraMode }, set: { multiViewModel.cameraMode = $0 })
-        }
-        return .constant(.object)
-    }
-
-    private var zoomToFitBinding: Binding<Bool> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.zoomToFit }, set: { singleViewModel.zoomToFit = $0 })
-        }
-        if let multiViewModel {
-            return Binding(get: { multiViewModel.zoomToFit }, set: { multiViewModel.zoomToFit = $0 })
-        }
-        return .constant(false)
-    }
-
-    private var verticalAngleOfViewBinding: Binding<Double> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.verticalAngleOfView }, set: { singleViewModel.verticalAngleOfView = $0 })
-        }
-        if let multiViewModel {
-            return Binding(get: { multiViewModel.verticalAngleOfView }, set: { multiViewModel.verticalAngleOfView = $0 })
-        }
-        return .constant(90)
-    }
-
-    private var currentViewSize: CGSize {
-        singleViewModel?.viewSize ?? multiViewModel?.viewSize ?? .zero
-    }
-
-    private var zoomToFitIsDisabled: Bool {
-        if singleViewModel != nil {
-            return false
-        }
-        if let multiViewModel {
-            return multiViewModel.combinedBoundsSize == .zero
-        }
-        return false
     }
 
     // MARK: - Render Content
@@ -430,84 +355,23 @@ struct UnifiedInspectorView: View {
     @ViewBuilder
     private var renderContent: some View {
         UnifiedRenderContent(
-            backgroundColor: backgroundColorBinding,
-            useSphericalHarmonics: useSphericalHarmonicsBinding,
-            sphericalHarmonicsDisabled: sphericalHarmonicsIsDisabled,
+            backgroundColor: $viewModel.backgroundColor,
+            useSphericalHarmonics: $viewModel.useSphericalHarmonics,
+            sphericalHarmonicsDisabled: !viewModel.hasSphericalHarmonicsData,
             sphericalHarmonicsWarning: sphericalHarmonicsWarning,
-            showBoundingBoxes: $showBoundingBoxes,
-            debugModeEnabled: debugModeEnabledBinding,
-            debugMode: debugModeBinding
+            showBoundingBoxes: $viewModel.showBoundingBoxes,
+            debugModeEnabled: $viewModel.debugModeEnabled,
+            debugMode: $viewModel.debugMode
         ) {
             cullingSection
         }
     }
 
-    // MARK: - Debug Mode Bindings
-
-    private var debugModeEnabledBinding: Binding<Bool> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.debugModeEnabled }, set: { singleViewModel.debugModeEnabled = $0 })
-        }
-        if let multiViewModel {
-            return Binding(get: { multiViewModel.debugModeEnabled }, set: { multiViewModel.debugModeEnabled = $0 })
-        }
-        return .constant(false)
-    }
-
-    private var debugModeBinding: Binding<SplatDebugMode> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.debugMode }, set: { singleViewModel.debugMode = $0 })
-        }
-        if let multiViewModel {
-            return Binding(get: { multiViewModel.debugMode }, set: { multiViewModel.debugMode = $0 })
-        }
-        return .constant(.distanceFromCenter)
-    }
-
-    // MARK: - Unified Render Bindings
-
-    private var backgroundColorBinding: Binding<Color> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.backgroundColor }, set: { singleViewModel.backgroundColor = $0 })
-        }
-        return Binding(
-            get: {
-                guard let c = document?.scene.renderSettings.backgroundColor, c.count == 4 else {
-                    return .black
-                }
-                return Color(red: Double(c[0]), green: Double(c[1]), blue: Double(c[2]), opacity: Double(c[3]))
-            },
-            set: { newColor in
-                let resolved = newColor.resolve(in: EnvironmentValues())
-                document?.scene.renderSettings.backgroundColor = [
-                    Float(resolved.red), Float(resolved.green), Float(resolved.blue), Float(resolved.opacity)
-                ]
-            }
-        )
-    }
-
-    private var useSphericalHarmonicsBinding: Binding<Bool> {
-        if let singleViewModel {
-            return Binding(get: { singleViewModel.useSphericalHarmonics }, set: { singleViewModel.useSphericalHarmonics = $0 })
-        }
-        return Binding(
-            get: { document?.scene.renderSettings.useSphericalHarmonics ?? false },
-            set: { document?.scene.renderSettings.useSphericalHarmonics = $0 }
-        )
-    }
-
-    private var sphericalHarmonicsIsDisabled: Bool {
-        if let singleViewModel {
-            return !singleViewModel.hasSphericalHarmonicsData
-        }
-        return !(multiViewModel?.allCloudsHaveSphericalHarmonics ?? false)
-    }
-
     private var sphericalHarmonicsWarning: String? {
-        if singleViewModel != nil {
+        if mode == .single {
             return nil
         }
-        if !(multiViewModel?.allCloudsHaveSphericalHarmonics ?? true) {
+        if !viewModel.hasSphericalHarmonicsData {
             return "Not all clouds have SH data"
         }
         return nil
@@ -515,20 +379,12 @@ struct UnifiedInspectorView: View {
 
     @ViewBuilder
     private var cullingSection: some View {
-        if let singleViewModel {
-            NormalizedCullingSection(
-                enabled: Binding(get: { singleViewModel.cullBoundingBoxEnabled }, set: { singleViewModel.cullBoundingBoxEnabled = $0 }),
-                minBounds: Binding(get: { singleViewModel.cullMinNormalized }, set: { singleViewModel.cullMinNormalized = $0 }),
-                maxBounds: Binding(get: { singleViewModel.cullMaxNormalized }, set: { singleViewModel.cullMaxNormalized = $0 }),
-                disabled: singleViewModel.boundsSize == .zero
-            )
-        } else {
-            AbsoluteCullingSection(
-                enabled: $cullBoundingBoxEnabled,
-                minBounds: $cullMinBounds,
-                maxBounds: $cullMaxBounds
-            )
-        }
+        NormalizedCullingSection(
+            enabled: $viewModel.cullBoundingBoxEnabled,
+            minBounds: $viewModel.cullMinNormalized,
+            maxBounds: $viewModel.cullMaxNormalized,
+            disabled: viewModel.boundsSize == .zero
+        )
     }
 }
 
@@ -537,49 +393,31 @@ struct UnifiedInspectorView: View {
 extension UnifiedInspectorView {
     /// Create inspector for single splat mode
     init(
-        singleViewModel: SplatDocumentViewModel,
-        tab: Binding<UnifiedInspectorTab>,
-        showBoundingBoxes: Binding<Bool> = .constant(false),
-        cullBoundingBoxEnabled: Binding<Bool> = .constant(false),
-        cullMinBounds: Binding<SIMD3<Float>> = .constant(.zero),
-        cullMaxBounds: Binding<SIMD3<Float>> = .constant(.one)
+        singleViewModel: UnifiedSplatViewModel,
+        tab: Binding<UnifiedInspectorTab>
     ) {
         self.mode = .single
+        self.viewModel = singleViewModel
         self._tab = tab
-        self.singleViewModel = singleViewModel
-        self.multiViewModel = nil
         self._document = .constant(nil)
         self._selectedCloud = .constant(nil)
         self.onDeleteCloud = nil
-        self._showBoundingBoxes = showBoundingBoxes
-        self._cullBoundingBoxEnabled = cullBoundingBoxEnabled
-        self._cullMinBounds = cullMinBounds
-        self._cullMaxBounds = cullMaxBounds
     }
 
     /// Create inspector for multi-cloud mode
     init(
-        multiViewModel: SplatSceneViewModel,
+        multiViewModel: UnifiedSplatViewModel,
         document: Binding<SplatSceneDocument?>,
         selectedCloud: Binding<SplatScene.CloudReference?>,
         tab: Binding<UnifiedInspectorTab>,
-        onDeleteCloud: (() -> Void)? = nil,
-        showBoundingBoxes: Binding<Bool>,
-        cullBoundingBoxEnabled: Binding<Bool>,
-        cullMinBounds: Binding<SIMD3<Float>>,
-        cullMaxBounds: Binding<SIMD3<Float>>
+        onDeleteCloud: (() -> Void)? = nil
     ) {
         self.mode = .multi
+        self.viewModel = multiViewModel
         self._tab = tab
-        self.singleViewModel = nil
-        self.multiViewModel = multiViewModel
         self._document = document
         self._selectedCloud = selectedCloud
         self.onDeleteCloud = onDeleteCloud
-        self._showBoundingBoxes = showBoundingBoxes
-        self._cullBoundingBoxEnabled = cullBoundingBoxEnabled
-        self._cullMinBounds = cullMinBounds
-        self._cullMaxBounds = cullMaxBounds
     }
 }
 #endif

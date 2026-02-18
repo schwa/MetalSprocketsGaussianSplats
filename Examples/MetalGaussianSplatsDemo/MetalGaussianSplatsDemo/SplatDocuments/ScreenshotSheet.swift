@@ -28,7 +28,7 @@ struct TransferableImage: Transferable {
 
 struct ScreenshotSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(SplatDocumentViewModel.self) private var viewModel
+    @Environment(UnifiedSplatViewModel.self) private var viewModel
 
     @State private var width: Int
     @State private var height: Int
@@ -122,7 +122,7 @@ struct ScreenshotSheet: View {
         do {
             // Capture values
             let cameraMatrix = viewModel.cameraMatrix
-            let modelMatrix = viewModel.modelMatrix
+            let sceneTransform = viewModel.sceneTransform
 
             // Load splat cloud (always use SparkSplat)
             // Note: Don't pass modelTransform here - it's handled by the render pipeline
@@ -143,7 +143,7 @@ struct ScreenshotSheet: View {
                 try SparkSplatRenderPipeline(
                     splatCloud: splatCloud,
                     projectionMatrix: projectionMatrix,
-                    modelMatrix: modelMatrix,
+                    modelMatrix: sceneTransform,
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(size)
                 )

@@ -385,13 +385,13 @@ struct AbsoluteCullingSection: View {
 
 struct SceneInspectorContent: View {
     @Binding var document: SplatSceneDocument
-    @Environment(SplatSceneViewModel.self) private var viewModel
+    @Environment(UnifiedSplatViewModel.self) private var viewModel
 
     private var enabledSplatCount: Int {
         let enabledCloudIDs = Set(document.scene.clouds.filter(\.enabled).map(\.id))
         return viewModel.loadedClouds
             .filter { enabledCloudIDs.contains($0.id) }
-            .reduce(into: 0) { $0 += $1.cloud.count }
+            .reduce(into: 0) { $0 += $1.cloud?.count ?? 0 }
     }
 
     var body: some View {

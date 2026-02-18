@@ -31,11 +31,6 @@ struct LoadedSplatCloud: Identifiable {
     let descriptor: SplatCloudDescriptor
     var bounds: BoundingBox?
 
-    // Per-cloud settings
-    var enabled: Bool = true
-    var opacity: Float = 1.0
-    var transform: Transform = .identity
-
     /// Whether this cloud is fully loaded and ready to render
     var isLoaded: Bool { cloud != nil }
 }
@@ -45,6 +40,19 @@ struct LoadedSplatCloud: Identifiable {
 @Observable
 @MainActor
 final class UnifiedSplatViewModel {
+    // MARK: - Mode
+
+    enum Mode {
+        case single
+        case multi
+    }
+
+    let mode: Mode
+
+    init(mode: Mode = .single) {
+        self.mode = mode
+    }
+
     // MARK: - Loaded Clouds
 
     /// All loaded splat clouds
@@ -53,10 +61,49 @@ final class UnifiedSplatViewModel {
     /// Loading state
     var loadingState: SplatLoadingState = .idle
 
-    // MARK: - Scene Transform
+    // MARK: - Scene Transform (single mode: model rotation)
 
-    /// Global scene transform applied to all clouds
-    var sceneTransform: Transform = Transform(rotation: [.pi, 0, 0])
+    /// For single mode: rotation around X axis (default π to flip Y-up to Y-down)
+    var modelRotationX: Float = .pi {
+        didSet {
+            updateSceneTransform()
+            updateCameraForZoomToFit()
+        }
+    }
+    var modelRotationY: Float = 0 {
+        didSet {
+            updateSceneTransform()
+            updateCameraForZoomToFit()
+        }
+    }
+    var modelRotationZ: Float = 0 {
+        didSet {
+            updateSceneTransform()
+            updateCameraForZoomToFit()
+        }
+    }
+    var centerModel: Bool = false {
+        didSet {
+            updateSceneTransform()
+            updateCameraForZoomToFit()
+        }
+    }
+
+    /// Computed scene transform matrix
+    private(set) var sceneTransform: simd_float4x4 = simd_float4x4(xRotation: .radians(.pi))
+
+    private func updateSceneTransform() {
+        let rotX = simd_float4x4(xRotation: .radians(modelRotationX))
+        let rotY = simd_float4x4(yRotation: .radians(modelRotationY))
+        let rotZ = simd_float4x4(zRotation: .radians(modelRotationZ))
+        let rotation = rotZ * rotY * rotX
+        if centerModel, let firstBounds = loadedClouds.first?.bounds {
+            let translation = simd_float4x4(translation: -firstBounds.center)
+            sceneTransform = rotation * translation
+        } else {
+            sceneTransform = rotation
+        }
+    }
 
     // MARK: - Camera
 
@@ -102,22 +149,26 @@ final class UnifiedSplatViewModel {
     var cullMinNormalized: SIMD3<Float> = SIMD3(0, 0, 0)
     var cullMaxNormalized: SIMD3<Float> = SIMD3(1, 1, 1)
 
-    /// Computed culling bounding box in world space
+    /// Computed culling bounding box in model space
     var cullBoundingBox: BoundingBox3D? {
-        guard cullBoundingBoxEnabled, combinedBoundsSize != .zero else {
+        guard cullBoundingBoxEnabled, boundsSize != .zero else {
             return nil
         }
-        let actualMin = combinedBoundsCenter - combinedBoundsSize / 2
-        let minBounds = actualMin + cullMinNormalized * combinedBoundsSize
-        let maxBounds = actualMin + cullMaxNormalized * combinedBoundsSize
+        let actualMin = boundsCenter - boundsSize / 2
+        let minBounds = actualMin + cullMinNormalized * boundsSize
+        let maxBounds = actualMin + cullMaxNormalized * boundsSize
         return BoundingBox3D(minBounds: minBounds, maxBounds: maxBounds)
     }
 
-    // MARK: - Computed Bounds
+    // MARK: - Bounds
 
-    /// Combined bounds of all enabled clouds (in world space after transforms)
-    private(set) var combinedBoundsCenter: SIMD3<Float> = .zero
-    private(set) var combinedBoundsSize: SIMD3<Float> = .zero
+    /// Bounds center (single cloud's center, or combined center for multi)
+    private(set) var boundsCenter: SIMD3<Float> = .zero
+    /// Bounds size (single cloud's size, or combined size for multi)
+    private(set) var boundsSize: SIMD3<Float> = .zero
+
+    /// Incremented when bounds are computed (triggers UI updates)
+    var boundsUpdateCount: Int = 0
 
     // MARK: - Image Conversion State (for single-file mode)
 
@@ -128,10 +179,20 @@ final class UnifiedSplatViewModel {
 
     // MARK: - Resource Access (for multi-file mode)
 
-    private nonisolated(unsafe) var resourceAccess = ScopedResourceAccess()
+    private var resourceAccess = ScopedResourceAccess()
     private var loadedCloudIDs: Set<UUID> = []
 
     // MARK: - Computed Properties
+
+    /// First cloud's descriptor (for single mode info display)
+    var descriptor: SplatCloudDescriptor? {
+        loadedClouds.first?.descriptor
+    }
+
+    /// First cloud's GPU cloud (for single mode rendering)
+    var splatCloud: GPUSplatCloud<SparkSplat>? {
+        loadedClouds.first?.cloud
+    }
 
     /// Whether all loaded clouds have spherical harmonics data
     var hasSphericalHarmonicsData: Bool {
@@ -141,9 +202,16 @@ final class UnifiedSplatViewModel {
         return loadedClouds.allSatisfy(\.descriptor.hasSphericalHarmonics)
     }
 
-    /// Get enabled clouds for rendering
-    var enabledClouds: [GPUSplatCloud<SparkSplat>] {
-        loadedClouds.filter { $0.enabled && $0.cloud != nil }.compactMap(\.cloud)
+    /// Get enabled clouds for rendering (multi mode checks scene, single mode always returns all)
+    func enabledClouds(from scene: SplatScene?) -> [GPUSplatCloud<SparkSplat>] {
+        if let scene {
+            let enabledIDs = Set(scene.clouds.filter(\.enabled).map(\.id))
+            return loadedClouds
+                .filter { enabledIDs.contains($0.id) && $0.cloud != nil }
+                .compactMap(\.cloud)
+        } else {
+            return loadedClouds.compactMap(\.cloud)
+        }
     }
 
     /// Background color as float array for renderer
@@ -157,15 +225,10 @@ final class UnifiedSplatViewModel {
         useSphericalHarmonics && hasSphericalHarmonicsData
     }
 
-    /// Descriptor for single-cloud mode
-    var singleCloudDescriptor: SplatCloudDescriptor? {
-        loadedClouds.first?.descriptor
-    }
-
     // MARK: - Loading (Single File)
 
     /// Load a single splat file (for single-document mode)
-    func loadSingleFile(url: URL?, contentType: UTType?) async {
+    func load(url: URL?, contentType: UTType?) async {
         guard let url else {
             reset()
             return
@@ -176,7 +239,7 @@ final class UnifiedSplatViewModel {
             isImageConversion = true
             cameraMode = .spatialScene
             verticalAngleOfView = 45
-            sceneTransform = Transform(rotation: [0, 0, .pi])
+            modelRotationZ = .pi
             #if os(macOS)
             sourceImage = NSImage(contentsOf: url)
             #else
@@ -192,9 +255,9 @@ final class UnifiedSplatViewModel {
                 let descriptor = try SplatCloudDescriptor(url: url)
 
                 // Compute bounds
-                var bounds: BoundingBox?
                 if let computedBounds = try? await descriptor.computeBounds() {
-                    bounds = computedBounds
+                    boundsCenter = computedBounds.center
+                    boundsSize = computedBounds.size
                 }
 
                 // Only auto-load if not a large file (< 1M splats)
@@ -205,7 +268,6 @@ final class UnifiedSplatViewModel {
                     ImmersiveState.shared.splatCloud = gpuCloud
                     #endif
                 } else {
-                    // Store descriptor but don't load yet (large file)
                     gpuCloud = nil
                 }
 
@@ -214,10 +276,10 @@ final class UnifiedSplatViewModel {
                     displayName: url.deletingPathExtension().lastPathComponent,
                     cloud: gpuCloud,
                     descriptor: descriptor,
-                    bounds: bounds
+                    bounds: BoundingBox(min: boundsCenter - boundsSize / 2, max: boundsCenter + boundsSize / 2)
                 )
                 loadedClouds = [loadedCloud]
-                updateCombinedBounds()
+                updateSceneTransform()
                 loadingState = .ready
             } catch {
                 loadingState = .error("Failed to load splat file: \(error.localizedDescription)")
@@ -226,9 +288,9 @@ final class UnifiedSplatViewModel {
     }
 
     /// Force load the splat cloud (for large files that weren't auto-loaded)
-    func loadSplatCloudIfNeeded() {
+    func loadSplatCloud() {
         guard loadedClouds.count == 1,
-              let first = loadedClouds.first,
+              var first = loadedClouds.first,
               first.cloud == nil
         else {
             return
@@ -236,16 +298,14 @@ final class UnifiedSplatViewModel {
 
         do {
             let gpuCloud: GPUSplatCloud<SparkSplat> = try first.descriptor.loadGPUSplatCloud()
-            loadedClouds[0] = LoadedSplatCloud(
+            first = LoadedSplatCloud(
                 id: first.id,
                 displayName: first.displayName,
                 cloud: gpuCloud,
                 descriptor: first.descriptor,
-                bounds: first.bounds,
-                enabled: first.enabled,
-                opacity: first.opacity,
-                transform: first.transform
+                bounds: first.bounds
             )
+            loadedClouds = [first]
 
             #if os(visionOS)
             ImmersiveState.shared.splatCloud = gpuCloud
@@ -257,18 +317,21 @@ final class UnifiedSplatViewModel {
 
     // MARK: - Loading (Multi-Cloud Scene)
 
-    /// Load clouds from a scene document (for multi-cloud mode)
-    func loadFromScene(_ scene: SplatScene) {
+    /// Check if we need to reload (structural change) vs just update properties
+    func needsReload(for scene: SplatScene) -> Bool {
         let sceneCloudIDs = Set(scene.clouds.map(\.id))
+        return sceneCloudIDs != loadedCloudIDs
+    }
 
+    /// Load clouds from a scene document (for multi-cloud mode)
+    func loadClouds(from scene: SplatScene) {
         // Only reload if structural change (add/remove clouds)
-        guard sceneCloudIDs != loadedCloudIDs else {
-            // Just update transforms/settings from existing clouds
-            updateCloudSettings(from: scene)
+        guard needsReload(for: scene) else {
             return
         }
 
-        loadedCloudIDs = sceneCloudIDs
+        let targetCloudIDs = Set(scene.clouds.map(\.id))
+        loadedCloudIDs = targetCloudIDs
 
         if scene.clouds.isEmpty {
             loadingState = .idle
@@ -290,18 +353,12 @@ final class UnifiedSplatViewModel {
                         modelTransform: resolvedCloud.transform.matrix
                     )
 
-                    // Find matching scene cloud for settings
-                    let sceneCloud = scene.clouds.first { $0.id == resolvedCloud.id }
-
                     loaded.append(LoadedSplatCloud(
                         id: resolvedCloud.id,
                         displayName: resolvedCloud.displayName ?? resolvedCloud.url.lastPathComponent,
                         cloud: gpuCloud,
                         descriptor: descriptor,
-                        bounds: nil,
-                        enabled: sceneCloud?.enabled ?? true,
-                        opacity: sceneCloud?.opacity ?? 1.0,
-                        transform: sceneCloud?.transform ?? .identity
+                        bounds: nil
                     ))
                 } catch {
                     // Skip clouds that fail to load
@@ -310,16 +367,9 @@ final class UnifiedSplatViewModel {
 
             loadedClouds = loaded
 
-            // Apply scene settings
-            sceneTransform = scene.sceneTransform
             if let camera = scene.camera {
                 cameraMatrix = camera.matrix
                 verticalAngleOfView = camera.verticalAngleOfView
-            }
-            useSphericalHarmonics = scene.renderSettings.useSphericalHarmonics
-            let bg = scene.renderSettings.backgroundColor
-            if bg.count == 4 {
-                backgroundColor = Color(red: Double(bg[0]), green: Double(bg[1]), blue: Double(bg[2]), opacity: Double(bg[3]))
             }
 
             loadingState = loaded.isEmpty ? .idle : .ready
@@ -331,22 +381,6 @@ final class UnifiedSplatViewModel {
         } catch {
             loadingState = .error("Failed to load clouds: \(error.localizedDescription)")
         }
-    }
-
-    /// Update cloud settings from scene without reloading
-    private func updateCloudSettings(from scene: SplatScene) {
-        for i in loadedClouds.indices {
-            if let sceneCloud = scene.clouds.first(where: { $0.id == loadedClouds[i].id }) {
-                loadedClouds[i].enabled = sceneCloud.enabled
-                loadedClouds[i].opacity = sceneCloud.opacity
-                loadedClouds[i].transform = sceneCloud.transform
-
-                // Update GPU cloud transform
-                loadedClouds[i].cloud?.modelTransform = sceneCloud.transform.matrix
-                loadedClouds[i].cloud?.opacity = sceneCloud.opacity
-            }
-        }
-        sceneTransform = scene.sceneTransform
     }
 
     // MARK: - Image Conversion
@@ -386,7 +420,7 @@ final class UnifiedSplatViewModel {
             loadingState = .converting(status: "Loading converted splat cloud...")
 
             convertedURL = outputURL
-            await loadSingleFile(url: outputURL, contentType: .ply)
+            await load(url: outputURL, contentType: .ply)
         } catch {
             loadingState = .error("Conversion failed: \(error.localizedDescription)")
         }
@@ -407,22 +441,24 @@ final class UnifiedSplatViewModel {
             }
         }
         if didComputeAny {
-            updateCombinedBounds()
+            boundsUpdateCount += 1
         }
     }
 
-    /// Update combined bounds from all enabled clouds
-    func updateCombinedBounds() {
+    /// Update combined bounds from all enabled clouds (for multi mode)
+    func updateCombinedBounds(for scene: SplatScene) {
         var minBounds = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
         var maxBounds = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
         var hasBounds = false
 
-        for cloud in loadedClouds where cloud.enabled {
-            guard let bounds = cloud.bounds else {
+        for cloud in scene.clouds where cloud.enabled {
+            guard let loadedCloud = loadedClouds.first(where: { $0.id == cloud.id }),
+                  let bounds = loadedCloud.bounds
+            else {
                 continue
             }
 
-            let transform = sceneTransform.matrix * cloud.transform.matrix
+            let transform = scene.sceneTransform.matrix * cloud.transform.matrix
             let corners: [SIMD3<Float>] = [
                 SIMD3(bounds.min.x, bounds.min.y, bounds.min.z),
                 SIMD3(bounds.max.x, bounds.min.y, bounds.min.z),
@@ -443,11 +479,11 @@ final class UnifiedSplatViewModel {
         }
 
         if hasBounds {
-            combinedBoundsCenter = (minBounds + maxBounds) / 2
-            combinedBoundsSize = maxBounds - minBounds
+            boundsCenter = (minBounds + maxBounds) / 2
+            boundsSize = maxBounds - minBounds
         } else {
-            combinedBoundsCenter = .zero
-            combinedBoundsSize = .zero
+            boundsCenter = .zero
+            boundsSize = .zero
         }
 
         if zoomToFit {
@@ -464,24 +500,78 @@ final class UnifiedSplatViewModel {
         guard viewSize.width > 0, viewSize.height > 0 else {
             return
         }
-        guard combinedBoundsSize != .zero else {
+        guard boundsSize != .zero else {
             return
         }
+
+        if mode == .single {
+            updateCameraForZoomToFitSingle()
+        } else {
+            updateCameraForZoomToFitMulti()
+        }
+    }
+
+    private func updateCameraForZoomToFitSingle() {
+        // Get the maximum extent of the bounding box (after rotation)
+        let rotX = simd_float4x4(xRotation: .radians(modelRotationX))
+        let rotY = simd_float4x4(yRotation: .radians(modelRotationY))
+        let rotZ = simd_float4x4(zRotation: .radians(modelRotationZ))
+        let rotation = rotZ * rotY * rotX
+
+        // Transform the 8 corners of the bounding box and find the extents
+        let center = centerModel ? SIMD3<Float>.zero : boundsCenter
+        let halfSize = boundsSize / 2
+        let corners: [SIMD3<Float>] = [
+            center + [-halfSize.x, -halfSize.y, -halfSize.z],
+            center + [halfSize.x, -halfSize.y, -halfSize.z],
+            center + [-halfSize.x, halfSize.y, -halfSize.z],
+            center + [halfSize.x, halfSize.y, -halfSize.z],
+            center + [-halfSize.x, -halfSize.y, halfSize.z],
+            center + [halfSize.x, -halfSize.y, halfSize.z],
+            center + [-halfSize.x, halfSize.y, halfSize.z],
+            center + [halfSize.x, halfSize.y, halfSize.z]
+        ]
+
+        var maxX: Float = 0
+        var maxY: Float = 0
+        var maxZ: Float = 0
+        for corner in corners {
+            let transformed = (rotation * SIMD4<Float>(corner, 1)).xyz
+            maxX = max(maxX, abs(transformed.x))
+            maxY = max(maxY, abs(transformed.y))
+            maxZ = max(maxZ, abs(transformed.z))
+        }
+
+        let modelWidth = maxX * 2
+        let modelHeight = maxY * 2
+        let modelDepth = maxZ * 2
 
         let screenAspect = Float(viewSize.width / viewSize.height)
         let fovRadians = Float(verticalAngleOfView) * .pi / 180
         let halfFovTan = tan(fovRadians / 2)
 
-        let modelWidth = combinedBoundsSize.x
-        let modelHeight = combinedBoundsSize.y
-        let modelDepth = combinedBoundsSize.z
+        let distanceForHeight = (modelHeight / 2) / halfFovTan
+        let distanceForWidth = (modelWidth / 2) / (halfFovTan * screenAspect)
+        let distance = (max(distanceForHeight, distanceForWidth) + modelDepth / 2) / 0.9
+
+        let modelCenter = centerModel ? SIMD3<Float>.zero : (rotation * SIMD4<Float>(boundsCenter, 1)).xyz
+        cameraMatrix = .init(translation: [modelCenter.x, modelCenter.y, modelCenter.z + distance])
+    }
+
+    private func updateCameraForZoomToFitMulti() {
+        let screenAspect = Float(viewSize.width / viewSize.height)
+        let fovRadians = Float(verticalAngleOfView) * .pi / 180
+        let halfFovTan = tan(fovRadians / 2)
+
+        let modelWidth = boundsSize.x
+        let modelHeight = boundsSize.y
+        let modelDepth = boundsSize.z
 
         let distanceForHeight = (modelHeight / 2) / halfFovTan
         let distanceForWidth = (modelWidth / 2) / (halfFovTan * screenAspect)
-
         let distance = (max(distanceForHeight, distanceForWidth) + modelDepth / 2) / 0.9
 
-        cameraMatrix = .init(translation: [combinedBoundsCenter.x, combinedBoundsCenter.y, combinedBoundsCenter.z + distance])
+        cameraMatrix = .init(translation: [boundsCenter.x, boundsCenter.y, boundsCenter.z + distance])
     }
 
     // MARK: - Reset
@@ -492,14 +582,16 @@ final class UnifiedSplatViewModel {
         convertedURL = nil
         sourceImage = nil
         isImageConversion = false
-        combinedBoundsCenter = .zero
-        combinedBoundsSize = .zero
+        boundsCenter = .zero
+        boundsSize = .zero
         resourceAccess.stopAccessing()
         loadedCloudIDs = []
     }
 
-    nonisolated deinit {
-        resourceAccess.stopAccessing()
+    deinit {
+        MainActor.assumeIsolated {
+            resourceAccess.stopAccessing()
+        }
     }
 }
 #endif
