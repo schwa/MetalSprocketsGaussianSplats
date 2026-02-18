@@ -384,7 +384,8 @@ struct UnifiedDocumentView: View {
         case .single:
             UnifiedInspectorView(
                 singleViewModel: singleViewModel,
-                tab: $inspectorTab
+                tab: $inspectorTab,
+                showBoundingBoxes: $showBoundingBoxes
             )
 
         case .multi:
@@ -419,6 +420,7 @@ struct UnifiedDocumentView: View {
                         selectedCloudID = nil
                     }
                 },
+                showBoundingBoxes: $showBoundingBoxes,
                 cullBoundingBoxEnabled: $cullBoundingBoxEnabled,
                 cullMinBounds: $cullMinBounds,
                 cullMaxBounds: $cullMaxBounds
@@ -454,16 +456,6 @@ struct UnifiedDocumentView: View {
                 showScreenshotSheet = true
             }
         }
-
-        // Bounding Boxes toggle (both modes)
-        #if os(macOS)
-        ToolbarItem(placement: .primaryAction) {
-            Toggle(isOn: $showBoundingBoxes) {
-                Label("Bounding Boxes", systemImage: "cube")
-            }
-            .toggleStyle(.button)
-        }
-        #endif
 
         // Inspector toggle (both modes)
         ToolbarItem(placement: .primaryAction) {

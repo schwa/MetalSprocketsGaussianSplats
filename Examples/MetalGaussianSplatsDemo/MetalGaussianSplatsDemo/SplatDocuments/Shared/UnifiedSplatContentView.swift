@@ -197,6 +197,9 @@ struct UnifiedInspectorView: View {
     @Binding var selectedCloud: SplatScene.CloudReference?
     var onDeleteCloud: (() -> Void)?
 
+    // Shared render state
+    @Binding var showBoundingBoxes: Bool
+
     // Shared culling state
     @Binding var cullBoundingBoxEnabled: Bool
     @Binding var cullMinBounds: SIMD3<Float>
@@ -431,6 +434,7 @@ struct UnifiedInspectorView: View {
             useSphericalHarmonics: useSphericalHarmonicsBinding,
             sphericalHarmonicsDisabled: sphericalHarmonicsIsDisabled,
             sphericalHarmonicsWarning: sphericalHarmonicsWarning,
+            showBoundingBoxes: $showBoundingBoxes,
             debugModeEnabled: debugModeEnabledBinding,
             debugMode: debugModeBinding
         ) {
@@ -535,6 +539,7 @@ extension UnifiedInspectorView {
     init(
         singleViewModel: SplatDocumentViewModel,
         tab: Binding<UnifiedInspectorTab>,
+        showBoundingBoxes: Binding<Bool> = .constant(false),
         cullBoundingBoxEnabled: Binding<Bool> = .constant(false),
         cullMinBounds: Binding<SIMD3<Float>> = .constant(.zero),
         cullMaxBounds: Binding<SIMD3<Float>> = .constant(.one)
@@ -546,6 +551,7 @@ extension UnifiedInspectorView {
         self._document = .constant(nil)
         self._selectedCloud = .constant(nil)
         self.onDeleteCloud = nil
+        self._showBoundingBoxes = showBoundingBoxes
         self._cullBoundingBoxEnabled = cullBoundingBoxEnabled
         self._cullMinBounds = cullMinBounds
         self._cullMaxBounds = cullMaxBounds
@@ -558,6 +564,7 @@ extension UnifiedInspectorView {
         selectedCloud: Binding<SplatScene.CloudReference?>,
         tab: Binding<UnifiedInspectorTab>,
         onDeleteCloud: (() -> Void)? = nil,
+        showBoundingBoxes: Binding<Bool>,
         cullBoundingBoxEnabled: Binding<Bool>,
         cullMinBounds: Binding<SIMD3<Float>>,
         cullMaxBounds: Binding<SIMD3<Float>>
@@ -569,6 +576,7 @@ extension UnifiedInspectorView {
         self._document = document
         self._selectedCloud = selectedCloud
         self.onDeleteCloud = onDeleteCloud
+        self._showBoundingBoxes = showBoundingBoxes
         self._cullBoundingBoxEnabled = cullBoundingBoxEnabled
         self._cullMinBounds = cullMinBounds
         self._cullMaxBounds = cullMaxBounds

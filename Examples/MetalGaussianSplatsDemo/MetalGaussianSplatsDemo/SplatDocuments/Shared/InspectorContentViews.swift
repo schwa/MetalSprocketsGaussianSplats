@@ -291,6 +291,7 @@ struct UnifiedRenderContent<CullingContent: View>: View {
     @Binding var useSphericalHarmonics: Bool
     var sphericalHarmonicsDisabled: Bool = false
     var sphericalHarmonicsWarning: String?
+    @Binding var showBoundingBoxes: Bool
     @Binding var debugModeEnabled: Bool
     @Binding var debugMode: SplatDebugMode
     @ViewBuilder var cullingContent: () -> CullingContent
@@ -307,6 +308,8 @@ struct UnifiedRenderContent<CullingContent: View>: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
+
+            Toggle("Show Bounding Boxes", isOn: $showBoundingBoxes)
         }
 
         Section("Debug Visualization") {
