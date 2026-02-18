@@ -1,6 +1,9 @@
+import os
 import simd
 import SwiftUI
 import UniformTypeIdentifiers
+
+private let logger = Logger(subsystem: "com.schwa.MetalGaussianSplatsDemo", category: "SplatSceneDocument")
 
 /// A document representing a splat scene with multiple clouds
 struct SplatSceneDocument: FileDocument {
@@ -19,10 +22,20 @@ struct SplatSceneDocument: FileDocument {
 
     init(configuration: ReadConfiguration) throws {
         guard let data = configuration.file.regularFileContents else {
+            logger.error("Failed to read file contents")
             throw CocoaError(.fileReadCorruptFile)
         }
         let decoder = JSONDecoder()
-        self.scene = try decoder.decode(SplatScene.self, from: data)
+        do {
+            self.scene = try decoder.decode(SplatScene.self, from: data)
+        } catch {
+            if let jsonString = String(data: data, encoding: .utf8) {
+                logger.error("Failed to decode SplatScene: \(error)\nJSON:\n\(jsonString)")
+            } else {
+                logger.error("Failed to decode SplatScene: \(error)")
+            }
+            throw error
+        }
     }
 
     func fileWrapper(configuration _: WriteConfiguration) throws -> FileWrapper {

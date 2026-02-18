@@ -37,6 +37,84 @@ struct Transform: Codable, Sendable, Equatable {
     }
 
     static let identity = Self()
+
+    // MARK: - Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case translation, rotation
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        translation = try container.decodeIfPresent(SIMD3<Float>.self, forKey: .translation) ?? .zero
+        rotation = try container.decode(RotationValue.self, forKey: .rotation).radians
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(translation, forKey: .translation)
+        try container.encode(rotation, forKey: .rotation)
+    }
+}
+
+// MARK: - Rotation Value (supports both radians and degrees)
+
+/// A rotation value that can be decoded from either radians (floats) or degrees (strings like "45°")
+/// Each component can be independently a float (radians) or string (degrees)
+private struct RotationValue: Decodable {
+    let radians: SIMD3<Float>
+
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+
+        guard container.count == 3 else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Rotation must have exactly 3 elements"
+            )
+        }
+
+        var values: [Float] = []
+        for _ in 0..<3 {
+            // Try float first (radians)
+            if let floatValue = try? container.decode(Float.self) {
+                values.append(floatValue)
+            }
+            // Try string (degrees)
+            else if let stringValue = try? container.decode(String.self) {
+                values.append(try Self.parseAngle(stringValue))
+            } else {
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Rotation element must be a number (radians) or string like \"45°\" (degrees)"
+                )
+            }
+        }
+
+        radians = SIMD3<Float>(values[0], values[1], values[2])
+    }
+
+    /// Parse an angle string like "45°", "-90°", "180.5°"
+    private static func parseAngle(_ string: String) throws -> Float {
+        let trimmed = string.trimmingCharacters(in: .whitespaces)
+
+        // Regex: optional minus, digits, optional decimal, required degree symbol
+        let pattern = #"^(-?\d+\.?\d*)°$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+              let range = Range(match.range(at: 1), in: trimmed),
+              let degrees = Float(String(trimmed[range]))
+        else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Invalid angle format: '\(string)'. Expected format like \"45°\""
+                )
+            )
+        }
+
+        return degrees * .pi / 180
+    }
 }
 
 // MARK: - SplatScene Model
@@ -48,31 +126,6 @@ struct SplatScene: Codable, Sendable {
     var sceneTransform = Transform(rotation: [.pi, 0, 0])  // Default X rotation of 180°
     var camera: CameraState?
     var renderSettings = RenderSettings()
-
-    // Custom decoding to handle missing keys from older documents
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        clouds = try container.decodeIfPresent([CloudReference].self, forKey: .clouds) ?? []
-        // Handle both old (matrix) and new (Transform) format
-        if let transform = try? container.decodeIfPresent(Transform.self, forKey: .sceneTransform) {
-            sceneTransform = transform
-        } else if let matrix = try? container.decodeIfPresent(simd_float4x4.self, forKey: .sceneTransform) {
-            sceneTransform = Transform(matrix: matrix)
-        } else {
-            sceneTransform = Transform(rotation: [.pi, 0, 0])
-        }
-        camera = try container.decodeIfPresent(CameraState.self, forKey: .camera)
-        renderSettings = try container.decodeIfPresent(RenderSettings.self, forKey: .renderSettings) ?? RenderSettings()
-    }
-
-    init() {
-        // Default initializer
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case version, clouds, sceneTransform, camera, renderSettings
-    }
 
     struct CloudReference: Codable, Identifiable, Sendable, Equatable {
         var id = UUID()
