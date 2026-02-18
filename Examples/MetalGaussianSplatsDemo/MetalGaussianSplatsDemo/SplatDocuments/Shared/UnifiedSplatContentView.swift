@@ -338,6 +338,36 @@ struct UnifiedInspectorView: View {
 
     // MARK: - Camera Content
 
+    /// Get the bounds center for the selected cloud (multi mode) or the overall bounds (single mode)
+    private var selectedCloudBoundsCenter: SIMD3<Float> {
+        guard mode == .multi,
+              let cloud = selectedCloud,
+              let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloud.id }),
+              let bounds = loadedCloud.bounds
+        else {
+            return viewModel.boundsCenter
+        }
+        // Transform the bounds center by the cloud's transform
+        let localCenter = bounds.center
+        let worldCenter = (cloud.transform.matrix * SIMD4<Float>(localCenter, 1)).xyz
+        return worldCenter
+    }
+
+    /// Check if we have valid bounds for teleporting
+    private var hasTeleportTarget: Bool {
+        if mode == .multi {
+            // In multi mode, need a selected cloud with bounds
+            guard let cloud = selectedCloud,
+                  let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloud.id }),
+                  loadedCloud.bounds != nil
+            else {
+                return false
+            }
+            return true
+        }
+        return viewModel.boundsSize != .zero
+    }
+
     @ViewBuilder
     private var cameraContent: some View {
         UnifiedCameraContent(
@@ -346,7 +376,10 @@ struct UnifiedInspectorView: View {
             verticalAngleOfView: $viewModel.verticalAngleOfView,
             cameraMatrix: $viewModel.cameraMatrix,
             viewSize: viewModel.viewSize,
-            zoomToFitDisabled: viewModel.boundsSize == .zero
+            zoomToFitDisabled: viewModel.boundsSize == .zero,
+            boundsCenter: selectedCloudBoundsCenter,
+            boundsSize: viewModel.boundsSize,
+            teleportDisabled: !hasTeleportTarget
         )
     }
 

@@ -150,6 +150,8 @@ struct UnifiedDocumentView: View {
                 viewModel.loadClouds(from: doc.scene)
                 viewModel.updateCombinedBounds(for: doc.scene)
             }
+            // Ensure there's always a selection if clouds exist
+            ensureSelection()
         }
         .onChange(of: multiDocument?.scene.sceneTransform) {
             guard let doc = multiDocument else {
@@ -587,6 +589,17 @@ struct UnifiedDocumentView: View {
         }
         multiDocument?.scene.clouds[cloudIndex].transform.translation += offset
         dragOffsets[cloudID] = nil
+    }
+
+    /// Ensure there's always a cloud selected if clouds exist
+    private func ensureSelection() {
+        guard let doc = multiDocument else {
+            return
+        }
+        // If current selection is invalid or nil, select the first cloud
+        if selectedCloudID == nil || !doc.scene.clouds.contains(where: { $0.id == selectedCloudID }) {
+            selectedCloudID = doc.scene.clouds.first?.id
+        }
     }
 
     private func handleAddClouds(_ result: Result<[URL], Error>) {

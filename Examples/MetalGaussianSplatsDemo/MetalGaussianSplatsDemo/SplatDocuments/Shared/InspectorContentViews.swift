@@ -1,4 +1,5 @@
 #if os(iOS) || os(macOS)
+import GeometryLite3D
 import MetalSprocketsGaussianSplats
 import simd
 import SwiftUI
@@ -170,6 +171,9 @@ struct UnifiedCameraContent: View {
     @Binding var cameraMatrix: simd_float4x4
     var viewSize: CGSize
     var zoomToFitDisabled: Bool = false
+    var boundsCenter: SIMD3<Float> = .zero
+    var boundsSize: SIMD3<Float> = .zero
+    var teleportDisabled: Bool = false
 
     @Environment(\.displayScale) private var displayScale
 
@@ -183,6 +187,11 @@ struct UnifiedCameraContent: View {
             .pickerStyle(.segmented)
             Toggle("Zoom to Fit", isOn: $zoomToFit)
                 .disabled(cameraMode != .object || zoomToFitDisabled)
+
+            Button("Teleport to Center") {
+                teleportToCenter()
+            }
+            .disabled(teleportDisabled)
         }
 
         cameraTransformSection
@@ -195,6 +204,11 @@ struct UnifiedCameraContent: View {
         }
 
         viewportSection
+    }
+
+    private func teleportToCenter() {
+        // Position camera at bounds center, looking forward (-Z)
+        cameraMatrix = simd_float4x4(translation: boundsCenter)
     }
 
     @ViewBuilder
