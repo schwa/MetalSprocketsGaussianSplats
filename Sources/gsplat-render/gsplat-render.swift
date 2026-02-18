@@ -294,23 +294,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             throw ValidationError("Unsupported file format: .\(fileExtension)")
         }
 
-        // Debug: print SH coefficients for first few splats
-        if detectedSHDegree > 0, !shCoefficients.isEmpty {
-            let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
-            print("SH Debug (\(fileExtension)): degree=\(detectedSHDegree), floatsPerSplat=\(floatsPerSplat)")
-            for splatIdx in [0, 1, 100, 1_000] {
-                if splatIdx >= splats.count { continue }
-                let baseOffset = splatIdx * floatsPerSplat
-                print("  Splat \(splatIdx) first 3 coeffs:")
-                for i in 0..<min(3, floatsPerSplat / 3) {
-                    let r = shCoefficients[baseOffset + i * 3]
-                    let g = shCoefficients[baseOffset + i * 3 + 1]
-                    let b = shCoefficients[baseOffset + i * 3 + 2]
-                    print("    [\(i)]: R=\(String(format: "%+.4f", r)), G=\(String(format: "%+.4f", g)), B=\(String(format: "%+.4f", b))")
-                }
-            }
-        }
-
         return SplatLoadResult(splats: splats, shCoefficients: shCoefficients, shDegree: detectedSHDegree)
     }
 

@@ -76,7 +76,6 @@ struct SplashView: View {
                     if case let .success(urls) = result, let url = urls.first {
                         // Start accessing the security-scoped resource
                         guard url.startAccessingSecurityScopedResource() else {
-                            print("❌ Failed to access security-scoped resource: \(url)")
                             return
                         }
                         openFile(at: url)
@@ -134,7 +133,7 @@ struct SplashView: View {
                 try await openDocument(at: url)
                 dismissWindow(id: "splash")
             } catch {
-                print("❌ Failed to open document at \(url): \(error)")
+                // Document open failed - system will show alert
             }
         }
     }

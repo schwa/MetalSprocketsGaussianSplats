@@ -22,26 +22,7 @@ struct SplatSceneDocument: FileDocument {
             throw CocoaError(.fileReadCorruptFile)
         }
         let decoder = JSONDecoder()
-        do {
-            self.scene = try decoder.decode(SplatScene.self, from: data)
-        } catch {
-            print("❌ Failed to decode SplatScene: \(error)")
-            if let decodingError = error as? DecodingError {
-                switch decodingError {
-                case let .keyNotFound(key, context):
-                    print("  Key not found: \(key.stringValue), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-                case let .typeMismatch(type, context):
-                    print("  Type mismatch: expected \(type), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-                case let .valueNotFound(type, context):
-                    print("  Value not found: \(type), path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-                case .dataCorrupted(let context):
-                    print("  Data corrupted: \(context.debugDescription)")
-                @unknown default:
-                    break
-                }
-            }
-            throw error
-        }
+        self.scene = try decoder.decode(SplatScene.self, from: data)
     }
 
     func fileWrapper(configuration _: WriteConfiguration) throws -> FileWrapper {
@@ -78,8 +59,7 @@ final class ScopedResourceAccess {
                     isStale: isStale
                 ))
             } catch {
-                // Log but continue with other clouds
-                print("Failed to resolve cloud \(cloud.id): \(error)")
+                // Continue with other clouds if one fails to resolve
             }
         }
 

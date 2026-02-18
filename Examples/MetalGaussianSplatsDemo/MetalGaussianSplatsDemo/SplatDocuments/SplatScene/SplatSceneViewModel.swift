@@ -194,7 +194,7 @@ final class SplatSceneViewModel {
                         descriptor: descriptor
                     ))
                 } catch {
-                    print("Failed to load cloud \(resolvedCloud.url): \(error)")
+                    // Skip clouds that fail to load
                 }
             }
 
@@ -226,7 +226,7 @@ final class SplatSceneViewModel {
                 loadedClouds[i].bounds = bounds
                 didComputeAny = true
             } catch {
-                print("Failed to compute bounds for \(loadedClouds[i].displayName): \(error)")
+                // Skip bounds computation for clouds that fail
             }
         }
         if didComputeAny {
