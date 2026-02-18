@@ -30,10 +30,10 @@ struct UnifiedDocumentView: View {
     @State private var selectedCloudID: UUID?
     @State private var inspectorTab: UnifiedInspectorTab = .cloud
 
-    // Single mode: inspector visibility
+    // Inspector visibility (both modes)
     @State private var showInspector = true
 
-    // Multi mode: column visibility
+    // Multi mode: sidebar visibility
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     // Single mode specific
@@ -118,13 +118,16 @@ struct UnifiedDocumentView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             cloudListSidebar
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 300)
-        } content: {
-            mainContent
-                .navigationSplitViewColumnWidth(min: 400, ideal: 600)
         } detail: {
-            inspectorContent
-                .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
+            mainContent
+                .inspector(isPresented: $showInspector) {
+                    inspectorContent
+                        #if !os(visionOS)
+                        .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
+                        #endif
+                }
         }
+        .focusedSceneValue(\.inspectorVisibility, $showInspector)
         .environment(viewModel)
         .sheet(isPresented: $showScreenshotSheet) {
             ScreenshotSheet(
@@ -451,18 +454,9 @@ struct UnifiedDocumentView: View {
 
         // Inspector toggle (both modes)
         ToolbarItem(placement: .primaryAction) {
-            Button("Inspector", systemImage: "sidebar.right") {
+            Button(showInspector ? "Hide Inspector" : "Show Inspector", systemImage: "sidebar.right") {
                 withAnimation {
-                    switch mode {
-                    case .single:
-                        showInspector.toggle()
-                    case .multi:
-                        if columnVisibility == .all {
-                            columnVisibility = .doubleColumn
-                        } else {
-                            columnVisibility = .all
-                        }
-                    }
+                    showInspector.toggle()
                 }
             }
         }

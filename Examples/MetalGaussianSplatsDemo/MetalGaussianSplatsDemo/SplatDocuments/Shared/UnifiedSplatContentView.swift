@@ -73,7 +73,7 @@ struct UnifiedSplatContentView: View {
             cameraControlledRenderView
 
             // Bounding box overlay (multi-cloud mode only)
-            if showBoundingBoxes, mode == .multi {
+            if showBoundingBoxes {
                 boundingBoxOverlay
             }
         }

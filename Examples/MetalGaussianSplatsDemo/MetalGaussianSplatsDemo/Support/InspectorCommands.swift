@@ -19,12 +19,15 @@ struct InspectorCommands: Commands {
     @FocusedBinding(\.inspectorVisibility)
     private var showInspector: Bool?
 
+    private var menuTitle: String {
+        (showInspector ?? false) ? "Hide Inspector" : "Show Inspector"
+    }
+
     var body: some Commands {
         CommandGroup(after: .toolbar) {
-            Toggle("Show Inspector", isOn: Binding(
-                get: { showInspector ?? false },
-                set: { showInspector = $0 }
-            ))
+            Button(menuTitle) {
+                showInspector?.toggle()
+            }
             .keyboardShortcut("i", modifiers: [.command, .option])
             .disabled(showInspector == nil)
 
