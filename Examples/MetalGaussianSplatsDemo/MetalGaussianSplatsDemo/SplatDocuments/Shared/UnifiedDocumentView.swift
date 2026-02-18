@@ -392,18 +392,13 @@ struct UnifiedDocumentView: View {
         case .multi:
             let selectedCloud: Binding<SplatScene.CloudReference?> = Binding(
                 get: {
-                    guard let selectedID = selectedCloudID,
-                          let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID })
-                    else {
+                    guard let selectedID = selectedCloudID, let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID }) else {
                         return nil
                     }
                     return multiDocument?.scene.clouds[index]
                 },
                 set: { newValue in
-                    guard let newValue,
-                          let selectedID = selectedCloudID,
-                          let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID })
-                    else {
+                    guard let newValue, let selectedID = selectedCloudID, let index = multiDocument?.scene.clouds.firstIndex(where: { $0.id == selectedID }) else {
                         return
                     }
                     multiDocument?.scene.clouds[index] = newValue
@@ -534,13 +529,9 @@ struct UnifiedDocumentView: View {
     }
 
     private func handleAxisDrag(cloudID: UUID, axis: Int, screenDelta: CGSize, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4) {
-        guard let doc = multiDocument,
-              let cloudIndex = doc.scene.clouds.firstIndex(where: { $0.id == cloudID }),
-              let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloudID })
-        else {
+        guard let doc = multiDocument, let cloudIndex = doc.scene.clouds.firstIndex(where: { $0.id == cloudID }), let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloudID }) else {
             return
         }
-
         let bounds = loadedCloud.bounds ?? BoundingBox(min: .zero, max: .one)
         let modelMatrix = doc.scene.sceneTransform.matrix * doc.scene.clouds[cloudIndex].transform.matrix
         let worldCenter = modelMatrix * SIMD4<Float>(bounds.center, 1)
@@ -564,9 +555,7 @@ struct UnifiedDocumentView: View {
             )
         }
 
-        guard let p0 = toScreen(worldCenter),
-              let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0))
-        else {
+        guard let p0 = toScreen(worldCenter), let p1 = toScreen(worldCenter + SIMD4<Float>(axisNorm, 0)) else {
             return
         }
 
@@ -593,9 +582,7 @@ struct UnifiedDocumentView: View {
     }
 
     private func commitDrag(cloudID: UUID) {
-        guard let offset = dragOffsets[cloudID], offset != .zero,
-              let cloudIndex = multiDocument?.scene.clouds.firstIndex(where: { $0.id == cloudID })
-        else {
+        guard let offset = dragOffsets[cloudID], offset != .zero, let cloudIndex = multiDocument?.scene.clouds.firstIndex(where: { $0.id == cloudID }) else {
             return
         }
         multiDocument?.scene.clouds[cloudIndex].transform.translation += offset
