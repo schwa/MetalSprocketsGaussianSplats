@@ -139,6 +139,8 @@ struct SplatScene: Codable, Sendable {
         var displayName: String?
         /// Cloud opacity (0.0 - 1.0)
         var opacity: Float = 1.0
+        /// Debug color for this cloud (shown in debug mode)
+        var debugColor: SIMD3<Float> = [1, 1, 1]
 
         /// Resolve bookmark to URL
         /// - Returns: The resolved URL and whether the bookmark was stale
@@ -187,7 +189,7 @@ struct SplatScene: Codable, Sendable {
         // Codable with custom keys for transform
         // swiftlint:disable:next nesting
         enum CodingKeys: String, CodingKey {
-            case id, bookmarkData, transform, enabled, displayName, opacity
+            case id, bookmarkData, transform, enabled, displayName, opacity, debugColor
         }
     }
 

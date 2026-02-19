@@ -677,11 +677,36 @@ struct CloudListRow: View {
     @Binding var cloud: SplatScene.CloudReference
     var onDelete: () -> Void
 
+    private var debugColorBinding: Binding<Color> {
+        Binding(
+            get: {
+                Color(
+                    red: Double(cloud.debugColor.x),
+                    green: Double(cloud.debugColor.y),
+                    blue: Double(cloud.debugColor.z)
+                )
+            },
+            set: { newColor in
+                if let components = newColor.cgColor?.components, components.count >= 3 {
+                    cloud.debugColor = SIMD3<Float>(
+                        Float(components[0]),
+                        Float(components[1]),
+                        Float(components[2])
+                    )
+                }
+            }
+        )
+    }
+
     var body: some View {
         HStack {
             Toggle("", isOn: $cloud.enabled)
                 .labelsHidden()
                 .toggleStyle(.checkbox)
+
+            ColorPicker("", selection: debugColorBinding, supportsOpacity: false)
+                .labelsHidden()
+                .frame(width: 24)
 
             Text(cloud.displayName ?? "Unknown")
                 .lineLimit(1)
