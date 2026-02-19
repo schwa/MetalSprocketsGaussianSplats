@@ -88,12 +88,11 @@ public struct SparkSplatDebugRenderPipeline: Element {
     var boundingBox: BoundingBox3D?
     var debugParams: DebugParams
 
-    @MSState
-    private var sortManager: AsyncSortManager<SparkSplat>?
+    var sortManager: AsyncSortManager<SparkSplat>
     @MSState
     private var sortedIndices: SplatIndices?
     @MSState
-    private var lastSortedClouds: [GPUSplatCloud<SparkSplat>]?
+    private var listenerStarted: Bool = false
     var vertexShader: VertexShader
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
@@ -113,7 +112,8 @@ public struct SparkSplatDebugRenderPipeline: Element {
         cameraMatrix: simd_float4x4,
         drawableSize: SIMD2<Float>,
         debugParams: DebugParams,
-        boundingBox: BoundingBox3D? = nil
+        boundingBox: BoundingBox3D? = nil,
+        sortManager: AsyncSortManager<SparkSplat>
     ) throws {
         try self.init(
             splatClouds: [splatCloud],
@@ -122,7 +122,8 @@ public struct SparkSplatDebugRenderPipeline: Element {
             cameraMatrices: [cameraMatrix],
             drawableSize: drawableSize,
             debugParams: debugParams,
-            boundingBox: boundingBox
+            boundingBox: boundingBox,
+            sortManager: sortManager
         )
     }
 
@@ -136,7 +137,8 @@ public struct SparkSplatDebugRenderPipeline: Element {
         cameraMatrices: [simd_float4x4],
         drawableSize: SIMD2<Float>,
         debugParams: DebugParams,
-        boundingBox: BoundingBox3D? = nil
+        boundingBox: BoundingBox3D? = nil,
+        sortManager: AsyncSortManager<SparkSplat>
     ) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
@@ -204,10 +206,20 @@ public struct SparkSplatDebugRenderPipeline: Element {
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
         self.vertexDescriptor = vertexDescriptor
+
+        self.sortManager = sortManager
+
+        // Do initial synchronous sort
+        let parameters = SortParameters(camera: cameraMatrices[0], model: modelMatrix)
+        self._sortedIndices = MSState(wrappedValue: try sortManager.sortNowSync(parameters))
     }
 
     public var body: some Element {
         get throws {
+            let indices = sortedIndices ?? {
+                fatalError("sortedIndices not initialized - this should never happen as init performs initial sort")
+            }()
+
             // Compute view matrices (inverse of camera matrices)
             let viewMatrices = cameraMatrices.map(\.inverse)
 
@@ -218,61 +230,31 @@ public struct SparkSplatDebugRenderPipeline: Element {
             let amplificationCount = cameraMatrices.count
 
             try Group {
-                if let indexedDistancesBuffer = sortedIndices?.indices {
-                    try renderPipeline(
-                        indexedDistancesBuffer: indexedDistancesBuffer,
-                        viewMatrices: viewMatrices,
-                        cameraPositions: cameraPositions,
-                        amplificationCount: amplificationCount
-                    )
-                }
+                try renderPipeline(
+                    indexedDistancesBuffer: indices.indices,
+                    viewMatrices: viewMatrices,
+                    cameraPositions: cameraPositions,
+                    amplificationCount: amplificationCount
+                )
             }
-            .onChange(of: splatClouds, initial: true) { _, _ in
-                // Invalidate old sorted indices
-                sortedIndices = nil
-                lastSortedClouds = splatClouds
+            .onChange(of: listenerStarted, initial: true) { _, _ in
+                if !listenerStarted {
+                    listenerStarted = true
 
-                // Do initial synchronous sort so we have indices for first render
-                let device = _MTLCreateSystemDefaultDevice()
-                let initialSort: SplatIndices
-                if splatClouds.count == 1 {
-                    initialSort = try! CPUSplatRadixSorter.sort(
-                        device: device,
-                        splats: splatClouds[0].splats,
-                        camera: cameraMatrices[0],
-                        model: modelMatrix * splatClouds[0].modelTransform,
-                        reversed: false
-                    )
-                } else {
-                    initialSort = try! CPUSplatRadixSorter.sort(
-                        device: device,
-                        clouds: splatClouds,
-                        camera: cameraMatrices[0],
-                        sceneModel: modelMatrix,
-                        reversed: false
-                    )
-                }
-                sortedIndices = initialSort
-
-                // Set up the async sort manager for subsequent updates
-                let newSortManager = try! AsyncSortManager(device: device, splatClouds: splatClouds, capacity: totalSplatCount, logger: logger)
-                sortManager = newSortManager
-                nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
-                Task { @MainActor [sortManager = newSortManager, logger] in
-                    let channel = await sortManager.sortedIndicesChannel()
-                    var lastSortTime: TimeInterval = 0
-                    for await sort in channel {
-                        if sort.parameters.time < lastSortTime {
-                            logger?.error("Out of order sort")
-                            continue
+                    nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
+                    Task { @MainActor [sortManager, logger] in
+                        let channel = await sortManager.sortedIndicesChannel()
+                        var lastSortTime: TimeInterval = 0
+                        for await sort in channel {
+                            if sort.parameters.time < lastSortTime {
+                                logger?.error("Out of order sort")
+                                continue
+                            }
+                            lastSortTime = sort.parameters.time
+                            sortedIndicesRef.wrappedValue = sort
                         }
-                        lastSortTime = sort.parameters.time
-                        sortedIndicesRef.wrappedValue = sort
                     }
                 }
-
-                // Request immediate sort for new clouds
-                requestSort()
             }
             .onChange(of: cameraMatrices) {
                 requestSort()
@@ -380,9 +362,6 @@ public struct SparkSplatDebugRenderPipeline: Element {
     }
 
     func requestSort() {
-        guard let sortManager else {
-            fatalError("No sort manager")
-        }
         // Use average camera position for sorting (works for both mono and stereo)
         let averageCameraMatrix: simd_float4x4
         if cameraMatrices.count == 1 {

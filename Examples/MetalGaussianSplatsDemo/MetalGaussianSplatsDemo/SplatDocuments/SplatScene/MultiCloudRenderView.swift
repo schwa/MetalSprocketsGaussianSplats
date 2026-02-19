@@ -87,7 +87,8 @@ struct MultiCloudRenderPass: Element {
                             cameraMatrices: [cameraMatrix],
                             drawableSize: SIMD2<Float>(drawableSize),
                             debugParams: debugParams,
-                            boundingBox: cullBoundingBox
+                            boundingBox: cullBoundingBox,
+                            sortManager: sortManager
                         )
                     } else {
                         try SparkSplatRenderPipeline(

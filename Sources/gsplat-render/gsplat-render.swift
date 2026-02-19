@@ -435,6 +435,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Spark splat cloud is nil"])
             }
             splatCount = cloud.count
+            let sortManager = try AsyncSortManager(device: renderer.device, splatClouds: [cloud], capacity: cloud.count)
             let renderContent = try RenderPass {
                 let aspectRatio = Float(size.width) / Float(size.height)
                 let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
@@ -444,7 +445,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                    convertSRGBToLinear: useSrgbToLinear
+                    convertSRGBToLinear: useSrgbToLinear,
+                    sortManager: sortManager
                 )
             }
             rendering = try captureManager.with(enabled: capture) {

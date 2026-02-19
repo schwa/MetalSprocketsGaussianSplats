@@ -12,6 +12,7 @@ import simd
 struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
     let context: ImmersiveContext
     let splatCloud: GPUSplatCloud<SparkSplat>?
+    let sortManager: AsyncSortManager<SparkSplat>?
     let modelMatrix: simd_float4x4
     let scale: Float
     let translation: SIMD3<Float>
@@ -19,6 +20,7 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
     init(context: ImmersiveContext) throws {
         self.context = context
         self.splatCloud = ImmersiveState.shared.splatCloud
+        self.sortManager = ImmersiveState.shared.sortManager
         self.modelMatrix = ImmersiveState.shared.modelMatrix
         self.scale = ImmersiveState.shared.scale
         self.translation = ImmersiveState.shared.translation
@@ -35,7 +37,7 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
 
     nonisolated var body: some Element {
         get throws {
-            if let splatCloud {
+            if let splatCloud, let sortManager {
                 // Build view and projection matrices for stereo rendering
                 let viewMatrices = (0 ..< context.viewCount).map { context.viewMatrix(eye: $0) }
                 let projectionMatrices = (0 ..< context.viewCount).map { context.projectionMatrix(eye: $0) }
@@ -68,7 +70,8 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
                     modelMatrix: worldModelMatrix,
                     cameraMatrices: cameraMatrices,
                     drawableSize: drawableSize,
-                    convertSRGBToLinear: false
+                    convertSRGBToLinear: false,
+                    sortManager: sortManager
                 )
                 .depthCompare(function: .greater, enabled: true) // visionOS uses reverse-Z
                 .renderPipelineDescriptorModifier { descriptor in

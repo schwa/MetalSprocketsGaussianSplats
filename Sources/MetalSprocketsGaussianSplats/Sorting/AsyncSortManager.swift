@@ -8,6 +8,12 @@ import simd
 import Splats
 import Synchronization
 
+/// Assert that we're not on the main thread
+@inline(__always)
+private func assertNotMainThread(_ message: @autoclosure () -> String, file: StaticString = #file, line: UInt = #line) {
+    assert(!Thread.isMainThread, "\(message()) should not be called on main thread", file: file, line: line)
+}
+
 /// Statistics from a completed sort operation
 public struct SortEvent: Sendable {
     public var time: Date
@@ -91,7 +97,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     }
 
     /// Perform a synchronous sort immediately and return the result (nonisolated wrapper).
-    /// Blocks until the sort completes.
+    /// Blocks the calling thread until the sort completes.
     nonisolated
     public func sortNowSync(_ parameters: SortParameters) throws -> SplatIndices {
         let done = Atomic<Bool>(false)
@@ -118,6 +124,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Perform an async sort immediately and return the result.
     /// Also updates isSorted and currentSortedIndices, and sends to channels.
     public func sortNowAsync(_ parameters: SortParameters) throws -> SplatIndices {
+        assertNotMainThread("sortNowAsync")
         let start = CFAbsoluteTimeGetCurrent()
         let currentIndexedDistances: TypedMTLBuffer<IndexedDistance>
         let totalSplats: Int
@@ -155,6 +162,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         ._throttle(for: .milliseconds(33.3333))
 
         for await parameters in channel {
+            assertNotMainThread("startSorting")
             let start = CFAbsoluteTimeGetCurrent()
             let currentIndexedDistances: TypedMTLBuffer<IndexedDistance>
             let totalSplats: Int
