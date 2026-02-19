@@ -515,7 +515,7 @@ private struct TimeSinceSortView: View {
     var body: some View {
         Text(formatTimeSince(timeSince))
             .monospacedDigit()
-            .task {
+            .task(id: sortTime) {
                 while !Task.isCancelled {
                     timeSince = Date().timeIntervalSince(sortTime)
                     try? await Task.sleep(for: .milliseconds(100))

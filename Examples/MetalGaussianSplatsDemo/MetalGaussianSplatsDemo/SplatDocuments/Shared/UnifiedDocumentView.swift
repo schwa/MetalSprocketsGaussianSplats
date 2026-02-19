@@ -327,11 +327,6 @@ struct UnifiedDocumentView: View {
                     Label("No Clouds", systemImage: "cube.transparent")
                 } description: {
                     Text("Add splat clouds to your scene")
-                } actions: {
-                    Button("Add Cloud") {
-                        showAddCloudPicker = true
-                    }
-                    .buttonStyle(.borderedProminent)
                 }
             }
         }
