@@ -128,7 +128,10 @@ final class UnifiedSplatViewModel {
         }
     }
     var viewSize: CGSize = .zero {
-        didSet { updateCameraForZoomToFit() }
+        didSet {
+            guard viewSize != oldValue else { return }
+            updateCameraForZoomToFit()
+        }
     }
 
     // MARK: - Render Settings

@@ -218,15 +218,23 @@ struct UnifiedCameraContent: View {
 
         Section("Position") {
             LabeledContent("X", value: String(format: "%.3f", position.x))
+                .monospacedDigit()
             LabeledContent("Y", value: String(format: "%.3f", position.y))
+                .monospacedDigit()
             LabeledContent("Z", value: String(format: "%.3f", position.z))
+                .monospacedDigit()
         }
+        .animation(nil, value: position)
 
         Section("Rotation") {
             LabeledContent("Pitch", value: String(format: "%.1f°", rotation.x))
+                .monospacedDigit()
             LabeledContent("Yaw", value: String(format: "%.1f°", rotation.y))
+                .monospacedDigit()
             LabeledContent("Roll", value: String(format: "%.1f°", rotation.z))
+                .monospacedDigit()
         }
+        .animation(nil, value: rotation)
     }
 
     /// Extract camera position from the matrix
@@ -308,6 +316,7 @@ struct UnifiedRenderContent<CullingContent: View>: View {
     @Binding var showBoundingBoxes: Bool
     @Binding var debugModeEnabled: Bool
     @Binding var debugMode: SplatDebugMode
+    var onScreenshot: (() -> Void)?
     @ViewBuilder var cullingContent: () -> CullingContent
 
     var body: some View {
@@ -343,6 +352,14 @@ struct UnifiedRenderContent<CullingContent: View>: View {
         }
 
         cullingContent()
+
+        if let onScreenshot {
+            Section("Export") {
+                Button("Take Screenshot", systemImage: "camera") {
+                    onScreenshot()
+                }
+            }
+        }
     }
 }
 

@@ -196,7 +196,7 @@ struct UnifiedInspectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Tab picker
+            // Tab picker - disable animations to prevent flicker during camera updates
             Picker("Tab", selection: $tab) {
                 ForEach(UnifiedInspectorTab.tabs(for: mode), id: \.self) { tab in
                     Text(tab.rawValue).tag(tab)
@@ -205,6 +205,7 @@ struct UnifiedInspectorView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .padding()
+            .transaction { $0.animation = nil }
 
             Divider()
 
@@ -232,6 +233,7 @@ struct UnifiedInspectorView: View {
             }
             .formStyle(.grouped)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .transaction { $0.animation = nil }
         }
     }
 

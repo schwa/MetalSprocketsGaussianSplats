@@ -438,13 +438,6 @@ struct UnifiedDocumentView: View {
             }
         }
 
-        // Screenshot (both modes)
-        ToolbarItem(placement: .primaryAction) {
-            Button("Screenshot", systemImage: "camera") {
-                showScreenshotSheet = true
-            }
-        }
-
         // Inspector toggle (both modes)
         ToolbarItem(placement: .primaryAction) {
             Button(showInspector ? "Hide Inspector" : "Show Inspector", systemImage: "sidebar.right") {
