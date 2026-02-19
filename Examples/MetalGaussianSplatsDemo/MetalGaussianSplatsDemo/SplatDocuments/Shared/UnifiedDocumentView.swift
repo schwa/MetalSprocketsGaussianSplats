@@ -420,22 +420,26 @@ struct UnifiedDocumentView: View {
     private var multiRenderView: some View {
         if let doc = multiDocument {
             let enabledCloudIDs = Set(doc.scene.clouds.filter(\.enabled).map(\.id))
-            let enabledClouds: [GPUSplatCloud<SparkSplat>] = viewModel.loadedClouds
+
+            // Build enabled clouds and collect their debug colors in the same order
+            let preparedData: [(cloud: GPUSplatCloud<SparkSplat>, color: SIMD3<Float>)] = viewModel.loadedClouds
                 .filter { enabledCloudIDs.contains($0.id) }
                 .compactMap { loadedCloud in
-                    guard let cloud = loadedCloud.cloud else {
+                    guard let cloud = loadedCloud.cloud,
+                          let docCloud = doc.scene.clouds.first(where: { $0.id == loadedCloud.id }) else {
                         return nil
                     }
-                    if let docCloud = doc.scene.clouds.first(where: { $0.id == loadedCloud.id }) {
-                        var transform = docCloud.transform
-                        if let dragOffset = dragOffsets[loadedCloud.id] {
-                            transform.translation += dragOffset
-                        }
-                        cloud.modelTransform = transform.matrix
-                        cloud.opacity = docCloud.opacity
+                    var transform = docCloud.transform
+                    if let dragOffset = dragOffsets[loadedCloud.id] {
+                        transform.translation += dragOffset
                     }
-                    return cloud
+                    cloud.modelTransform = transform.matrix
+                    cloud.opacity = docCloud.opacity
+                    return (cloud: cloud, color: docCloud.debugColor)
                 }
+
+            let enabledClouds = preparedData.map(\.cloud)
+            let enabledCloudColors = preparedData.map(\.color)
 
             let useSH = doc.scene.renderSettings.useSphericalHarmonics && viewModel.hasSphericalHarmonicsData
 
@@ -454,8 +458,8 @@ struct UnifiedDocumentView: View {
                     mode: viewModel.debugMode,
                     boundsCenter: viewModel.boundsCenter,
                     boundsSize: viewModel.boundsSize,
-                    cloudCount: UInt32(viewModel.loadedClouds.count),
-                    cloudColors: multiDocument?.scene.clouds.map(\.debugColor) ?? []
+                    cloudCount: UInt32(enabledClouds.count),
+                    cloudColors: enabledCloudColors
                 ) : nil,
                 cameraMode: viewModel.cameraMode,
                 onDragChange: handleAxisDrag,

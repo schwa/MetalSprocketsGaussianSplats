@@ -454,12 +454,12 @@ namespace SparkSplatRenderShader {
             discard_fragment();
         }
 
-        // Use custom color if index is within bounds, otherwise fall back to generated color
+        // Use custom color if index is within bounds, otherwise magenta to indicate overflow
         float3 color;
         if (in.cloudIndex < MAX_DEBUG_CLOUD_COLORS) {
             color = params.cloudColors[in.cloudIndex];
         } else {
-            color = cloudIndexColor(in.cloudIndex, params.cloudCount);
+            color = float3(1.0, 0.0, 1.0); // Magenta for overflow
         }
 
         return float4(color * alpha, alpha);
