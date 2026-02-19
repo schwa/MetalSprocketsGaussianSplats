@@ -204,6 +204,16 @@ struct UnifiedDocumentView: View {
         }
         .listStyle(.sidebar)
         .navigationTitle("Clouds")
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                showAddCloudPicker = true
+            } label: {
+                Label("Add Cloud", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding()
+        }
         .overlay {
             if multiDocument?.scene.clouds.isEmpty ?? true {
                 ContentUnavailableView {
@@ -437,15 +447,6 @@ struct UnifiedDocumentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        // Add Cloud (multi mode only - fundamental to multi-cloud workflow)
-        if mode == .multi {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Cloud", systemImage: "plus") {
-                    showAddCloudPicker = true
-                }
-            }
-        }
-
         // Export PLY (single mode, image conversion only - specific workflow)
         if mode == .single, viewModel.isImageConversion, viewModel.convertedURL != nil {
             ToolbarItem(placement: .primaryAction) {
