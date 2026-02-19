@@ -13,9 +13,9 @@ import SwiftUI
 struct MultiCloudRenderView: View {
     let clouds: [GPUSplatCloud<SparkSplat>]
 
-    @Binding var cameraMatrix: simd_float4x4
+    let cameraMatrix: simd_float4x4
     let sceneTransform: simd_float4x4
-    @Binding var verticalAngleOfView: Double
+    let verticalAngleOfView: Double
     let useSphericalHarmonics: Bool
     let backgroundColor: [Float]
     var cullBoundingBox: BoundingBox3D?

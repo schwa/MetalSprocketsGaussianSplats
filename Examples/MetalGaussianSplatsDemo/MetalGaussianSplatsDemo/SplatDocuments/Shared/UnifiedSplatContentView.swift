@@ -97,9 +97,9 @@ struct UnifiedSplatContentView: View {
     private var cameraControlledRenderView: some View {
         let renderView = MultiCloudRenderView(
             clouds: clouds,
-            cameraMatrix: $cameraMatrix,
+            cameraMatrix: cameraMatrix,
             sceneTransform: sceneTransform,
-            verticalAngleOfView: $verticalAngleOfView,
+            verticalAngleOfView: verticalAngleOfView,
             useSphericalHarmonics: useSphericalHarmonics,
             backgroundColor: backgroundColor,
             cullBoundingBox: cullBoundingBox,
@@ -165,6 +165,7 @@ struct UnifiedSplatContentView: View {
                 viewportSize: viewportSize
             )
         }
+
     }
 }
 
