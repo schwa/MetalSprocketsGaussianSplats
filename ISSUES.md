@@ -35,3 +35,33 @@ closed: 2026-02-17
 
 ---
 
+## 3: Investigate testAntimatter15Rendering test failure
+status: new
+priority: low
+kind: bug
+created: 2026-02-19
+
+Test may have pre-existing golden image mismatch. Needs investigation.
+
+---
+
+## 4: Investigate splat rendering lag vs bounding boxes
+status: new
+priority: medium
+kind: bug
+created: 2026-02-19
+
+When camera moves, bounding box overlays move immediately but splats appear to lag behind. Sorting is confirmed to happen on background threads. Need to investigate if there's frame buffering or timing mismatch between SwiftUI overlays and Metal rendering.
+
+---
+
+## 5: Refactor sorting out of pipeline element
+status: new
+priority: low
+kind: enhancement
+created: 2026-02-19
+
+Architecture refactor: Move sort management from SparkSplatRenderPipeline to the view/renderer layer. Pipeline should be pure function of inputs (splatCloud, sortedIndices, camera matrices) with no @MSState, no async, no sort management.
+
+---
+
