@@ -146,6 +146,9 @@ public struct SparkSplatRenderPipeline: Element {
             )
         }
         self._sortedIndices = .init(wrappedValue: initialSort)
+
+        // Also create sort manager in init for async updates
+        self._sortManager = .init(wrappedValue: try AsyncSortManager(device: device, splatClouds: splatClouds, capacity: totalSplatCount, logger: nil))
     }
 
     public var body: some Element {
