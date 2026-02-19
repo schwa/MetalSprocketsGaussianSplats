@@ -51,7 +51,21 @@ priority: medium
 kind: bug
 created: 2026-02-19
 
-When camera moves, bounding box overlays move immediately but splats appear to lag behind. Sorting is confirmed to happen on background threads. Need to investigate if there's frame buffering or timing mismatch between SwiftUI overlays and Metal rendering.
+When camera moves, bounding box overlays move immediately but splats lag behind.
+
+Root cause identified: SwiftUI's drag gesture updates cameraMatrix at ~60Hz+, but RenderView (MTKView-backed) only renders at display refresh rate. The bounding box overlay uses .onChange(of: cameraMatrix) so it sees every update. But RenderView's content closure captures cameraMatrix at render time, which may be several camera updates behind.
+
+Example from logs:
+- 276.230: Metal renders with camera at (0,0,5)
+- 276.240-276.340: BoundingBox sees 10+ camera updates (moving to 4.09,-1.16,2.62)
+- 276.354: Metal finally renders again, now with camera at (4.09,-1.16,2.62)
+
+This is a ~100ms lag during fast movement.
+
+Possible fixes:
+1. Force MTKView to redraw when camera changes (setNeedsDisplay)
+2. Use isPaused=false with preferredFramesPerSecond to match gesture rate
+3. Handle at MetalSprockets level - RenderView should observe state changes
 
 ---
 
