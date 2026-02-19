@@ -316,6 +316,7 @@ struct UnifiedRenderContent<CullingContent: View>: View {
     @Binding var showBoundingBoxes: Bool
     @Binding var debugModeEnabled: Bool
     @Binding var debugMode: SplatDebugMode
+    var lastSortEvent: SortEvent?
     var onScreenshot: (() -> Void)?
     @ViewBuilder var cullingContent: () -> CullingContent
 
@@ -333,6 +334,26 @@ struct UnifiedRenderContent<CullingContent: View>: View {
             }
 
             Toggle("Show Bounding Boxes", isOn: $showBoundingBoxes)
+        }
+
+        if let sortEvent = lastSortEvent {
+            Section("Sort Statistics") {
+                LabeledContent("Duration") {
+                    Text(String(format: "%.2f ms", sortEvent.duration * 1_000))
+                        .monospacedDigit()
+                }
+                LabeledContent("Splats") {
+                    Text(sortEvent.splatCount.formatted())
+                        .monospacedDigit()
+                }
+                LabeledContent("Clouds") {
+                    Text("\(sortEvent.cloudCount)")
+                        .monospacedDigit()
+                }
+                LabeledContent("Time Since Sort") {
+                    TimeSinceSortView(sortTime: sortEvent.time)
+                }
+            }
         }
 
         Section("Debug Visualization") {
@@ -479,6 +500,36 @@ private struct AbsoluteBoundsSlider: View {
                     .monospacedDigit()
             }
             Slider(value: $value, in: range)
+        }
+    }
+}
+
+// MARK: - Time Since Sort View
+
+/// Displays time since last sort, auto-updating
+private struct TimeSinceSortView: View {
+    let sortTime: Date
+
+    @State private var timeSince: TimeInterval = 0
+
+    var body: some View {
+        Text(formatTimeSince(timeSince))
+            .monospacedDigit()
+            .task {
+                while !Task.isCancelled {
+                    timeSince = Date().timeIntervalSince(sortTime)
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+            }
+    }
+
+    private func formatTimeSince(_ interval: TimeInterval) -> String {
+        if interval < 1 {
+            return String(format: "%.0f ms", interval * 1000)
+        } else if interval < 60 {
+            return String(format: "%.1f s", interval)
+        } else {
+            return String(format: "%.0f s", interval)
         }
     }
 }

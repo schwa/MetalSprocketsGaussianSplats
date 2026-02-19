@@ -397,26 +397,31 @@ struct UnifiedDocumentView: View {
 
     @ViewBuilder
     private func singleRenderView(cloud: GPUSplatCloud<SparkSplat>) -> some View {
-        UnifiedSplatContentView(
-            mode: .single,
-            clouds: [cloud],
-            sceneTransform: viewModel.sceneTransform,
-            useSphericalHarmonics: viewModel.effectiveUseSphericalHarmonics,
-            backgroundColor: viewModel.backgroundColorArray,
-            cameraMatrix: $viewModel.cameraMatrix,
-            verticalAngleOfView: $viewModel.verticalAngleOfView,
-            cullBoundingBox: viewModel.cullBoundingBox,
-            showBoundingBoxes: viewModel.showBoundingBoxes,
-            boundingBoxInfos: singleModeBoundingBoxInfos,
-            debugParams: viewModel.debugModeEnabled ? computeDebugParams(
-                mode: viewModel.debugMode,
-                boundsCenter: viewModel.boundsCenter,
-                boundsSize: viewModel.boundsSize
-            ) : nil,
-            cameraMode: viewModel.cameraMode
-        )
-        .ignoresSafeArea()
-        .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
+        if let sortManager = viewModel.sortManager {
+            UnifiedSplatContentView(
+                mode: .single,
+                clouds: [cloud],
+                sceneTransform: viewModel.sceneTransform,
+                useSphericalHarmonics: viewModel.effectiveUseSphericalHarmonics,
+                backgroundColor: viewModel.backgroundColorArray,
+                cameraMatrix: $viewModel.cameraMatrix,
+                verticalAngleOfView: $viewModel.verticalAngleOfView,
+                cullBoundingBox: viewModel.cullBoundingBox,
+                showBoundingBoxes: viewModel.showBoundingBoxes,
+                boundingBoxInfos: singleModeBoundingBoxInfos,
+                debugParams: viewModel.debugModeEnabled ? computeDebugParams(
+                    mode: viewModel.debugMode,
+                    boundsCenter: viewModel.boundsCenter,
+                    boundsSize: viewModel.boundsSize
+                ) : nil,
+                sortManager: sortManager,
+                cameraMode: viewModel.cameraMode
+            )
+            .ignoresSafeArea()
+            .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
+        } else {
+            ProgressView("Initializing...")
+        }
     }
 
     /// Compute debug shader parameters based on mode and bounds
@@ -460,7 +465,7 @@ struct UnifiedDocumentView: View {
 
     @ViewBuilder
     private var multiRenderView: some View {
-        if let doc = multiDocument {
+        if let doc = multiDocument, let sortManager = viewModel.sortManager {
             let enabledCloudIDs = Set(doc.scene.clouds.filter(\.enabled).map(\.id))
 
             // Build enabled clouds and collect their debug colors in the same order
@@ -503,11 +508,14 @@ struct UnifiedDocumentView: View {
                     cloudCount: UInt32(enabledClouds.count),
                     cloudColors: enabledCloudColors
                 ) : nil,
+                sortManager: sortManager,
                 cameraMode: viewModel.cameraMode,
                 onDragChange: handleAxisDrag,
                 onDragEnd: commitDrag
             )
             .onGeometryChange(for: CGSize.self, of: \.size) { viewModel.viewSize = $0 }
+        } else if multiDocument != nil {
+            ProgressView("Initializing...")
         }
     }
 

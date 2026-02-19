@@ -58,6 +58,9 @@ struct UnifiedSplatContentView: View {
     // Debug rendering (nil = normal rendering, non-nil = debug mode)
     var debugParams: DebugParams?
 
+    // Sort manager (required)
+    var sortManager: AsyncSortManager<SparkSplat>
+
     // Camera mode for selecting the appropriate controller
     var cameraMode: CameraMode = .object
 
@@ -100,6 +103,7 @@ struct UnifiedSplatContentView: View {
             useSphericalHarmonics: useSphericalHarmonics,
             backgroundColor: backgroundColor,
             cullBoundingBox: cullBoundingBox,
+            sortManager: sortManager,
             debugParams: debugParams
         )
 
@@ -396,6 +400,7 @@ struct UnifiedInspectorView: View {
             showBoundingBoxes: $viewModel.showBoundingBoxes,
             debugModeEnabled: $viewModel.debugModeEnabled,
             debugMode: $viewModel.debugMode,
+            lastSortEvent: viewModel.lastSortEvent,
             onScreenshot: onScreenshot
         ) {
             cullingSection

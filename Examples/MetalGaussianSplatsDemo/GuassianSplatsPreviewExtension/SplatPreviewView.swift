@@ -1,6 +1,7 @@
 #if !arch(x86_64)
 import GeometryLite3D
 import Interaction3D
+import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
@@ -10,6 +11,7 @@ import SwiftUI
 
 struct SplatPreviewView: View {
     let splatCloud: GPUSplatCloud<SparkSplat>
+    let sortManager: AsyncSortManager<SparkSplat>
 
     @State private var cameraMatrix = simd_float4x4(translation: [0, 0, 5])
     private let modelMatrix = simd_float4x4(xRotation: .radians(.pi))
@@ -17,6 +19,12 @@ struct SplatPreviewView: View {
         verticalAngleOfView: .degrees(90),
         depthMode: .standard(zClip: 0.01 ... 1_000)
     )
+
+    init(splatCloud: GPUSplatCloud<SparkSplat>) throws {
+        self.splatCloud = splatCloud
+        let device = MTLCreateSystemDefaultDevice()!
+        self.sortManager = try AsyncSortManager(device: device, splatClouds: [splatCloud], capacity: splatCloud.count)
+    }
 
     var body: some View {
         RenderView { _, drawableSize in
@@ -27,7 +35,8 @@ struct SplatPreviewView: View {
                     projectionMatrix: projectionMatrix,
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
-                    drawableSize: SIMD2<Float>(drawableSize)
+                    drawableSize: SIMD2<Float>(drawableSize),
+                    sortManager: sortManager
                 )
             }
         }

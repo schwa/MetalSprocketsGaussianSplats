@@ -214,6 +214,9 @@ struct ScreenshotSheet: View {
         // Render offscreen - using single cloud constructor like CLI
         let renderer = try OffscreenRenderer(size: size)
 
+        // Create sort manager for this render
+        let sortManager = try AsyncSortManager(device: renderer.device, splatClouds: [cloud], capacity: cloud.count)
+
         // Set background color from viewModel
         renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
             red: Double(bgColor.red),
@@ -229,7 +232,8 @@ struct ScreenshotSheet: View {
                 projectionMatrix: projectionMatrix,
                 modelMatrix: sceneTransform,
                 cameraMatrix: cameraMatrix,
-                drawableSize: SIMD2<Float>(size)
+                drawableSize: SIMD2<Float>(size),
+                sortManager: sortManager
             )
         }
 

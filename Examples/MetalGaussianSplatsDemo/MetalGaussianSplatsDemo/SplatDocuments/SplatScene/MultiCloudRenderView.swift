@@ -19,6 +19,7 @@ struct MultiCloudRenderView: View {
     let useSphericalHarmonics: Bool
     let backgroundColor: [Float]
     var cullBoundingBox: BoundingBox3D?
+    var sortManager: AsyncSortManager<SparkSplat>
 
     // Debug rendering
     var debugParams: DebugParams?
@@ -47,6 +48,7 @@ struct MultiCloudRenderView: View {
                 drawableSize: drawableSize,
                 useSphericalHarmonics: useSphericalHarmonics,
                 cullBoundingBox: cullBoundingBox,
+                sortManager: sortManager,
                 debugParams: debugParams
             )
         }
@@ -67,6 +69,7 @@ struct MultiCloudRenderPass: Element {
     let drawableSize: CGSize
     let useSphericalHarmonics: Bool
     var cullBoundingBox: BoundingBox3D?
+    var sortManager: AsyncSortManager<SparkSplat>
 
     // Debug rendering
     var debugParams: DebugParams?
@@ -94,7 +97,8 @@ struct MultiCloudRenderPass: Element {
                             cameraMatrices: [cameraMatrix],
                             drawableSize: SIMD2<Float>(drawableSize),
                             useSphericalHarmonics: useSphericalHarmonics,
-                            boundingBox: cullBoundingBox
+                            boundingBox: cullBoundingBox,
+                            sortManager: sortManager
                         )
                     }
                 }

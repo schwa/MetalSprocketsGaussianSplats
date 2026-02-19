@@ -6,20 +6,6 @@ import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import Splats
 
-// MARK: - Element Extension for Multiple Resources
-
-extension Element {
-    /// Mark multiple resources as in use for argument buffer access
-    func useResources(_ resources: [any MTLResource], usage: MTLResourceUsage, stages: MTLRenderStages) -> some Element {
-        onWorkloadEnter { environmentValues in
-            let renderCommandEncoder = environmentValues.renderCommandEncoder.orFatalError("Missing render command encoder")
-            for resource in resources {
-                renderCommandEncoder.useResource(resource, usage: usage, stages: stages)
-            }
-        }
-    }
-}
-
 public struct SparkSplatRenderPipeline: Element {
     var splatClouds: [GPUSplatCloud<SparkSplat>]
     var projectionMatrices: [simd_float4x4]
@@ -28,9 +14,7 @@ public struct SparkSplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var useSphericalHarmonics: Bool
     var boundingBox: BoundingBox3D?
-
-    @MSState
-    private var sortManager: AsyncSortManager<SparkSplat>?
+    var sortManager: AsyncSortManager<SparkSplat>
     @MSState
     private var sortedIndices: SplatIndices?
     @MSState
@@ -52,7 +36,7 @@ public struct SparkSplatRenderPipeline: Element {
     // MARK: - Single Cloud Convenience Initializers
 
     /// Convenience initializer for single cloud, single-view rendering (non-stereo)
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortManager: AsyncSortManager<SparkSplat>) throws {
         try self.init(
             splatClouds: [splatCloud],
             projectionMatrices: [projectionMatrix],
@@ -61,12 +45,13 @@ public struct SparkSplatRenderPipeline: Element {
             drawableSize: drawableSize,
             convertSRGBToLinear: convertSRGBToLinear,
             useSphericalHarmonics: useSphericalHarmonics,
-            boundingBox: boundingBox
+            boundingBox: boundingBox,
+            sortManager: sortManager
         )
     }
 
     /// Convenience initializer for single cloud, stereo/amplification rendering
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortManager: AsyncSortManager<SparkSplat>) throws {
         try self.init(
             splatClouds: [splatCloud],
             projectionMatrices: projectionMatrices,
@@ -75,7 +60,8 @@ public struct SparkSplatRenderPipeline: Element {
             drawableSize: drawableSize,
             convertSRGBToLinear: convertSRGBToLinear,
             useSphericalHarmonics: useSphericalHarmonics,
-            boundingBox: boundingBox
+            boundingBox: boundingBox,
+            sortManager: sortManager
         )
     }
 
@@ -84,7 +70,8 @@ public struct SparkSplatRenderPipeline: Element {
     /// Full initializer supporting multiple clouds and stereo/amplification rendering
     /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when any cloud has SH data.
     /// - Parameter boundingBox: Optional world-space bounding box. Splats outside this box are culled.
-    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil) throws {
+    /// - Parameter sortManager: The sort manager to use for sorting splats.
+    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortManager: AsyncSortManager<SparkSplat>) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
         precondition(!splatClouds.isEmpty, "Must have at least one splat cloud")
@@ -123,33 +110,12 @@ public struct SparkSplatRenderPipeline: Element {
         vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
         self.vertexDescriptor = vertexDescriptor
 
-        // Perform initial sort in init so sortedIndices is available on first body evaluation
-        // This is necessary because onChange(initial: true) runs during body, but the body
-        // already captured sortedIndices as nil before onChange could set it.
-        let device = _MTLCreateSystemDefaultDevice()
-        let initialSort: SplatIndices
-        if splatClouds.count == 1 {
-            initialSort = try CPUSplatRadixSorter.sort(
-                device: device,
-                splats: splatClouds[0].splats,
-                camera: cameraMatrices[0],
-                model: modelMatrix * splatClouds[0].modelTransform,
-                reversed: false
-            )
-        } else {
-            initialSort = try CPUSplatRadixSorter.sort(
-                device: device,
-                clouds: splatClouds,
-                camera: cameraMatrices[0],
-                sceneModel: modelMatrix,
-                reversed: false
-            )
-        }
-        self._sortedIndices = .init(wrappedValue: initialSort)
-
-        // Also create sort manager in init for async updates
-        self._sortManager = .init(wrappedValue: try AsyncSortManager(device: device, splatClouds: splatClouds, capacity: totalSplatCount, logger: nil))
+        // Store provided sort manager (if any) - internal one created lazily in body if needed
+        self.sortManager = sortManager
     }
+
+    @MSState
+    private var listenerStarted: Bool = false
 
     public var body: some Element {
         get throws {
@@ -162,10 +128,28 @@ public struct SparkSplatRenderPipeline: Element {
             // Amplification count for stereo rendering
             let amplificationCount = cameraMatrices.count
 
-            // Assert that sort indices are initialized - this should never fail
-            // since we perform initial sort in init
-            guard let indexedDistancesBuffer = sortedIndices?.indices else {
-                fatalError("SparkSplatRenderPipeline: sortedIndices is nil - initial sort failed or was not performed")
+            // Start listener for async sort updates (once)
+            if !listenerStarted {
+                listenerStarted = true
+                nonisolated(unsafe) let sortedIndicesRef = _sortedIndices
+                Task { @MainActor [sortManager] in
+                    let channel = await sortManager.sortedIndicesChannel()
+                    for await sort in channel {
+                        sortedIndicesRef.wrappedValue = sort
+                    }
+                }
+            }
+
+            // Get sorted indices - perform sync sort if not yet sorted
+            let indexedDistancesBuffer: TypedMTLBuffer<IndexedDistance>
+            if let existing = sortedIndices?.indices {
+                indexedDistancesBuffer = existing
+            } else {
+                // First render - do a synchronous sort
+                let params = SortParameters(camera: cameraMatrices[0], model: modelMatrix, reversed: false)
+                let sorted = try sortManager.sortNowSync(params)
+                sortedIndices = sorted
+                indexedDistancesBuffer = sorted.indices
             }
 
             return try renderPipeline(
@@ -174,51 +158,6 @@ public struct SparkSplatRenderPipeline: Element {
                 cameraPositions: cameraPositions,
                 amplificationCount: amplificationCount
             )
-            .onChange(of: splatClouds) { _, _ in
-                // Cloud list changed - invalidate and re-sort
-                lastSortedClouds = splatClouds
-
-                let device = _MTLCreateSystemDefaultDevice()
-                let newSort: SplatIndices
-                if splatClouds.count == 1 {
-                    newSort = try! CPUSplatRadixSorter.sort(
-                        device: device,
-                        splats: splatClouds[0].splats,
-                        camera: cameraMatrices[0],
-                        model: modelMatrix * splatClouds[0].modelTransform,
-                        reversed: false
-                    )
-                } else {
-                    newSort = try! CPUSplatRadixSorter.sort(
-                        device: device,
-                        clouds: splatClouds,
-                        camera: cameraMatrices[0],
-                        sceneModel: modelMatrix,
-                        reversed: false
-                    )
-                }
-                sortedIndices = newSort
-
-                // Set up the async sort manager for subsequent updates
-                let newSortManager = try! AsyncSortManager(device: device, splatClouds: splatClouds, capacity: totalSplatCount, logger: logger)
-                sortManager = newSortManager
-                nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
-                Task { @MainActor [sortManager = newSortManager, logger] in
-                    let channel = await sortManager.sortedIndicesChannel()
-                    var lastSortTime: TimeInterval = 0
-                    for await sort in channel {
-                        if sort.parameters.time < lastSortTime {
-                            logger?.error("Out of order sort")
-                            continue
-                        }
-                        lastSortTime = sort.parameters.time
-                        sortedIndicesRef.wrappedValue = sort
-                    }
-                }
-
-                // Request immediate sort for new clouds
-                requestSort()
-            }
             .onChange(of: cameraMatrices) {
                 requestSort()
             }
@@ -339,9 +278,6 @@ public struct SparkSplatRenderPipeline: Element {
     }
 
     func requestSort() {
-        guard let sortManager else {
-            fatalError("No sort manager")
-        }
         // Use average camera position for sorting (works for both mono and stereo)
         let averageCameraMatrix: simd_float4x4
         if cameraMatrices.count == 1 {

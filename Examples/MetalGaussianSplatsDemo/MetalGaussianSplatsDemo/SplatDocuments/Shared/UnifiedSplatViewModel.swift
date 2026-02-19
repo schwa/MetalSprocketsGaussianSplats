@@ -1,7 +1,9 @@
 #if os(iOS) || os(macOS)
+import AsyncAlgorithms
 import CoreGraphics
 import Foundation
 import GeometryLite3D
+import Metal
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import Observation
@@ -49,8 +51,35 @@ final class UnifiedSplatViewModel {
 
     let mode: Mode
 
+    /// Sort manager for async sorting with statistics
+    var sortManager: AsyncSortManager<SparkSplat>?
+
+    /// Latest sort event (updated from sort manager)
+    var lastSortEvent: SortEvent?
+
     init(mode: Mode = .single) {
         self.mode = mode
+    }
+
+    /// Creates or recreates the sort manager for the current clouds
+    func updateSortManager(for clouds: [GPUSplatCloud<SparkSplat>]) {
+        guard !clouds.isEmpty else {
+            sortManager = nil
+            return
+        }
+        let device = MTLCreateSystemDefaultDevice()!
+        let capacity = clouds.reduce(0) { $0 + $1.count }
+        sortManager = try? AsyncSortManager(device: device, splatClouds: clouds, capacity: capacity)
+
+        // Listen for sort events
+        if let sortManager {
+            Task { @MainActor [weak self] in
+                let channel = await sortManager.sortEventChannel()
+                for await event in channel {
+                    self?.lastSortEvent = event
+                }
+            }
+        }
     }
 
     // MARK: - Loaded Clouds
@@ -283,6 +312,9 @@ final class UnifiedSplatViewModel {
                     bounds: BoundingBox(min: boundsCenter - boundsSize / 2, max: boundsCenter + boundsSize / 2)
                 )
                 loadedClouds = [loadedCloud]
+                if let gpuCloud {
+                    updateSortManager(for: [gpuCloud])
+                }
                 updateSceneTransform()
                 loadingState = .ready
             } catch {
@@ -307,6 +339,7 @@ final class UnifiedSplatViewModel {
                 bounds: first.bounds
             )
             loadedClouds = [first]
+            updateSortManager(for: [gpuCloud])
 
             #if os(visionOS)
             ImmersiveState.shared.splatCloud = gpuCloud
@@ -367,6 +400,9 @@ final class UnifiedSplatViewModel {
             }
 
             loadedClouds = loaded
+
+            // Update sort manager for the new clouds
+            updateSortManager(for: loaded.compactMap(\.cloud))
 
             if let camera = scene.camera {
                 cameraMatrix = camera.matrix

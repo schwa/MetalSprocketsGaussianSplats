@@ -62,7 +62,7 @@ class PreviewViewController: NSViewController, QLPreviewingController {
         )
 
         // Create and host the SwiftUI view
-        let previewView = SplatPreviewView(splatCloud: splatCloud)
+        let previewView = try SplatPreviewView(splatCloud: splatCloud)
         let hostingView = NSHostingView(rootView: previewView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 

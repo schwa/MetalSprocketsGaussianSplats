@@ -124,7 +124,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
                 sortedIndices = initialSort
 
                 // Set up the async sort manager for subsequent updates
-                let newSortManager = try! AsyncSortManager(device: device, splatCloud: splatCloud, capacity: splatCloud.count, logger: logger)
+                let newSortManager = try! AsyncSortManager(device: device, splatClouds: [splatCloud], capacity: splatCloud.count, logger: logger)
                 sortManager = newSortManager
                 nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
                 Task { @MainActor [sortManager = newSortManager, logger] in
