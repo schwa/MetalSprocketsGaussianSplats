@@ -28,7 +28,7 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
         defer {
             let durationMS = (CFAbsoluteTimeGetCurrent() - startTime) * 1_000
             if durationMS > 16 {
-                logger?.warning("CPU splat sort: \(String(format: "%.2f", durationMS))ms (\(splats.count) splats)")
+                logger?.warning("CPU splat sort: \(durationMS.formatted(.number.precision(.fractionLength(2))))ms (\(splats.count) splats)")
             }
         }
         return try signposter.withIntervalSignpost("CPUSplatRadixSorter.sort().make_buffers", id: signpost) {
@@ -59,7 +59,7 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
         defer {
             let durationMS = (CFAbsoluteTimeGetCurrent() - startTime) * 1_000
             if durationMS > 16 {
-                logger?.warning("CPU multi-cloud splat sort: \(String(format: "%.2f", durationMS))ms (\(totalCount) splats across \(clouds.count) clouds)")
+                logger?.warning("CPU multi-cloud splat sort: \(durationMS.formatted(.number.precision(.fractionLength(2))))ms (\(totalCount) splats across \(clouds.count) clouds)")
             }
         }
 

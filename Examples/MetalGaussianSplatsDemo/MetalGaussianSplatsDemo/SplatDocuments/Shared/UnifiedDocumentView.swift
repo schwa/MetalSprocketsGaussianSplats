@@ -238,7 +238,9 @@ struct UnifiedDocumentView: View {
         }
         // Sync camera state back to document
         .onChange(of: viewModel.cameraMatrix) {
-            guard mode == .multi else { return }
+            guard mode == .multi else {
+                return
+            }
             multiDocument?.scene.camera = SplatScene.CameraState(
                 matrix: viewModel.cameraMatrix,
                 verticalAngleOfView: viewModel.verticalAngleOfView,
@@ -246,7 +248,9 @@ struct UnifiedDocumentView: View {
             )
         }
         .onChange(of: viewModel.verticalAngleOfView) {
-            guard mode == .multi else { return }
+            guard mode == .multi else {
+                return
+            }
             multiDocument?.scene.camera = SplatScene.CameraState(
                 matrix: viewModel.cameraMatrix,
                 verticalAngleOfView: viewModel.verticalAngleOfView,
@@ -254,7 +258,9 @@ struct UnifiedDocumentView: View {
             )
         }
         .onChange(of: viewModel.cameraMode) {
-            guard mode == .multi else { return }
+            guard mode == .multi else {
+                return
+            }
             multiDocument?.scene.camera = SplatScene.CameraState(
                 matrix: viewModel.cameraMatrix,
                 verticalAngleOfView: viewModel.verticalAngleOfView,

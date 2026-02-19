@@ -217,21 +217,21 @@ struct UnifiedCameraContent: View {
         let rotation = cameraRotationDegrees
 
         Section("Position") {
-            LabeledContent("X", value: String(format: "%.3f", position.x))
+            LabeledContent("X", value: position.x.formatted(.number.precision(.fractionLength(3))))
                 .monospacedDigit()
-            LabeledContent("Y", value: String(format: "%.3f", position.y))
+            LabeledContent("Y", value: position.y.formatted(.number.precision(.fractionLength(3))))
                 .monospacedDigit()
-            LabeledContent("Z", value: String(format: "%.3f", position.z))
+            LabeledContent("Z", value: position.z.formatted(.number.precision(.fractionLength(3))))
                 .monospacedDigit()
         }
         .animation(nil, value: position)
 
         Section("Rotation") {
-            LabeledContent("Pitch", value: String(format: "%.1f°", rotation.x))
+            LabeledContent("Pitch", value: rotation.x.formatted(.number.precision(.fractionLength(1))) + "°")
                 .monospacedDigit()
-            LabeledContent("Yaw", value: String(format: "%.1f°", rotation.y))
+            LabeledContent("Yaw", value: rotation.y.formatted(.number.precision(.fractionLength(1))) + "°")
                 .monospacedDigit()
-            LabeledContent("Roll", value: String(format: "%.1f°", rotation.z))
+            LabeledContent("Roll", value: rotation.z.formatted(.number.precision(.fractionLength(1))) + "°")
                 .monospacedDigit()
         }
         .animation(nil, value: rotation)
@@ -282,8 +282,8 @@ struct UnifiedCameraContent: View {
         guard size.width > 0, size.height > 0 else {
             return "—"
         }
-        let ratio = size.width / size.height
-        return String(format: "%.2f:1", ratio)
+        let ratio = Double(size.width / size.height)
+        return ratio.formatted(.number.precision(.fractionLength(2))) + ":1"
     }
 
     private func megapixelsString(for size: CGSize) -> String {
@@ -291,8 +291,8 @@ struct UnifiedCameraContent: View {
             return "—"
         }
         let pixels = size.width * displayScale * size.height * displayScale
-        let megapixels = pixels / 1_000_000
-        return String(format: "%.2f MP", megapixels)
+        let megapixels = Double(pixels / 1_000_000)
+        return megapixels.formatted(.number.precision(.fractionLength(2))) + " MP"
     }
 
     private func formattedDimension(_ value: CGFloat) -> String {
@@ -339,7 +339,7 @@ struct UnifiedRenderContent<CullingContent: View>: View {
         if let sortEvent = lastSortEvent {
             Section("Sort Statistics") {
                 LabeledContent("Duration") {
-                    Text(String(format: "%.2f ms", sortEvent.duration * 1_000))
+                    Text((sortEvent.duration * 1_000).formatted(.number.precision(.fractionLength(2))) + " ms")
                         .monospacedDigit()
                 }
                 LabeledContent("Splats") {
@@ -476,7 +476,7 @@ private struct NormalizedBoundsSlider: View {
             HStack {
                 Text(label)
                 Spacer()
-                Text(String(format: "%.0f%%", value * 100))
+                Text((value * 100).formatted(.number.precision(.fractionLength(0))) + "%")
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
@@ -495,7 +495,7 @@ private struct AbsoluteBoundsSlider: View {
             HStack {
                 Text(label)
                 Spacer()
-                Text(String(format: "%.2f", value))
+                Text(value.formatted(.number.precision(.fractionLength(2))))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
@@ -525,11 +525,11 @@ private struct TimeSinceSortView: View {
 
     private func formatTimeSince(_ interval: TimeInterval) -> String {
         if interval < 1 {
-            return String(format: "%.0f ms", interval * 1000)
+            return (interval * 1000).formatted(.number.precision(.fractionLength(0))) + " ms"
         } else if interval < 60 {
-            return String(format: "%.1f s", interval)
+            return interval.formatted(.number.precision(.fractionLength(1))) + " s"
         } else {
-            return String(format: "%.0f s", interval)
+            return interval.formatted(.number.precision(.fractionLength(0))) + " s"
         }
     }
 }

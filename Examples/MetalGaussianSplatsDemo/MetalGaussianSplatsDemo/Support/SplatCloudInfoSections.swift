@@ -9,7 +9,7 @@ struct SplatCloudInfoSections: View {
             LabeledContent("Type", value: descriptor?.fileTypeDescription ?? "—")
             LabeledContent("Size", value: descriptor.map { $0.fileSize.formatted(.byteCount(style: .file)) } ?? "—")
             LabeledContent("Splats", value: descriptor.map { $0.splatCount.formatted() } ?? "—")
-            LabeledContent("Bytes/Splat", value: descriptor.map { String(format: "%.1f", $0.bytesPerSplat) } ?? "—")
+            LabeledContent("Bytes/Splat", value: descriptor.map { $0.bytesPerSplat.formatted(.number.precision(.fractionLength(1))) } ?? "—")
             LabeledContent("Spherical Harmonics", value: descriptor.map { $0.hasSphericalHarmonics ? "Yes (degree \($0.shDegree))" : "No" } ?? "—")
         }
         Section("Bounds") {
@@ -27,6 +27,6 @@ struct SplatCloudInfoSections: View {
     }
 
     private func formatVector(_ v: SIMD3<Float>) -> String {
-        String(format: "(%.2f, %.2f, %.2f)", v.x, v.y, v.z)
+        "(\(v.x.formatted(.number.precision(.fractionLength(2)))), \(v.y.formatted(.number.precision(.fractionLength(2)))), \(v.z.formatted(.number.precision(.fractionLength(2)))))"
     }
 }

@@ -163,7 +163,7 @@ public final class TileSplatResources {
     /// Human-readable memory usage string
     public var memoryUsageDescription: String {
         let mb = Double(totalMemoryUsage) / (1_024 * 1_024)
-        return String(format: "%.1f MB (%d tiles, max %d total intersections)", mb, numTiles, Self.maxTotalSplatTileIntersections)
+        return "\(mb.formatted(.number.precision(.fractionLength(1)))) MB (\(numTiles) tiles, max \(Self.maxTotalSplatTileIntersections) total intersections)"
     }
 
     // MARK: - Stats Readback

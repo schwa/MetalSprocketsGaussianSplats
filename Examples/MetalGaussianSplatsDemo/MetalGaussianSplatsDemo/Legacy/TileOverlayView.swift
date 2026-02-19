@@ -52,7 +52,7 @@ struct TileStatsView: View {
                     Text("\(counts.count)")
                 }
                 LabeledContent("Active percentage") {
-                    Text(String(format: "%.1f%%", Double(nonZeroCount) * 100.0 / Double(counts.count)))
+                    Text((Double(nonZeroCount) * 100.0 / Double(counts.count)).formatted(.number.precision(.fractionLength(1))) + "%")
                 }
                 LabeledContent("Empty tiles") {
                     Text("\(counts.count - nonZeroCount)")
@@ -70,7 +70,7 @@ struct TileStatsView: View {
                     Text("\(maxCount)")
                 }
                 LabeledContent("Avg per active") {
-                    Text(String(format: "%.1f", avg))
+                    Text(avg.formatted(.number.precision(.fractionLength(1))))
                 }
                 LabeledContent("Median") {
                     Text("\(median)")

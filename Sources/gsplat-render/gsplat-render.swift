@@ -479,7 +479,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
     @MainActor
     func addLabel(to cgImage: CGImage, renderConfig: RenderConfig, splatCount: Int, useSparkRenderer: Bool, useSrgbToLinear: Bool, effectiveSHDegree: UInt8) -> CGImage {
-        let fovStr = renderConfig.projectionFov.map { String(format: "%.1f°", $0) } ?? "60°"
+        let fovStr = renderConfig.projectionFov.map { $0.formatted(.number.precision(.fractionLength(1))) + "°" } ?? "60°"
         let camPos = renderConfig.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
         let modelPos = renderConfig.getModelPosition() ?? SIMD3<Float>(0, 0, 0)
 
@@ -488,8 +488,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         Renderer: \(useSparkRenderer ? "Spark" : "Antimatter15") | sRGB→Linear: \(useSrgbToLinear)\(shInfo)
         Size: \(renderConfig.width)x\(renderConfig.height) | FOV: \(fovStr)
         Splats: \(splatCount) | Near/Far: \(renderConfig.near)/\(renderConfig.far)
-        Camera: (\(String(format: "%.2f", camPos.x)), \(String(format: "%.2f", camPos.y)), \(String(format: "%.2f", camPos.z)))
-        Model: (\(String(format: "%.2f", modelPos.x)), \(String(format: "%.2f", modelPos.y)), \(String(format: "%.2f", modelPos.z)))
+        Camera: (\(camPos.x.formatted(.number.precision(.fractionLength(2)))), \(camPos.y.formatted(.number.precision(.fractionLength(2)))), \(camPos.z.formatted(.number.precision(.fractionLength(2)))))
+        Model: (\(modelPos.x.formatted(.number.precision(.fractionLength(2)))), \(modelPos.y.formatted(.number.precision(.fractionLength(2)))), \(modelPos.z.formatted(.number.precision(.fractionLength(2)))))
         """
 
         let labelView = ZStack(alignment: .bottomLeading) {

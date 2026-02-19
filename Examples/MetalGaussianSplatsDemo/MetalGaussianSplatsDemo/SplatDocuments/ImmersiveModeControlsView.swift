@@ -70,7 +70,7 @@ struct ImmersiveModeControlsView: View {
                     Text("Scale")
                     HStack {
                         Slider(value: $immersiveState.scale, in: 0.01...2.0)
-                        Text(String(format: "%.2f", immersiveState.scale))
+                        Text(immersiveState.scale.formatted(.number.precision(.fractionLength(2))))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                             .frame(width: 40)

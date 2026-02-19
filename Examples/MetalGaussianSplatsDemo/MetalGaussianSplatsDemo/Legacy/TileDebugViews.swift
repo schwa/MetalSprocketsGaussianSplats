@@ -56,7 +56,7 @@ struct TileStatsOverlay: View {
             }
             GridRow {
                 Text("Avg")
-                Text(String(format: "%.1f", currentStats.avg))
+                Text(currentStats.avg.formatted(.number.precision(.fractionLength(1))))
             }
             GridRow {
                 Text("Median")
