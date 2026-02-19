@@ -802,22 +802,44 @@ struct CloudListRow: View {
     private var debugColorBinding: Binding<Color> {
         Binding(
             get: {
-                Color(
-                    red: Double(cloud.debugColor.x),
-                    green: Double(cloud.debugColor.y),
-                    blue: Double(cloud.debugColor.z)
+                // Convert linear to sRGB for display
+                let linear = cloud.debugColor
+                let srgb = SIMD3<Float>(
+                    linearToSRGB(linear.x),
+                    linearToSRGB(linear.y),
+                    linearToSRGB(linear.z)
+                )
+                return Color(
+                    red: Double(srgb.x),
+                    green: Double(srgb.y),
+                    blue: Double(srgb.z)
                 )
             },
             set: { newColor in
+                // Convert sRGB from picker to linear for storage
                 if let components = newColor.cgColor?.components, components.count >= 3 {
                     cloud.debugColor = SIMD3<Float>(
-                        Float(components[0]),
-                        Float(components[1]),
-                        Float(components[2])
+                        srgbToLinear(Float(components[0])),
+                        srgbToLinear(Float(components[1])),
+                        srgbToLinear(Float(components[2]))
                     )
                 }
             }
         )
+    }
+
+    private func srgbToLinear(_ value: Float) -> Float {
+        if value <= 0.04045 {
+            return value / 12.92
+        }
+        return pow((value + 0.055) / 1.055, 2.4)
+    }
+
+    private func linearToSRGB(_ value: Float) -> Float {
+        if value <= 0.0031308 {
+            return value * 12.92
+        }
+        return 1.055 * pow(value, 1.0 / 2.4) - 0.055
     }
 
     var body: some View {
