@@ -699,18 +699,19 @@ struct CloudListRow: View {
     }
 
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
             Toggle("", isOn: $cloud.enabled)
                 .labelsHidden()
                 .toggleStyle(.checkbox)
 
-            ColorPicker("", selection: debugColorBinding, supportsOpacity: false)
-                .labelsHidden()
-                .frame(width: 24)
-
             Text(cloud.displayName ?? "Unknown")
                 .lineLimit(1)
                 .foregroundStyle(cloud.enabled ? .primary : .secondary)
+
+            Spacer()
+
+            ColorPicker("", selection: debugColorBinding, supportsOpacity: false)
+                .labelsHidden()
         }
         .contextMenu {
             Toggle("Enabled", isOn: $cloud.enabled)

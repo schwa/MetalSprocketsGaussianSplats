@@ -191,6 +191,17 @@ struct SplatScene: Codable, Sendable {
         enum CodingKeys: String, CodingKey {
             case id, bookmarkData, transform, enabled, displayName, opacity, debugColor
         }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UUID.self, forKey: .id)
+            bookmarkData = try container.decode(Data.self, forKey: .bookmarkData)
+            transform = try container.decodeIfPresent(Transform.self, forKey: .transform) ?? .identity
+            enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+            displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+            opacity = try container.decodeIfPresent(Float.self, forKey: .opacity) ?? 1.0
+            debugColor = try container.decodeIfPresent(SIMD3<Float>.self, forKey: .debugColor) ?? [1, 1, 1]
+        }
     }
 
     struct CameraState: Codable, Sendable {

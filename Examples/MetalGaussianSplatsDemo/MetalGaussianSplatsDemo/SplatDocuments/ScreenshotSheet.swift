@@ -111,7 +111,7 @@ struct ScreenshotSheet: View {
     }
 
     private func renderScreenshot() {
-        guard let descriptor = viewModel.descriptor else {
+        guard let splatCloud = viewModel.splatCloud else {
             errorMessage = "No splat cloud loaded"
             return
         }
@@ -123,10 +123,7 @@ struct ScreenshotSheet: View {
             // Capture values
             let cameraMatrix = viewModel.cameraMatrix
             let sceneTransform = viewModel.sceneTransform
-
-            // Load splat cloud (always use SparkSplat)
-            // Note: Don't pass modelTransform here - it's handled by the render pipeline
-            let splatCloud: GPUSplatCloud<SparkSplat> = try descriptor.loadGPUSplatCloud()
+            let bgColor = viewModel.backgroundColor.resolve(in: .init())
 
             // Create projection
             let projection = PerspectiveProjection(
@@ -137,7 +134,15 @@ struct ScreenshotSheet: View {
 
             // Render offscreen using Spark renderer
             let size = CGSize(width: width, height: height)
-            let renderer = try OffscreenRenderer(size: size)
+            var renderer = try OffscreenRenderer(size: size)
+
+            // Set background color from viewModel
+            renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
+                red: Double(bgColor.red),
+                green: Double(bgColor.green),
+                blue: Double(bgColor.blue),
+                alpha: 1.0
+            )
 
             let renderPass = try RenderPass {
                 try SparkSplatRenderPipeline(
