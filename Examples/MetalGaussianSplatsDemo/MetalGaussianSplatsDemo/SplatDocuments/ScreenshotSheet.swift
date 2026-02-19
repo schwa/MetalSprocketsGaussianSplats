@@ -30,41 +30,73 @@ struct ScreenshotSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(UnifiedSplatViewModel.self) private var viewModel
 
+    let sceneTransform: simd_float4x4
+    /// Cloud descriptors and their model transforms for loading fresh clouds
+    let cloudInfos: [(descriptor: SplatCloudDescriptor, modelTransform: simd_float4x4)]
+
     @State private var width: Int
     @State private var height: Int
     @State private var isRendering = false
     @State private var isExporting = false
     @State private var errorMessage: String?
     @State private var exportImage: TransferableImage?
+    @State private var previewImage: CGImage?
 
-    init(defaultWidth: Int, defaultHeight: Int) {
+    init(cloudInfos: [(descriptor: SplatCloudDescriptor, modelTransform: simd_float4x4)], sceneTransform: simd_float4x4, defaultWidth: Int, defaultHeight: Int) {
+        self.cloudInfos = cloudInfos
+        self.sceneTransform = sceneTransform
         _width = State(initialValue: defaultWidth)
         _height = State(initialValue: defaultHeight)
     }
 
+    private let maxPreviewSize: CGFloat = 300
+
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Text("Export Screenshot")
                 .font(.headline)
 
-            Form {
+            // Preview
+            Group {
+                if let previewImage {
+                    Image(decorative: previewImage, scale: 1.0)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: maxPreviewSize, maxHeight: maxPreviewSize)
+                        .background(Color.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else if isRendering {
+                    ProgressView()
+                        .frame(width: maxPreviewSize, height: maxPreviewSize * CGFloat(height) / CGFloat(max(width, 1)))
+                        .background(Color.black.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Rectangle()
+                        .fill(Color.black.opacity(0.1))
+                        .frame(width: maxPreviewSize, height: maxPreviewSize * CGFloat(height) / CGFloat(max(width, 1)))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay {
+                            Text("No Preview")
+                                .foregroundStyle(.secondary)
+                        }
+                }
+            }
+            .frame(maxHeight: maxPreviewSize)
+
+            // Size controls
+            HStack(spacing: 16) {
                 LabeledContent("Width") {
                     TextField("Width", value: $width, format: .number)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 100)
-                    Text("px")
-                        .foregroundStyle(.secondary)
+                        .frame(width: 80)
                 }
 
                 LabeledContent("Height") {
                     TextField("Height", value: $height, format: .number)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 100)
-                    Text("px")
-                        .foregroundStyle(.secondary)
+                        .frame(width: 80)
                 }
             }
-            .formStyle(.grouped)
 
             if let errorMessage {
                 Text(errorMessage)
@@ -79,21 +111,24 @@ struct ScreenshotSheet: View {
                 .keyboardShortcut(.cancelAction)
 
                 Button("Save…") {
-                    Task {
-                        renderScreenshot()
-                    }
+                    renderForExport()
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .disabled(isRendering || viewModel.descriptor == nil)
-            }
-
-            if isRendering {
-                ProgressView("Rendering…")
+                .disabled(isRendering || cloudInfos.isEmpty)
             }
         }
         .padding()
-        .frame(width: 300)
+        .frame(width: 360)
+        .onAppear {
+            renderPreview()
+        }
+        .onChange(of: width) {
+            renderPreview()
+        }
+        .onChange(of: height) {
+            renderPreview()
+        }
         .fileExporter(
             isPresented: $isExporting,
             item: exportImage,
@@ -110,9 +145,34 @@ struct ScreenshotSheet: View {
         }
     }
 
-    private func renderScreenshot() {
-        guard let splatCloud = viewModel.splatCloud else {
-            errorMessage = "No splat cloud loaded"
+    private func renderPreview() {
+        // Render at a smaller size for preview
+        let scale = min(1.0, maxPreviewSize / CGFloat(max(width, height)))
+        let previewWidth = Int(CGFloat(width) * scale)
+        let previewHeight = Int(CGFloat(height) * scale)
+
+        guard previewWidth > 0, previewHeight > 0, !cloudInfos.isEmpty else {
+            previewImage = nil
+            return
+        }
+
+        isRendering = true
+        errorMessage = nil
+
+        // Render synchronously for preview (it's small)
+        do {
+            let cgImage = try renderToImage(width: previewWidth, height: previewHeight)
+            previewImage = cgImage
+        } catch {
+            errorMessage = "Preview failed: \(error.localizedDescription)"
+        }
+
+        isRendering = false
+    }
+
+    private func renderForExport() {
+        guard !cloudInfos.isEmpty else {
+            errorMessage = "No splat clouds loaded"
             return
         }
 
@@ -120,43 +180,7 @@ struct ScreenshotSheet: View {
         errorMessage = nil
 
         do {
-            // Capture values
-            let cameraMatrix = viewModel.cameraMatrix
-            let sceneTransform = viewModel.sceneTransform
-            let bgColor = viewModel.backgroundColor.resolve(in: .init())
-
-            // Create projection
-            let projection = PerspectiveProjection(
-                verticalAngleOfView: .degrees(Float(viewModel.verticalAngleOfView)),
-                depthMode: .standard(zClip: 0.01 ... 1_000)
-            )
-            let projectionMatrix = projection.projectionMatrix(for: CGSize(width: width, height: height))
-
-            // Render offscreen using Spark renderer
-            let size = CGSize(width: width, height: height)
-            var renderer = try OffscreenRenderer(size: size)
-
-            // Set background color from viewModel
-            renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
-                red: Double(bgColor.red),
-                green: Double(bgColor.green),
-                blue: Double(bgColor.blue),
-                alpha: 1.0
-            )
-
-            let renderPass = try RenderPass {
-                try SparkSplatRenderPipeline(
-                    splatCloud: splatCloud,
-                    projectionMatrix: projectionMatrix,
-                    modelMatrix: sceneTransform,
-                    cameraMatrix: cameraMatrix,
-                    drawableSize: SIMD2<Float>(size)
-                )
-            }
-
-            let rendering = try renderer.render(renderPass)
-            let cgImage = try rendering.cgImage
-
+            let cgImage = try renderToImage(width: width, height: height)
             exportImage = TransferableImage(cgImage: cgImage)
             isExporting = true
         } catch {
@@ -164,5 +188,52 @@ struct ScreenshotSheet: View {
         }
 
         isRendering = false
+    }
+
+    private func renderToImage(width: Int, height: Int) throws -> CGImage {
+        let cameraMatrix = viewModel.cameraMatrix
+        let bgColor = viewModel.backgroundColor.resolve(in: .init())
+
+        // Load first cloud only for now (to match CLI behavior)
+        guard let firstInfo = cloudInfos.first else {
+            throw NSError(domain: "ScreenshotSheet", code: 1, userInfo: [NSLocalizedDescriptionKey: "No clouds to render"])
+        }
+
+        let cloud: GPUSplatCloud<SparkSplat> = try firstInfo.descriptor.loadGPUSplatCloud(
+            modelTransform: firstInfo.modelTransform
+        )
+
+        // Create projection
+        let projection = PerspectiveProjection(
+            verticalAngleOfView: .degrees(Float(viewModel.verticalAngleOfView)),
+            depthMode: .standard(zClip: 0.01 ... 1_000)
+        )
+        let size = CGSize(width: width, height: height)
+        let projectionMatrix = projection.projectionMatrix(for: size)
+
+        // Render offscreen - using single cloud constructor like CLI
+        let renderer = try OffscreenRenderer(size: size)
+
+        // Set background color from viewModel
+        renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: Double(bgColor.red),
+            green: Double(bgColor.green),
+            blue: Double(bgColor.blue),
+            alpha: 1.0
+        )
+
+        // Use single-cloud constructor (matches CLI exactly)
+        let renderPass = try RenderPass {
+            try SparkSplatRenderPipeline(
+                splatCloud: cloud,
+                projectionMatrix: projectionMatrix,
+                modelMatrix: sceneTransform,
+                cameraMatrix: cameraMatrix,
+                drawableSize: SIMD2<Float>(size)
+            )
+        }
+
+        let rendering = try renderer.render(renderPass)
+        return try rendering.cgImage
     }
 }

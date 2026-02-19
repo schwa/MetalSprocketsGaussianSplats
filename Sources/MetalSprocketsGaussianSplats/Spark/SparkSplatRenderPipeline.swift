@@ -122,6 +122,30 @@ public struct SparkSplatRenderPipeline: Element {
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
         self.vertexDescriptor = vertexDescriptor
+
+        // Perform initial sort in init so sortedIndices is available on first body evaluation
+        // This is necessary because onChange(initial: true) runs during body, but the body
+        // already captured sortedIndices as nil before onChange could set it.
+        let device = _MTLCreateSystemDefaultDevice()
+        let initialSort: SplatIndices
+        if splatClouds.count == 1 {
+            initialSort = try CPUSplatRadixSorter.sort(
+                device: device,
+                splats: splatClouds[0].splats,
+                camera: cameraMatrices[0],
+                model: modelMatrix * splatClouds[0].modelTransform,
+                reversed: false
+            )
+        } else {
+            initialSort = try CPUSplatRadixSorter.sort(
+                device: device,
+                clouds: splatClouds,
+                camera: cameraMatrices[0],
+                sceneModel: modelMatrix,
+                reversed: false
+            )
+        }
+        self._sortedIndices = .init(wrappedValue: initialSort)
     }
 
     public var body: some Element {
@@ -135,26 +159,26 @@ public struct SparkSplatRenderPipeline: Element {
             // Amplification count for stereo rendering
             let amplificationCount = cameraMatrices.count
 
-            try Group {
-                if let indexedDistancesBuffer = sortedIndices?.indices {
-                    try renderPipeline(
-                        indexedDistancesBuffer: indexedDistancesBuffer,
-                        viewMatrices: viewMatrices,
-                        cameraPositions: cameraPositions,
-                        amplificationCount: amplificationCount
-                    )
-                }
+            // Assert that sort indices are initialized - this should never fail
+            // since we perform initial sort in init
+            guard let indexedDistancesBuffer = sortedIndices?.indices else {
+                fatalError("SparkSplatRenderPipeline: sortedIndices is nil - initial sort failed or was not performed")
             }
-            .onChange(of: splatClouds, initial: true) { _, _ in
-                // Invalidate old sorted indices
-                sortedIndices = nil
+
+            return try renderPipeline(
+                indexedDistancesBuffer: indexedDistancesBuffer,
+                viewMatrices: viewMatrices,
+                cameraPositions: cameraPositions,
+                amplificationCount: amplificationCount
+            )
+            .onChange(of: splatClouds) { _, _ in
+                // Cloud list changed - invalidate and re-sort
                 lastSortedClouds = splatClouds
 
-                // Do initial synchronous sort so we have indices for first render
                 let device = _MTLCreateSystemDefaultDevice()
-                let initialSort: SplatIndices
+                let newSort: SplatIndices
                 if splatClouds.count == 1 {
-                    initialSort = try! CPUSplatRadixSorter.sort(
+                    newSort = try! CPUSplatRadixSorter.sort(
                         device: device,
                         splats: splatClouds[0].splats,
                         camera: cameraMatrices[0],
@@ -162,7 +186,7 @@ public struct SparkSplatRenderPipeline: Element {
                         reversed: false
                     )
                 } else {
-                    initialSort = try! CPUSplatRadixSorter.sort(
+                    newSort = try! CPUSplatRadixSorter.sort(
                         device: device,
                         clouds: splatClouds,
                         camera: cameraMatrices[0],
@@ -170,7 +194,7 @@ public struct SparkSplatRenderPipeline: Element {
                         reversed: false
                     )
                 }
-                sortedIndices = initialSort
+                sortedIndices = newSort
 
                 // Set up the async sort manager for subsequent updates
                 let newSortManager = try! AsyncSortManager(device: device, splatClouds: splatClouds, capacity: totalSplatCount, logger: logger)

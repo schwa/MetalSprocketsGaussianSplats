@@ -76,6 +76,38 @@ struct UnifiedDocumentView: View {
         inspectorTab = mode == .multi ? .scene : .cloud
     }
 
+    // MARK: - Prepared Data for Screenshot
+
+    /// Returns the cloud infos (descriptors + transforms) and scene transform for screenshot rendering
+    private var screenshotData: (cloudInfos: [(descriptor: SplatCloudDescriptor, modelTransform: simd_float4x4)], sceneTransform: simd_float4x4) {
+        switch mode {
+        case .single:
+            let infos = viewModel.loadedClouds.map { loadedCloud in
+                (descriptor: loadedCloud.descriptor, modelTransform: simd_float4x4.identity)
+            }
+            return (infos, viewModel.sceneTransform)
+
+        case .multi:
+            guard let doc = multiDocument else {
+                return ([], .identity)
+            }
+            let enabledCloudIDs = Set(doc.scene.clouds.filter(\.enabled).map(\.id))
+            let infos: [(descriptor: SplatCloudDescriptor, modelTransform: simd_float4x4)] = viewModel.loadedClouds
+                .filter { enabledCloudIDs.contains($0.id) }
+                .compactMap { loadedCloud in
+                    guard let docCloud = doc.scene.clouds.first(where: { $0.id == loadedCloud.id }) else {
+                        return nil
+                    }
+                    var transform = docCloud.transform
+                    if let dragOffset = dragOffsets[loadedCloud.id] {
+                        transform.translation += dragOffset
+                    }
+                    return (descriptor: loadedCloud.descriptor, modelTransform: transform.matrix)
+                }
+            return (infos, doc.scene.sceneTransform.matrix)
+        }
+    }
+
     // MARK: - Single Mode Layout
 
     @ViewBuilder
@@ -89,7 +121,10 @@ struct UnifiedDocumentView: View {
             }
             .focusedSceneValue(\.inspectorVisibility, $showInspector)
             .sheet(isPresented: $showScreenshotSheet) {
+                let data = screenshotData
                 ScreenshotSheet(
+                    cloudInfos: data.cloudInfos,
+                    sceneTransform: data.sceneTransform,
                     defaultWidth: Int(viewModel.viewSize.width * displayScale),
                     defaultHeight: Int(viewModel.viewSize.height * displayScale)
                 )
@@ -130,7 +165,10 @@ struct UnifiedDocumentView: View {
         .focusedSceneValue(\.inspectorVisibility, $showInspector)
         .environment(viewModel)
         .sheet(isPresented: $showScreenshotSheet) {
+            let data = screenshotData
             ScreenshotSheet(
+                cloudInfos: data.cloudInfos,
+                sceneTransform: data.sceneTransform,
                 defaultWidth: Int(viewModel.viewSize.width * displayScale),
                 defaultHeight: Int(viewModel.viewSize.height * displayScale)
             )
