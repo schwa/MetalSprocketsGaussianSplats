@@ -193,6 +193,7 @@ struct UnifiedInspectorView: View {
     @Binding var document: SplatSceneDocument?
     @Binding var selectedCloud: SplatScene.CloudReference?
     var onDeleteCloud: (() -> Void)?
+    var onScreenshot: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -396,7 +397,8 @@ struct UnifiedInspectorView: View {
             sphericalHarmonicsWarning: sphericalHarmonicsWarning,
             showBoundingBoxes: $viewModel.showBoundingBoxes,
             debugModeEnabled: $viewModel.debugModeEnabled,
-            debugMode: $viewModel.debugMode
+            debugMode: $viewModel.debugMode,
+            onScreenshot: onScreenshot
         ) {
             cullingSection
         }
@@ -429,7 +431,8 @@ extension UnifiedInspectorView {
     /// Create inspector for single splat mode
     init(
         singleViewModel: UnifiedSplatViewModel,
-        tab: Binding<UnifiedInspectorTab>
+        tab: Binding<UnifiedInspectorTab>,
+        onScreenshot: (() -> Void)? = nil
     ) {
         self.mode = .single
         self.viewModel = singleViewModel
@@ -437,6 +440,7 @@ extension UnifiedInspectorView {
         self._document = .constant(nil)
         self._selectedCloud = .constant(nil)
         self.onDeleteCloud = nil
+        self.onScreenshot = onScreenshot
     }
 
     /// Create inspector for multi-cloud mode
@@ -445,7 +449,8 @@ extension UnifiedInspectorView {
         document: Binding<SplatSceneDocument?>,
         selectedCloud: Binding<SplatScene.CloudReference?>,
         tab: Binding<UnifiedInspectorTab>,
-        onDeleteCloud: (() -> Void)? = nil
+        onDeleteCloud: (() -> Void)? = nil,
+        onScreenshot: (() -> Void)? = nil
     ) {
         self.mode = .multi
         self.viewModel = multiViewModel
@@ -453,6 +458,7 @@ extension UnifiedInspectorView {
         self._document = document
         self._selectedCloud = selectedCloud
         self.onDeleteCloud = onDeleteCloud
+        self.onScreenshot = onScreenshot
     }
 }
 #endif

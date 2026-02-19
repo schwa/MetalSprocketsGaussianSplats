@@ -184,6 +184,15 @@ struct UnifiedDocumentView: View {
                         multiDocument?.scene.clouds.removeAll { $0.id == cloud.id }
                     }
                     .tag(cloud.id)
+                    .onTapGesture(count: 2) {
+                        // Double-click to teleport to cloud center
+                        if let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloud.id }),
+                           let bounds = loadedCloud.bounds {
+                            let localCenter = bounds.center
+                            let worldCenter = (cloud.transform.matrix * SIMD4<Float>(localCenter, 1)).xyz
+                            viewModel.cameraMatrix = simd_float4x4(translation: worldCenter)
+                        }
+                    }
                 }
                 .onDelete { indexSet in
                     multiDocument?.scene.clouds.remove(atOffsets: indexSet)
@@ -388,7 +397,8 @@ struct UnifiedDocumentView: View {
         case .single:
             UnifiedInspectorView(
                 singleViewModel: viewModel,
-                tab: $inspectorTab
+                tab: $inspectorTab,
+                onScreenshot: { showScreenshotSheet = true }
             )
 
         case .multi:
@@ -407,12 +417,19 @@ struct UnifiedDocumentView: View {
                 }
             )
 
-            UnifiedInspectorView(multiViewModel: viewModel, document: $multiDocument, selectedCloud: selectedCloud, tab: $inspectorTab) {
-                if let id = selectedCloudID {
-                    multiDocument?.scene.clouds.removeAll { $0.id == id }
-                    selectedCloudID = nil
-                }
-            }
+            UnifiedInspectorView(
+                multiViewModel: viewModel,
+                document: $multiDocument,
+                selectedCloud: selectedCloud,
+                tab: $inspectorTab,
+                onDeleteCloud: {
+                    if let id = selectedCloudID {
+                        multiDocument?.scene.clouds.removeAll { $0.id == id }
+                        selectedCloudID = nil
+                    }
+                },
+                onScreenshot: { showScreenshotSheet = true }
+            )
         }
     }
 
@@ -605,9 +622,7 @@ struct UnifiedDocumentView: View {
         for url in urls {
             let didStartAccess = url.startAccessingSecurityScopedResource()
             do {
-                let offset = SIMD3<Float>(Float((multiDocument?.scene.clouds.count ?? 0) + cloudRefs.count) * 5.0, 0, 0)
-                let transform = Transform(translation: offset)
-                let cloudRef = try SplatScene.CloudReference(url: url, transform: transform)
+                let cloudRef = try SplatScene.CloudReference(url: url)
                 cloudRefs.append((cloudRef, didStartAccess))
             } catch {
                 if didStartAccess {
