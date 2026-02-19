@@ -371,6 +371,9 @@ final class UnifiedSplatViewModel {
             if let camera = scene.camera {
                 cameraMatrix = camera.matrix
                 verticalAngleOfView = camera.verticalAngleOfView
+                if let mode = CameraMode(rawValue: camera.mode.capitalized) {
+                    cameraMode = mode
+                }
             }
 
             loadingState = loaded.isEmpty ? .idle : .ready

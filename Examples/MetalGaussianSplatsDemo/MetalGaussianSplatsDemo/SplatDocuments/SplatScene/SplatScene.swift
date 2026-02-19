@@ -204,9 +204,31 @@ struct SplatScene: Codable, Sendable {
         }
     }
 
-    struct CameraState: Codable, Sendable {
+    struct CameraState: Codable, Sendable, Equatable {
+        /// Camera position and orientation as a 4x4 matrix
         var matrix: simd_float4x4
+        /// Vertical field of view in degrees
         var verticalAngleOfView: Double
+        /// Camera mode (object, room, spatialScene)
+        var mode: String = "object"
+
+        init(matrix: simd_float4x4 = .identity, verticalAngleOfView: Double = 60.0, mode: String = "object") {
+            self.matrix = matrix
+            self.verticalAngleOfView = verticalAngleOfView
+            self.mode = mode
+        }
+
+        // Custom decoder for backward compatibility
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            matrix = try container.decode(simd_float4x4.self, forKey: .matrix)
+            verticalAngleOfView = try container.decode(Double.self, forKey: .verticalAngleOfView)
+            mode = try container.decodeIfPresent(String.self, forKey: .mode) ?? "object"
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case matrix, verticalAngleOfView, mode
+        }
     }
 
     struct RenderSettings: Codable, Sendable, Equatable {

@@ -236,6 +236,31 @@ struct UnifiedDocumentView: View {
             }
             viewModel.updateCombinedBounds(for: doc.scene)
         }
+        // Sync camera state back to document
+        .onChange(of: viewModel.cameraMatrix) {
+            guard mode == .multi else { return }
+            multiDocument?.scene.camera = SplatScene.CameraState(
+                matrix: viewModel.cameraMatrix,
+                verticalAngleOfView: viewModel.verticalAngleOfView,
+                mode: viewModel.cameraMode.rawValue.lowercased()
+            )
+        }
+        .onChange(of: viewModel.verticalAngleOfView) {
+            guard mode == .multi else { return }
+            multiDocument?.scene.camera = SplatScene.CameraState(
+                matrix: viewModel.cameraMatrix,
+                verticalAngleOfView: viewModel.verticalAngleOfView,
+                mode: viewModel.cameraMode.rawValue.lowercased()
+            )
+        }
+        .onChange(of: viewModel.cameraMode) {
+            guard mode == .multi else { return }
+            multiDocument?.scene.camera = SplatScene.CameraState(
+                matrix: viewModel.cameraMatrix,
+                verticalAngleOfView: viewModel.verticalAngleOfView,
+                mode: viewModel.cameraMode.rawValue.lowercased()
+            )
+        }
     }
 
     // MARK: - Cloud List Sidebar (Multi Mode)
@@ -256,6 +281,23 @@ struct UnifiedDocumentView: View {
                             let localCenter = bounds.center
                             let worldCenter = (cloud.transform.matrix * SIMD4<Float>(localCenter, 1)).xyz
                             viewModel.cameraMatrix = simd_float4x4(translation: worldCenter)
+                        }
+                    }
+                    .contextMenu {
+                        Button("Exclusive") {
+                            // Disable all other clouds, enable this one
+                            for i in multiDocument!.scene.clouds.indices {
+                                multiDocument!.scene.clouds[i].enabled = (multiDocument!.scene.clouds[i].id == cloud.id)
+                            }
+                        }
+                        Button("Enable All") {
+                            for i in multiDocument!.scene.clouds.indices {
+                                multiDocument!.scene.clouds[i].enabled = true
+                            }
+                        }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            multiDocument?.scene.clouds.removeAll { $0.id == cloud.id }
                         }
                     }
                 }
