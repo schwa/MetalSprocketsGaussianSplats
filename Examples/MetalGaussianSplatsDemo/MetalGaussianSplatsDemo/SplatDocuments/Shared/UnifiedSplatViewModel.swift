@@ -129,7 +129,9 @@ final class UnifiedSplatViewModel {
     }
     var viewSize: CGSize = .zero {
         didSet {
-            guard viewSize != oldValue else { return }
+            guard viewSize != oldValue else {
+                return
+            }
             updateCameraForZoomToFit()
         }
     }

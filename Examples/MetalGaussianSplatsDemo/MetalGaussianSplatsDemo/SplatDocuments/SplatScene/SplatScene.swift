@@ -101,9 +101,9 @@ private struct RotationValue: Decodable {
         // Regex: optional minus, digits, optional decimal, required degree symbol
         let pattern = #"^(-?\d+\.?\d*)°$"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
-              let range = Range(match.range(at: 1), in: trimmed),
-              let degrees = Float(String(trimmed[range]))
+            let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+            let range = Range(match.range(at: 1), in: trimmed),
+            let degrees = Float(String(trimmed[range]))
         else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(

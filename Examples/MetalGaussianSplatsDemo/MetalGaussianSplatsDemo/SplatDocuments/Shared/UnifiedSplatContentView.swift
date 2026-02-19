@@ -344,16 +344,14 @@ struct UnifiedInspectorView: View {
     /// Get the bounds center for the selected cloud (multi mode) or the overall bounds (single mode)
     private var selectedCloudBoundsCenter: SIMD3<Float> {
         guard mode == .multi,
-              let cloud = selectedCloud,
-              let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloud.id }),
-              let bounds = loadedCloud.bounds
+            let cloud = selectedCloud,
+            let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloud.id }),
+            let bounds = loadedCloud.bounds
         else {
             return viewModel.boundsCenter
         }
         // Transform the bounds center by the cloud's transform
-        let localCenter = bounds.center
-        let worldCenter = (cloud.transform.matrix * SIMD4<Float>(localCenter, 1)).xyz
-        return worldCenter
+        return (cloud.transform.matrix * SIMD4<Float>(bounds.center, 1)).xyz
     }
 
     /// Check if we have valid bounds for teleporting
@@ -361,8 +359,8 @@ struct UnifiedInspectorView: View {
         if mode == .multi {
             // In multi mode, need a selected cloud with bounds
             guard let cloud = selectedCloud,
-                  let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloud.id }),
-                  loadedCloud.bounds != nil
+                let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloud.id }),
+                loadedCloud.bounds != nil
             else {
                 return false
             }

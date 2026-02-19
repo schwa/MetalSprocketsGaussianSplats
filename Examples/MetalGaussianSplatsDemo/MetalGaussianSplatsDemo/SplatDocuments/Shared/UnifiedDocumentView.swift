@@ -225,7 +225,7 @@ struct UnifiedDocumentView: View {
                     .onTapGesture(count: 2) {
                         // Double-click to teleport to cloud center
                         if let loadedCloud = viewModel.loadedClouds.first(where: { $0.id == cloud.id }),
-                           let bounds = loadedCloud.bounds {
+                            let bounds = loadedCloud.bounds {
                             let localCenter = bounds.center
                             let worldCenter = (cloud.transform.matrix * SIMD4<Float>(localCenter, 1)).xyz
                             viewModel.cameraMatrix = simd_float4x4(translation: worldCenter)
@@ -445,9 +445,10 @@ struct UnifiedDocumentView: View {
         case .single:
             UnifiedInspectorView(
                 singleViewModel: viewModel,
-                tab: $inspectorTab,
-                onScreenshot: { showScreenshotSheet = true }
-            )
+                tab: $inspectorTab
+            ) {
+                showScreenshotSheet = true
+            }
 
         case .multi:
             let selectedCloud: Binding<SplatScene.CloudReference?> = Binding(
