@@ -10,6 +10,33 @@ import simd
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - DebugCloudIndexParams Helper
+
+extension DebugCloudIndexParams {
+    /// Create params with custom cloud colors
+    /// - Parameters:
+    ///   - cloudCount: Number of clouds
+    ///   - colors: Array of colors for each cloud (up to 16). Remaining slots filled with white.
+    static func withColors(cloudCount: UInt32, colors: [SIMD3<Float>]) -> DebugCloudIndexParams {
+        // Swift bridges C arrays as tuples, so we need to create it manually
+        var params = DebugCloudIndexParams()
+        params.cloudCount = cloudCount
+
+        // Fill colors into the tuple (up to 16)
+        withUnsafeMutablePointer(to: &params.cloudColors) { ptr in
+            let colorPtr = UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: SIMD3<Float>.self)
+            for i in 0..<16 {
+                if i < colors.count {
+                    colorPtr[i] = colors[i]
+                } else {
+                    colorPtr[i] = SIMD3<Float>(1, 1, 1) // Default to white
+                }
+            }
+        }
+        return params
+    }
+}
+
 // MARK: - Unified Document View
 
 /// A unified view for displaying both single splat documents and multi-cloud scenes
@@ -351,7 +378,7 @@ struct UnifiedDocumentView: View {
     }
 
     /// Compute debug shader parameters based on mode and bounds
-    private func computeDebugParams(mode: SplatDebugMode, boundsCenter: SIMD3<Float>, boundsSize: SIMD3<Float>, cloudCount: UInt32 = 1) -> DebugParams {
+    private func computeDebugParams(mode: SplatDebugMode, boundsCenter: SIMD3<Float>, boundsSize: SIMD3<Float>, cloudCount: UInt32 = 1, cloudColors: [SIMD3<Float>] = []) -> DebugParams {
         let maxExtent = max(boundsSize.x, max(boundsSize.y, boundsSize.z))
         switch mode {
         case .distanceFromCenter:
@@ -367,7 +394,7 @@ struct UnifiedDocumentView: View {
         case .aspectRatio:
             return .aspectRatio(DebugAspectRatioParams(minRatio: 1.0, maxRatio: 10.0))
         case .cloudIndex:
-            return .cloudIndex(DebugCloudIndexParams(cloudCount: cloudCount))
+            return .cloudIndex(DebugCloudIndexParams.withColors(cloudCount: cloudCount, colors: cloudColors))
         }
     }
 
@@ -427,7 +454,8 @@ struct UnifiedDocumentView: View {
                     mode: viewModel.debugMode,
                     boundsCenter: viewModel.boundsCenter,
                     boundsSize: viewModel.boundsSize,
-                    cloudCount: UInt32(viewModel.loadedClouds.count)
+                    cloudCount: UInt32(viewModel.loadedClouds.count),
+                    cloudColors: multiDocument?.scene.clouds.map(\.debugColor) ?? []
                 ) : nil,
                 cameraMode: viewModel.cameraMode,
                 onDragChange: handleAxisDrag,

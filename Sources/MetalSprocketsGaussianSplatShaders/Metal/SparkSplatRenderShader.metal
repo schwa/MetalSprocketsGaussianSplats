@@ -454,7 +454,13 @@ namespace SparkSplatRenderShader {
             discard_fragment();
         }
 
-        float3 color = cloudIndexColor(in.cloudIndex, params.cloudCount);
+        // Use custom color if index is within bounds, otherwise fall back to generated color
+        float3 color;
+        if (in.cloudIndex < MAX_DEBUG_CLOUD_COLORS) {
+            color = params.cloudColors[in.cloudIndex];
+        } else {
+            color = cloudIndexColor(in.cloudIndex, params.cloudCount);
+        }
 
         return float4(color * alpha, alpha);
     }

@@ -38,9 +38,13 @@ struct DebugAspectRatioParams {
     float maxRatio;         // Ratio at which color is fully red (elongated)
 };
 
+/// Maximum number of clouds that can have custom debug colors
+#define MAX_DEBUG_CLOUD_COLORS 16
+
 /// Parameters for cloud index debug visualization
 struct DebugCloudIndexParams {
-    unsigned int cloudCount;  // Total number of clouds (for color cycling)
+    unsigned int cloudCount;  // Total number of clouds
+    simd_float3 cloudColors[MAX_DEBUG_CLOUD_COLORS];  // Custom colors for each cloud
 };
 
 // MARK: - SparkSplat structure
