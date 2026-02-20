@@ -10,6 +10,31 @@ import simd
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - LazyView
+
+/// A view that defers its content creation until it appears
+struct LazyView<Content: View>: View {
+    @State private var hasAppeared = false
+    let content: () -> Content
+
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        Group {
+            if hasAppeared {
+                content()
+            } else {
+                Color.clear
+            }
+        }
+        .onAppear {
+            hasAppeared = true
+        }
+    }
+}
+
 // MARK: - DebugCloudIndexParams Helper
 
 extension DebugCloudIndexParams {
@@ -58,10 +83,10 @@ struct UnifiedDocumentView: View {
     @State private var inspectorTab: UnifiedInspectorTab = .cloud
 
     // Inspector visibility (both modes)
-    @State private var showInspector = true
+    @SceneStorage("showInspector") private var showInspector = true
 
     // Multi mode: sidebar visibility
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
 
     // Single mode specific
     @State private var confirmedLoad = false
@@ -141,9 +166,11 @@ struct UnifiedDocumentView: View {
     private var singleModeLayout: some View {
         mainContent
             .inspector(isPresented: $showInspector) {
-                inspectorContent
-                    #if !os(visionOS)
-                    .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
+                LazyView {
+                    inspectorContent
+                }
+                #if !os(visionOS)
+                .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
                 #endif
             }
             .focusedSceneValue(\.inspectorVisibility, $showInspector)
@@ -171,6 +198,7 @@ struct UnifiedDocumentView: View {
                     await viewModel.load(url: newURL, contentType: singleDocument?.contentType)
                 }
             }
+            .environment(viewModel)
     }
 
     // MARK: - Multi Mode Layout
@@ -178,14 +206,18 @@ struct UnifiedDocumentView: View {
     @ViewBuilder
     private var multiModeLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            cloudListSidebar
-                .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 300)
+            LazyView {
+                cloudListSidebar
+            }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 300)
         } detail: {
             mainContent
                 .inspector(isPresented: $showInspector) {
-                    inspectorContent
-                        #if !os(visionOS)
-                        .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
+                    LazyView {
+                        inspectorContent
+                    }
+                    #if !os(visionOS)
+                    .inspectorColumnWidth(min: 200, ideal: 300, max: 400)
                     #endif
                 }
         }

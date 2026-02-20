@@ -79,3 +79,58 @@ Architecture refactor: Move sort management from SparkSplatRenderPipeline to the
 
 ---
 
+## 6: Multi-splat mode FPS drops to ~10fps during camera rotation
+status: new
+priority: high
+kind: bug
+created: 2026-02-20
+
+## Problem
+In multi-splat mode (.splatscene files), FPS drops dramatically (to ~10fps or less) during camera rotation, while single-splat mode maintains 60fps.
+
+## Key Findings
+
+### What we know:
+1. **RenderView.draw() is fast** - Each frame takes only 1-6ms total (content ~0.1ms, update ~1-4ms, setup ~0.1ms, workload ~0.3-1.5ms)
+2. **MTKView draw calls are inconsistent** - FPS measured at draw() entry varies wildly: 60fps, then suddenly 13fps, 3fps, 0.8fps, back to 60fps
+3. **Single-splat mode works fine** - 60fps maintained during rotation
+4. **Sorting is NOT the bottleneck** - Disabling sorting (sortingEnabled=false) doesn't help
+5. **Bounding boxes are NOT the issue** - Problem occurs with showBoundingBoxes=false
+6. **SwiftUI updates are responsive** - UI elements update smoothly, only Metal view lags
+
+### The mystery:
+- CPU work per frame is fast (~1-6ms)
+- But MTKView's draw(in:) is not being called at 60fps
+- Something is throttling the display link or blocking main thread between draw calls
+
+## Differences between single and multi mode:
+1. NavigationSplitView with sidebar (multi only)
+2. Cloud list with selection state
+3. Multiple clouds being filtered/mapped each frame in `multiRenderView`
+4. `preparedData` computation on each render
+5. More complex document binding (`multiDocument`)
+
+## Things tried:
+- [x] Fire-and-forget AsyncChannel sends (avoid back-pressure blocking)
+- [x] Sorting toggle to disable sorting entirely
+- [x] LazyView for sidebars/inspector (defer content until appear)
+- [x] Starting with sidebar hidden (.detailOnly)
+- [ ] None of these fixed the issue
+
+## Debug logging added:
+- RenderView.draw timing: content/update/setup/workload/total/fps
+- Enable via RENDERVIEW_LOG_FRAME=1 environment variable
+
+## Theories to investigate:
+1. NavigationSplitView causing layout thrashing during camera updates
+2. Document binding updates causing excessive SwiftUI work
+3. @Observable viewModel updates cascading to non-Metal views
+4. Some Metal/CAMetalLayer issue with drawable management (note: `[CAMetalLayerDrawable texture] should not be called after already presenting` warning appears)
+
+## Reproduction:
+1. Open a .splatscene file with multiple clouds
+2. Rotate camera with mouse drag
+3. Observe FPS drop in Metal HUD or debug logging
+
+---
+
