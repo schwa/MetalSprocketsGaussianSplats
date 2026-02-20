@@ -41,6 +41,7 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       enableGPUValidationMode = "1"
+      showGraphicsOverview = "Yes"
       allowLocationSimulation = "YES"
       disablePerformanceAntipatternChecker = "YES">
       <BuildableProductRunnable
@@ -77,7 +78,7 @@
          <EnvironmentVariable
             key = "METAL_LOGGING"
             value = "YES"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
       </EnvironmentVariables>
    </LaunchAction>

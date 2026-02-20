@@ -147,8 +147,10 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         isSorted = true
 
         // Send to channels (fire and forget)
+        // Fire-and-forget send to avoid blocking on channel back-pressure
+        let event = SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count)
         Task {
-            await _sortEventChannel.send(SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count))
+            await _sortEventChannel.send(event)
             await _sortedIndicesChannel.send(result)
         }
 
@@ -187,8 +189,12 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
             currentSortedIndices = result
             isSorted = true
 
-            await _sortEventChannel.send(SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count))
-            await _sortedIndicesChannel.send(result)
+            // Fire-and-forget send to avoid blocking on channel back-pressure
+            let event = SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count)
+            Task {
+                await _sortEventChannel.send(event)
+                await _sortedIndicesChannel.send(result)
+            }
         }
     }
 }

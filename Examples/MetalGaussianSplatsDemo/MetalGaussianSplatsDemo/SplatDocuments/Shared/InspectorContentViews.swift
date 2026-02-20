@@ -320,9 +320,15 @@ struct UnifiedRenderContent<CullingContent: View>: View {
     var onScreenshot: (() -> Void)?
     @ViewBuilder var cullingContent: () -> CullingContent
 
+    @Environment(UnifiedSplatViewModel.self) private var viewModel
+
     var body: some View {
         Section("Renderer") {
             LabeledContent("Type", value: "Spark")
+            LabeledContent("FPS") {
+                Text(viewModel.currentFPS.formatted(.number.precision(.fractionLength(1))))
+                    .monospacedDigit()
+            }
             ColorPicker("Background", selection: $backgroundColor)
             Toggle("Spherical Harmonics", isOn: $useSphericalHarmonics)
                 .disabled(sphericalHarmonicsDisabled || debugModeEnabled)
@@ -336,8 +342,18 @@ struct UnifiedRenderContent<CullingContent: View>: View {
             Toggle("Show Bounding Boxes", isOn: $showBoundingBoxes)
         }
 
-        if let sortEvent = lastSortEvent {
-            Section("Sort Statistics") {
+        Section("Sorting") {
+            Toggle("Enable Sorting", isOn: Binding(
+                get: { viewModel.sortingEnabled },
+                set: { viewModel.sortingEnabled = $0 }
+            ))
+
+            Button("Sort Now") {
+                viewModel.triggerManualSort()
+            }
+            .disabled(viewModel.sortingEnabled)
+
+            if let sortEvent = lastSortEvent {
                 LabeledContent("Duration") {
                     Text((sortEvent.duration * 1_000).formatted(.number.precision(.fractionLength(2))) + " ms")
                         .monospacedDigit()

@@ -57,6 +57,40 @@ final class UnifiedSplatViewModel {
     /// Latest sort event (updated from sort manager)
     var lastSortEvent: SortEvent?
 
+    /// Whether sorting is enabled (when disabled, splats render with last sort order)
+    var sortingEnabled: Bool = true
+
+    /// Trigger a manual sort using current camera position
+    func triggerManualSort() {
+        guard let sortManager else {
+            return
+        }
+        let params = SortParameters(camera: cameraMatrix, model: sceneTransform, reversed: false)
+        sortManager.requestSort(params)
+    }
+
+    // MARK: - FPS Tracking
+
+    /// Current FPS (updated every second)
+    var currentFPS: Double = 0
+
+    /// Frame count for FPS calculation
+    private var frameCount: Int = 0
+    private var lastFPSUpdate: CFAbsoluteTime = 0
+
+    /// Call this from RenderView closure to track frames
+    nonisolated func recordFrame() {
+        let now = CFAbsoluteTimeGetCurrent()
+        Task { @MainActor in
+            frameCount += 1
+            if now - lastFPSUpdate >= 1.0 {
+                currentFPS = Double(frameCount) / (now - lastFPSUpdate)
+                frameCount = 0
+                lastFPSUpdate = now
+            }
+        }
+    }
+
     init(mode: Mode = .single) {
         self.mode = mode
     }

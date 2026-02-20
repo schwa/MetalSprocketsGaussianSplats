@@ -70,6 +70,8 @@ struct UnifiedSplatContentView: View {
 
     @State private var viewportSize: CGSize = .zero
 
+    @Environment(UnifiedSplatViewModel.self) private var viewModel
+
     var body: some View {
         ZStack {
             // Main render view
@@ -104,7 +106,9 @@ struct UnifiedSplatContentView: View {
             backgroundColor: backgroundColor,
             cullBoundingBox: cullBoundingBox,
             sortManager: sortManager,
-            debugParams: debugParams
+            debugParams: debugParams,
+            onFrame: viewModel.recordFrame,
+            sortingEnabled: viewModel.sortingEnabled
         )
 
         switch cameraMode {

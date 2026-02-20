@@ -15,6 +15,7 @@ public struct SparkSplatRenderPipeline: Element {
     var useSphericalHarmonics: Bool
     var boundingBox: BoundingBox3D?
     var sortManager: AsyncSortManager<SparkSplat>
+    var sortingEnabled: Bool = true
     @MSState
     private var sortedIndices: SplatIndices?
     @MSState
@@ -71,7 +72,7 @@ public struct SparkSplatRenderPipeline: Element {
     /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when any cloud has SH data.
     /// - Parameter boundingBox: Optional world-space bounding box. Splats outside this box are culled.
     /// - Parameter sortManager: The sort manager to use for sorting splats.
-    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortManager: AsyncSortManager<SparkSplat>) throws {
+    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortManager: AsyncSortManager<SparkSplat>, sortingEnabled: Bool = true) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
         precondition(!splatClouds.isEmpty, "Must have at least one splat cloud")
@@ -83,6 +84,7 @@ public struct SparkSplatRenderPipeline: Element {
         self.drawableSize = drawableSize
         self.boundingBox = boundingBox
         self.convertSRGBToLinear = convertSRGBToLinear
+        self.sortingEnabled = sortingEnabled
 
         // Determine if SH should be used: explicit override, or auto-detect from any cloud having SH data
         let hasSHData = splatClouds.contains { $0.shCoefficients != nil }
@@ -161,10 +163,14 @@ public struct SparkSplatRenderPipeline: Element {
                 amplificationCount: amplificationCount
             )
             .onChange(of: cameraMatrices) {
-                requestSort()
+                if sortingEnabled {
+                    requestSort()
+                }
             }
             .onChange(of: modelMatrix) {
-                requestSort()
+                if sortingEnabled {
+                    requestSort()
+                }
             }
             .onChange(of: boundingBox != nil, initial: true) { _, useBoundingBox in
                 // Recreate shaders when bounding box presence changes (function constant changes)

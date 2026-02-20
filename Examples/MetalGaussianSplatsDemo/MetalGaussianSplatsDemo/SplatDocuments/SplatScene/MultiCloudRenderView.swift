@@ -24,6 +24,12 @@ struct MultiCloudRenderView: View {
     // Debug rendering
     var debugParams: DebugParams?
 
+    // FPS tracking callback
+    var onFrame: (() -> Void)?
+
+    // Sorting control
+    var sortingEnabled: Bool = true
+
     @State private var projection: (any ProjectionProtocol) = PerspectiveProjection(verticalAngleOfView: .degrees(90), depthMode: .standard(zClip: 0.01 ... 1_000))
 
     private var clearColor: MTLClearColor {
@@ -40,7 +46,8 @@ struct MultiCloudRenderView: View {
 
     var body: some View {
         RenderView { _, drawableSize in
-            MultiCloudRenderPass(
+            onFrame?()
+            return MultiCloudRenderPass(
                 clouds: clouds,
                 cameraMatrix: cameraMatrix,
                 sceneTransform: sceneTransform,
@@ -49,7 +56,8 @@ struct MultiCloudRenderView: View {
                 useSphericalHarmonics: useSphericalHarmonics,
                 cullBoundingBox: cullBoundingBox,
                 sortManager: sortManager,
-                debugParams: debugParams
+                debugParams: debugParams,
+                sortingEnabled: sortingEnabled
             )
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
@@ -74,6 +82,9 @@ struct MultiCloudRenderPass: Element {
     // Debug rendering
     var debugParams: DebugParams?
 
+    // Sorting control
+    var sortingEnabled: Bool = true
+
     var body: some Element {
         get throws {
             if !clouds.isEmpty {
@@ -88,7 +99,8 @@ struct MultiCloudRenderPass: Element {
                             drawableSize: SIMD2<Float>(drawableSize),
                             debugParams: debugParams,
                             boundingBox: cullBoundingBox,
-                            sortManager: sortManager
+                            sortManager: sortManager,
+                            sortingEnabled: sortingEnabled
                         )
                     } else {
                         try SparkSplatRenderPipeline(
@@ -99,7 +111,8 @@ struct MultiCloudRenderPass: Element {
                             drawableSize: SIMD2<Float>(drawableSize),
                             useSphericalHarmonics: useSphericalHarmonics,
                             boundingBox: cullBoundingBox,
-                            sortManager: sortManager
+                            sortManager: sortManager,
+                            sortingEnabled: sortingEnabled
                         )
                     }
                 }

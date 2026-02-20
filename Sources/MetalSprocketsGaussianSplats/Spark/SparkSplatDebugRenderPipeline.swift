@@ -89,6 +89,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
     var debugParams: DebugParams
 
     var sortManager: AsyncSortManager<SparkSplat>
+    var sortingEnabled: Bool = true
     @MSState
     private var sortedIndices: SplatIndices?
     @MSState
@@ -138,7 +139,8 @@ public struct SparkSplatDebugRenderPipeline: Element {
         drawableSize: SIMD2<Float>,
         debugParams: DebugParams,
         boundingBox: BoundingBox3D? = nil,
-        sortManager: AsyncSortManager<SparkSplat>
+        sortManager: AsyncSortManager<SparkSplat>,
+        sortingEnabled: Bool = true
     ) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
@@ -151,6 +153,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         self.drawableSize = drawableSize
         self.debugParams = debugParams
         self.boundingBox = boundingBox
+        self.sortingEnabled = sortingEnabled
 
         // Derive debug mode from params
         switch debugParams {
@@ -257,10 +260,14 @@ public struct SparkSplatDebugRenderPipeline: Element {
                 }
             }
             .onChange(of: cameraMatrices) {
-                requestSort()
+                if sortingEnabled {
+                    requestSort()
+                }
             }
             .onChange(of: modelMatrix) {
-                requestSort()
+                if sortingEnabled {
+                    requestSort()
+                }
             }
         }
     }
