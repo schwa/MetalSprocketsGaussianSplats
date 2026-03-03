@@ -1,7 +1,6 @@
 ---
 excluded:
   - "**/.build"
-  - "**/Package.swift"
   - "tmp"
 only_rules:
   - accessibility_label_for_image
@@ -250,3 +249,10 @@ only_rules:
   - xct_specific_matcher
   - xctfail_message
   - yoda_condition
+
+custom_rules:
+  local_dependency_path:
+    name: "Local Dependency Path"
+    regex: '\.package\(path:'
+    message: "Local dependency path detected. Use remote URLs for dependencies."
+    severity: warning
