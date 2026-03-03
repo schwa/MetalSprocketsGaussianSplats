@@ -140,10 +140,11 @@ In multi-splat mode (.splatscene files), FPS drops dramatically (to ~10fps or le
 ---
 
 ## 7: Remove 'Unified' prefix from type names
-status: new
+status: closed
 priority: low
 kind: enhancement
 created: 2026-03-03
+closed: 2026-03-03
 
 The 'Unified' prefix on types like UnifiedDocumentView, UnifiedSplatContentView, UnifiedSplatViewModel, UnifiedInspectorView, UnifiedCameraContent, UnifiedRenderContent, UnifiedCloudInfoContent, UnifiedInspectorTab was an artifact of merging single and multi splat views. Now that they're merged, the prefix is redundant and makes names unnecessarily long. Rename to clearer, shorter names.
 
