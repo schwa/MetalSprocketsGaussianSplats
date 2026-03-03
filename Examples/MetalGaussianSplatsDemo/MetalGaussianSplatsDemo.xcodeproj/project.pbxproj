@@ -484,6 +484,7 @@
 			baseConfigurationReferenceAnchor = 452EC1342EF51EF600AB9206 /* Configuration */;
 			baseConfigurationReferenceRelativePath = "Project-Debug.xcconfig";
 			buildSettings = {
+				DEVELOPMENT_TEAM = 6E23EP94PG;
 			};
 			name = Debug;
 		};
@@ -492,6 +493,7 @@
 			baseConfigurationReferenceAnchor = 452EC1342EF51EF600AB9206 /* Configuration */;
 			baseConfigurationReferenceRelativePath = "Project-Release.xcconfig";
 			buildSettings = {
+				DEVELOPMENT_TEAM = 6E23EP94PG;
 			};
 			name = Release;
 		};

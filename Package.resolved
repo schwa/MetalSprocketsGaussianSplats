@@ -1,5 +1,5 @@
 {
-  "originHash" : "53466e66a007639dfa9791c23361aa5af23df5606f19061e07c72128dc910b9f",
+  "originHash" : "0c27df29541b81bc53f5f3594e354cb1d0d12f76a4e612d12f9f384203a46c9e",
   "pins" : [
     {
       "identity" : "earcut-swift",
@@ -25,7 +25,7 @@
       "location" : "https://github.com/schwa/GoldenImage",
       "state" : {
         "branch" : "main",
-        "revision" : "34396251ee4fc108b9167ba5785f66a5c473088b"
+        "revision" : "58067df0fd0f4fe522dfd6d48469e9f1ca0dfdd2"
       }
     },
     {
@@ -43,7 +43,7 @@
       "location" : "https://github.com/schwa/MetalSprocketsAddOns",
       "state" : {
         "branch" : "main",
-        "revision" : "0ba51c5319fae4729a2a469437c2b25b76dc9301"
+        "revision" : "625b73a349c6ef0914d1febf4607ce571a91a09b"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser",
       "state" : {
-        "revision" : "cdd0ef3755280949551dc26dee5de9ddeda89f54",
-        "version" : "1.6.2"
+        "revision" : "c5d11a805e765f52ba34ec7284bd4fcd6ba68615",
+        "version" : "1.7.0"
       }
     },
     {
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms",
       "state" : {
-        "revision" : "2773d4125311133a2f705ec374c363a935069d45",
-        "version" : "1.1.0"
+        "revision" : "2971dd5d9f6e0515664b01044826bcea16e59fac",
+        "version" : "1.1.2"
       }
     },
     {
