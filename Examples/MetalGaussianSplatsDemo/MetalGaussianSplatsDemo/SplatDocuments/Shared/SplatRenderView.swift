@@ -140,7 +140,6 @@ struct SplatRenderView: View {
                 viewportSize: viewportSize
             )
         }
-
     }
 }
 

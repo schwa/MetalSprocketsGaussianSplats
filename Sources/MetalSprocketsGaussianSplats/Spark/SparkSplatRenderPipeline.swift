@@ -127,8 +127,6 @@ public struct SparkSplatRenderPipeline: Element {
             // Extract camera positions from camera matrices
             let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
 
-
-
             // Amplification count for stereo rendering
             let amplificationCount = cameraMatrices.count
 

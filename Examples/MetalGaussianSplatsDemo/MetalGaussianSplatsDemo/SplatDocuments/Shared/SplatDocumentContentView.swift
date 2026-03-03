@@ -480,8 +480,7 @@ struct SplatDocumentContentView: View {
             let preparedData: [(cloud: GPUSplatCloud<SparkSplat>, color: SIMD3<Float>)] = viewModel.loadedClouds
                 .filter { enabledCloudIDs.contains($0.id) }
                 .compactMap { loadedCloud in
-                    guard let cloud = loadedCloud.cloud,
-                          let docCloud = doc.scene.clouds.first(where: { $0.id == loadedCloud.id }) else {
+                    guard let cloud = loadedCloud.cloud, let docCloud = doc.scene.clouds.first(where: { $0.id == loadedCloud.id }) else {
                         return nil
                     }
                     var transform = docCloud.transform

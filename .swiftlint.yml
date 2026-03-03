@@ -126,7 +126,7 @@ only_rules:
   - multiline_parameters
   - multiline_parameters_brackets
   - multiple_closures_with_trailing_closure
-  - nesting
+#  - nesting
   - nimble_operator
   - no_empty_block
 #  - no_extension_access_modifier

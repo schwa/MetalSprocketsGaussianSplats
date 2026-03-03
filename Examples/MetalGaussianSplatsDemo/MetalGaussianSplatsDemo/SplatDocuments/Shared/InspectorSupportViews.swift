@@ -108,12 +108,12 @@ struct TimeSinceSortView: View {
 
     private func formatTimeSince(_ interval: TimeInterval) -> String {
         if interval < 1 {
-            return (interval * 1000).formatted(.number.precision(.fractionLength(0))) + " ms"
-        } else if interval < 60 {
-            return interval.formatted(.number.precision(.fractionLength(1))) + " s"
-        } else {
-            return interval.formatted(.number.precision(.fractionLength(0))) + " s"
+            return (interval * 1_000).formatted(.number.precision(.fractionLength(0))) + " ms"
         }
+        if interval < 60 {
+            return interval.formatted(.number.precision(.fractionLength(1))) + " s"
+        }
+        return interval.formatted(.number.precision(.fractionLength(0))) + " s"
     }
 }
 #endif
