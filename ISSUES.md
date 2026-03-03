@@ -147,5 +147,7 @@ created: 2026-03-03
 
 The 'Unified' prefix on types like UnifiedDocumentView, UnifiedSplatContentView, UnifiedSplatViewModel, UnifiedInspectorView, UnifiedCameraContent, UnifiedRenderContent, UnifiedCloudInfoContent, UnifiedInspectorTab was an artifact of merging single and multi splat views. Now that they're merged, the prefix is redundant and makes names unnecessarily long. Rename to clearer, shorter names.
 
+- 2026-03-03: Also rename types with 'Content' suffix to use more descriptive names like Inspector, Editor, Detail. For example: UnifiedCameraContent -> CameraInspector, UnifiedRenderContent -> RenderInspector, UnifiedCloudInfoContent -> CloudInfoInspector, UnifiedSplatContentView -> SplatRenderView or similar.
+
 ---
 
