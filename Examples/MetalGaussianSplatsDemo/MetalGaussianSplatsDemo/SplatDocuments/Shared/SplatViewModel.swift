@@ -37,11 +37,11 @@ struct LoadedSplatCloud: Identifiable {
     var isLoaded: Bool { cloud != nil }
 }
 
-// MARK: - Unified Splat View Model
+// MARK: - Splat View Model
 
 @Observable
 @MainActor
-final class UnifiedSplatViewModel {
+final class SplatViewModel {
     // MARK: - Mode
 
     enum Mode {

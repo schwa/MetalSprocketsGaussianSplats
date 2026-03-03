@@ -10,31 +10,6 @@ import simd
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - LazyView
-
-/// A view that defers its content creation until it appears
-struct LazyView<Content: View>: View {
-    @State private var hasAppeared = false
-    let content: () -> Content
-
-    init(@ViewBuilder content: @escaping () -> Content) {
-        self.content = content
-    }
-
-    var body: some View {
-        Group {
-            if hasAppeared {
-                content()
-            } else {
-                Color.clear
-            }
-        }
-        .onAppear {
-            hasAppeared = true
-        }
-    }
-}
-
 // MARK: - DebugCloudIndexParams Helper
 
 extension DebugCloudIndexParams {
@@ -62,10 +37,10 @@ extension DebugCloudIndexParams {
     }
 }
 
-// MARK: - Unified Document View
+// MARK: - Document Content View
 
 /// A unified view for displaying both single splat documents and multi-cloud scenes
-struct UnifiedDocumentView: View {
+struct SplatDocumentContentView: View {
     let mode: SplatContentMode
 
     // Single mode
@@ -77,10 +52,10 @@ struct UnifiedDocumentView: View {
 
     // MARK: - State
 
-    @State private var viewModel: UnifiedSplatViewModel
+    @State private var viewModel: SplatViewModel
 
     @State private var selectedCloudID: UUID?
-    @State private var inspectorTab: UnifiedInspectorTab = .cloud
+    @State private var inspectorTab: InspectorTab = .cloud
 
     // Inspector visibility (both modes)
     @SceneStorage("showInspector") private var showInspector = true
@@ -106,7 +81,7 @@ struct UnifiedDocumentView: View {
         self.singleDocument = singleDocument
         self.fileURL = fileURL
         self._multiDocument = multiDocument
-        self._viewModel = State(initialValue: UnifiedSplatViewModel(mode: mode == .single ? .single : .multi))
+        self._viewModel = State(initialValue: SplatViewModel(mode: mode == .single ? .single : .multi))
     }
 
     // MARK: - Body
@@ -431,7 +406,7 @@ struct UnifiedDocumentView: View {
     @ViewBuilder
     private func singleRenderView(cloud: GPUSplatCloud<SparkSplat>) -> some View {
         if let sortManager = viewModel.sortManager {
-            UnifiedSplatContentView(
+            SplatRenderView(
                 mode: .single,
                 clouds: [cloud],
                 sceneTransform: viewModel.sceneTransform,
@@ -523,7 +498,7 @@ struct UnifiedDocumentView: View {
 
             let useSH = doc.scene.renderSettings.useSphericalHarmonics && viewModel.hasSphericalHarmonicsData
 
-            UnifiedSplatContentView(
+            SplatRenderView(
                 mode: .multi,
                 clouds: enabledClouds,
                 sceneTransform: doc.scene.sceneTransform.matrix,
@@ -558,7 +533,7 @@ struct UnifiedDocumentView: View {
     private var inspectorContent: some View {
         switch mode {
         case .single:
-            UnifiedInspectorView(
+            InspectorView(
                 singleViewModel: viewModel,
                 tab: $inspectorTab
             ) {
@@ -581,7 +556,7 @@ struct UnifiedDocumentView: View {
                 }
             )
 
-            UnifiedInspectorView(
+            InspectorView(
                 multiViewModel: viewModel,
                 document: $multiDocument,
                 selectedCloud: selectedCloud,
@@ -800,7 +775,7 @@ struct UnifiedDocumentView: View {
 
 // MARK: - Convenience Initializers
 
-extension UnifiedDocumentView {
+extension SplatDocumentContentView {
     /// Create view for single splat document
     init(document: SplatDocument, fileURL: URL?) {
         self.init(

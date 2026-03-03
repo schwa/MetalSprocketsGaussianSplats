@@ -9,39 +9,10 @@ import MetalSprocketsUI
 import simd
 import SwiftUI
 
-// MARK: - Shared Camera Mode
-
-/// Camera mode shared by both single and multi-cloud views
-enum CameraMode: String, CaseIterable {
-    case object = "Object"
-    case room = "Room"
-    case spatialScene = "Spatial Scene"
-
-    var initialPosition: SIMD3<Float> {
-        switch self {
-        case .object:
-            [0, 0, 5]
-        case .room:
-            [0, 0, 0]
-        case .spatialScene:
-            [0, 0, 0.2]
-        }
-    }
-}
-
-// MARK: - Unified Content View Mode
-
-enum SplatContentMode {
-    /// Single splat file - no sidebar, no add cloud
-    case single
-    /// Multi-cloud scene - sidebar with cloud list, add cloud enabled
-    case multi
-}
-
-// MARK: - Unified Splat Content View
+// MARK: - Splat Render View
 
 /// A unified content view for rendering splat clouds, used by both single-document and multi-cloud scene views
-struct UnifiedSplatContentView: View {
+struct SplatRenderView: View {
     let mode: SplatContentMode
     let clouds: [GPUSplatCloud<SparkSplat>]
     let sceneTransform: simd_float4x4
@@ -70,7 +41,7 @@ struct UnifiedSplatContentView: View {
 
     @State private var viewportSize: CGSize = .zero
 
-    @Environment(UnifiedSplatViewModel.self) private var viewModel
+    @Environment(SplatViewModel.self) private var viewModel
 
     var body: some View {
         ZStack {
@@ -173,9 +144,9 @@ struct UnifiedSplatContentView: View {
     }
 }
 
-// MARK: - Unified Inspector Tab
+// MARK: - Inspector Tab
 
-enum UnifiedInspectorTab: String, CaseIterable {
+enum InspectorTab: String, CaseIterable {
     case cloud = "Cloud"
     case scene = "Scene"    // Multi-cloud mode only
     case camera = "Camera"
@@ -191,12 +162,12 @@ enum UnifiedInspectorTab: String, CaseIterable {
     }
 }
 
-// MARK: - Unified Inspector View
+// MARK: - Inspector View
 
-struct UnifiedInspectorView: View {
+struct InspectorView: View {
     let mode: SplatContentMode
-    @Bindable var viewModel: UnifiedSplatViewModel
-    @Binding var tab: UnifiedInspectorTab
+    @Bindable var viewModel: SplatViewModel
+    @Binding var tab: InspectorTab
 
     // Multi-mode only: document and selection
     @Binding var document: SplatSceneDocument?
@@ -208,7 +179,7 @@ struct UnifiedInspectorView: View {
         VStack(spacing: 0) {
             // Tab picker - disable animations to prevent flicker during camera updates
             Picker("Tab", selection: $tab) {
-                ForEach(UnifiedInspectorTab.tabs(for: mode), id: \.self) { tab in
+                ForEach(InspectorTab.tabs(for: mode), id: \.self) { tab in
                     Text(tab.rawValue).tag(tab)
                 }
             }
@@ -227,7 +198,7 @@ struct UnifiedInspectorView: View {
 
                 case .scene:
                     if var doc = document {
-                        SceneInspectorContent(document: Binding(
+                        SceneInspector(document: Binding(
                             get: { doc },
                             set: { doc = $0; document = $0 }
                         ))
@@ -254,7 +225,7 @@ struct UnifiedInspectorView: View {
         if mode == .multi, selectedCloud == nil {
             ContentUnavailableView("No Selection", systemImage: "cube.transparent", description: Text("Select a cloud to view its details"))
         } else {
-            UnifiedCloudInfoContent(
+            CloudInspector(
                 descriptor: cloudDescriptor,
                 rotationX: cloudRotationXBinding,
                 rotationY: cloudRotationYBinding,
@@ -380,7 +351,7 @@ struct UnifiedInspectorView: View {
 
     @ViewBuilder
     private var cameraContent: some View {
-        UnifiedCameraContent(
+        CameraInspector(
             cameraMode: $viewModel.cameraMode,
             zoomToFit: $viewModel.zoomToFit,
             verticalAngleOfView: $viewModel.verticalAngleOfView,
@@ -397,7 +368,7 @@ struct UnifiedInspectorView: View {
 
     @ViewBuilder
     private var renderContent: some View {
-        UnifiedRenderContent(
+        RenderInspector(
             backgroundColor: $viewModel.backgroundColor,
             useSphericalHarmonics: $viewModel.useSphericalHarmonics,
             sphericalHarmonicsDisabled: !viewModel.hasSphericalHarmonicsData,
@@ -435,11 +406,11 @@ struct UnifiedInspectorView: View {
 
 // MARK: - Convenience Initializers
 
-extension UnifiedInspectorView {
+extension InspectorView {
     /// Create inspector for single splat mode
     init(
-        singleViewModel: UnifiedSplatViewModel,
-        tab: Binding<UnifiedInspectorTab>,
+        singleViewModel: SplatViewModel,
+        tab: Binding<InspectorTab>,
         onScreenshot: (() -> Void)? = nil
     ) {
         self.mode = .single
@@ -453,10 +424,10 @@ extension UnifiedInspectorView {
 
     /// Create inspector for multi-cloud mode
     init(
-        multiViewModel: UnifiedSplatViewModel,
+        multiViewModel: SplatViewModel,
         document: Binding<SplatSceneDocument?>,
         selectedCloud: Binding<SplatScene.CloudReference?>,
-        tab: Binding<UnifiedInspectorTab>,
+        tab: Binding<InspectorTab>,
         onDeleteCloud: (() -> Void)? = nil,
         onScreenshot: (() -> Void)? = nil
     ) {

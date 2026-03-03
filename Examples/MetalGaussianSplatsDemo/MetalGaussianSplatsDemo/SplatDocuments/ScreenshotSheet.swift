@@ -28,7 +28,7 @@ struct TransferableImage: Transferable {
 
 struct ScreenshotSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(UnifiedSplatViewModel.self) private var viewModel
+    @Environment(SplatViewModel.self) private var viewModel
 
     let sceneTransform: simd_float4x4
     /// Cloud descriptors and their model transforms for loading fresh clouds

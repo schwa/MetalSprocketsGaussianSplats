@@ -12,7 +12,7 @@ struct SplatDocumentView: View {
 
     @State private var viewModel = SplatDocumentViewModel()
     @State private var showInspector = false
-    @State private var inspectorTab: UnifiedInspectorTab = .cloud
+    @State private var inspectorTab: InspectorTab = .cloud
     @State private var confirmedLoad = false
     @State private var showScreenshotSheet = false
     @State private var showExportDialog = false
@@ -120,7 +120,7 @@ struct SplatDocumentView: View {
                     Float(bgColor.opacity)
                 ]
 
-                UnifiedSplatContentView(
+                SplatRenderView(
                     mode: .single,
                     clouds: [splatCloud],
                     sceneTransform: viewModel.modelMatrix,
@@ -192,7 +192,7 @@ struct SplatDocumentView: View {
             }
             .disabled(immersiveState.isImmersive)
             .popover(isPresented: $showInspector) {
-                UnifiedInspectorView(
+                InspectorView(
                     singleViewModel: viewModel,
                     tab: $inspectorTab
                 )
