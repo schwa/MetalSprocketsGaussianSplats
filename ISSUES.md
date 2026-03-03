@@ -132,5 +132,7 @@ In multi-splat mode (.splatscene files), FPS drops dramatically (to ~10fps or le
 2. Rotate camera with mouse drag
 3. Observe FPS drop in Metal HUD or debug logging
 
+- 2026-03-03: Confirmed: a .splatscene file with just a single cloud reproduces the same FPS drop. Rules out multi-cloud rendering as the cause. Issue is in the multi-mode infrastructure: NavigationSplitView, .onChange handlers syncing camera to document binding, or the Binding<SplatSceneDocument?> triggering SwiftUI re-evaluation.
+
 ---
 
