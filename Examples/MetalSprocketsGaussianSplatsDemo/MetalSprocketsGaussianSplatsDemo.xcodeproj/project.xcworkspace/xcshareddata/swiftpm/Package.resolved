@@ -1,6 +1,15 @@
 {
-  "originHash" : "74202a5b3de86dbbe34ed6dbfd11dff293cada21b8384b9765480709c41e4ee4",
+  "originHash" : "6d44cfdfdddda9b7e04c33eef8e8753f8fc478de2608016fff2b2bc53e374e0e",
   "pins" : [
+    {
+      "identity" : "earcut-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/earcut-swift",
+      "state" : {
+        "revision" : "84309d9350a3e818412c4c13156af5d95d761147",
+        "version" : "0.1.0"
+      }
+    },
     {
       "identity" : "geometrylite3d",
       "kind" : "remoteSourceControl",
@@ -20,12 +29,48 @@
       }
     },
     {
+      "identity" : "metalcompilerplugin",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/MetalCompilerPlugin",
+      "state" : {
+        "revision" : "36c761478a8e3fb934acf8ef2db4696af95069b4",
+        "version" : "0.1.5"
+      }
+    },
+    {
+      "identity" : "metalsprockets",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/MetalSprockets",
+      "state" : {
+        "revision" : "a9b12fbeb174b40d4ecc68965f851fcb60a51b05",
+        "version" : "0.1.5"
+      }
+    },
+    {
+      "identity" : "metalsprocketsaddons",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/MetalSprocketsAddOns",
+      "state" : {
+        "branch" : "main",
+        "revision" : "7bbb307cd5efda853e796debe7a90d7bc3982bed"
+      }
+    },
+    {
       "identity" : "swift-algorithms",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-algorithms",
       "state" : {
         "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
         "version" : "1.2.1"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "c5d11a805e765f52ba34ec7284bd4fcd6ba68615",
+        "version" : "1.7.0"
       }
     },
     {
@@ -56,12 +101,30 @@
       }
     },
     {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "state" : {
+        "revision" : "0687f71944021d616d34d922343dcef086855920",
+        "version" : "600.0.1"
+      }
+    },
+    {
       "identity" : "swiftformats",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/SwiftFormats",
       "state" : {
         "revision" : "6b51ccec7fccf2f1d4f28f03def6c6b97d17c05b",
         "version" : "0.3.6"
+      }
+    },
+    {
+      "identity" : "zipfoundation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/weichsel/ZIPFoundation",
+      "state" : {
+        "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
+        "version" : "0.9.20"
       }
     }
   ],
