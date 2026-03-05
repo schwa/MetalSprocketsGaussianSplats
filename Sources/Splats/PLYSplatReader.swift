@@ -3,7 +3,7 @@ import simd
 
 /// Reader for PLY files containing Gaussian splat data
 /// Wraps PLYReader and converts records to GenericSplat
-public struct PLYSplatReader: SplatReader {
+public struct PLYSplatReader: SplatReaderProtocol {
     private let plyReader: PLYReader
 
     /// The degree of spherical harmonics detected in the file (0 = none, 1-3 = higher-order SH)

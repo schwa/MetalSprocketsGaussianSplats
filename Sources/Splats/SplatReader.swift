@@ -1,16 +1,33 @@
 import Foundation
 
-public protocol SplatReader {
-    var splatCount: Int { get }
+/// A splat reader that automatically selects the appropriate format reader based on file extension.
+public struct SplatReader: SplatReaderProtocol {
+    private let inner: any SplatReaderProtocol
 
-    init(url: URL) throws
-    init(data: Data) throws
-    func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws
-}
+    public var splatCount: Int {
+        inner.splatCount
+    }
 
-public extension SplatReader {
-    init(url: URL) throws {
-        let data = try Data(contentsOf: url)
-        try self.init(data: data)
+    public init(url: URL) throws {
+        switch url.pathExtension.lowercased() {
+        case "ply":
+            inner = try PLYSplatReader(url: url)
+        case "splat":
+            inner = try Antimatter15Reader(url: url)
+        case "sog":
+            inner = try SOGReaderCPU(url: url)
+        case "spz":
+            inner = try SPZReader(url: url)
+        default:
+            throw SplatsError.unsupportedFormat(url.pathExtension)
+        }
+    }
+
+    public init(data: Data) throws {
+        throw SplatsError.unsupportedFormat("unknown (data-only init requires a URL to determine format)")
+    }
+
+    public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {
+        try inner.read(handler)
     }
 }

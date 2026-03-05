@@ -16,7 +16,7 @@ public extension UTType {
 
 /// Reader for SPZ (Splat) files - a compressed format for 3D Gaussian splats
 /// Supports both version 2 and version 3 SPZ files
-public struct SPZReader: SplatReader {
+public struct SPZReader: SplatReaderProtocol {
     private let decompressedData: Data
 
     public let version: UInt32

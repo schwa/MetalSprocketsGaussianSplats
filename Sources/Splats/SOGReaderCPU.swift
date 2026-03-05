@@ -8,7 +8,7 @@ import ZIPFoundation
 
 /// Reader for SOG (Splat Optimized GPU) files
 /// Uses CPU-based conversion
-public struct SOGReaderCPU: SplatReader {
+public struct SOGReaderCPU: SplatReaderProtocol {
     private let splats: [GenericSplat]
     private let sphericalHarmonics: [[[Float]]]? // Per-splat SH coefficients, or nil if no SH data. Each splat has [[r,g,b], [r,g,b], ...]
 

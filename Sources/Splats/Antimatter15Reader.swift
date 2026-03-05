@@ -15,7 +15,7 @@ public extension UTType {
 
 /// Reader for .splat files - the Antimatter15 format for 3D Gaussian splats
 /// Each splat is 32 bytes: position (12), scale (12), color (4), rotation (4)
-public struct Antimatter15Reader: SplatReader {
+public struct Antimatter15Reader: SplatReaderProtocol {
     private let data: Data
 
     public var splatCount: Int {
