@@ -193,6 +193,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
             let event = SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count)
             Task {
                 await _sortEventChannel.send(event)
+            }
+            Task {
                 await _sortedIndicesChannel.send(result)
             }
         }

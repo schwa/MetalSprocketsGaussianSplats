@@ -117,19 +117,28 @@ public struct SparkSplatRenderPipeline: Element {
         let initialSort = try sortManager.sortNowSync(params)
         self.sortedIndices = initialSort
 
-        // Start listener for async sort updates
-        nonisolated(unsafe) let sortedIndicesRef = _sortedIndices
-        Task { @MainActor [sortManager] in
-            let channel = await sortManager.sortedIndicesChannel()
-            for await sort in channel {
-                sortedIndicesRef.wrappedValue = sort
-            }
-        }
     }
+
+    @MSState
+    private var listenerStarted: Bool = false
 
     public var body: some Element {
         get throws {
             return try renderPipeline()
+            .onChange(of: listenerStarted, initial: true) { _, _ in
+                guard !listenerStarted else {
+                    return
+                }
+                listenerStarted = true
+                nonisolated(unsafe) let sortedIndicesRef = _sortedIndices
+                Task { @MainActor [sortManager] in
+                    let channel = await sortManager.sortedIndicesChannel()
+                    for await sort in channel {
+                        sortedIndicesRef.wrappedValue = sort
+                    }
+                }
+
+            }
             .onChange(of: cameraMatrices) {
                 if sortingEnabled {
                     requestSort()
@@ -171,8 +180,6 @@ public struct SparkSplatRenderPipeline: Element {
         let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
         let amplificationCount = cameraMatrices.count
         let device = _MTLCreateSystemDefaultDevice()
-
-        print(sortedIndices.parameters)
 
         // Build per-cloud data array
         var cloudDataArray: [SplatCloudData] = []
