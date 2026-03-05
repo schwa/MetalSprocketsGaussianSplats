@@ -52,7 +52,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Option(help: "Camera far clipping plane")
     var far: Float = 100.0
 
-    @Option(help: "Path to splat file (.splat, .ply, .spz) to render")
+    @Option(help: "Path to splat file (.splat, .ply, .spz, .sog) to render")
     var splat: String?
 
     @Option(help: "Path to JSON configuration file")

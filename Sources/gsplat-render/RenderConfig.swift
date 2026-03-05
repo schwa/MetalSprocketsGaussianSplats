@@ -36,7 +36,7 @@ struct RenderConfig: Codable {
     /// Camera far clipping plane
     var far: Float = 100.0
 
-    /// Path to splat file (.splat, .ply, .spz) to render
+    /// Path to splat file (.splat, .ply, .spz, .sog) to render
     var splat: String
 
     /// Renderer to use: "antimatter15" or "spark"
