@@ -152,3 +152,13 @@ The 'Unified' prefix on types like UnifiedDocumentView, UnifiedSplatContentView,
 
 ---
 
+## 8: Fix AsyncChannel send blocking: split event and indices sends into separate Tasks
+status: new
+priority: medium
+kind: bug
+created: 2026-03-05
+
+In AsyncSortManager.startSorting(), _sortEventChannel.send() and _sortedIndicesChannel.send() were in the same Task. If no consumer listened to the event channel, send() would suspend forever, blocking the indices send. Fixed by splitting into separate Tasks. Also moved sort listener startup from init() to onChange(initial: true) to avoid continuous re-sorting.
+
+---
+
