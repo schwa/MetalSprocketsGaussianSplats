@@ -457,16 +457,18 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Antimatter15 splat cloud is nil"])
             }
             splatCount = cloud.count
+            let sortManager = try AsyncSortManager(device: renderer.device, splatClouds: [cloud], capacity: cloud.count)
+            let aspectRatio = Float(size.width) / Float(size.height)
+            let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
             let renderContent = try RenderPass {
-                let aspectRatio = Float(size.width) / Float(size.height)
-                let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
                 try Antimatter15SplatRenderPipeline(
                     splatCloud: cloud,
                     projectionMatrix: projectionMatrix,
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                    debugMode: .off
+                    debugMode: .off,
+                    sortManager: sortManager
                 )
             }
             rendering = try captureManager.with(enabled: capture) {

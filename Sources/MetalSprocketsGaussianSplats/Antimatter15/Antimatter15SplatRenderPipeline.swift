@@ -19,12 +19,9 @@ public struct Antimatter15SplatRenderPipeline: Element {
     @MSState
     var fragmentShader: FragmentShader
     @MSState
-    private var sortManager: AsyncSortManager<Antimatter15GPUSplat>?
-    @MSState
-    private var sortedIndices: SplatIndices?
-    @MSState
-    private var lastSortedCloud: GPUSplatCloud<Antimatter15GPUSplat>?
+    private var sortedIndices: SplatIndices
 
+    var sortManager: AsyncSortManager<Antimatter15GPUSplat>
     var vertexDescriptor: MTLVertexDescriptor
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
@@ -32,13 +29,14 @@ public struct Antimatter15SplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var debugMode: DebugMode
 
-    public init(splatCloud: GPUSplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe) throws {
+    public init(splatCloud: GPUSplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe, sortManager: AsyncSortManager<Antimatter15GPUSplat>) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
         self.debugMode = debugMode
+        self.sortManager = sortManager
 
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("Antimatter15SplatRenderShader")
 
@@ -54,49 +52,51 @@ public struct Antimatter15SplatRenderPipeline: Element {
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
         self.vertexDescriptor = vertexDescriptor
+
+        // Perform initial synchronous sort
+        let params = SortParameters(camera: cameraMatrix, model: modelMatrix, reversed: false)
+        self.sortedIndices = try sortManager.sortNowSync(params)
     }
+
+    @MSState
+    private var listenerStarted: Bool = false
 
     public var body: some Element {
         get throws {
             // Concatenate outer modelMatrix with per-cloud transform
             let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
 
-            try Group {
-                if let indexedDistancesBuffer = sortedIndices?.indices {
-                    try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-                        Draw { commandEncoder in
-                            let vertices: [SIMD2<Float>] = [
-                                [-1, -1], [-1, 1], [1, -1], [1, 1]
-                            ]
-                            if debugMode == .wireframe {
-                                commandEncoder.setTriangleFillMode(.lines)
-                            }
-                            commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                            commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
-                        }
-                        .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
-                        .parameter("indexedDistances", buffer: indexedDistancesBuffer.unsafeMTLBuffer)
-                        .parameter("modelMatrix", value: combinedModelMatrix)
-                        .parameter("viewMatrix", value: cameraMatrix.inverse)
-                        .parameter("projectionMatrix", value: projectionMatrix)
-                        .parameter("drawableSize", value: drawableSize)
-                        .parameter("scale", value: Float(2.0))
+            try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
+                Draw { commandEncoder in
+                    let vertices: [SIMD2<Float>] = [
+                        [-1, -1], [-1, 1], [1, -1], [1, 1]
+                    ]
+                    if debugMode == .wireframe {
+                        commandEncoder.setTriangleFillMode(.lines)
                     }
-                    .vertexDescriptor(vertexDescriptor)
-                    .renderPipelineDescriptorModifier { renderPipelineDescriptor in
-                        renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
-                        renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
-                        renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
-                        renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
-                        renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-                        renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-                        renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-                    }
+                    commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
+                    commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
                 }
+                .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
+                .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
+                .parameter("modelMatrix", value: combinedModelMatrix)
+                .parameter("viewMatrix", value: cameraMatrix.inverse)
+                .parameter("projectionMatrix", value: projectionMatrix)
+                .parameter("drawableSize", value: drawableSize)
+                .parameter("scale", value: Float(2.0))
+            }
+            .vertexDescriptor(vertexDescriptor)
+            .renderPipelineDescriptorModifier { renderPipelineDescriptor in
+                renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
+                renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
+                renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
+                renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
+                renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+                renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+                renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
             }
             .onChange(of: debugMode) {
                 do {
-                    // Update shaders with new constants when debugMode changes
                     let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("Antimatter15SplatRenderShader")
                     var fragmentConstants = FunctionConstants()
                     fragmentConstants["debug_mode"] = .int32(debugMode.rawValue)
@@ -106,42 +106,18 @@ public struct Antimatter15SplatRenderPipeline: Element {
                     fatalError("Failed to update shaders: \(error)")
                 }
             }
-            .onChange(of: splatCloud, initial: true) { _, _ in
-                // Invalidate old sorted indices
-                sortedIndices = nil
-                lastSortedCloud = splatCloud
-
-                // Do initial synchronous sort so we have indices for first render
-                let device = _MTLCreateSystemDefaultDevice()
-                let combinedModel = modelMatrix * splatCloud.modelTransform
-                let initialSort = try! CPUSplatRadixSorter.sort(
-                    device: device,
-                    splats: splatCloud.splats,
-                    camera: cameraMatrix,
-                    model: combinedModel,
-                    reversed: false
-                )
-                sortedIndices = initialSort
-
-                // Set up the async sort manager for subsequent updates
-                let newSortManager = try! AsyncSortManager(device: device, splatClouds: [splatCloud], capacity: splatCloud.count, logger: logger)
-                sortManager = newSortManager
-                nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
-                Task { @MainActor [sortManager = newSortManager, logger] in
+            .onChange(of: listenerStarted, initial: true) { _, _ in
+                guard !listenerStarted else {
+                    return
+                }
+                listenerStarted = true
+                nonisolated(unsafe) let sortedIndicesRef = _sortedIndices
+                Task { @MainActor [sortManager] in
                     let channel = await sortManager.sortedIndicesChannel()
-                    var lastSortTime: TimeInterval = 0
                     for await sort in channel {
-                        if sort.parameters.time < lastSortTime {
-                            logger?.error("Out of order sort")
-                            continue
-                        }
-                        lastSortTime = sort.parameters.time
                         sortedIndicesRef.wrappedValue = sort
                     }
                 }
-
-                // Request immediate sort for new cloud
-                requestSort()
             }
             .onChange(of: cameraMatrix) {
                 requestSort()
@@ -153,10 +129,6 @@ public struct Antimatter15SplatRenderPipeline: Element {
     }
 
     func requestSort() {
-        guard let sortManager else {
-            fatalError("No sort manager")
-        }
-        // Pass only the scene-level modelMatrix; sorter combines with cloud.modelTransform
         let parameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
         sortManager.requestSort(parameters)
     }
