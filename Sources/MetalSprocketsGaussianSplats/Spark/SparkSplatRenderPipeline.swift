@@ -129,23 +129,7 @@ public struct SparkSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            // Compute view matrices (inverse of camera matrices)
-            let viewMatrices = cameraMatrices.map(\.inverse)
-
-            // Extract camera positions from camera matrices
-            let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
-
-            // Amplification count for stereo rendering
-            let amplificationCount = cameraMatrices.count
-
-            let indexedDistancesBuffer = sortedIndices.indices
-
-            return try renderPipeline(
-                indexedDistancesBuffer: indexedDistancesBuffer,
-                viewMatrices: viewMatrices,
-                cameraPositions: cameraPositions,
-                amplificationCount: amplificationCount
-            )
+            return try renderPipeline()
             .onChange(of: cameraMatrices) {
                 if sortingEnabled {
                     requestSort()
@@ -182,13 +166,13 @@ public struct SparkSplatRenderPipeline: Element {
 
     // MARK: - Render Pipeline
 
-    private func renderPipeline(
-        indexedDistancesBuffer: TypedMTLBuffer<IndexedDistance>,
-        viewMatrices: [simd_float4x4],
-        cameraPositions: [SIMD3<Float>],
-        amplificationCount: Int
-    ) throws -> some Element {
+    private func renderPipeline() throws -> some Element {
+        let viewMatrices = cameraMatrices.map(\.inverse)
+        let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
+        let amplificationCount = cameraMatrices.count
         let device = _MTLCreateSystemDefaultDevice()
+
+        print(sortedIndices.parameters)
 
         // Build per-cloud data array
         var cloudDataArray: [SplatCloudData] = []
@@ -243,7 +227,7 @@ public struct SparkSplatRenderPipeline: Element {
                 commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
                 commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)
             }
-            .parameter("indexedDistances", buffer: indexedDistancesBuffer.unsafeMTLBuffer)
+            .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
             .parameter("viewMatrices", values: viewMatrices)
             .parameter("projectionMatrices", values: projectionMatrices)
             .parameter("drawableSize", value: drawableSize)
