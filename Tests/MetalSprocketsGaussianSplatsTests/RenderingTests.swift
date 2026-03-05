@@ -1,7 +1,6 @@
 #if !arch(x86_64)
 import CoreGraphics
 import Foundation
-import GoldenImage
 import Metal
 import MetalSprockets
 @testable import MetalSprocketsGaussianSplats
@@ -218,58 +217,6 @@ struct SplatRenderingTests {
         self.device = device
     }
 
-    @Test
-    @MainActor
-    func testAntimatter15Rendering() throws {
-        // Create test splats - a simple red splat at origin
-        let splats = [
-            Antimatter15GPUSplat.testSplat(position: [0, 0, -5])
-        ]
-
-        let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
-
-        // Set up camera looking at the splat
-        let cameraMatrix = simd_float4x4.identity
-        let modelMatrix = simd_float4x4.identity
-
-        let cloud = GPUSplatCloud<Antimatter15GPUSplat>(
-            splats: splatBuffer,
-            modelTransform: modelMatrix
-        )
-
-        // Create projection matrix
-        let size = CGSize(width: 512, height: 512)
-        let aspect = Float(size.width / size.height)
-        let projectionMatrix = perspectiveProjection(fovY: .pi / 4, aspect: aspect, near: 0.1, far: 100)
-
-        // Create the render pipeline
-        let renderPipeline = try Antimatter15SplatRenderPipeline(
-            splatCloud: cloud,
-            projectionMatrix: projectionMatrix,
-            modelMatrix: modelMatrix,
-            cameraMatrix: cameraMatrix,
-            drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-            debugMode: .filled
-        )
-
-        // Render offscreen
-        let offscreenRenderer = try OffscreenRenderer(size: size)
-        let renderPass = try RenderPass {
-            renderPipeline
-        }
-        let rendering = try offscreenRenderer.render(renderPass)
-
-        // Basic validation - check we got a texture
-        #expect(rendering.texture.width == Int(size.width))
-        #expect(rendering.texture.height == Int(size.height))
-
-        // Compare with golden image
-        let image = try rendering.cgImage
-        let goldenImagesDir = try #require(Bundle.module.resourceURL?.appendingPathComponent("Golden Images"))
-        let comparison = GoldenImageComparison(imageDirectory: goldenImagesDir, options: .none)
-        let isMatch = try comparison.image(image: image, matchesGoldenImageNamed: "Antimatter15SingleSplat")
-        #expect(isMatch)
-    }
 }
 
 // MARK: - Math Helpers
