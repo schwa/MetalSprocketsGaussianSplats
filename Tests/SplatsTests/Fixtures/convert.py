@@ -24,10 +24,9 @@ def process_ply_to_splat(ply_file_path):
                 dtype=np.float32,
             )
         )
-        # PLY uses WXYZ order (rot_0=w, rot_1=x, rot_2=y, rot_3=z)
-        # Antimatter15 format uses XYZW order
+        # Both PLY and Antimatter15 format use WXYZ order (real part first)
         rot = np.array(
-            [v["rot_1"], v["rot_2"], v["rot_3"], v["rot_0"]],  # Convert WXYZ to XYZW
+            [v["rot_0"], v["rot_1"], v["rot_2"], v["rot_3"]],
             dtype=np.float32,
         )
         SH_C0 = 0.28209479177387814
