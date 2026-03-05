@@ -17,9 +17,7 @@ public struct SparkSplatRenderPipeline: Element {
     var sortManager: AsyncSortManager<SparkSplat>
     var sortingEnabled: Bool = true
     @MSState
-    private var sortedIndices: SplatIndices?
-    @MSState
-    private var lastSortedClouds: [GPUSplatCloud<SparkSplat>]?
+    private var sortedIndices: SplatIndices
     @MSState
     var vertexShader: VertexShader
     @MSState
@@ -112,12 +110,22 @@ public struct SparkSplatRenderPipeline: Element {
         vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
         self.vertexDescriptor = vertexDescriptor
 
-        // Store provided sort manager (if any) - internal one created lazily in body if needed
         self.sortManager = sortManager
-    }
 
-    @MSState
-    private var listenerStarted: Bool = false
+        // Perform initial synchronous sort
+        let params = SortParameters(camera: cameraMatrices[0], model: modelMatrix, reversed: false)
+        let initialSort = try sortManager.sortNowSync(params)
+        self.sortedIndices = initialSort
+
+        // Start listener for async sort updates
+        nonisolated(unsafe) let sortedIndicesRef = _sortedIndices
+        Task { @MainActor [sortManager] in
+            let channel = await sortManager.sortedIndicesChannel()
+            for await sort in channel {
+                sortedIndicesRef.wrappedValue = sort
+            }
+        }
+    }
 
     public var body: some Element {
         get throws {
@@ -130,29 +138,7 @@ public struct SparkSplatRenderPipeline: Element {
             // Amplification count for stereo rendering
             let amplificationCount = cameraMatrices.count
 
-            // Start listener for async sort updates (once)
-            if !listenerStarted {
-                listenerStarted = true
-                nonisolated(unsafe) let sortedIndicesRef = _sortedIndices
-                Task { @MainActor [sortManager] in
-                    let channel = await sortManager.sortedIndicesChannel()
-                    for await sort in channel {
-                        sortedIndicesRef.wrappedValue = sort
-                    }
-                }
-            }
-
-            // Get sorted indices - perform sync sort if not yet sorted
-            let indexedDistancesBuffer: TypedMTLBuffer<IndexedDistance>
-            if let existing = sortedIndices?.indices {
-                indexedDistancesBuffer = existing
-            } else {
-                // First render - do a synchronous sort
-                let params = SortParameters(camera: cameraMatrices[0], model: modelMatrix, reversed: false)
-                let sorted = try sortManager.sortNowSync(params)
-                sortedIndices = sorted
-                indexedDistancesBuffer = sorted.indices
-            }
+            let indexedDistancesBuffer = sortedIndices.indices
 
             return try renderPipeline(
                 indexedDistancesBuffer: indexedDistancesBuffer,
