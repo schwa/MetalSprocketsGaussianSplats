@@ -162,3 +162,13 @@ In AsyncSortManager.startSorting(), _sortEventChannel.send() and _sortedIndicesC
 
 ---
 
+## 9: renderTargetArrayLength = 1 required on macOS due to visionOS cruft
+status: new
+priority: medium
+kind: bug
+created: 2026-03-05
+
+SparkSplatRenderPipeline requires .renderPassDescriptorModifier { $0.renderTargetArrayLength = 1 } on macOS. This is visionOS stereo rendering cruft leaking into macOS. Should be handled internally by the pipeline or MetalSprockets so callers don't need to set it.
+
+---
+

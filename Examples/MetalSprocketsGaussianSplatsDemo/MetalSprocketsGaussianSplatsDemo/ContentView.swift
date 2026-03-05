@@ -19,7 +19,7 @@ struct ContentView: View {
     init() {
         let device = MTLCreateSystemDefaultDevice()!
         let url = Bundle.main.url(forResource: "butterfly-wings-closed", withExtension: "spz")!
-        let reader = try! SPZReader(url: url)
+        let reader = try! SplatReader(url: url)
         var splats: [SparkSplat] = []
         splats.reserveCapacity(reader.splatCount)
         try! reader.read { _, extendedSplat in
