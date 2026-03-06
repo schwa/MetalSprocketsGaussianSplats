@@ -1,3 +1,4 @@
+#if os(iOS) || os(macOS)
 import CoreGraphics
 import GeometryLite3D
 import ImageIO
@@ -241,3 +242,4 @@ struct ScreenshotSheet: View {
         return try rendering.cgImage
     }
 }
+#endif
