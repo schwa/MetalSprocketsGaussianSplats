@@ -216,7 +216,6 @@ struct SplatRenderingTests {
         }
         self.device = device
     }
-
 }
 
 // MARK: - Math Helpers

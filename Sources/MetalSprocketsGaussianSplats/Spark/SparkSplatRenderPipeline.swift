@@ -116,7 +116,6 @@ public struct SparkSplatRenderPipeline: Element {
         let params = SortParameters(camera: cameraMatrices[0], model: modelMatrix, reversed: false)
         let initialSort = try sortManager.sortNowSync(params)
         self.sortedIndices = initialSort
-
     }
 
     @MSState
@@ -124,7 +123,7 @@ public struct SparkSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            return try renderPipeline()
+            try renderPipeline()
             .onChange(of: listenerStarted, initial: true) { _, _ in
                 guard !listenerStarted else {
                     return
@@ -137,7 +136,6 @@ public struct SparkSplatRenderPipeline: Element {
                         sortedIndicesRef.wrappedValue = sort
                     }
                 }
-
             }
             .onChange(of: cameraMatrices) {
                 if sortingEnabled {

@@ -23,7 +23,7 @@ public struct SplatReader: SplatReaderProtocol {
         }
     }
 
-    public init(data: Data) throws {
+    public init(data _: Data) throws {
         throw SplatsError.unsupportedFormat("unknown (data-only init requires a URL to determine format)")
     }
 

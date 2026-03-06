@@ -7,7 +7,7 @@ let package = Package(
     platforms: [
         .macOS(.v15),
         .iOS(.v18),
-        .visionOS(.v26),
+        .visionOS(.v26)
     ],
     products: [
         .library(
@@ -21,7 +21,7 @@ let package = Package(
         .executable(
             name: "gsplat-render",
             targets: ["gsplat-render"]
-        ),
+        )
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
@@ -32,7 +32,7 @@ let package = Package(
         .package(url: "https://github.com/schwa/MetalSprocketsAddOns", branch: "main"),
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
-        .package(url: "https://github.com/schwa/GoldenImage", branch: "main"),
+        .package(url: "https://github.com/schwa/GoldenImage", branch: "main")
     ],
     targets: [
         .target(
@@ -42,10 +42,10 @@ let package = Package(
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
                 .product(name: "GeometryLite3D", package: "GeometryLite3D"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
-                .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
+                .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin")
             ],
             resources: [
-                .copy("Empty.txt"),
+                .copy("Empty.txt")
             ]
         ),
         .target(
@@ -58,7 +58,7 @@ let package = Package(
                 .product(name: "MetalSprocketsUI", package: "MetalSprockets"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "Collections", package: "swift-collections"),
-                .product(name: "GeometryLite3D", package: "GeometryLite3D"),
+                .product(name: "GeometryLite3D", package: "GeometryLite3D")
             ],
             resources: [
                 .process("Resources/LDR_RGBA_0.png")
@@ -67,7 +67,7 @@ let package = Package(
         .target(
             name: "MetalSprocketsGaussianSplatShaders",
             dependencies: [
-                .product(name: "MetalSprocketsAddOnsShaders", package: "MetalSprocketsAddOns"),
+                .product(name: "MetalSprocketsAddOnsShaders", package: "MetalSprocketsAddOns")
             ],
             exclude: ["Metal"],
             plugins: [
@@ -80,7 +80,7 @@ let package = Package(
                 "MetalSprocketsGaussianSplats",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
-                .product(name: "GeometryLite3D", package: "GeometryLite3D"),
+                .product(name: "GeometryLite3D", package: "GeometryLite3D")
             ]
         ),
         .testTarget(
@@ -88,7 +88,7 @@ let package = Package(
             dependencies: [
                 "MetalSprocketsGaussianSplats",
                 "MetalSprocketsGaussianSplatShaders",
-                "GoldenImage",
+                "GoldenImage"
             ],
             resources: [
                 .copy("Fixtures"),
@@ -100,9 +100,9 @@ let package = Package(
             dependencies: [
                 "Splats",
                 "MetalSprocketsGaussianSplatShaders",
-                .product(name: "GeometryLite3D", package: "GeometryLite3D"),
+                .product(name: "GeometryLite3D", package: "GeometryLite3D")
             ],
             resources: [.copy("Fixtures")]
-        ),
+        )
     ]
 )

@@ -27,7 +27,8 @@ struct GoldenImageRenderingTests {
     @Test @MainActor
     func testSparkRenderRainbowRing() throws {
         let image = try renderSplatsWithSpark(
-            fixture: "RainbowRing", extension: "splat",
+            fixture: "RainbowRing",
+            extension: "splat",
             cameraPosition: [0.1, 0.5, 3],
             size: CGSize(width: 512, height: 512)
         )
@@ -37,7 +38,8 @@ struct GoldenImageRenderingTests {
     @Test @MainActor
     func testSparkRenderSixSplats() throws {
         let image = try renderSplatsWithSpark(
-            fixture: "6Splats", extension: "splat",
+            fixture: "6Splats",
+            extension: "splat",
             cameraPosition: [0.1, 0.5, 5],
             size: CGSize(width: 512, height: 512)
         )
@@ -47,7 +49,8 @@ struct GoldenImageRenderingTests {
     @Test @MainActor
     func testSparkRenderTestGrid() throws {
         let image = try renderSplatsWithSpark(
-            fixture: "test-grid", extension: "spz",
+            fixture: "test-grid",
+            extension: "spz",
             cameraPosition: [0.1, 5, 5],
             size: CGSize(width: 512, height: 512)
         )
@@ -59,7 +62,8 @@ struct GoldenImageRenderingTests {
     @Test @MainActor
     func testAntimatter15RenderRainbowRing() throws {
         let image = try renderSplatsWithAntimatter15(
-            fixture: "RainbowRing", extension: "splat",
+            fixture: "RainbowRing",
+            extension: "splat",
             cameraPosition: [0.1, 0.5, 3],
             size: CGSize(width: 512, height: 512)
         )
@@ -69,7 +73,8 @@ struct GoldenImageRenderingTests {
     @Test @MainActor
     func testAntimatter15RenderSixSplats() throws {
         let image = try renderSplatsWithAntimatter15(
-            fixture: "6Splats", extension: "splat",
+            fixture: "6Splats",
+            extension: "splat",
             cameraPosition: [0.1, 0.5, 5],
             size: CGSize(width: 512, height: 512)
         )
