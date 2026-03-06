@@ -1,5 +1,5 @@
 {
-  "originHash" : "15eec8ad12abe8a80b1ac80efb0b25d4f83d0fc67862963d9cc7faa1299bcb8d",
+  "originHash" : "136ac35ee4b25ed68b728c909c6a6ea2bbdb93bd3ef2005d6e9d831a4bd29d56",
   "pins" : [
     {
       "identity" : "earcut-swift",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GoldenImage",
       "state" : {
-        "revision" : "7ac44e80ad0fa3483e952a57e03f8fca7a375327",
-        "version" : "0.1.0"
+        "revision" : "6f134ad54fa8877c8245775078986038ea38ac42",
+        "version" : "0.1.2"
       }
     },
     {
