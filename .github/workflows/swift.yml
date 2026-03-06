@@ -56,8 +56,8 @@ jobs:
               "extra-cpp-flags": []
           }
           EOF
-      - name: Build (iOS)
-        run: swift build -v --product MetalSprocketsGaussianSplats --destination .ios-destination.json
+      - name: Build Libraries (iOS)
+        run: swift build -v --product Splats --product MetalSprocketsGaussianSplats --destination .ios-destination.json
 
   build-visionos:
     runs-on: "macos-26"
@@ -81,8 +81,8 @@ jobs:
               "extra-cpp-flags": []
           }
           EOF
-      - name: Build (visionOS)
-        run: swift build -v --product MetalSprocketsGaussianSplats --destination .visionos-destination.json
+      - name: Build Libraries (visionOS)
+        run: swift build -v --product Splats --product MetalSprocketsGaussianSplats --destination .visionos-destination.json
 
   build-simple-demo:
     runs-on: "macos-26"
