@@ -852,7 +852,9 @@ struct CloudListRow: View {
         HStack(spacing: 8) {
             Toggle("", isOn: $cloud.enabled)
                 .labelsHidden()
+                #if os(macOS)
                 .toggleStyle(.checkbox)
+                #endif
 
             Text(cloud.displayName ?? "Unknown")
                 .lineLimit(1)
