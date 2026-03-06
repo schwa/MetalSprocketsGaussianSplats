@@ -1,5 +1,5 @@
 {
-  "originHash" : "34c70fdbf7247df2fa76574f2836b506d42279a77a71c12c1d22a89b7d9cf7ac",
+  "originHash" : "15eec8ad12abe8a80b1ac80efb0b25d4f83d0fc67862963d9cc7faa1299bcb8d",
   "pins" : [
     {
       "identity" : "earcut-swift",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GoldenImage",
       "state" : {
-        "branch" : "main",
-        "revision" : "58067df0fd0f4fe522dfd6d48469e9f1ca0dfdd2"
+        "revision" : "7ac44e80ad0fa3483e952a57e03f8fca7a375327",
+        "version" : "0.1.0"
       }
     },
     {
@@ -52,7 +52,7 @@
       "location" : "https://github.com/schwa/MetalSprocketsAddOns",
       "state" : {
         "branch" : "main",
-        "revision" : "625b73a349c6ef0914d1febf4607ce571a91a09b"
+        "revision" : "7bbb307cd5efda853e796debe7a90d7bc3982bed"
       }
     },
     {
@@ -69,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms",
       "state" : {
-        "revision" : "2971dd5d9f6e0515664b01044826bcea16e59fac",
-        "version" : "1.1.2"
+        "revision" : "9d349bcc328ac3c31ce40e746b5882742a0d1272",
+        "version" : "1.1.3"
       }
     },
     {
