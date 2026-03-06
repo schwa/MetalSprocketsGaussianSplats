@@ -48,7 +48,7 @@ jobs:
           }
           EOF
       - name: Build (iOS)
-        run: swift build -v --destination .ios-destination.json
+        run: swift build -v --product MetalSprocketsGaussianSplats --destination .ios-destination.json
 
   build-visionos:
     runs-on: "macos-26"
@@ -73,7 +73,7 @@ jobs:
           }
           EOF
       - name: Build (visionOS)
-        run: swift build -v --destination .visionos-destination.json
+        run: swift build -v --product MetalSprocketsGaussianSplats --destination .visionos-destination.json
 
   build-simple-demo:
     runs-on: "macos-26"
