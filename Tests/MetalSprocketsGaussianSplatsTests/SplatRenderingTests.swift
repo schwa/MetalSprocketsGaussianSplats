@@ -11,7 +11,7 @@ import simd
 @testable import Splats
 import Testing
 
-@Suite
+@Suite(.disabled(if: ProcessInfo.processInfo.environment["CI"] != nil, "Golden image tests are GPU-dependent and not reliable on CI"))
 struct GoldenImageRenderingTests {
     let device: MTLDevice
 
