@@ -182,3 +182,42 @@ We need unit tests that render splats via OffscreenRenderer and compare against 
 
 ---
 
+## 11: Memory leak: AsyncChannel send Tasks accumulate holding Metal buffers
+status: new
+priority: high
+kind: bug
+labels: memory-leak, metal, async
+created: 2026-03-09
+
+In AsyncSortManager.sortNowAsync(), the fire-and-forget Task sends to both channels sequentially:
+
+```swift
+Task {
+    await _sortEventChannel.send(event)
+    await _sortedIndicesChannel.send(result)
+}
+```
+
+AsyncChannel.send() suspends until a consumer receives the value. If _sortEventChannel has no consumer (e.g. the simple demo never calls sortEventChannel()), the event send blocks forever. Because the sends are sequential, the _sortedIndicesChannel send is never reached either. The Task suspends indefinitely, holding a reference to result which contains a TypedMTLBuffer<IndexedDistance> (a Metal buffer).
+
+Every call to sortNowAsync leaks one Metal buffer via a suspended Task. Combined with #12 (sortNowSync called every frame from init), this produces the unbounded accumulation of splats-indexed_distances buffers visible in the GPU debugger.
+
+Affected code: Sources/MetalSprocketsGaussianSplats/Sorting/AsyncSortManager.swift — the Task in sortNowAsync() that sends to both _sortEventChannel and _sortedIndicesChannel sequentially.
+
+---
+
+## 12: sortNowSync called in SparkSplatRenderPipeline.init runs every frame
+status: new
+priority: high
+kind: bug
+labels: performance
+created: 2026-03-09
+
+SparkSplatRenderPipeline.init calls sortManager.sortNowSync() to perform an initial sort. Because the struct is recreated every frame as part of the declarative render tree (inside the RenderView closure), this blocking synchronous sort runs every frame instead of once.
+
+The initial sort should be moved to an .onChange(initial: true) handler that only triggers on first creation or when the splat cloud changes.
+
+Same issue likely applies to Antimatter15SplatRenderPipeline and SparkSplatDebugRenderPipeline.
+
+---
+
