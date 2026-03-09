@@ -183,11 +183,12 @@ We need unit tests that render splats via OffscreenRenderer and compare against 
 ---
 
 ## 11: Memory leak: AsyncChannel send Tasks accumulate holding Metal buffers
-status: new
+status: closed
 priority: high
 kind: bug
 labels: memory-leak, metal, async
 created: 2026-03-09
+closed: 2026-03-09
 
 In AsyncSortManager.sortNowAsync(), the fire-and-forget Task sends to both channels sequentially:
 
@@ -203,6 +204,8 @@ AsyncChannel.send() suspends until a consumer receives the value. If _sortEventC
 Every call to sortNowAsync leaks one Metal buffer via a suspended Task. Combined with #12 (sortNowSync called every frame from init), this produces the unbounded accumulation of splats-indexed_distances buffers visible in the GPU debugger.
 
 Affected code: Sources/MetalSprocketsGaussianSplats/Sorting/AsyncSortManager.swift — the Task in sortNowAsync() that sends to both _sortEventChannel and _sortedIndicesChannel sequentially.
+
+- 2026-03-09: Fixed by #12. The leak was caused by sortNowSync being called every frame from init, with each call creating a suspended Task holding a Metal buffer via the blocked _sortEventChannel send. Removing sortNowSync from init eliminates the per-frame buffer accumulation.
 
 ---
 
