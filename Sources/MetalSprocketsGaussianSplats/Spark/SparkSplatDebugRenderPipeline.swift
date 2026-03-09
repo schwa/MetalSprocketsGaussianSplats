@@ -211,18 +211,10 @@ public struct SparkSplatDebugRenderPipeline: Element {
         self.vertexDescriptor = vertexDescriptor
 
         self.sortManager = sortManager
-
-        // Do initial synchronous sort
-        let parameters = SortParameters(camera: cameraMatrices[0], model: modelMatrix)
-        self._sortedIndices = MSState(wrappedValue: try sortManager.sortNowSync(parameters))
     }
 
     public var body: some Element {
         get throws {
-            let indices = sortedIndices ?? {
-                fatalError("sortedIndices not initialized - this should never happen as init performs initial sort")
-            }()
-
             // Compute view matrices (inverse of camera matrices)
             let viewMatrices = cameraMatrices.map(\.inverse)
 
@@ -233,12 +225,14 @@ public struct SparkSplatDebugRenderPipeline: Element {
             let amplificationCount = cameraMatrices.count
 
             try Group {
-                try renderPipeline(
-                    indexedDistancesBuffer: indices.indices,
-                    viewMatrices: viewMatrices,
-                    cameraPositions: cameraPositions,
-                    amplificationCount: amplificationCount
-                )
+                if let sortedIndices {
+                    try renderPipeline(
+                        indexedDistancesBuffer: sortedIndices.indices,
+                        viewMatrices: viewMatrices,
+                        cameraPositions: cameraPositions,
+                        amplificationCount: amplificationCount
+                    )
+                }
             }
             .onChange(of: listenerStarted, initial: true) { _, _ in
                 if !listenerStarted {
@@ -257,6 +251,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
                             sortedIndicesRef.wrappedValue = sort
                         }
                     }
+                    requestSort()
                 }
             }
             .onChange(of: cameraMatrices) {

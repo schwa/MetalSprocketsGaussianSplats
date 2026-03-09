@@ -17,7 +17,7 @@ public struct SparkSplatRenderPipeline: Element {
     var sortManager: AsyncSortManager<SparkSplat>
     var sortingEnabled: Bool = true
     @MSState
-    private var sortedIndices: SplatIndices
+    private var sortedIndices: SplatIndices?
     @MSState
     var vertexShader: VertexShader
     @MSState
@@ -111,11 +111,6 @@ public struct SparkSplatRenderPipeline: Element {
         self.vertexDescriptor = vertexDescriptor
 
         self.sortManager = sortManager
-
-        // Perform initial synchronous sort
-        let params = SortParameters(camera: cameraMatrices[0], model: modelMatrix, reversed: false)
-        let initialSort = try sortManager.sortNowSync(params)
-        self.sortedIndices = initialSort
     }
 
     @MSState
@@ -123,7 +118,11 @@ public struct SparkSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            try renderPipeline()
+            try Group {
+                if let sortedIndices {
+                    try renderPipeline(sortedIndices: sortedIndices)
+                }
+            }
             .onChange(of: listenerStarted, initial: true) { _, _ in
                 guard !listenerStarted else {
                     return
@@ -136,6 +135,7 @@ public struct SparkSplatRenderPipeline: Element {
                         sortedIndicesRef.wrappedValue = sort
                     }
                 }
+                requestSort()
             }
             .onChange(of: cameraMatrices) {
                 if sortingEnabled {
@@ -173,7 +173,7 @@ public struct SparkSplatRenderPipeline: Element {
 
     // MARK: - Render Pipeline
 
-    private func renderPipeline() throws -> some Element {
+    private func renderPipeline(sortedIndices: SplatIndices) throws -> some Element {
         let viewMatrices = cameraMatrices.map(\.inverse)
         let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
         let amplificationCount = cameraMatrices.count

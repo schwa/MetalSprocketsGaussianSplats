@@ -19,7 +19,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
     @MSState
     var fragmentShader: FragmentShader
     @MSState
-    private var sortedIndices: SplatIndices
+    private var sortedIndices: SplatIndices?
 
     var sortManager: AsyncSortManager<Antimatter15GPUSplat>
     var vertexDescriptor: MTLVertexDescriptor
@@ -52,10 +52,6 @@ public struct Antimatter15SplatRenderPipeline: Element {
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
         self.vertexDescriptor = vertexDescriptor
-
-        // Perform initial synchronous sort
-        let params = SortParameters(camera: cameraMatrix, model: modelMatrix, reversed: false)
-        self.sortedIndices = try sortManager.sortNowSync(params)
     }
 
     @MSState
@@ -63,37 +59,41 @@ public struct Antimatter15SplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            // Concatenate outer modelMatrix with per-cloud transform
-            let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
+            try Group {
+                if let sortedIndices {
+                    // Concatenate outer modelMatrix with per-cloud transform
+                    let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
 
-            try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-                Draw { commandEncoder in
-                    let vertices: [SIMD2<Float>] = [
-                        [-1, -1], [-1, 1], [1, -1], [1, 1]
-                    ]
-                    if debugMode == .wireframe {
-                        commandEncoder.setTriangleFillMode(.lines)
+                    try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
+                        Draw { commandEncoder in
+                            let vertices: [SIMD2<Float>] = [
+                                [-1, -1], [-1, 1], [1, -1], [1, 1]
+                            ]
+                            if debugMode == .wireframe {
+                                commandEncoder.setTriangleFillMode(.lines)
+                            }
+                            commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
+                            commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
+                        }
+                        .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
+                        .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
+                        .parameter("modelMatrix", value: combinedModelMatrix)
+                        .parameter("viewMatrix", value: cameraMatrix.inverse)
+                        .parameter("projectionMatrix", value: projectionMatrix)
+                        .parameter("drawableSize", value: drawableSize)
+                        .parameter("scale", value: Float(2.0))
                     }
-                    commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                    commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
+                    .vertexDescriptor(vertexDescriptor)
+                    .renderPipelineDescriptorModifier { renderPipelineDescriptor in
+                        renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
+                        renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
+                        renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
+                        renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
+                        renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+                        renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+                        renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+                    }
                 }
-                .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
-                .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
-                .parameter("modelMatrix", value: combinedModelMatrix)
-                .parameter("viewMatrix", value: cameraMatrix.inverse)
-                .parameter("projectionMatrix", value: projectionMatrix)
-                .parameter("drawableSize", value: drawableSize)
-                .parameter("scale", value: Float(2.0))
-            }
-            .vertexDescriptor(vertexDescriptor)
-            .renderPipelineDescriptorModifier { renderPipelineDescriptor in
-                renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
-                renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
-                renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
-                renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
-                renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-                renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-                renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
             }
             .onChange(of: debugMode) {
                 do {
@@ -118,6 +118,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
                         sortedIndicesRef.wrappedValue = sort
                     }
                 }
+                requestSort()
             }
             .onChange(of: cameraMatrix) {
                 requestSort()

@@ -207,17 +207,20 @@ Affected code: Sources/MetalSprocketsGaussianSplats/Sorting/AsyncSortManager.swi
 ---
 
 ## 12: sortNowSync called in SparkSplatRenderPipeline.init runs every frame
-status: new
+status: closed
 priority: high
 kind: bug
 labels: performance
 created: 2026-03-09
+closed: 2026-03-09
 
 SparkSplatRenderPipeline.init calls sortManager.sortNowSync() to perform an initial sort. Because the struct is recreated every frame as part of the declarative render tree (inside the RenderView closure), this blocking synchronous sort runs every frame instead of once.
 
 The initial sort should be moved to an .onChange(initial: true) handler that only triggers on first creation or when the splat cloud changes.
 
 Same issue likely applies to Antimatter15SplatRenderPipeline and SparkSplatDebugRenderPipeline.
+
+- 2026-03-09: Moved sortNowSync out of init into onChange(initial: true) for all three render pipelines. sortedIndices is now optional, rendering skipped until first sort completes.
 
 ---
 
