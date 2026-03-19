@@ -227,3 +227,12 @@ Same issue likely applies to Antimatter15SplatRenderPipeline and SparkSplatDebug
 
 ---
 
+## 13: Stop using placeholder Metal debug labels
+status: new
+priority: medium
+kind: none
+created: 2026-03-19
+
+
+---
+
