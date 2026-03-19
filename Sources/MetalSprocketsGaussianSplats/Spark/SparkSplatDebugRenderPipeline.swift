@@ -291,7 +291,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         }
 
         // Create buffer for cloud data array
-        let cloudDataBuffer = try device.makeTypedBuffer(values: cloudDataArray, options: [])
+        let cloudDataBuffer = try device.makeTypedBuffer(values: cloudDataArray, options: []).labeled("CloudData")
 
         // Create the argument buffer struct
         let argumentBuffer = MultiCloudArgumentBuffer(
