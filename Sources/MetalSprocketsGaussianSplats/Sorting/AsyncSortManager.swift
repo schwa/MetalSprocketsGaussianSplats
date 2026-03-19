@@ -51,8 +51,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         self.logger = nil
         let channel = _sortRequestChannel
         self.sortingTask = Task(priority: .high) { [weak self] in
-            let processedChannel = channel.removeDuplicates { $0 == $1 }._throttle(for: .milliseconds(33.3333))
-            for await parameters in processedChannel {
+            // TODO: restore throttle/dedupe after fixing leak
+            for await parameters in channel {
                 guard let self else { break }
                 do {
                     try await self.processSortRequest(parameters, logger: nil)
@@ -72,8 +72,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         self.logger = logger
         let channel = _sortRequestChannel
         self.sortingTask = Task(priority: .high) { [weak self] in
-            let processedChannel = channel.removeDuplicates { $0 == $1 }._throttle(for: .milliseconds(33.3333))
-            for await parameters in processedChannel {
+            // TODO: restore throttle/dedupe after fixing leak
+            for await parameters in channel {
                 guard let self else { break }
                 do {
                     try await self.processSortRequest(parameters, logger: logger)
@@ -94,6 +94,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     deinit {
         sortingTask?.cancel()
         _sortRequestChannel.finish()
+        _sortedIndicesChannel.finish()
+        _sortEventChannel.finish()
     }
 
     public func sortedIndicesChannel() -> AsyncChannel<SplatIndices> {
