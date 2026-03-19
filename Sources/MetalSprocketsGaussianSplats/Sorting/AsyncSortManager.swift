@@ -36,6 +36,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     private var _sortEventChannel: AsyncChannel<SortEvent> = .init()
     private var logger: Logger?
     private var sorter: CPUSplatRadixSorter<Splat>
+    nonisolated(unsafe) private var sortingTask: Task<Void, Never>?
 
     /// Whether at least one sort has completed
     public private(set) var isSorted: Bool = false
@@ -48,13 +49,18 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         self.sorter = .init(device: device, capacity: capacity)
         self.splatClouds = splatClouds
         self.logger = nil
-        Task(priority: .high) {
-            do {
-                try await self.startSorting()
-            } catch is CancellationError {
-                // This line intentionally left blank.
-            } catch {
-                // Silently fail - no logger
+        let channel = _sortRequestChannel
+        self.sortingTask = Task(priority: .high) { [weak self] in
+            let processedChannel = channel.removeDuplicates { $0 == $1 }._throttle(for: .milliseconds(33.3333))
+            for await parameters in processedChannel {
+                guard let self else { break }
+                do {
+                    try await self.processSortRequest(parameters, logger: nil)
+                } catch is CancellationError {
+                    break
+                } catch {
+                    // Silently fail - no logger
+                }
             }
         }
     }
@@ -64,13 +70,18 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         self.sorter = .init(device: device, capacity: capacity)
         self.splatClouds = splatClouds
         self.logger = logger
-        Task(priority: .high) {
-            do {
-                try await self.startSorting()
-            } catch is CancellationError {
-                // This line intentionally left blank.
-            } catch {
-                logger?.log("Failed to sort splats: \(error)")
+        let channel = _sortRequestChannel
+        self.sortingTask = Task(priority: .high) { [weak self] in
+            let processedChannel = channel.removeDuplicates { $0 == $1 }._throttle(for: .milliseconds(33.3333))
+            for await parameters in processedChannel {
+                guard let self else { break }
+                do {
+                    try await self.processSortRequest(parameters, logger: logger)
+                } catch is CancellationError {
+                    break
+                } catch {
+                    logger?.log("Failed to sort splats: \(error)")
+                }
             }
         }
     }
@@ -78,6 +89,11 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Convenience initializer for single cloud
     public init(device: MTLDevice, splatCloud: GPUSplatCloud<Splat>, capacity: Int) throws {
         try self.init(device: device, splatClouds: [splatCloud], capacity: capacity)
+    }
+
+    deinit {
+        sortingTask?.cancel()
+        _sortRequestChannel.finish()
     }
 
     public func sortedIndicesChannel() -> AsyncChannel<SplatIndices> {
@@ -159,46 +175,41 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         return result
     }
 
-    private func startSorting() async throws {
-        let channel = _sortRequestChannel.removeDuplicates { lhs, rhs in
-            lhs == rhs
+    /// Process a single sort request
+    private func processSortRequest(_ parameters: SortParameters, logger: Logger?) throws {
+        try Task.checkCancellation()
+        assertNotMainThread("processSortRequest")
+        let start = CFAbsoluteTimeGetCurrent()
+        let currentIndexedDistances: TypedMTLBuffer<IndexedDistance>
+        let totalSplats: Int
+        if splatClouds.count == 1 {
+            // Single cloud path - combine scene model with cloud transform
+            let cloud = splatClouds[0]
+            let combinedModel = parameters.model * cloud.modelTransform
+            currentIndexedDistances = try sorter.sort(splats: cloud.splats, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
+            totalSplats = cloud.splats.count
+        } else {
+            // Multi-cloud path - sorter handles per-cloud transforms internally
+            currentIndexedDistances = try sorter.sort(clouds: splatClouds, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
+            totalSplats = splatClouds.reduce(0) { $0 + $1.splats.count }
         }
-        ._throttle(for: .milliseconds(33.3333))
+        let end = CFAbsoluteTimeGetCurrent()
+        let duration = end - start
+        if duration > 0.033 {
+            logger?.warning("### Sort took longer than expected (\(duration * 1_000) msec, \(duration / 0.033)x).")
+        }
 
-        for await parameters in channel {
-            assertNotMainThread("startSorting")
-            let start = CFAbsoluteTimeGetCurrent()
-            let currentIndexedDistances: TypedMTLBuffer<IndexedDistance>
-            let totalSplats: Int
-            if splatClouds.count == 1 {
-                // Single cloud path - combine scene model with cloud transform
-                let cloud = splatClouds[0]
-                let combinedModel = parameters.model * cloud.modelTransform
-                currentIndexedDistances = try sorter.sort(splats: cloud.splats, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
-                totalSplats = cloud.splats.count
-            } else {
-                // Multi-cloud path - sorter handles per-cloud transforms internally
-                currentIndexedDistances = try sorter.sort(clouds: splatClouds, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
-                totalSplats = splatClouds.reduce(0) { $0 + $1.splats.count }
-            }
-            let end = CFAbsoluteTimeGetCurrent()
-            let duration = end - start
-            if duration > 0.033 {
-                logger?.warning("### Sort took longer than expected (\(duration * 1_000) msec, \(duration / 0.033)x).")
-            }
+        let result = SplatIndices(parameters: parameters, indices: currentIndexedDistances)
+        currentSortedIndices = result
+        isSorted = true
 
-            let result = SplatIndices(parameters: parameters, indices: currentIndexedDistances)
-            currentSortedIndices = result
-            isSorted = true
-
-            // Fire-and-forget send to avoid blocking on channel back-pressure
-            let event = SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count)
-            Task {
-                await _sortEventChannel.send(event)
-            }
-            Task {
-                await _sortedIndicesChannel.send(result)
-            }
+        // Fire-and-forget send to avoid blocking on channel back-pressure
+        let event = SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count)
+        Task {
+            await _sortEventChannel.send(event)
+        }
+        Task {
+            await _sortedIndicesChannel.send(result)
         }
     }
 }
