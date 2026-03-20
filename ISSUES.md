@@ -236,3 +236,12 @@ created: 2026-03-19
 
 ---
 
+## 14: Make the splat renderers take sorted index buffers instead of sort managers.
+status: new
+priority: medium
+kind: none
+created: 2026-03-20
+
+
+---
+
