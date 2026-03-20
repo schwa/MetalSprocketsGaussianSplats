@@ -130,7 +130,9 @@ public struct SparkSplatRenderPipeline: Element {
                 listenerStarted = true
                 nonisolated(unsafe) let sortedIndicesRef = _sortedIndices
                 Task { @MainActor [weak sortManager] in
-                    guard let sortManager else { return }
+                    guard let sortManager else {
+                        return
+                    }
                     let channel = await sortManager.sortedIndicesChannel()
                     for await sort in channel {
                         // Channel will finish when sortManager is deallocated
