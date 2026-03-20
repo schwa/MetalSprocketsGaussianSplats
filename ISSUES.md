@@ -70,10 +70,11 @@ Possible fixes:
 ---
 
 ## 5: Refactor sorting out of pipeline element
-status: new
-priority: low
+status: open
+priority: critical
 kind: enhancement
 created: 2026-02-19
+updated: 2026-03-20
 
 Architecture refactor: Move sort management from SparkSplatRenderPipeline to the view/renderer layer. Pipeline should be pure function of inputs (splatCloud, sortedIndices, camera matrices) with no @MSState, no async, no sort management.
 
@@ -136,6 +137,7 @@ In multi-splat mode (.splatscene files), FPS drops dramatically (to ~10fps or le
 - 2026-03-03: Root cause confirmed: reading multiDocument (the @Binding<SplatSceneDocument?>) anywhere in the view body during rendering creates a SwiftUI dependency that causes aggressive re-evaluation, starving the MTKView. multiDocument is read in multiRenderView, multiModeMainContent, inspectorContent, buildBoundingBoxInfos, cloudListSidebar, and all onChange handlers. Fix requires refactoring so the ViewModel owns all state needed for rendering (cloud enabled/opacity/transform/debugColor) and multiDocument is only read/written in discrete event handlers, never in computed view body properties.
 - 2026-03-03: Deeper root cause found: The issue is NOT specific to multi-mode document binding reads. It affects single-mode too. Any inspector tab that takes @Binding from the @Observable ViewModel triggers the problem. Even $viewModel.cameraMode (which doesn't change during rotation) causes per-frame re-evaluation when passed as a Binding to a child view. This suggests that Binding created via $viewModel.property from an @Observable object causes observation of the entire object, not just that property. During camera rotation, cameraMatrix changes 60x/sec, which invalidates all views holding any Binding from the ViewModel. The SwiftUI Form layout pass in the inspector then starves the MTKView of draw calls. Affected: all inspector tabs (Camera, Render, Cloud) when they take Bindings from the ViewModel. Fix approach: decouple inspector from ViewModel bindings - use plain values with explicit write-back callbacks, or extract inspector-editable state into a separate @Observable object that doesn't include rapidly-changing properties like cameraMatrix.
 - 2026-03-03: Proposed fix: Split ViewModel into two @Observable objects. 1) RenderState: rapidly-changing properties (cameraMatrix, currentFPS, sortEvents, frameCount). Only read by the render view, never bound to SwiftUI inspector views. 2) UIState: user-editable settings (cameraMode, backgroundColor, useSphericalHarmonics, showBoundingBoxes, debugMode, etc). Changed only by discrete user actions, safe to bind to SwiftUI forms. This prevents cross-contamination: cameraMatrix changing at 60fps only invalidates the render view, not the inspector. This is likely a general architectural pattern needed for any SwiftUI + Metal app that combines a render loop with SwiftUI controls.
+- 2026-03-20: this is a swiftui issue - use the swiftui instrument.
 
 ---
 
@@ -153,10 +155,11 @@ The 'Unified' prefix on types like UnifiedDocumentView, UnifiedSplatContentView,
 ---
 
 ## 8: Fix AsyncChannel send blocking: split event and indices sends into separate Tasks
-status: new
-priority: medium
+status: open
+priority: critical
 kind: bug
 created: 2026-03-05
+updated: 2026-03-20
 
 In AsyncSortManager.startSorting(), _sortEventChannel.send() and _sortedIndicesChannel.send() were in the same Task. If no consumer listened to the event channel, send() would suspend forever, blocking the indices send. Fixed by splitting into separate Tasks. Also moved sort listener startup from init() to onChange(initial: true) to avoid continuous re-sorting.
 
@@ -237,8 +240,8 @@ created: 2026-03-19
 ---
 
 ## 14: Make the splat renderers take sorted index buffers instead of sort managers.
-status: new
-priority: medium
+status: open
+priority: critical
 kind: none
 created: 2026-03-20
 
