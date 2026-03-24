@@ -1,4 +1,5 @@
 #if os(visionOS)
+import AsyncAlgorithms
 import Foundation
 import GeometryLite3D
 import Metal
