@@ -223,7 +223,6 @@ public struct SparkSplatRenderPipeline: Element {
         }
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
     }
-
 }
 
 #endif

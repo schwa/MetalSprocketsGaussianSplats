@@ -58,33 +58,33 @@ public struct Antimatter15SplatRenderPipeline: Element {
                 let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
 
                 try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-                        Draw { commandEncoder in
-                            let vertices: [SIMD2<Float>] = [
-                                [-1, -1], [-1, 1], [1, -1], [1, 1]
-                            ]
-                            if debugMode == .wireframe {
-                                commandEncoder.setTriangleFillMode(.lines)
-                            }
-                            commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                            commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
+                    Draw { commandEncoder in
+                        let vertices: [SIMD2<Float>] = [
+                            [-1, -1], [-1, 1], [1, -1], [1, 1]
+                        ]
+                        if debugMode == .wireframe {
+                            commandEncoder.setTriangleFillMode(.lines)
                         }
-                        .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
-                        .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
-                        .parameter("modelMatrix", value: combinedModelMatrix)
-                        .parameter("viewMatrix", value: cameraMatrix.inverse)
-                        .parameter("projectionMatrix", value: projectionMatrix)
-                        .parameter("drawableSize", value: drawableSize)
-                        .parameter("scale", value: Float(2.0))
+                        commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
+                        commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
                     }
-                    .vertexDescriptor(vertexDescriptor)
-                    .renderPipelineDescriptorModifier { renderPipelineDescriptor in
-                        renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
-                        renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
-                        renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
-                        renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
-                        renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-                        renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-                        renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+                    .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
+                    .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
+                    .parameter("modelMatrix", value: combinedModelMatrix)
+                    .parameter("viewMatrix", value: cameraMatrix.inverse)
+                    .parameter("projectionMatrix", value: projectionMatrix)
+                    .parameter("drawableSize", value: drawableSize)
+                    .parameter("scale", value: Float(2.0))
+                }
+                .vertexDescriptor(vertexDescriptor)
+                .renderPipelineDescriptorModifier { renderPipelineDescriptor in
+                    renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
+                    renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
+                    renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
+                    renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
+                    renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+                    renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+                    renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
                 }
             }
             .onChange(of: debugMode) {
