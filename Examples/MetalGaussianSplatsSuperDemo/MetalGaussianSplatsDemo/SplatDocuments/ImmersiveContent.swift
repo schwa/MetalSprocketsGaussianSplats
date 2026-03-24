@@ -12,7 +12,7 @@ import simd
 struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
     let context: ImmersiveContext
     let splatCloud: GPUSplatCloud<SparkSplat>?
-    let sortManager: AsyncSortManager<SparkSplat>?
+    let sortedIndices: SplatIndices?
     let modelMatrix: simd_float4x4
     let scale: Float
     let translation: SIMD3<Float>
@@ -20,7 +20,7 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
     init(context: ImmersiveContext) throws {
         self.context = context
         self.splatCloud = ImmersiveState.shared.splatCloud
-        self.sortManager = ImmersiveState.shared.sortManager
+        self.sortedIndices = ImmersiveState.shared.sortedIndices
         self.modelMatrix = ImmersiveState.shared.modelMatrix
         self.scale = ImmersiveState.shared.scale
         self.translation = ImmersiveState.shared.translation
@@ -33,11 +33,14 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
         let headForward = -SIMD3<Float>(cameraMatrix.columns.2.x, cameraMatrix.columns.2.y, cameraMatrix.columns.2.z)
         ImmersiveState.shared.headPosition = headPosition
         ImmersiveState.shared.headForward = headForward
+
+        // Request sort with current camera
+        ImmersiveState.shared.requestSort(cameraMatrix: cameraMatrix)
     }
 
     nonisolated var body: some Element {
         get throws {
-            if let splatCloud, let sortManager {
+            if let splatCloud, let sortedIndices {
                 // Build view and projection matrices for stereo rendering
                 let viewMatrices = (0 ..< context.viewCount).map { context.viewMatrix(eye: $0) }
                 let projectionMatrices = (0 ..< context.viewCount).map { context.projectionMatrix(eye: $0) }
@@ -71,7 +74,7 @@ struct GaussianSplatImmersiveContent: Element, @unchecked Sendable {
                     cameraMatrices: cameraMatrices,
                     drawableSize: drawableSize,
                     convertSRGBToLinear: false,
-                    sortManager: sortManager
+                    sortedIndices: sortedIndices
                 )
                 .depthCompare(function: .greater, enabled: true) // visionOS uses reverse-Z
                 .renderPipelineDescriptorModifier { descriptor in

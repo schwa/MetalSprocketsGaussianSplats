@@ -87,13 +87,8 @@ public struct SparkSplatDebugRenderPipeline: Element {
     var debugMode: SplatDebugMode
     var boundingBox: BoundingBox3D?
     var debugParams: DebugParams
+    var sortedIndices: SplatIndices?
 
-    var sortManager: AsyncSortManager<SparkSplat>
-    var sortingEnabled: Bool = true
-    @MSState
-    private var sortedIndices: SplatIndices?
-    @MSState
-    private var listenerStarted: Bool = false
     var vertexShader: VertexShader
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
@@ -114,7 +109,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         drawableSize: SIMD2<Float>,
         debugParams: DebugParams,
         boundingBox: BoundingBox3D? = nil,
-        sortManager: AsyncSortManager<SparkSplat>
+        sortedIndices: SplatIndices?
     ) throws {
         try self.init(
             splatClouds: [splatCloud],
@@ -124,7 +119,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
             drawableSize: drawableSize,
             debugParams: debugParams,
             boundingBox: boundingBox,
-            sortManager: sortManager
+            sortedIndices: sortedIndices
         )
     }
 
@@ -139,8 +134,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         drawableSize: SIMD2<Float>,
         debugParams: DebugParams,
         boundingBox: BoundingBox3D? = nil,
-        sortManager: AsyncSortManager<SparkSplat>,
-        sortingEnabled: Bool = true
+        sortedIndices: SplatIndices?
     ) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
@@ -153,7 +147,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         self.drawableSize = drawableSize
         self.debugParams = debugParams
         self.boundingBox = boundingBox
-        self.sortingEnabled = sortingEnabled
+        self.sortedIndices = sortedIndices
 
         // Derive debug mode from params
         switch debugParams {
@@ -209,8 +203,6 @@ public struct SparkSplatDebugRenderPipeline: Element {
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
         self.vertexDescriptor = vertexDescriptor
-
-        self.sortManager = sortManager
     }
 
     public var body: some Element {
@@ -232,36 +224,6 @@ public struct SparkSplatDebugRenderPipeline: Element {
                         cameraPositions: cameraPositions,
                         amplificationCount: amplificationCount
                     )
-                }
-            }
-            .onChange(of: listenerStarted, initial: true) { _, _ in
-                if !listenerStarted {
-                    listenerStarted = true
-
-                    nonisolated(unsafe) var sortedIndicesRef = _sortedIndices
-                    Task { @MainActor [sortManager, logger] in
-                        let channel = await sortManager.sortedIndicesChannel()
-                        var lastSortTime: TimeInterval = 0
-                        for await sort in channel {
-                            if sort.parameters.time < lastSortTime {
-                                logger?.error("Out of order sort")
-                                continue
-                            }
-                            lastSortTime = sort.parameters.time
-                            sortedIndicesRef.wrappedValue = sort
-                        }
-                    }
-                    requestSort()
-                }
-            }
-            .onChange(of: cameraMatrices) {
-                if sortingEnabled {
-                    requestSort()
-                }
-            }
-            .onChange(of: modelMatrix) {
-                if sortingEnabled {
-                    requestSort()
                 }
             }
         }
@@ -363,25 +325,6 @@ public struct SparkSplatDebugRenderPipeline: Element {
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
     }
 
-    func requestSort() {
-        // Use average camera position for sorting (works for both mono and stereo)
-        let averageCameraMatrix: simd_float4x4
-        if cameraMatrices.count == 1 {
-            averageCameraMatrix = cameraMatrices[0]
-        } else {
-            var avgPosition = SIMD3<Float>.zero
-            for matrix in cameraMatrices {
-                avgPosition += SIMD3<Float>(matrix.columns.3.x, matrix.columns.3.y, matrix.columns.3.z)
-            }
-            avgPosition /= Float(cameraMatrices.count)
-            var avgMatrix = cameraMatrices[0]
-            avgMatrix.columns.3 = SIMD4<Float>(avgPosition, 1.0)
-            averageCameraMatrix = avgMatrix
-        }
-        // Pass only the scene-level modelMatrix; sorter combines with cloud.modelTransform
-        let parameters = SortParameters(camera: averageCameraMatrix, model: modelMatrix)
-        sortManager.requestSort(parameters)
-    }
 }
 
 #endif

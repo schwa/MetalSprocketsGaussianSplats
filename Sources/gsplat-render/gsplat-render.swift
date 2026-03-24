@@ -436,6 +436,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             }
             splatCount = cloud.count
             let sortManager = try AsyncSortManager(device: renderer.device, splatClouds: [cloud], capacity: cloud.count)
+            let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
+            let sortedIndices = try sortManager.sortNowSync(sortParameters)
             let renderContent = try RenderPass {
                 let aspectRatio = Float(size.width) / Float(size.height)
                 let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
@@ -446,7 +448,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
                     convertSRGBToLinear: useSrgbToLinear,
-                    sortManager: sortManager
+                    sortedIndices: sortedIndices
                 )
             }
             rendering = try captureManager.with(enabled: capture) {
@@ -458,6 +460,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             }
             splatCount = cloud.count
             let sortManager = try AsyncSortManager(device: renderer.device, splatClouds: [cloud], capacity: cloud.count)
+            let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
+            let sortedIndices = try sortManager.sortNowSync(sortParameters)
             let aspectRatio = Float(size.width) / Float(size.height)
             let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
             let renderContent = try RenderPass {
@@ -468,7 +472,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
                     debugMode: .off,
-                    sortManager: sortManager
+                    sortedIndices: sortedIndices
                 )
             }
             rendering = try captureManager.with(enabled: capture) {

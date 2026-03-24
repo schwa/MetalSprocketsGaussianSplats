@@ -1,4 +1,5 @@
 #if os(iOS) || os(macOS)
+import AsyncAlgorithms
 import GeometryLite3D
 import Interaction3D
 import MetalSprockets
@@ -30,6 +31,7 @@ struct MultiCloudRenderView: View {
     // Sorting control
     var sortingEnabled: Bool = true
 
+    @State private var sortedIndices: SplatIndices?
     @State private var projection: (any ProjectionProtocol) = PerspectiveProjection(verticalAngleOfView: .degrees(90), depthMode: .standard(zClip: 0.01 ... 1_000))
 
     private var clearColor: MTLClearColor {
@@ -55,17 +57,36 @@ struct MultiCloudRenderView: View {
                 drawableSize: drawableSize,
                 useSphericalHarmonics: useSphericalHarmonics,
                 cullBoundingBox: cullBoundingBox,
-                sortManager: sortManager,
-                debugParams: debugParams,
-                sortingEnabled: sortingEnabled
+                sortedIndices: sortedIndices,
+                debugParams: debugParams
             )
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(clearColor)
-        //        .modifier(TurntableCameraController(transform: $cameraMatrix))
+        .task {
+            let channel = await sortManager.sortedIndicesChannel()
+            for await indices in channel {
+                sortedIndices = indices
+            }
+        }
+        .onChange(of: cameraMatrix, initial: true) {
+            if sortingEnabled {
+                requestSort()
+            }
+        }
+        .onChange(of: sceneTransform) {
+            if sortingEnabled {
+                requestSort()
+            }
+        }
         .onChange(of: verticalAngleOfView, initial: true) {
             projection = PerspectiveProjection(verticalAngleOfView: .degrees(Float(verticalAngleOfView)), depthMode: .standard(zClip: 0.01 ... 1_000))
         }
+    }
+
+    private func requestSort() {
+        let parameters = SortParameters(camera: cameraMatrix, model: sceneTransform)
+        sortManager.requestSort(parameters)
     }
 }
 
@@ -77,13 +98,10 @@ struct MultiCloudRenderPass: Element {
     let drawableSize: CGSize
     let useSphericalHarmonics: Bool
     var cullBoundingBox: BoundingBox3D?
-    var sortManager: AsyncSortManager<SparkSplat>
+    var sortedIndices: SplatIndices?
 
     // Debug rendering
     var debugParams: DebugParams?
-
-    // Sorting control
-    var sortingEnabled: Bool = true
 
     var body: some Element {
         get throws {
@@ -99,8 +117,7 @@ struct MultiCloudRenderPass: Element {
                             drawableSize: SIMD2<Float>(drawableSize),
                             debugParams: debugParams,
                             boundingBox: cullBoundingBox,
-                            sortManager: sortManager,
-                            sortingEnabled: sortingEnabled
+                            sortedIndices: sortedIndices
                         )
                     } else {
                         try SparkSplatRenderPipeline(
@@ -111,8 +128,7 @@ struct MultiCloudRenderPass: Element {
                             drawableSize: SIMD2<Float>(drawableSize),
                             useSphericalHarmonics: useSphericalHarmonics,
                             boundingBox: cullBoundingBox,
-                            sortManager: sortManager,
-                            sortingEnabled: sortingEnabled
+                            sortedIndices: sortedIndices
                         )
                     }
                 }

@@ -17,6 +17,8 @@ final class ImmersiveState {
         }
     }
     var sortManager: AsyncSortManager<SparkSplat>?
+    var sortedIndices: SplatIndices?
+    private var sortListenerTask: Task<Void, Never>?
     var modelMatrix = simd_float4x4(xRotation: .radians(.pi))
     var scale: Float = 1.0
     var translation: SIMD3<Float> = .zero
@@ -31,6 +33,9 @@ final class ImmersiveState {
     }
 
     private func updateSortManager() {
+        sortListenerTask?.cancel()
+        sortListenerTask = nil
+        sortedIndices = nil
         guard let splatCloud else {
             sortManager = nil
             return
@@ -40,6 +45,22 @@ final class ImmersiveState {
             return
         }
         sortManager = try? AsyncSortManager(device: device, splatClouds: [splatCloud], capacity: splatCloud.count)
+        if let sortManager {
+            sortListenerTask = Task { @MainActor [weak self] in
+                let channel = await sortManager.sortedIndicesChannel()
+                for await indices in channel {
+                    self?.sortedIndices = indices
+                }
+            }
+        }
+    }
+
+    func requestSort(cameraMatrix: simd_float4x4) {
+        let worldModelMatrix = simd_float4x4(translation: translation)
+            * simd_float4x4(scale: SIMD3<Float>(repeating: scale))
+            * modelMatrix
+        let parameters = SortParameters(camera: cameraMatrix, model: worldModelMatrix)
+        sortManager?.requestSort(parameters)
     }
 
     func recenter(distance: Float = 2.0) {

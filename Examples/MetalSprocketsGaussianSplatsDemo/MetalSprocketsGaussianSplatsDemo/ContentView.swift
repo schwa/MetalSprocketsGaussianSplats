@@ -1,4 +1,5 @@
 #if !arch(x86_64)
+import AsyncAlgorithms
 import GeometryLite3D
 import Interaction3D
 import Metal
@@ -12,6 +13,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var cameraMatrix = simd_float4x4(translation: SIMD3<Float>(0, 0, 3))
+    @State private var sortedIndices: SplatIndices?
 
     let splatCloud: GPUSplatCloud<SparkSplat>
     let sortManager: AsyncSortManager<SparkSplat>
@@ -43,7 +45,7 @@ struct ContentView: View {
                     modelMatrix: .identity,
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)),
-                    sortManager: sortManager
+                    sortedIndices: sortedIndices
                 )
             }
             .renderPassDescriptorModifier { descriptor in
@@ -52,6 +54,16 @@ struct ContentView: View {
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+        .task {
+            let channel = await sortManager.sortedIndicesChannel()
+            for await indices in channel {
+                sortedIndices = indices
+            }
+        }
+        .onChange(of: cameraMatrix, initial: true) {
+            let parameters = SortParameters(camera: cameraMatrix, model: .identity)
+            sortManager.requestSort(parameters)
+        }
     }
 }
 #else

@@ -1,4 +1,5 @@
 #if !arch(x86_64)
+import AsyncAlgorithms
 import GeometryLite3D
 import Interaction3D
 import Metal
@@ -14,6 +15,7 @@ struct SplatPreviewView: View {
     let sortManager: AsyncSortManager<SparkSplat>
 
     @State private var cameraMatrix = simd_float4x4(translation: [0, 0, 5])
+    @State private var sortedIndices: SplatIndices?
     private let modelMatrix = simd_float4x4(xRotation: .radians(.pi))
     private let projection = PerspectiveProjection(
         verticalAngleOfView: .degrees(90),
@@ -36,13 +38,22 @@ struct SplatPreviewView: View {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: SIMD2<Float>(drawableSize),
-                    sortManager: sortManager
+                    sortedIndices: sortedIndices
                 )
             }
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
-        //        .modifier(TurntableCameraController(transform: $cameraMatrix))
+        .task {
+            let channel = await sortManager.sortedIndicesChannel()
+            for await indices in channel {
+                sortedIndices = indices
+            }
+        }
+        .onChange(of: cameraMatrix, initial: true) {
+            let parameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
+            sortManager.requestSort(parameters)
+        }
     }
 }
 #endif

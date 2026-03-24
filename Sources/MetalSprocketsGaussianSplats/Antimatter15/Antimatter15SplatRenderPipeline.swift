@@ -18,10 +18,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
-    @MSState
-    private var sortedIndices: SplatIndices?
-
-    var sortManager: AsyncSortManager<Antimatter15GPUSplat>
+    var sortedIndices: SplatIndices?
     var vertexDescriptor: MTLVertexDescriptor
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
@@ -29,14 +26,14 @@ public struct Antimatter15SplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var debugMode: DebugMode
 
-    public init(splatCloud: GPUSplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe, sortManager: AsyncSortManager<Antimatter15GPUSplat>) throws {
+    public init(splatCloud: GPUSplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe, sortedIndices: SplatIndices?) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
         self.cameraMatrix = cameraMatrix
         self.drawableSize = drawableSize
         self.debugMode = debugMode
-        self.sortManager = sortManager
+        self.sortedIndices = sortedIndices
 
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("Antimatter15SplatRenderShader")
 
@@ -53,9 +50,6 @@ public struct Antimatter15SplatRenderPipeline: Element {
         vertexDescriptor.layouts[0].stride = MemoryLayout<SIMD2<Float>>.stride
         self.vertexDescriptor = vertexDescriptor
     }
-
-    @MSState
-    private var listenerStarted: Bool = false
 
     public var body: some Element {
         get throws {
@@ -106,32 +100,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
                     fatalError("Failed to update shaders: \(error)")
                 }
             }
-            .onChange(of: listenerStarted, initial: true) { _, _ in
-                guard !listenerStarted else {
-                    return
-                }
-                listenerStarted = true
-                nonisolated(unsafe) let sortedIndicesRef = _sortedIndices
-                Task { @MainActor [sortManager] in
-                    let channel = await sortManager.sortedIndicesChannel()
-                    for await sort in channel {
-                        sortedIndicesRef.wrappedValue = sort
-                    }
-                }
-                requestSort()
-            }
-            .onChange(of: cameraMatrix) {
-                requestSort()
-            }
-            .onChange(of: modelMatrix) {
-                requestSort()
-            }
         }
-    }
-
-    func requestSort() {
-        let parameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
-        sortManager.requestSort(parameters)
     }
 }
 
