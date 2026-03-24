@@ -87,7 +87,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
     var debugMode: SplatDebugMode
     var boundingBox: BoundingBox3D?
     var debugParams: DebugParams
-    var sortedIndices: SplatIndices?
+    var sortedIndices: SplatIndices
 
     var vertexShader: VertexShader
     var fragmentShader: FragmentShader
@@ -109,7 +109,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         drawableSize: SIMD2<Float>,
         debugParams: DebugParams,
         boundingBox: BoundingBox3D? = nil,
-        sortedIndices: SplatIndices?
+        sortedIndices: SplatIndices
     ) throws {
         try self.init(
             splatClouds: [splatCloud],
@@ -134,7 +134,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         drawableSize: SIMD2<Float>,
         debugParams: DebugParams,
         boundingBox: BoundingBox3D? = nil,
-        sortedIndices: SplatIndices?
+        sortedIndices: SplatIndices
     ) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
@@ -217,14 +217,12 @@ public struct SparkSplatDebugRenderPipeline: Element {
             let amplificationCount = cameraMatrices.count
 
             try Group {
-                if let sortedIndices {
-                    try renderPipeline(
-                        indexedDistancesBuffer: sortedIndices.indices,
-                        viewMatrices: viewMatrices,
-                        cameraPositions: cameraPositions,
-                        amplificationCount: amplificationCount
-                    )
-                }
+                try renderPipeline(
+                    indexedDistancesBuffer: sortedIndices.indices,
+                    viewMatrices: viewMatrices,
+                    cameraPositions: cameraPositions,
+                    amplificationCount: amplificationCount
+                )
             }
         }
     }

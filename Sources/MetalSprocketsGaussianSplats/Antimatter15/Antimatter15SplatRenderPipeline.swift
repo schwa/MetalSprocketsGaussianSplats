@@ -18,7 +18,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
-    var sortedIndices: SplatIndices?
+    var sortedIndices: SplatIndices
     var vertexDescriptor: MTLVertexDescriptor
     var projectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
@@ -26,7 +26,7 @@ public struct Antimatter15SplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var debugMode: DebugMode
 
-    public init(splatCloud: GPUSplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe, sortedIndices: SplatIndices?) throws {
+    public init(splatCloud: GPUSplatCloud<Antimatter15GPUSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, debugMode: DebugMode = .wireframe, sortedIndices: SplatIndices) throws {
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
@@ -54,11 +54,10 @@ public struct Antimatter15SplatRenderPipeline: Element {
     public var body: some Element {
         get throws {
             try Group {
-                if let sortedIndices {
-                    // Concatenate outer modelMatrix with per-cloud transform
-                    let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
+                // Concatenate outer modelMatrix with per-cloud transform
+                let combinedModelMatrix = modelMatrix * splatCloud.modelTransform
 
-                    try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
+                try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                         Draw { commandEncoder in
                             let vertices: [SIMD2<Float>] = [
                                 [-1, -1], [-1, 1], [1, -1], [1, 1]
@@ -86,7 +85,6 @@ public struct Antimatter15SplatRenderPipeline: Element {
                         renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
                         renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
                         renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-                    }
                 }
             }
             .onChange(of: debugMode) {

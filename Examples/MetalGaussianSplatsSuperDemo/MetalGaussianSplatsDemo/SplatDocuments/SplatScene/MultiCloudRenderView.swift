@@ -105,7 +105,7 @@ struct MultiCloudRenderPass: Element {
 
     var body: some Element {
         get throws {
-            if !clouds.isEmpty {
+            if !clouds.isEmpty, let sortedIndices {
                 let projectionMatrix = projection.projectionMatrix(for: drawableSize)
                 try RenderPass {
                     if let debugParams {

@@ -31,15 +31,17 @@ struct SplatPreviewView: View {
     var body: some View {
         RenderView { _, drawableSize in
             let projectionMatrix = projection.projectionMatrix(for: drawableSize)
-            try RenderPass {
-                try SparkSplatRenderPipeline(
-                    splatCloud: splatCloud,
-                    projectionMatrix: projectionMatrix,
-                    modelMatrix: modelMatrix,
-                    cameraMatrix: cameraMatrix,
-                    drawableSize: SIMD2<Float>(drawableSize),
-                    sortedIndices: sortedIndices
-                )
+            if let sortedIndices {
+                try RenderPass {
+                    try SparkSplatRenderPipeline(
+                        splatCloud: splatCloud,
+                        projectionMatrix: projectionMatrix,
+                        modelMatrix: modelMatrix,
+                        cameraMatrix: cameraMatrix,
+                        drawableSize: SIMD2<Float>(drawableSize),
+                        sortedIndices: sortedIndices
+                    )
+                }
             }
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)

@@ -14,7 +14,7 @@ public struct SparkSplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var useSphericalHarmonics: Bool
     var boundingBox: BoundingBox3D?
-    var sortedIndices: SplatIndices?
+    var sortedIndices: SplatIndices
     @MSState
     var vertexShader: VertexShader
     @MSState
@@ -32,7 +32,7 @@ public struct SparkSplatRenderPipeline: Element {
     // MARK: - Single Cloud Convenience Initializers
 
     /// Convenience initializer for single cloud, single-view rendering (non-stereo)
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices?) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices) throws {
         try self.init(
             splatClouds: [splatCloud],
             projectionMatrices: [projectionMatrix],
@@ -47,7 +47,7 @@ public struct SparkSplatRenderPipeline: Element {
     }
 
     /// Convenience initializer for single cloud, stereo/amplification rendering
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices?) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices) throws {
         try self.init(
             splatClouds: [splatCloud],
             projectionMatrices: projectionMatrices,
@@ -67,7 +67,7 @@ public struct SparkSplatRenderPipeline: Element {
     /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when any cloud has SH data.
     /// - Parameter boundingBox: Optional world-space bounding box. Splats outside this box are culled.
     /// - Parameter sortedIndices: Pre-sorted indices from a sort manager. If nil, nothing is rendered.
-    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices?) throws {
+    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
         precondition(!splatClouds.isEmpty, "Must have at least one splat cloud")
@@ -111,9 +111,7 @@ public struct SparkSplatRenderPipeline: Element {
     public var body: some Element {
         get throws {
             try Group {
-                if let sortedIndices {
-                    try renderPipeline(sortedIndices: sortedIndices)
-                }
+                try renderPipeline(sortedIndices: sortedIndices)
             }
             .onChange(of: boundingBox != nil, initial: true) { _, useBoundingBox in
                 // Recreate shaders when bounding box presence changes (function constant changes)

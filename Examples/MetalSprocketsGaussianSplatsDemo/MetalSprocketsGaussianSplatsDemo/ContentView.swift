@@ -38,18 +38,20 @@ struct ContentView: View {
                 depthMode: .standard(zClip: 0.01 ... 1_000)
             )
             let projectionMatrix = projection.projectionMatrix(for: drawableSize)
-            try RenderPass {
-                try SparkSplatRenderPipeline(
-                    splatCloud: splatCloud,
-                    projectionMatrix: projectionMatrix,
-                    modelMatrix: .identity,
-                    cameraMatrix: cameraMatrix,
-                    drawableSize: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)),
-                    sortedIndices: sortedIndices
-                )
-            }
-            .renderPassDescriptorModifier { descriptor in
-                descriptor.renderTargetArrayLength = 1
+            if let sortedIndices {
+                try RenderPass {
+                    try SparkSplatRenderPipeline(
+                        splatCloud: splatCloud,
+                        projectionMatrix: projectionMatrix,
+                        modelMatrix: .identity,
+                        cameraMatrix: cameraMatrix,
+                        drawableSize: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)),
+                        sortedIndices: sortedIndices
+                    )
+                }
+                .renderPassDescriptorModifier { descriptor in
+                    descriptor.renderTargetArrayLength = 1
+                }
             }
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
