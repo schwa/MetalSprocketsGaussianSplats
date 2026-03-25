@@ -1,5 +1,5 @@
-import XCTest
 @testable import MetalSprocketsGaussianSplats
+import XCTest
 
 // MARK: - Initialization
 
@@ -31,7 +31,7 @@ final class CurrentValueTests: XCTestCase {
         let stream = SingleValueStream<Int?>()
         stream.yield(nil)
         // currentValue is Optional<Optional<Int>>, outer is .some, inner is nil
-        XCTAssertEqual(stream.currentValue, Optional<Int?>.some(nil))
+        XCTAssertEqual(stream.currentValue, Int??.some(nil))
     }
 
     func testCurrentValuePersistsAfterFinish() {
@@ -43,7 +43,7 @@ final class CurrentValueTests: XCTestCase {
 
     func testCurrentValueUpdatesAfterManyYields() {
         let stream = SingleValueStream<Int>()
-        for i in 0..<1000 {
+        for i in 0..<1_000 {
             stream.yield(i)
         }
         XCTAssertEqual(stream.currentValue, 999)
@@ -336,7 +336,7 @@ final class ForAwaitTests: XCTestCase {
         let expectation = XCTestExpectation(description: "loop exited")
 
         let task = Task {
-            for await _ in stream {}
+            for await _ in stream { /* consume */ }
             expectation.fulfill()
         }
 
@@ -393,7 +393,7 @@ final class ConcurrencySafetyTests: XCTestCase {
         let stream = SingleValueStream<Int>()
 
         await withTaskGroup(of: Void.self) { group in
-            for i in 0..<1000 {
+            for i in 0..<1_000 {
                 group.addTask {
                     stream.yield(i)
                 }
@@ -411,12 +411,12 @@ final class ConcurrencySafetyTests: XCTestCase {
 
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
-                for i in 0..<1000 {
+                for i in 0..<1_000 {
                     stream.yield(i)
                 }
             }
             group.addTask {
-                for _ in 0..<1000 {
+                for _ in 0..<1_000 {
                     _ = stream.currentValue
                 }
             }
@@ -470,7 +470,7 @@ final class EdgeCaseTests: XCTestCase {
 // MARK: - Actor integration
 
 final class ActorIntegrationTests: XCTestCase {
-    actor Counter {
+    private actor Counter {
         private let stream = SingleValueStream<Int>()
         private var count = 0
 
@@ -536,7 +536,7 @@ final class TimeoutTests: XCTestCase {
         let stream = SingleValueStream<Int>()
 
         let task = Task {
-            for await _ in stream {}
+            for await _ in stream { /* consume */ }
         }
 
         try? await Task.sleep(for: .milliseconds(100))
@@ -565,7 +565,7 @@ final class TimeoutTests: XCTestCase {
         let stream = SingleValueStream<Int>()
 
         let task = Task {
-            for await _ in stream {}
+            for await _ in stream { /* consume */ }
         }
 
         stream.finish()

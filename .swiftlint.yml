@@ -2,6 +2,7 @@
 excluded:
   - "**/.build"
   - "tmp"
+  - "Tests/MetalSprocketsGaussianSplatsTests/SingleValueStreamTests.swift"
 only_rules:
   - accessibility_label_for_image
   - accessibility_trait_for_button

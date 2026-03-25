@@ -1,6 +1,5 @@
 #if !arch(x86_64)
 
-
 @preconcurrency import Metal
 import MetalSprocketsGaussianSplatShaders
 internal import os

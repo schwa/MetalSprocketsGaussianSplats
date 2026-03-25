@@ -131,14 +131,14 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     ///     self.sortedIndices = indices
     /// }
     /// ```
-    public nonisolated var sortedIndicesStream: SingleValueStream<SplatIndices> {
+    nonisolated public var sortedIndicesStream: SingleValueStream<SplatIndices> {
         _sortedIndicesStream
     }
 
     /// Stream of sort timing events, updated after each completed sort.
     ///
     /// Useful for performance monitoring and UI display of sort statistics.
-    public nonisolated var sortEventStream: SingleValueStream<SortEvent> {
+    nonisolated public var sortEventStream: SingleValueStream<SortEvent> {
         _sortEventStream
     }
 

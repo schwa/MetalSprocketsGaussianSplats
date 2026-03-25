@@ -70,13 +70,16 @@ Possible fixes:
 ---
 
 ## 5: Refactor sorting out of pipeline element
-status: open
+status: closed
 priority: critical
 kind: enhancement
 created: 2026-02-19
-updated: 2026-03-20
+updated: 2026-03-25
+closed: 2026-03-25
 
 Architecture refactor: Move sort management from SparkSplatRenderPipeline to the view/renderer layer. Pipeline should be pure function of inputs (splatCloud, sortedIndices, camera matrices) with no @MSState, no async, no sort management.
+
+- 2026-03-25: Completed: render pipelines now accept SplatIndices directly, no sort management or async state internally.
 
 ---
 
@@ -155,13 +158,16 @@ The 'Unified' prefix on types like UnifiedDocumentView, UnifiedSplatContentView,
 ---
 
 ## 8: Fix AsyncChannel send blocking: split event and indices sends into separate Tasks
-status: open
+status: closed
 priority: critical
 kind: bug
 created: 2026-03-05
-updated: 2026-03-20
+updated: 2026-03-25
+closed: 2026-03-25
 
 In AsyncSortManager.startSorting(), _sortEventChannel.send() and _sortedIndicesChannel.send() were in the same Task. If no consumer listened to the event channel, send() would suspend forever, blocking the indices send. Fixed by splitting into separate Tasks. Also moved sort listener startup from init() to onChange(initial: true) to avoid continuous re-sorting.
+
+- 2026-03-25: Resolved by replacing AsyncChannel with SingleValueStream and decoupling sort manager from render pipelines.
 
 ---
 
@@ -240,11 +246,14 @@ created: 2026-03-19
 ---
 
 ## 14: Make the splat renderers take sorted index buffers instead of sort managers.
-status: open
+status: closed
 priority: critical
 kind: none
 created: 2026-03-20
+updated: 2026-03-25
+closed: 2026-03-25
 
+- 2026-03-25: Resolved by replacing AsyncChannel with SingleValueStream and decoupling sort manager from render pipelines.
 
 ---
 
