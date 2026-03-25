@@ -248,3 +248,12 @@ created: 2026-03-20
 
 ---
 
+## 15: Create docc docs for entire project.
+status: new
+priority: medium
+kind: none
+created: 2026-03-25
+
+
+---
+
