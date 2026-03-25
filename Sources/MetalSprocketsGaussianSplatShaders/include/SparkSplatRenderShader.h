@@ -2,7 +2,7 @@
 #define SparkSplatRenderShader_h
 
 #import <simd/simd.h>
-#import "Support.h"
+#import "MetalSupport.h"
 
 // MARK: - Bounding Box structure
 
