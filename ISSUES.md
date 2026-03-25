@@ -257,3 +257,31 @@ created: 2026-03-25
 
 ---
 
+## 16: Create a SplatView that hides sort manager complexity
+status: new
+priority: medium
+kind: none
+created: 2026-03-25
+
+Using the render pipelines directly requires the caller to manage the AsyncSortManager lifecycle, subscribe to sortedIndicesStream, request sorts on camera/model changes, and guard on nil sortedIndices before constructing the pipeline.
+
+Create a high-level SplatView (SwiftUI) that encapsulates this pattern:
+- Owns the AsyncSortManager internally
+- Subscribes to sorted indices via .task
+- Requests sorts on camera/model changes via .onChange
+- Renders nothing until the first sort completes
+- Exposes a simple API: pass in a splat cloud, camera, projection, model matrix, and drawable size
+
+This would reduce the interactive rendering setup from ~20 lines to a single view.
+
+---
+
+## 17: Move the larger demo into own repo.
+status: new
+priority: medium
+kind: none
+created: 2026-03-25
+
+
+---
+
