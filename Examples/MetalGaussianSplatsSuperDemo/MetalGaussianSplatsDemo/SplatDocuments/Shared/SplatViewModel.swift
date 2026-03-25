@@ -1,5 +1,4 @@
 #if os(iOS) || os(macOS)
-import AsyncAlgorithms
 import CoreGraphics
 import Foundation
 import GeometryLite3D
@@ -108,8 +107,7 @@ final class SplatViewModel {
         // Listen for sort events
         if let sortManager {
             Task { @MainActor [weak self] in
-                let channel = await sortManager.sortEventChannel()
-                for await event in channel {
+                for await event in sortManager.sortEventStream {
                     self?.lastSortEvent = event
                 }
             }

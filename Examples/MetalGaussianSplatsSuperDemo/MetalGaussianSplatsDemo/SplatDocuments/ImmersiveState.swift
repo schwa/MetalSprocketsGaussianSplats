@@ -1,5 +1,4 @@
 #if os(visionOS)
-import AsyncAlgorithms
 import Foundation
 import GeometryLite3D
 import Metal
@@ -48,8 +47,7 @@ final class ImmersiveState {
         sortManager = try? AsyncSortManager(device: device, splatClouds: [splatCloud], capacity: splatCloud.count)
         if let sortManager {
             sortListenerTask = Task { @MainActor [weak self] in
-                let channel = await sortManager.sortedIndicesChannel()
-                for await indices in channel {
+                for await indices in sortManager.sortedIndicesStream {
                     self?.sortedIndices = indices
                 }
             }

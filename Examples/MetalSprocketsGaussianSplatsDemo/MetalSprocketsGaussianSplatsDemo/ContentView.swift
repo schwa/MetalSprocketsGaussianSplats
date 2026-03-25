@@ -1,5 +1,4 @@
 #if !arch(x86_64)
-import AsyncAlgorithms
 import GeometryLite3D
 import Interaction3D
 import Metal
@@ -57,8 +56,7 @@ struct ContentView: View {
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
         .task {
-            let channel = await sortManager.sortedIndicesChannel()
-            for await indices in channel {
+            for await indices in sortManager.sortedIndicesStream {
                 sortedIndices = indices
             }
         }

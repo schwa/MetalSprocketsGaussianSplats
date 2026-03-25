@@ -67,6 +67,11 @@ public enum SplatDebugMode: String, CaseIterable, Sendable {
 
 /// A debug render pipeline for Gaussian splats that uses the Spark vertex shader
 /// with alternative fragment shaders for visualization/debugging purposes.
+///
+/// Like ``SparkSplatRenderPipeline``, this pipeline does not manage sorting.
+/// The caller provides pre-sorted ``SplatIndices`` from an ``AsyncSortManager``.
+/// See ``SparkSplatRenderPipeline`` for the full usage pattern.
+///
 /// Parameters for debug visualization modes
 public enum DebugParams: Sendable {
     case distance(DebugDistanceParams)

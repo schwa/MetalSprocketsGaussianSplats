@@ -1,5 +1,5 @@
 #if !arch(x86_64)
-internal import AsyncAlgorithms
+
 import GeometryLite3D
 import Metal
 import MetalSprocketsGaussianSplatShaders

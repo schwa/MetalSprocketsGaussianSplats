@@ -1,5 +1,4 @@
 #if os(iOS) || os(macOS)
-import AsyncAlgorithms
 import GeometryLite3D
 import Interaction3D
 import MetalSprockets
@@ -64,8 +63,7 @@ struct MultiCloudRenderView: View {
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(clearColor)
         .task {
-            let channel = await sortManager.sortedIndicesChannel()
-            for await indices in channel {
+            for await indices in sortManager.sortedIndicesStream {
                 sortedIndices = indices
             }
         }

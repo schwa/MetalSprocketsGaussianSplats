@@ -24,7 +24,6 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-collections", from: "1.2.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
         .package(url: "https://github.com/schwa/MetalCompilerPlugin", from: "0.1.4"),
@@ -56,7 +55,6 @@ let package = Package(
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
                 .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
                 .product(name: "MetalSprocketsUI", package: "MetalSprockets"),
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "GeometryLite3D", package: "GeometryLite3D")
             ],

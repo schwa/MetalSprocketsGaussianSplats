@@ -1,6 +1,6 @@
 #if !arch(x86_64)
 
-internal import AsyncAlgorithms
+
 @preconcurrency import Metal
 import MetalSprocketsGaussianSplatShaders
 internal import os

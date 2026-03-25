@@ -1,5 +1,4 @@
 #if !arch(x86_64)
-import AsyncAlgorithms
 import GeometryLite3D
 import Interaction3D
 import Metal
@@ -47,8 +46,7 @@ struct SplatPreviewView: View {
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 1))
         .task {
-            let channel = await sortManager.sortedIndicesChannel()
-            for await indices in channel {
+            for await indices in sortManager.sortedIndicesStream {
                 sortedIndices = indices
             }
         }

@@ -1,5 +1,4 @@
 #if !arch(x86_64)
-public import AsyncAlgorithms
 import Dispatch
 @preconcurrency import Metal
 import MetalSprocketsGaussianSplatShaders
@@ -31,9 +30,9 @@ public struct SortEvent: Sendable {
 
 public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     private var splatClouds: [GPUSplatCloud<Splat>]
-    private var _sortRequestChannel: AsyncChannel<SortParameters> = .init()
-    private var _sortedIndicesChannel: AsyncChannel<SplatIndices> = .init()
-    private var _sortEventChannel: AsyncChannel<SortEvent> = .init()
+    private let _sortRequestStream = SingleValueStream<SortParameters>()
+    private let _sortedIndicesStream = SingleValueStream<SplatIndices>()
+    private let _sortEventStream = SingleValueStream<SortEvent>()
     private var logger: Logger?
     private var sorter: CPUSplatRadixSorter<Splat>
     nonisolated(unsafe) private var sortingTask: Task<Void, Never>?
@@ -49,10 +48,9 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         self.sorter = .init(device: device, capacity: capacity)
         self.splatClouds = splatClouds
         self.logger = nil
-        let channel = _sortRequestChannel
+        let stream = _sortRequestStream
         self.sortingTask = Task(priority: .high) { [weak self] in
-            // TODO: restore throttle/dedupe after fixing leak
-            for await parameters in channel {
+            for await parameters in stream {
                 guard let self else { break }
                 do {
                     try await self.processSortRequest(parameters, logger: nil)
@@ -70,10 +68,9 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         self.sorter = .init(device: device, capacity: capacity)
         self.splatClouds = splatClouds
         self.logger = logger
-        let channel = _sortRequestChannel
+        let stream = _sortRequestStream
         self.sortingTask = Task(priority: .high) { [weak self] in
-            // TODO: restore throttle/dedupe after fixing leak
-            for await parameters in channel {
+            for await parameters in stream {
                 guard let self else { break }
                 do {
                     try await self.processSortRequest(parameters, logger: logger)
@@ -93,25 +90,23 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
 
     deinit {
         sortingTask?.cancel()
-        _sortRequestChannel.finish()
-        _sortedIndicesChannel.finish()
-        _sortEventChannel.finish()
+        _sortRequestStream.finish()
+        _sortedIndicesStream.finish()
+        _sortEventStream.finish()
     }
 
-    public func sortedIndicesChannel() -> AsyncChannel<SplatIndices> {
-        _sortedIndicesChannel
+    public nonisolated var sortedIndicesStream: SingleValueStream<SplatIndices> {
+        _sortedIndicesStream
     }
 
-    public func sortEventChannel() -> AsyncChannel<SortEvent> {
-        _sortEventChannel
+    public nonisolated var sortEventStream: SingleValueStream<SortEvent> {
+        _sortEventStream
     }
 
     /// Request an async sort with the given parameters
     nonisolated
     public func requestSort(_ parameters: SortParameters) {
-        Task {
-            await _sortRequestChannel.send(parameters)
-        }
+        _sortRequestStream.yield(parameters)
     }
 
     /// Perform a synchronous sort immediately and return the result (nonisolated wrapper).
@@ -164,15 +159,9 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         currentSortedIndices = result
         isSorted = true
 
-        // Send to channels (fire and forget)
-        // Fire-and-forget send to avoid blocking on channel back-pressure
         let event = SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count)
-        Task {
-            await _sortEventChannel.send(event)
-        }
-        Task {
-            await _sortedIndicesChannel.send(result)
-        }
+        _sortEventStream.yield(event)
+        _sortedIndicesStream.yield(result)
 
         return result
     }
@@ -205,14 +194,9 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         currentSortedIndices = result
         isSorted = true
 
-        // Fire-and-forget send to avoid blocking on channel back-pressure
         let event = SortEvent(time: Date(), duration: duration, splatCount: totalSplats, cloudCount: splatClouds.count)
-        Task {
-            await _sortEventChannel.send(event)
-        }
-        Task {
-            await _sortedIndicesChannel.send(result)
-        }
+        _sortEventStream.yield(event)
+        _sortedIndicesStream.yield(result)
     }
 }
 #endif

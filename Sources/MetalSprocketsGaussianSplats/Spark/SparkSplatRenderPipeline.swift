@@ -6,6 +6,62 @@ import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import Splats
 
+/// A MetalSprockets render pipeline for Gaussian splats using the Spark renderer.
+///
+/// This pipeline is a pure rendering element — it does not manage sorting. The caller
+/// is responsible for creating an ``AsyncSortManager``, subscribing to its
+/// ``AsyncSortManager/sortedIndicesStream``, requesting sorts when the camera or model
+/// changes, and passing the resulting ``SplatIndices`` into the pipeline.
+///
+/// ## Interactive Rendering (SwiftUI)
+///
+/// ```swift
+/// @State private var sortedIndices: SplatIndices?
+///
+/// var body: some View {
+///     RenderView { _, drawableSize in
+///         if let sortedIndices {
+///             try RenderPass {
+///                 try SparkSplatRenderPipeline(
+///                     splatCloud: cloud,
+///                     projectionMatrix: projectionMatrix,
+///                     modelMatrix: .identity,
+///                     cameraMatrix: cameraMatrix,
+///                     drawableSize: SIMD2<Float>(drawableSize),
+///                     sortedIndices: sortedIndices
+///                 )
+///             }
+///         }
+///     }
+///     .task {
+///         for await indices in sortManager.sortedIndicesStream {
+///             sortedIndices = indices
+///         }
+///     }
+///     .onChange(of: cameraMatrix, initial: true) {
+///         sortManager.requestSort(SortParameters(camera: cameraMatrix, model: .identity))
+///     }
+/// }
+/// ```
+///
+/// ## Offline / Single-Frame Rendering
+///
+/// ```swift
+/// let sortedIndices = try sortManager.sortNowSync(sortParameters)
+/// let renderPass = try RenderPass {
+///     try SparkSplatRenderPipeline(
+///         splatCloud: cloud,
+///         projectionMatrix: projectionMatrix,
+///         modelMatrix: .identity,
+///         cameraMatrix: cameraMatrix,
+///         drawableSize: drawableSize,
+///         sortedIndices: sortedIndices
+///     )
+/// }
+/// ```
+///
+/// Supports single or multiple splat clouds, mono and stereo rendering,
+/// optional spherical harmonics, and bounding box culling.
 public struct SparkSplatRenderPipeline: Element {
     var splatClouds: [GPUSplatCloud<SparkSplat>]
     var projectionMatrices: [simd_float4x4]
@@ -66,7 +122,7 @@ public struct SparkSplatRenderPipeline: Element {
     /// Full initializer supporting multiple clouds and stereo/amplification rendering
     /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when any cloud has SH data.
     /// - Parameter boundingBox: Optional world-space bounding box. Splats outside this box are culled.
-    /// - Parameter sortedIndices: Pre-sorted indices from a sort manager. If nil, nothing is rendered.
+    /// - Parameter sortedIndices: Pre-sorted splat indices from an ``AsyncSortManager``.
     public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
