@@ -291,6 +291,18 @@ priority: medium
 kind: none
 created: 2026-03-25
 
+Move MetalGaussianSplatsSuperDemo into its own repo at ~/Projects/MetalGaussianSplatsDemo.
+
+Done:
+- Copied to ~/Projects/MetalGaussianSplatsDemo
+- Changed local package ref to remote GitHub dependency
+- Added README and .gitignore
+- Initialized jj repo
+
+Remaining:
+- Create GitHub repo and push
+- Remove Examples/MetalGaussianSplatsSuperDemo from this repo
+- Update CI to remove build-super-demo job (or point to new repo)
 
 ---
 
