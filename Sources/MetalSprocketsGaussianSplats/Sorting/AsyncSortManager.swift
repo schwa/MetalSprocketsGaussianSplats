@@ -28,6 +28,32 @@ public struct SortEvent: Sendable {
     }
 }
 
+/// Manages asynchronous sorting of Gaussian splat clouds by distance from the camera.
+///
+/// The sort manager runs sorts on a background thread and publishes results via
+/// ``sortedIndicesStream``. It is intended to be owned by the caller (typically a
+/// SwiftUI view or view model), not by the render pipeline.
+///
+/// ## Typical Usage
+///
+/// 1. Create a sort manager with one or more splat clouds.
+/// 2. Subscribe to ``sortedIndicesStream`` to receive sorted indices as they complete.
+/// 3. Call ``requestSort(_:)`` whenever the camera or model matrix changes.
+/// 4. Pass the received ``SplatIndices`` to a render pipeline.
+///
+/// ```swift
+/// let sortManager = try AsyncSortManager(device: device, splatCloud: cloud, capacity: cloud.count)
+///
+/// // In a .task:
+/// for await indices in sortManager.sortedIndicesStream {
+///     self.sortedIndices = indices
+/// }
+///
+/// // On camera change:
+/// sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+/// ```
+///
+/// For single-frame offline rendering, use ``sortNowSync(_:)`` instead.
 public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     private var splatClouds: [GPUSplatCloud<Splat>]
     private let _sortRequestStream = SingleValueStream<SortParameters>()
@@ -95,10 +121,23 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         _sortEventStream.finish()
     }
 
+    /// Stream of sorted indices, updated after each completed sort.
+    ///
+    /// Subscribe with `for await` to receive the latest sorted indices.
+    /// Old values are dropped if not consumed — only the most recent sort matters.
+    ///
+    /// ```swift
+    /// for await indices in sortManager.sortedIndicesStream {
+    ///     self.sortedIndices = indices
+    /// }
+    /// ```
     public nonisolated var sortedIndicesStream: SingleValueStream<SplatIndices> {
         _sortedIndicesStream
     }
 
+    /// Stream of sort timing events, updated after each completed sort.
+    ///
+    /// Useful for performance monitoring and UI display of sort statistics.
     public nonisolated var sortEventStream: SingleValueStream<SortEvent> {
         _sortEventStream
     }
@@ -134,8 +173,10 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         return try result.withLock { $0! }.get()
     }
 
-    /// Perform an async sort immediately and return the result.
-    /// Also updates isSorted and currentSortedIndices, and sends to channels.
+    /// Performs an async sort immediately and returns the result.
+    ///
+    /// Also updates ``isSorted``, ``currentSortedIndices``, and yields to
+    /// ``sortedIndicesStream`` and ``sortEventStream``.
     public func sortNowAsync(_ parameters: SortParameters) throws -> SplatIndices {
         assertNotMainThread("sortNowAsync")
         let start = CFAbsoluteTimeGetCurrent()

@@ -5,6 +5,14 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
+/// A MetalSprockets render pipeline for Gaussian splats using the Antimatter15 renderer.
+///
+/// Like ``SparkSplatRenderPipeline``, this pipeline does not manage sorting.
+/// The caller provides pre-sorted ``SplatIndices`` from an ``AsyncSortManager``.
+/// See ``SparkSplatRenderPipeline`` for the full usage pattern.
+///
+/// Supports single splat clouds only. For multi-cloud rendering, use
+/// ``SparkSplatRenderPipeline`` instead.
 public struct Antimatter15SplatRenderPipeline: Element {
     public enum DebugMode: Int32, CaseIterable {
         case off = 0
