@@ -2,15 +2,6 @@
   "originHash" : "6d44cfdfdddda9b7e04c33eef8e8753f8fc478de2608016fff2b2bc53e374e0e",
   "pins" : [
     {
-      "identity" : "earcut-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/earcut-swift",
-      "state" : {
-        "revision" : "84309d9350a3e818412c4c13156af5d95d761147",
-        "version" : "0.1.0"
-      }
-    },
-    {
       "identity" : "geometrylite3d",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GeometryLite3D",
@@ -44,15 +35,6 @@
       "state" : {
         "revision" : "a9b12fbeb174b40d4ecc68965f851fcb60a51b05",
         "version" : "0.1.5"
-      }
-    },
-    {
-      "identity" : "metalsprocketsaddons",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/MetalSprocketsAddOns",
-      "state" : {
-        "branch" : "main",
-        "revision" : "7bbb307cd5efda853e796debe7a90d7bc3982bed"
       }
     },
     {
