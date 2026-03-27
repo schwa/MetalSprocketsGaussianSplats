@@ -66,6 +66,11 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Whether at least one sort has completed
     public private(set) var isSorted: Bool = false
 
+    /// The current capacity of the internal sorter. Exposed for testing.
+    internal var sorterCapacity: Int {
+        sorter.capacity
+    }
+
     /// The most recent sorted indices (nil until first sort completes)
     public private(set) var currentSortedIndices: SplatIndices?
 
@@ -140,6 +145,35 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Useful for performance monitoring and UI display of sort statistics.
     nonisolated public var sortEventStream: SingleValueStream<SortEvent> {
         _sortEventStream
+    }
+
+    /// Replace the active splat clouds without recreating the sort manager.
+    ///
+    /// If the combined splat count of the new clouds exceeds the sorter's current
+    /// capacity, the internal scratch buffer is grown automatically. The existing
+    /// ``currentSortedIndices`` are deliberately **not** cleared — the stale indices
+    /// remain available for rendering until the next sort completes, preventing a
+    /// blank frame on every cloud switch.
+    ///
+    /// After calling this, request a fresh sort to update the indices:
+    ///
+    /// ```swift
+    /// await sortManager.setSplatClouds([newCloud])
+    /// sortManager.requestSort(SortParameters(camera: cameraMatrix, model: .identity))
+    /// ```
+    public func setSplatClouds(_ clouds: [GPUSplatCloud<Splat>]) {
+        splatClouds = clouds
+        let totalCount = clouds.reduce(0) { $0 + $1.count }
+        if totalCount > sorter.capacity {
+            sorter.grow(capacity: totalCount)
+        }
+    }
+
+    /// Convenience for switching to a single splat cloud.
+    ///
+    /// Equivalent to `setSplatClouds([cloud])`. See ``setSplatClouds(_:)`` for details.
+    public func setSplatCloud(_ cloud: GPUSplatCloud<Splat>) {
+        setSplatClouds([cloud])
     }
 
     /// Request an async sort with the given parameters

@@ -11,7 +11,7 @@ private let signposter: OSSignposter = .init(subsystem: "io.schwa.MetalSprockets
 internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
     private var device: MTLDevice
     private var temporaryIndexedDistances: [IndexedDistance]
-    private var capacity: Int
+    internal private(set) var capacity: Int
     private var signpost = signposter.makeSignpostID()
 
     internal init(device: MTLDevice, capacity: Int) {
@@ -19,6 +19,16 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
         self.capacity = capacity
         releaseAssert(capacity > 0, "You shouldn't be creating a sorter with a capacity of zero.")
         temporaryIndexedDistances = .init(repeating: .init(), count: capacity)
+    }
+
+    /// Grow the sorter's scratch buffer to accommodate at least `newCapacity` splats.
+    /// Has no effect if `newCapacity <= capacity`.
+    internal func grow(capacity newCapacity: Int) {
+        guard newCapacity > capacity else {
+            return
+        }
+        capacity = newCapacity
+        temporaryIndexedDistances = .init(repeating: .init(), count: newCapacity)
     }
 
     /// Sort a single cloud's splats

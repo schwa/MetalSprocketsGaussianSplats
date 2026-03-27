@@ -306,3 +306,111 @@ Remaining:
 
 ---
 
+## 18: Allow AsyncSortManager to switch splat cloud
+status: closed
+priority: medium
+kind: feature
+created: 2026-03-27
+closed: 2026-03-27
+
+Currently AsyncSortManager is initialised with a fixed set of GPUSplatClouds and cannot be retargeted. When switching between splats at runtime we have to create a new AsyncSortManager per cloud, which causes the sortedIndices to reset to nil on every switch — producing a blank frame and visible flicker.
+
+We need a way to swap the active cloud(s) on an existing AsyncSortManager without recreating it. Something like:
+
+    func setSplatClouds(_ clouds: [GPUSplatCloud<Splat>])
+
+or a mutable splatClouds property. The sorter's internal MTLBuffer capacity would need to grow if the new cloud is larger than the original capacity.
+
+- 2026-03-27: Implemented setSplatClouds(_:) and setSplatCloud(_:) on AsyncSortManager. Added grow(capacity:) to CPUSplatRadixSorter. currentSortedIndices is preserved across cloud switches to prevent blank frames. Added 5 unit tests covering capacity growth, no-shrink, indices preservation, and correct sort count after switch.
+
+---
+
+## 19: Provide a lightweight one-shot sort helper for offline/offscreen rendering
+status: new
+priority: medium
+kind: feature
+created: 2026-03-27
+
+When rendering offscreen or in a single-frame context (e.g. snapshot, test, CLI tool), the full AsyncSortManager is overkill. It spins up a background task, manages streams, and holds actor state that is never needed for a single sort.
+
+We should provide a simple public enum or struct SplatSorter with static sort methods that perform a synchronous, one-shot sort and return SplatIndices directly — no actor, no streams, no ongoing state.
+
+API should look like:
+
+    // Single cloud
+    let indices = try SplatSorter.sort(device: device, splatCloud: cloud, parameters: sortParameters)
+
+    // Multiple clouds
+    let indices = try SplatSorter.sort(device: device, splatClouds: clouds, parameters: sortParameters)
+
+CPUSplatRadixSorter already has internal static convenience methods (sort(device:splats:camera:model:reversed:) and sort(device:clouds:camera:sceneModel:reversed:)) that do the heavy lifting. SplatSorter should be a thin public wrapper over those.
+
+---
+
+## 20: Adaptive sort algorithm: insertion sort for small camera deltas, radix sort fallback
+status: new
+priority: medium
+kind: enhancement
+labels: performance, sorting
+created: 2026-03-30
+
+## Summary
+
+When the camera moves only slightly between frames, the sort index buffer is nearly sorted already. An insertion sort on nearly-sorted data is O(n) vs our radix sort which always does 2 full passes regardless. We should detect small camera movements and use insertion sort as the fast path, falling back to radix sort for large camera jumps.
+
+## Approach
+
+### Algorithm selection heuristic
+Compare current vs previous camera matrix:
+- Translation delta: `length(currentPos - previousPos)`
+- Rotation delta: `dot(currentForward, previousForward)`
+- If both below thresholds → insertion sort, otherwise → radix sort
+
+Alternative/complementary: start insertion sort, count swaps, bail out to radix if swaps exceed a threshold (e.g. 2n–5n).
+
+### Buffer reuse constraint
+We intentionally allocate new sort index buffers each frame to avoid modifying a Metal buffer that may still be in-flight on the GPU. For insertion sort to work, we need the *previous* sorted order as a starting point. Options:
+- Copy the previous frame's sorted buffer into a fresh buffer, then insertion sort in-place on the copy
+- Double/triple-buffer the index buffers and track which are safe to reuse
+- Use Metal events or completion handlers to know when a buffer is no longer in use
+
+The copy-then-sort approach is simplest and still wins if the insertion sort pass is fast (memcpy of n elements + O(n) sort ≪ O(2n) radix sort with allocation).
+
+## Complexity
+
+| Scenario | Radix Sort | Insertion Sort |
+|---|---|---|
+| Nearly sorted | ~2n | ~n |
+| Random | ~2n | ~n² (catastrophic) |
+
+The heuristic/bail-out mechanism is critical to avoid the O(n²) case.
+
+## Files likely affected
+- `Sources/MetalSprocketsGaussianSplats/Sorting/CPUSplatRadixSorter.swift`
+- `Sources/MetalSprocketsGaussianSplats/Sorting/AsyncSortManager.swift`
+- New file for insertion sort implementation
+
+Timsort is a better fit than raw insertion sort:
+- Exploits existing sorted runs naturally — O(n) on nearly-sorted data
+- O(n log n) worst case — no catastrophic O(n²) like insertion sort
+- **Eliminates the need for a bail-out mechanism or fine-grained camera heuristic**
+
+### Revised approach
+- **Default to Timsort** for all frames
+- **Detect camera teleport** (translation delta exceeds a large threshold) and force radix sort in that case
+- This is a much simpler heuristic: binary decision (teleport vs not) rather than a gradient
+
+### Tradeoff
+- On fully random data, radix (2n) still beats Timsort (n log n ≈ 17n for 100k splats)
+- But fully random only happens on teleport, which we catch explicitly
+- For everything else Timsort adapts automatically — no tuning needed
+
+- 2026-03-30: ## Addendum: Timsort instead of insertion sort
+- 2026-03-30: ## Note on Timsort complexity
+
+Timsort is algorithmically ideal but significantly more complex to implement — hundreds of lines (merge runs, galloping, min-run calculation, merge stack) vs ~10 lines for insertion sort. We'd be writing it from scratch against UnsafeMutableBufferPointer<IndexedDistance>.
+
+Insertion sort + bail-out to radix remains a viable simpler option. Keep Timsort as a future consideration if we find a good Swift implementation or if the bail-out heuristic proves fiddly to tune.
+
+---
+
