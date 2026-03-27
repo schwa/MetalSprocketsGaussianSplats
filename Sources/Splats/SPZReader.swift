@@ -3,7 +3,6 @@ import Foundation
 import simd
 import UniformTypeIdentifiers
 
-
 // MARK: - SPZReader
 
 /// Reader for SPZ (Splat) files - a compressed format for 3D Gaussian splats

@@ -2,7 +2,6 @@ import Foundation
 import simd
 import UniformTypeIdentifiers
 
-
 // MARK: - Antimatter15Reader
 
 /// Reader for .splat files - the Antimatter15 format for 3D Gaussian splats

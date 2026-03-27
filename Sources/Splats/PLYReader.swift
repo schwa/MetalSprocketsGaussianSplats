@@ -1,7 +1,6 @@
 import Foundation
 import UniformTypeIdentifiers
 
-
 public struct PLYReader {
     public enum Format {
         case ascii
