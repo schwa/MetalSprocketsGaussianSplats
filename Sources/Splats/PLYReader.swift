@@ -1,14 +1,6 @@
 import Foundation
 import UniformTypeIdentifiers
 
-public extension UTType {
-    static var ply: UTType {
-        guard let type = UTType(filenameExtension: "ply") else {
-            fatalError("Failed to create UTType for .ply extension")
-        }
-        return type
-    }
-}
 
 public struct PLYReader {
     public enum Format {

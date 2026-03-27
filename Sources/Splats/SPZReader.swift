@@ -3,14 +3,6 @@ import Foundation
 import simd
 import UniformTypeIdentifiers
 
-public extension UTType {
-    static var spz: UTType {
-        guard let type = UTType(filenameExtension: "spz") else {
-            fatalError("Failed to create UTType for .spz extension")
-        }
-        return type
-    }
-}
 
 // MARK: - SPZReader
 

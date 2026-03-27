@@ -2,14 +2,6 @@ import Foundation
 import simd
 import UniformTypeIdentifiers
 
-public extension UTType {
-    static var antimatter15Splat: UTType {
-        guard let type = UTType(filenameExtension: "splat") else {
-            fatalError("Failed to create UTType for .splat extension")
-        }
-        return type
-    }
-}
 
 // MARK: - Antimatter15Reader
 
