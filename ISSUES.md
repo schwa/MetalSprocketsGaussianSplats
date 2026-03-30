@@ -286,10 +286,12 @@ This would reduce the interactive rendering setup from ~20 lines to a single vie
 ---
 
 ## 17: Move the larger demo into own repo.
-status: new
+status: closed
 priority: medium
 kind: none
 created: 2026-03-25
+updated: 2026-03-30
+closed: 2026-03-30
 
 Move MetalGaussianSplatsSuperDemo into its own repo at ~/Projects/MetalGaussianSplatsDemo.
 
@@ -405,12 +407,12 @@ Timsort is a better fit than raw insertion sort:
 - But fully random only happens on teleport, which we catch explicitly
 - For everything else Timsort adapts automatically — no tuning needed
 
-- 2026-03-30: ## Addendum: Timsort instead of insertion sort
-- 2026-03-30: ## Note on Timsort complexity
-
 Timsort is algorithmically ideal but significantly more complex to implement — hundreds of lines (merge runs, galloping, min-run calculation, merge stack) vs ~10 lines for insertion sort. We'd be writing it from scratch against UnsafeMutableBufferPointer<IndexedDistance>.
 
 Insertion sort + bail-out to radix remains a viable simpler option. Keep Timsort as a future consideration if we find a good Swift implementation or if the bail-out heuristic proves fiddly to tune.
+
+- 2026-03-30: ## Addendum: Timsort instead of insertion sort
+- 2026-03-30: ## Note on Timsort complexity
 
 ---
 
