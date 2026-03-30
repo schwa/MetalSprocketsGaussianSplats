@@ -328,10 +328,12 @@ or a mutable splatClouds property. The sorter's internal MTLBuffer capacity woul
 ---
 
 ## 19: Provide a lightweight one-shot sort helper for offline/offscreen rendering
-status: new
+status: closed
 priority: medium
 kind: feature
 created: 2026-03-27
+updated: 2026-03-30
+closed: 2026-03-30
 
 When rendering offscreen or in a single-frame context (e.g. snapshot, test, CLI tool), the full AsyncSortManager is overkill. It spins up a background task, manages streams, and holds actor state that is never needed for a single sort.
 
@@ -346,6 +348,8 @@ API should look like:
     let indices = try SplatSorter.sort(device: device, splatClouds: clouds, parameters: sortParameters)
 
 CPUSplatRadixSorter already has internal static convenience methods (sort(device:splats:camera:model:reversed:) and sort(device:clouds:camera:sceneModel:reversed:)) that do the heavy lifting. SplatSorter should be a thin public wrapper over those.
+
+- 2026-03-30: Implemented SplatSorter as a public enum with two static sort methods wrapping CPUSplatRadixSorter. Handles empty cloud list gracefully. Added SplatSorterTests with 5 tests (all passing).
 
 ---
 
