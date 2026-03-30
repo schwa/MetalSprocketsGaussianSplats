@@ -420,3 +420,20 @@ Insertion sort + bail-out to radix remains a viable simpler option. Keep Timsort
 
 ---
 
+## 21: Rename gsplat-render to something less generic
+status: new
+priority: low
+kind: enhancement
+created: 2026-03-30
+
+The CLI tool is currently named 'gsplat-render' which is generic and could conflict with other Gaussian splat tools. Consider renaming to something that reflects its connection to MetalSprockets, e.g.:
+
+- msplat-render
+- metalgsplat
+- sprocket-render
+- ms-gsplat
+
+The name should be short, memorable, and clearly associated with MetalSprocketsGaussianSplats.
+
+---
+
