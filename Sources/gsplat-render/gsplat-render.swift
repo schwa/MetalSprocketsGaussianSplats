@@ -435,9 +435,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Spark splat cloud is nil"])
             }
             splatCount = cloud.count
-            let sortManager = try AsyncSortManager(device: renderer.device, splatClouds: [cloud], capacity: cloud.count)
             let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
-            let sortedIndices = try sortManager.sortNowSync(sortParameters)
+            let sortedIndices = try SplatSorter.sort(device: renderer.device, splatCloud: cloud, parameters: sortParameters)
             let renderContent = try RenderPass {
                 let aspectRatio = Float(size.width) / Float(size.height)
                 let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
@@ -459,9 +458,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Antimatter15 splat cloud is nil"])
             }
             splatCount = cloud.count
-            let sortManager = try AsyncSortManager(device: renderer.device, splatClouds: [cloud], capacity: cloud.count)
             let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
-            let sortedIndices = try sortManager.sortNowSync(sortParameters)
+            let sortedIndices = try SplatSorter.sort(device: renderer.device, splatCloud: cloud, parameters: sortParameters)
             let aspectRatio = Float(size.width) / Float(size.height)
             let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
             let renderContent = try RenderPass {
