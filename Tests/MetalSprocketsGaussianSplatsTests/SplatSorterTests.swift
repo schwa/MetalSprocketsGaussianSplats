@@ -57,7 +57,7 @@ struct SplatSorterTests {
     func sortEmptyClouds() throws {
         let params = SortParameters(camera: .identity, model: .identity)
         let indices = try SplatSorter.sort(device: device, splatClouds: [GPUSplatCloud<SparkSplat>](), parameters: params)
-        #expect(indices.indices.count == 0)
+        #expect(indices.indices.isEmpty)
     }
 
     @Test("sort preserves parameters in result")
