@@ -86,7 +86,7 @@ struct AsyncSortManagerSwitchTests {
 
         // Perform an initial sort so currentSortedIndices is non-nil
         let params = SortParameters(camera: .identity, model: .identity)
-        _ = try sortManager.sortNowSync(params)
+        _ = sortManager.sortNowSync(params)
 
         let indicesBefore = await sortManager.currentSortedIndices
         #expect(indicesBefore != nil, "Expected non-nil indices after initial sort")
@@ -108,7 +108,7 @@ struct AsyncSortManagerSwitchTests {
         await sortManager.setSplatCloud(cloudB)
 
         let params = SortParameters(camera: .identity, model: .identity)
-        let indices = try sortManager.sortNowSync(params)
+        let indices = sortManager.sortNowSync(params)
 
         #expect(indices.indices.count == cloudB.count)
     }

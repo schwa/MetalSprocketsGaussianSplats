@@ -2,6 +2,7 @@
 
 @preconcurrency import Metal
 import MetalSprocketsGaussianSplatShaders
+import MetalSprocketsSupport
 internal import os
 import simd
 import Splats
@@ -31,8 +32,14 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
         temporaryIndexedDistances = .init(repeating: .init(), count: newCapacity)
     }
 
-    /// Sort a single cloud's splats
-    internal func sort(splats: TypedMTLBuffer<Splat>, camera: simd_float4x4, model: simd_float4x4, reversed: Bool = false) throws -> TypedMTLBuffer<IndexedDistance> {
+    /// Sort a single cloud's splats into the provided buffer
+    /// - Parameters:
+    ///   - splats: The splats to sort
+    ///   - outputBuffer: Buffer to write sorted indices into (must have capacity >= splats.count)
+    ///   - camera: Camera matrix
+    ///   - model: Model matrix
+    ///   - reversed: Whether to reverse sort order
+    internal func sort(splats: TypedMTLBuffer<Splat>, into outputBuffer: inout TypedMTLBuffer<IndexedDistance>, camera: simd_float4x4, model: simd_float4x4, reversed: Bool = false) {
         let startTime = CFAbsoluteTimeGetCurrent()
         defer {
             let durationMS = (CFAbsoluteTimeGetCurrent() - startTime) * 1_000
@@ -40,27 +47,23 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
                 logger?.warning("CPU splat sort: \(durationMS.formatted(.number.precision(.fractionLength(2))))ms (\(splats.count) splats)")
             }
         }
-        return try signposter.withIntervalSignpost("CPUSplatRadixSorter.sort().make_buffers", id: signpost) {
-            var currentIndexedDistances = try signposter.withIntervalSignpost("CPUSplatRadixSorter.sort()", id: signpost) {
-                try device.makeTypedBuffer(element: IndexedDistance.self, capacity: capacity, options: []).labeled("\(splats.unsafeMTLBuffer.label ?? "splats")-indexed_distances-\(Date.now.iso8601)")
-            }
+        signposter.withIntervalSignpost("CPUSplatRadixSorter.sort()", id: signpost) {
             signposter.withIntervalSignpost("CPUSplatRadixSorter.cpuRadixSort()", id: signpost) {
-                cpuRadixSort(splats: splats, indexedDistances: &currentIndexedDistances, temporaryIndexedDistances: &temporaryIndexedDistances, camera: camera, model: model, reversed: reversed)
+                cpuRadixSort(splats: splats, indexedDistances: &outputBuffer, temporaryIndexedDistances: &temporaryIndexedDistances, camera: camera, model: model, reversed: reversed)
             }
             // Update count after sorting - the buffer now contains splats.count sorted indices
-            currentIndexedDistances.count = splats.count
-            return currentIndexedDistances
+            outputBuffer.count = splats.count
         }
     }
 
     /// Sort multiple clouds' splats together into a unified sorted buffer
     /// - Parameters:
     ///   - clouds: Array of splat clouds (each with its own modelTransform)
+    ///   - outputBuffer: Buffer to write sorted indices into
     ///   - camera: Camera matrix
     ///   - sceneModel: Scene-level model matrix (applied to all clouds)
     ///   - reversed: Whether to reverse sort order
-    /// - Returns: Unified sorted IndexedDistance buffer with cloudIndex populated
-    internal func sort(clouds: [GPUSplatCloud<Splat>], camera: simd_float4x4, sceneModel: simd_float4x4, reversed: Bool = false) throws -> TypedMTLBuffer<IndexedDistance> {
+    internal func sort(clouds: [GPUSplatCloud<Splat>], into outputBuffer: inout TypedMTLBuffer<IndexedDistance>, camera: simd_float4x4, sceneModel: simd_float4x4, reversed: Bool = false) {
         let totalCount = clouds.reduce(0) { $0 + $1.count }
         releaseAssert(totalCount <= capacity, "Total splat count \(totalCount) exceeds capacity \(capacity)")
 
@@ -72,15 +75,12 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
             }
         }
 
-        return try signposter.withIntervalSignpost("CPUSplatRadixSorter.sortMultiCloud()", id: signpost) {
-            var currentIndexedDistances = try device.makeTypedBuffer(element: IndexedDistance.self, capacity: capacity, options: []).labeled("multi_cloud-indexed_distances-\(Date.now.iso8601)")
-
+        signposter.withIntervalSignpost("CPUSplatRadixSorter.sortMultiCloud()", id: signpost) {
             signposter.withIntervalSignpost("CPUSplatRadixSorter.cpuRadixSortMultiCloud()", id: signpost) {
-                cpuRadixSortMultiCloud(clouds: clouds, indexedDistances: &currentIndexedDistances, temporaryIndexedDistances: &temporaryIndexedDistances, camera: camera, sceneModel: sceneModel, reversed: reversed, totalCount: totalCount)
+                cpuRadixSortMultiCloud(clouds: clouds, indexedDistances: &outputBuffer, temporaryIndexedDistances: &temporaryIndexedDistances, camera: camera, sceneModel: sceneModel, reversed: reversed, totalCount: totalCount)
             }
             // Update count after sorting - the buffer now contains totalCount sorted indices
-            currentIndexedDistances.count = totalCount
-            return currentIndexedDistances
+            outputBuffer.count = totalCount
         }
     }
 }
@@ -195,19 +195,25 @@ internal func releaseAssert(_ condition: @autoclosure () -> Bool, _ message: @au
 }
 
 internal extension CPUSplatRadixSorter {
-    /// Convenience for single-cloud sort
+    /// Convenience for single-cloud sort (allocates its own buffer)
     static func sort(device: MTLDevice, splats: TypedMTLBuffer<Splat>, camera: simd_float4x4, model: simd_float4x4, reversed: Bool) throws -> SplatIndices {
         let sorter = CPUSplatRadixSorter<Splat>(device: device, capacity: splats.count)
-        let indices = try sorter.sort(splats: splats, camera: camera, model: model, reversed: reversed)
-        return .init(parameters: .init(camera: camera, model: model, reversed: reversed), indices: indices)
+        let mtlBuffer = try device.makeBuffer(length: splats.count * MemoryLayout<IndexedDistance>.stride, options: []).orThrow(.resourceCreationFailure("Failed to create index buffer"))
+        mtlBuffer.label = "IndexBuffer-oneshot"
+        var outputBuffer = TypedMTLBuffer<IndexedDistance>(buffer: mtlBuffer, count: 0)
+        sorter.sort(splats: splats, into: &outputBuffer, camera: camera, model: model, reversed: reversed)
+        return .init(parameters: .init(camera: camera, model: model, reversed: reversed), indices: outputBuffer)
     }
 
-    /// Convenience for multi-cloud sort
+    /// Convenience for multi-cloud sort (allocates its own buffer)
     static func sort(device: MTLDevice, clouds: [GPUSplatCloud<Splat>], camera: simd_float4x4, sceneModel: simd_float4x4, reversed: Bool) throws -> SplatIndices {
         let totalCount = clouds.reduce(0) { $0 + $1.count }
         let sorter = CPUSplatRadixSorter<Splat>(device: device, capacity: totalCount)
-        let indices = try sorter.sort(clouds: clouds, camera: camera, sceneModel: sceneModel, reversed: reversed)
-        return .init(parameters: .init(camera: camera, model: sceneModel, reversed: reversed), indices: indices)
+        let mtlBuffer = try device.makeBuffer(length: totalCount * MemoryLayout<IndexedDistance>.stride, options: []).orThrow(.resourceCreationFailure("Failed to create index buffer"))
+        mtlBuffer.label = "IndexBuffer-oneshot"
+        var outputBuffer = TypedMTLBuffer<IndexedDistance>(buffer: mtlBuffer, count: 0)
+        sorter.sort(clouds: clouds, into: &outputBuffer, camera: camera, sceneModel: sceneModel, reversed: reversed)
+        return .init(parameters: .init(camera: camera, model: sceneModel, reversed: reversed), indices: outputBuffer)
     }
 }
 #endif

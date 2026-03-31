@@ -17,7 +17,7 @@ public struct TypedMTLBuffer<Element> {
         MemoryLayout<Element>.stride
     }
 
-    internal init(buffer: MTLBuffer, count: Int) {
+    package init(buffer: MTLBuffer, count: Int) {
         self.base = buffer
         self.count = count
     }

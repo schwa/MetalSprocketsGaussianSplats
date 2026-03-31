@@ -40,6 +40,7 @@ public struct SortEvent: Sendable {
 /// 2. Subscribe to ``sortedIndicesStream`` to receive sorted indices as they complete.
 /// 3. Call ``requestSort(_:)`` whenever the camera or model matrix changes.
 /// 4. Pass the received ``SplatIndices`` to a render pipeline.
+/// 5. Return used index buffers to ``indexBufferPool`` in your command buffer's completion handler.
 ///
 /// ```swift
 /// let sortManager = try AsyncSortManager(device: device, splatCloud: cloud, capacity: cloud.count)
@@ -51,6 +52,14 @@ public struct SortEvent: Sendable {
 ///
 /// // On camera change:
 /// sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+///
+/// // When receiving new indices, release the old ones:
+/// for await indices in sortManager.sortedIndicesStream {
+///     if let old = sortedIndices {
+///         sortManager.release(old)
+///     }
+///     sortedIndices = indices
+/// }
 /// ```
 ///
 /// For single-frame offline rendering, use ``sortNowSync(_:)`` instead.
@@ -62,6 +71,9 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     private var logger: Logger?
     private var sorter: CPUSplatRadixSorter<Splat>
     nonisolated(unsafe) private var sortingTask: Task<Void, Never>?
+    private let device: MTLDevice
+    private var capacity: Int
+    nonisolated(unsafe) private var _indexBufferPool: Pool<TypedMTLBuffer<IndexedDistance>>
 
     /// Whether at least one sort has completed
     public private(set) var isSorted: Bool = false
@@ -75,10 +87,21 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     public private(set) var currentSortedIndices: SplatIndices?
 
     /// Initialize with multiple clouds
-    public init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int) throws {
+    ///
+    /// - Parameters:
+    ///   - device: The Metal device to use for buffer allocation.
+    ///   - splatClouds: The splat clouds to sort.
+    ///   - capacity: Maximum number of splats the sorter can handle.
+    ///   - preallocatedBufferCount: Number of index buffers to preallocate in the pool.
+    ///     Typical value is 4 (in-flight MTKView buffers + 1 for sorting). Default is 0
+    ///     which allocates buffers on demand.
+    public init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int, preallocatedBufferCount: Int = 0) throws {
+        self.device = device
+        self.capacity = capacity
         self.sorter = .init(device: device, capacity: capacity)
         self.splatClouds = splatClouds
         self.logger = nil
+        self._indexBufferPool = Self.makeIndexBufferPool(device: device, capacity: capacity, preallocatedCount: preallocatedBufferCount)
         let stream = _sortRequestStream
         self.sortingTask = Task(priority: .high) { [weak self] in
             for await parameters in stream {
@@ -95,10 +118,13 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     }
 
     /// Internal initializer with logger support
-    internal init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int, logger: Logger?) throws {
+    internal init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int, preallocatedBufferCount: Int = 0, logger: Logger?) throws {
+        self.device = device
+        self.capacity = capacity
         self.sorter = .init(device: device, capacity: capacity)
         self.splatClouds = splatClouds
         self.logger = logger
+        self._indexBufferPool = Self.makeIndexBufferPool(device: device, capacity: capacity, preallocatedCount: preallocatedBufferCount)
         let stream = _sortRequestStream
         self.sortingTask = Task(priority: .high) { [weak self] in
             for await parameters in stream {
@@ -115,8 +141,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     }
 
     /// Convenience initializer for single cloud
-    public init(device: MTLDevice, splatCloud: GPUSplatCloud<Splat>, capacity: Int) throws {
-        try self.init(device: device, splatClouds: [splatCloud], capacity: capacity)
+    public init(device: MTLDevice, splatCloud: GPUSplatCloud<Splat>, capacity: Int, preallocatedBufferCount: Int = 0) throws {
+        try self.init(device: device, splatClouds: [splatCloud], capacity: capacity, preallocatedBufferCount: preallocatedBufferCount)
     }
 
     deinit {
@@ -147,12 +173,42 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         _sortEventStream
     }
 
+    /// Pool of index buffers for reuse.
+    ///
+    /// Use ``release(_:)`` to return buffers to the pool when they are no longer needed.
+    ///
+    /// If buffers are not released, the pool will allocate new buffers on each sort
+    /// (with a warning logged), defeating the purpose of pooling.
+    nonisolated public var indexBufferPool: Pool<TypedMTLBuffer<IndexedDistance>> {
+        _indexBufferPool
+    }
+
+    /// Release sorted indices back to the pool for reuse.
+    ///
+    /// Call this when you receive new indices and are done with the old ones:
+    ///
+    /// ```swift
+    /// for await indices in sortManager.sortedIndicesStream {
+    ///     if let old = sortedIndices {
+    ///         sortManager.release(old)
+    ///     }
+    ///     sortedIndices = indices
+    /// }
+    /// ```
+    ///
+    /// - Parameter indices: The sorted indices to release.
+    nonisolated public func release(_ indices: SplatIndices) {
+        _indexBufferPool.release(indices.indices)
+    }
+
     /// Replace the active splat clouds without recreating the sort manager.
     ///
     /// If the combined splat count of the new clouds exceeds the sorter's current
-    /// capacity, the internal scratch buffer is grown automatically. The existing
-    /// ``currentSortedIndices`` are deliberately **not** cleared — the stale indices
-    /// remain available for rendering until the next sort completes, preventing a
+    /// capacity, the internal scratch buffer is grown automatically and a new buffer
+    /// pool is created. The old pool drains naturally as GPU completions return buffers.
+    ///
+    /// The existing ``currentSortedIndices`` are deliberately **not** cleared — the stale
+    /// indices remain available for rendering until the next sort completes, preventing a
     /// blank frame on every cloud switch.
     ///
     /// After calling this, request a fresh sort to update the indices:
@@ -164,8 +220,27 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     public func setSplatClouds(_ clouds: [GPUSplatCloud<Splat>]) {
         splatClouds = clouds
         let totalCount = clouds.reduce(0) { $0 + $1.count }
-        if totalCount > sorter.capacity {
-            sorter.grow(capacity: totalCount)
+        if totalCount != capacity {
+            resize(capacity: totalCount)
+        }
+    }
+
+    /// Resize the sorter's capacity and create a new buffer pool.
+    ///
+    /// The old pool continues to exist and drains naturally as in-flight buffers
+    /// are released via GPU completion handlers.
+    private func resize(capacity newCapacity: Int) {
+        capacity = newCapacity
+        sorter.grow(capacity: newCapacity)
+        _indexBufferPool = Self.makeIndexBufferPool(device: device, capacity: newCapacity, preallocatedCount: 0)
+    }
+
+    /// Create a new index buffer pool with the given capacity.
+    private static func makeIndexBufferPool(device: MTLDevice, capacity: Int, preallocatedCount: Int) -> Pool<TypedMTLBuffer<IndexedDistance>> {
+        Pool<TypedMTLBuffer<IndexedDistance>>(preallocatedCount: preallocatedCount) { id in
+            let buffer = device.makeBuffer(length: capacity * MemoryLayout<IndexedDistance>.stride, options: [])!
+            buffer.label = "IndexBuffer-pool-\(id)"
+            return TypedMTLBuffer<IndexedDistance>(buffer: buffer, count: 0)
         }
     }
 
@@ -185,17 +260,13 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Perform a synchronous sort immediately and return the result (nonisolated wrapper).
     /// Blocks the calling thread until the sort completes.
     nonisolated
-    public func sortNowSync(_ parameters: SortParameters) throws -> SplatIndices {
+    public func sortNowSync(_ parameters: SortParameters) -> SplatIndices {
         let done = Atomic<Bool>(false)
-        let result = Mutex<Result<SplatIndices, Error>?>(nil)
+        let result = Mutex<SplatIndices?>(nil)
 
         Task { [self] in
-            do {
-                let sorted = try await self.sortNowAsync(parameters)
-                result.withLock { $0 = .success(sorted) }
-            } catch {
-                result.withLock { $0 = .failure(error) }
-            }
+            let sorted = await self.sortNowAsync(parameters)
+            result.withLock { $0 = sorted }
             done.store(true, ordering: .releasing)
         }
 
@@ -204,33 +275,33 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
             Thread.sleep(forTimeInterval: 0.0001)
         }
 
-        return try result.withLock { $0! }.get()
+        return result.withLock { $0! }
     }
 
     /// Performs an async sort immediately and returns the result.
     ///
     /// Also updates ``isSorted``, ``currentSortedIndices``, and yields to
     /// ``sortedIndicesStream`` and ``sortEventStream``.
-    public func sortNowAsync(_ parameters: SortParameters) throws -> SplatIndices {
+    public func sortNowAsync(_ parameters: SortParameters) -> SplatIndices {
         assertNotMainThread("sortNowAsync")
         let start = CFAbsoluteTimeGetCurrent()
-        let currentIndexedDistances: TypedMTLBuffer<IndexedDistance>
+        var outputBuffer = _indexBufferPool.acquire()
         let totalSplats: Int
 
         if splatClouds.count == 1 {
             let cloud = splatClouds[0]
             let combinedModel = parameters.model * cloud.modelTransform
-            currentIndexedDistances = try sorter.sort(splats: cloud.splats, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
+            sorter.sort(splats: cloud.splats, into: &outputBuffer, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
             totalSplats = cloud.splats.count
         } else {
-            currentIndexedDistances = try sorter.sort(clouds: splatClouds, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
+            sorter.sort(clouds: splatClouds, into: &outputBuffer, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
             totalSplats = splatClouds.reduce(0) { $0 + $1.splats.count }
         }
 
         let end = CFAbsoluteTimeGetCurrent()
         let duration = end - start
 
-        let result = SplatIndices(parameters: parameters, indices: currentIndexedDistances)
+        let result = SplatIndices(parameters: parameters, indices: outputBuffer)
         currentSortedIndices = result
         isSorted = true
 
@@ -246,17 +317,17 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         try Task.checkCancellation()
         assertNotMainThread("processSortRequest")
         let start = CFAbsoluteTimeGetCurrent()
-        let currentIndexedDistances: TypedMTLBuffer<IndexedDistance>
+        var outputBuffer = _indexBufferPool.acquire()
         let totalSplats: Int
         if splatClouds.count == 1 {
             // Single cloud path - combine scene model with cloud transform
             let cloud = splatClouds[0]
             let combinedModel = parameters.model * cloud.modelTransform
-            currentIndexedDistances = try sorter.sort(splats: cloud.splats, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
+            sorter.sort(splats: cloud.splats, into: &outputBuffer, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
             totalSplats = cloud.splats.count
         } else {
             // Multi-cloud path - sorter handles per-cloud transforms internally
-            currentIndexedDistances = try sorter.sort(clouds: splatClouds, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
+            sorter.sort(clouds: splatClouds, into: &outputBuffer, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
             totalSplats = splatClouds.reduce(0) { $0 + $1.splats.count }
         }
         let end = CFAbsoluteTimeGetCurrent()
@@ -265,7 +336,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
             logger?.warning("### Sort took longer than expected (\(duration * 1_000) msec, \(duration / 0.033)x).")
         }
 
-        let result = SplatIndices(parameters: parameters, indices: currentIndexedDistances)
+        let result = SplatIndices(parameters: parameters, indices: outputBuffer)
         currentSortedIndices = result
         isSorted = true
 

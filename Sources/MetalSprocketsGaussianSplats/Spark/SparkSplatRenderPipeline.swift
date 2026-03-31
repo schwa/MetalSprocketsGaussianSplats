@@ -31,6 +31,7 @@ import Splats
 ///                     sortedIndices: sortedIndices
 ///                 )
 ///             }
+
 ///         }
 ///     }
 ///     .task {
@@ -44,10 +45,24 @@ import Splats
 /// }
 /// ```
 ///
+/// ## Buffer Pooling
+///
+/// The ``AsyncSortManager`` uses an internal buffer pool for index buffers. To enable
+/// buffer reuse and reduce allocations, release old indices when receiving new ones:
+///
+/// ```swift
+/// for await indices in sortManager.sortedIndicesStream {
+///     if let old = sortedIndices {
+///         sortManager.release(old)
+///     }
+///     sortedIndices = indices
+/// }
+/// ```
+///
 /// ## Offline / Single-Frame Rendering
 ///
 /// ```swift
-/// let sortedIndices = try sortManager.sortNowSync(sortParameters)
+/// let sortedIndices = sortManager.sortNowSync(sortParameters)
 /// let renderPass = try RenderPass {
 ///     try SparkSplatRenderPipeline(
 ///         splatCloud: cloud,
@@ -58,6 +73,8 @@ import Splats
 ///         sortedIndices: sortedIndices
 ///     )
 /// }
+/// // For offline rendering, release after render:
+/// sortManager.release(sortedIndices)
 /// ```
 ///
 /// Supports single or multiple splat clouds, mono and stereo rendering,
@@ -280,5 +297,7 @@ public struct SparkSplatRenderPipeline: Element {
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
     }
 }
+
+// MARK: - Buffer Release Modifier
 
 #endif

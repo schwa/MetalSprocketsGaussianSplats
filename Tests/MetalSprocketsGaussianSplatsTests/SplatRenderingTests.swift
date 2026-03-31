@@ -115,7 +115,7 @@ struct GoldenImageRenderingTests {
         let cameraMatrix = makeCameraMatrix(position: cameraPosition)
         let projectionMatrix = makeProjectionMatrix(size: size)
         let sortParameters = SortParameters(camera: cameraMatrix, model: .identity)
-        let sortedIndices = try sortManager.sortNowSync(sortParameters)
+        let sortedIndices = sortManager.sortNowSync(sortParameters)
 
         let renderer = try OffscreenRenderer(size: size)
         let renderPass = try RenderPass {
@@ -146,7 +146,7 @@ struct GoldenImageRenderingTests {
         let cameraMatrix = makeCameraMatrix(position: cameraPosition)
         let projectionMatrix = makeProjectionMatrix(size: size)
         let sortParameters = SortParameters(camera: cameraMatrix, model: .identity)
-        let sortedIndices = try sortManager.sortNowSync(sortParameters)
+        let sortedIndices = sortManager.sortNowSync(sortParameters)
 
         let renderer = try OffscreenRenderer(size: size)
         let renderPass = try RenderPass {
