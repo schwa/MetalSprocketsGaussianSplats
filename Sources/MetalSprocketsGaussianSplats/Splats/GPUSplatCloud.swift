@@ -82,7 +82,7 @@ public struct SplatIndices: Sendable, Equatable {
         pool?.release(indices)
     }
 
-    public static func == (lhs: SplatIndices, rhs: SplatIndices) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.parameters == rhs.parameters && lhs.indices == rhs.indices
     }
 }
