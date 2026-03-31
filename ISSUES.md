@@ -19,7 +19,7 @@ Benefits:
 - Reduced code duplication
 - Easier to maintain single rendering pipeline
 
-- 2026-03-31T15:59:58.876049+00:00: 00: 00: Combined single and multi-splat document views by refactoring SplatDocumentView to use the same MultiCloudRenderView infrastructure as SplatSceneView. Changes include:
+- 2026-03-31T16:02:23.498853+00:00: 00: 00: 00: 00: Combined single and multi-splat document views by refactoring SplatDocumentView to use the same MultiCloudRenderView infrastructure as SplatSceneView. Changes include:
 
 ---
 
@@ -31,7 +31,7 @@ created: 2026-02-09T00:00:00+00:00
 updated: 2026-02-17T00:00:00+00:00
 closed: 2026-02-17T00:00:00+00:00
 
-- 2026-03-31T15:59:58.876263+00:00: 00: 00: Fixed by adding SplatSceneDocument types to allowedContentTypes and properly accessing security-scoped resources from fileImporter
+- 2026-03-31T16:02:23.499079+00:00: 00: 00: 00: 00: Fixed by adding SplatSceneDocument types to allowedContentTypes and properly accessing security-scoped resources from fileImporter
 
 ---
 
@@ -79,7 +79,7 @@ closed: 2026-03-25T00:00:00+00:00
 
 Architecture refactor: Move sort management from SparkSplatRenderPipeline to the view/renderer layer. Pipeline should be pure function of inputs (splatCloud, sortedIndices, camera matrices) with no @MSState, no async, no sort management.
 
-- 2026-03-31T15:59:58.876946+00:00: 00: 00: Completed: render pipelines now accept SplatIndices directly, no sort management or async state internally.
+- 2026-03-31T16:02:23.499806+00:00: 00: 00: 00: 00: Completed: render pipelines now accept SplatIndices directly, no sort management or async state internally.
 
 ---
 
@@ -136,11 +136,11 @@ In multi-splat mode (.splatscene files), FPS drops dramatically (to ~10fps or le
 2. Rotate camera with mouse drag
 3. Observe FPS drop in Metal HUD or debug logging
 
-- 2026-03-31T15:59:58.877165+00:00: 00: 00: Confirmed: a .splatscene file with just a single cloud reproduces the same FPS drop. Rules out multi-cloud rendering as the cause. Issue is in the multi-mode infrastructure: NavigationSplitView, .onChange handlers syncing camera to document binding, or the Binding<SplatSceneDocument?> triggering SwiftUI re-evaluation.
-- 2026-03-31T15:59:58.877169+00:00: 00: 00: Root cause confirmed: reading multiDocument (the @Binding<SplatSceneDocument?>) anywhere in the view body during rendering creates a SwiftUI dependency that causes aggressive re-evaluation, starving the MTKView. multiDocument is read in multiRenderView, multiModeMainContent, inspectorContent, buildBoundingBoxInfos, cloudListSidebar, and all onChange handlers. Fix requires refactoring so the ViewModel owns all state needed for rendering (cloud enabled/opacity/transform/debugColor) and multiDocument is only read/written in discrete event handlers, never in computed view body properties.
-- 2026-03-31T15:59:58.877176+00:00: 00: 00: Deeper root cause found: The issue is NOT specific to multi-mode document binding reads. It affects single-mode too. Any inspector tab that takes @Binding from the @Observable ViewModel triggers the problem. Even $viewModel.cameraMode (which doesn't change during rotation) causes per-frame re-evaluation when passed as a Binding to a child view. This suggests that Binding created via $viewModel.property from an @Observable object causes observation of the entire object, not just that property. During camera rotation, cameraMatrix changes 60x/sec, which invalidates all views holding any Binding from the ViewModel. The SwiftUI Form layout pass in the inspector then starves the MTKView of draw calls. Affected: all inspector tabs (Camera, Render, Cloud) when they take Bindings from the ViewModel. Fix approach: decouple inspector from ViewModel bindings - use plain values with explicit write-back callbacks, or extract inspector-editable state into a separate @Observable object that doesn't include rapidly-changing properties like cameraMatrix.
-- 2026-03-31T15:59:58.877179+00:00: 00: 00: Proposed fix: Split ViewModel into two @Observable objects. 1) RenderState: rapidly-changing properties (cameraMatrix, currentFPS, sortEvents, frameCount). Only read by the render view, never bound to SwiftUI inspector views. 2) UIState: user-editable settings (cameraMode, backgroundColor, useSphericalHarmonics, showBoundingBoxes, debugMode, etc). Changed only by discrete user actions, safe to bind to SwiftUI forms. This prevents cross-contamination: cameraMatrix changing at 60fps only invalidates the render view, not the inspector. This is likely a general architectural pattern needed for any SwiftUI + Metal app that combines a render loop with SwiftUI controls.
-- 2026-03-31T15:59:58.877180+00:00: 00: 00: this is a swiftui issue - use the swiftui instrument.
+- 2026-03-31T16:02:23.500048+00:00: 00: 00: 00: 00: Confirmed: a .splatscene file with just a single cloud reproduces the same FPS drop. Rules out multi-cloud rendering as the cause. Issue is in the multi-mode infrastructure: NavigationSplitView, .onChange handlers syncing camera to document binding, or the Binding<SplatSceneDocument?> triggering SwiftUI re-evaluation.
+- 2026-03-31T16:02:23.500052+00:00: 00: 00: 00: 00: Root cause confirmed: reading multiDocument (the @Binding<SplatSceneDocument?>) anywhere in the view body during rendering creates a SwiftUI dependency that causes aggressive re-evaluation, starving the MTKView. multiDocument is read in multiRenderView, multiModeMainContent, inspectorContent, buildBoundingBoxInfos, cloudListSidebar, and all onChange handlers. Fix requires refactoring so the ViewModel owns all state needed for rendering (cloud enabled/opacity/transform/debugColor) and multiDocument is only read/written in discrete event handlers, never in computed view body properties.
+- 2026-03-31T16:02:23.500059+00:00: 00: 00: 00: 00: Deeper root cause found: The issue is NOT specific to multi-mode document binding reads. It affects single-mode too. Any inspector tab that takes @Binding from the @Observable ViewModel triggers the problem. Even $viewModel.cameraMode (which doesn't change during rotation) causes per-frame re-evaluation when passed as a Binding to a child view. This suggests that Binding created via $viewModel.property from an @Observable object causes observation of the entire object, not just that property. During camera rotation, cameraMatrix changes 60x/sec, which invalidates all views holding any Binding from the ViewModel. The SwiftUI Form layout pass in the inspector then starves the MTKView of draw calls. Affected: all inspector tabs (Camera, Render, Cloud) when they take Bindings from the ViewModel. Fix approach: decouple inspector from ViewModel bindings - use plain values with explicit write-back callbacks, or extract inspector-editable state into a separate @Observable object that doesn't include rapidly-changing properties like cameraMatrix.
+- 2026-03-31T16:02:23.500063+00:00: 00: 00: 00: 00: Proposed fix: Split ViewModel into two @Observable objects. 1) RenderState: rapidly-changing properties (cameraMatrix, currentFPS, sortEvents, frameCount). Only read by the render view, never bound to SwiftUI inspector views. 2) UIState: user-editable settings (cameraMode, backgroundColor, useSphericalHarmonics, showBoundingBoxes, debugMode, etc). Changed only by discrete user actions, safe to bind to SwiftUI forms. This prevents cross-contamination: cameraMatrix changing at 60fps only invalidates the render view, not the inspector. This is likely a general architectural pattern needed for any SwiftUI + Metal app that combines a render loop with SwiftUI controls.
+- 2026-03-31T16:02:23.500064+00:00: 00: 00: 00: 00: this is a swiftui issue - use the swiftui instrument.
 
 ---
 
@@ -153,7 +153,7 @@ closed: 2026-03-03T00:00:00+00:00
 
 The 'Unified' prefix on types like UnifiedDocumentView, UnifiedSplatContentView, UnifiedSplatViewModel, UnifiedInspectorView, UnifiedCameraContent, UnifiedRenderContent, UnifiedCloudInfoContent, UnifiedInspectorTab was an artifact of merging single and multi splat views. Now that they're merged, the prefix is redundant and makes names unnecessarily long. Rename to clearer, shorter names.
 
-- 2026-03-31T15:59:58.877430+00:00: 00: 00: Also rename types with 'Content' suffix to use more descriptive names like Inspector, Editor, Detail. For example: UnifiedCameraContent -> CameraInspector, UnifiedRenderContent -> RenderInspector, UnifiedCloudInfoContent -> CloudInfoInspector, UnifiedSplatContentView -> SplatRenderView or similar.
+- 2026-03-31T16:02:23.500312+00:00: 00: 00: 00: 00: Also rename types with 'Content' suffix to use more descriptive names like Inspector, Editor, Detail. For example: UnifiedCameraContent -> CameraInspector, UnifiedRenderContent -> RenderInspector, UnifiedCloudInfoContent -> CloudInfoInspector, UnifiedSplatContentView -> SplatRenderView or similar.
 
 ---
 
@@ -167,7 +167,7 @@ closed: 2026-03-25T00:00:00+00:00
 
 In AsyncSortManager.startSorting(), _sortEventChannel.send() and _sortedIndicesChannel.send() were in the same Task. If no consumer listened to the event channel, send() would suspend forever, blocking the indices send. Fixed by splitting into separate Tasks. Also moved sort listener startup from init() to onChange(initial: true) to avoid continuous re-sorting.
 
-- 2026-03-31T15:59:58.877811+00:00: 00: 00: Resolved by replacing AsyncChannel with SingleValueStream and decoupling sort manager from render pipelines.
+- 2026-03-31T16:02:23.500543+00:00: 00: 00: 00: 00: Resolved by replacing AsyncChannel with SingleValueStream and decoupling sort manager from render pipelines.
 
 ---
 
@@ -214,7 +214,7 @@ Every call to sortNowAsync leaks one Metal buffer via a suspended Task. Combined
 
 Affected code: Sources/MetalSprocketsGaussianSplats/Sorting/AsyncSortManager.swift — the Task in sortNowAsync() that sends to both _sortEventChannel and _sortedIndicesChannel sequentially.
 
-- 2026-03-31T15:59:58.878647+00:00: 00: 00: Fixed by #12. The leak was caused by sortNowSync being called every frame from init, with each call creating a suspended Task holding a Metal buffer via the blocked _sortEventChannel send. Removing sortNowSync from init eliminates the per-frame buffer accumulation.
+- 2026-03-31T16:02:23.501251+00:00: 00: 00: 00: 00: Fixed by #12. The leak was caused by sortNowSync being called every frame from init, with each call creating a suspended Task holding a Metal buffer via the blocked _sortEventChannel send. Removing sortNowSync from init eliminates the per-frame buffer accumulation.
 
 ---
 
@@ -232,7 +232,7 @@ The initial sort should be moved to an .onChange(initial: true) handler that onl
 
 Same issue likely applies to Antimatter15SplatRenderPipeline and SparkSplatDebugRenderPipeline.
 
-- 2026-03-31T15:59:58.878873+00:00: 00: 00: Moved sortNowSync out of init into onChange(initial: true) for all three render pipelines. sortedIndices is now optional, rendering skipped until first sort completes.
+- 2026-03-31T16:02:23.501478+00:00: 00: 00: 00: 00: Moved sortNowSync out of init into onChange(initial: true) for all three render pipelines. sortedIndices is now optional, rendering skipped until first sort completes.
 
 ---
 
@@ -253,7 +253,7 @@ created: 2026-03-20T00:00:00+00:00
 updated: 2026-03-25T00:00:00+00:00
 closed: 2026-03-25T00:00:00+00:00
 
-- 2026-03-31T15:59:58.879400+00:00: 00: 00: Resolved by replacing AsyncChannel with SingleValueStream and decoupling sort manager from render pipelines.
+- 2026-03-31T16:02:23.501934+00:00: 00: 00: 00: 00: Resolved by replacing AsyncChannel with SingleValueStream and decoupling sort manager from render pipelines.
 
 ---
 
@@ -323,7 +323,7 @@ We need a way to swap the active cloud(s) on an existing AsyncSortManager withou
 
 or a mutable splatClouds property. The sorter's internal MTLBuffer capacity would need to grow if the new cloud is larger than the original capacity.
 
-- 2026-03-31T15:59:58.880449+00:00: 00: 00: Implemented setSplatClouds(_:) and setSplatCloud(_:) on AsyncSortManager. Added grow(capacity:) to CPUSplatRadixSorter. currentSortedIndices is preserved across cloud switches to prevent blank frames. Added 5 unit tests covering capacity growth, no-shrink, indices preservation, and correct sort count after switch.
+- 2026-03-31T16:02:23.502842+00:00: 00: 00: 00: 00: Implemented setSplatClouds(_:) and setSplatCloud(_:) on AsyncSortManager. Added grow(capacity:) to CPUSplatRadixSorter. currentSortedIndices is preserved across cloud switches to prevent blank frames. Added 5 unit tests covering capacity growth, no-shrink, indices preservation, and correct sort count after switch.
 
 ---
 
@@ -349,7 +349,7 @@ API should look like:
 
 CPUSplatRadixSorter already has internal static convenience methods (sort(device:splats:camera:model:reversed:) and sort(device:clouds:camera:sceneModel:reversed:)) that do the heavy lifting. SplatSorter should be a thin public wrapper over those.
 
-- 2026-03-31T15:59:58.880663+00:00: 00: 00: Implemented SplatSorter as a public enum with two static sort methods wrapping CPUSplatRadixSorter. Handles empty cloud list gracefully. Added SplatSorterTests with 5 tests (all passing).
+- 2026-03-31T16:02:23.503227+00:00: 00: 00: 00: 00: Implemented SplatSorter as a public enum with two static sort methods wrapping CPUSplatRadixSorter. Handles empty cloud list gracefully. Added SplatSorterTests with 5 tests (all passing).
 
 ---
 
@@ -415,8 +415,8 @@ Timsort is algorithmically ideal but significantly more complex to implement —
 
 Insertion sort + bail-out to radix remains a viable simpler option. Keep Timsort as a future consideration if we find a good Swift implementation or if the bail-out heuristic proves fiddly to tune.
 
-- 2026-03-31T15:59:58.880900+00:00: 00: 00: ## Addendum: Timsort instead of insertion sort
-- 2026-03-31T15:59:58.880900+00:00: 00: 00: ## Note on Timsort complexity
+- 2026-03-31T16:02:23.503469+00:00: 00: 00: 00: 00: ## Addendum: Timsort instead of insertion sort
+- 2026-03-31T16:02:23.503470+00:00: 00: 00: 00: 00: ## Note on Timsort complexity
 
 ---
 
@@ -479,11 +479,13 @@ The antimatter15 splat format and rendering code should be deprecated and eventu
 ---
 
 ## 24: Mark stochastic and tile-based renderers as experimental
-status: new
+status: closed
 priority: low
 kind: task
-labels: documentation,api
+labels: documentation, api
 created: 2026-03-31T15:59:58.870075+00:00
+updated: 2026-03-31T16:02:23.492502+00:00
+closed: 2026-03-31T16:02:23.492502+00:00
 
 The stochastic and tile-based splat renderers should be clearly marked as experimental.
 
@@ -492,6 +494,25 @@ The stochastic and tile-based splat renderers should be clearly marked as experi
 - Update any public API documentation to note experimental status
 - Consider adding runtime warnings or logging when these renderers are used
 - Ensure naming conventions reflect experimental status if appropriate
+
+- 2026-03-31T16:02:23.504696+00:00: Added experimental documentation comments to all stochastic and tile-based renderer types:
+
+**Stochastic:**
+- StochasticSplatRenderPipeline
+
+**Tile-based:**
+- TileBasedSplatPipeline
+- TileBasedSplatPass
+- TileSplatResources
+- TileBinningCountPass
+- TileBinningWritePass
+- TileHeatMapRenderPass
+- TilePrefixSumComputePass
+- TileSortingComputePass
+- TileSplatRenderPass
+
+All types now have documentation comments with:
+- Important: This renderer/type is **experimental** and may have significant changes or be removed in future versions.
 
 ---
 
