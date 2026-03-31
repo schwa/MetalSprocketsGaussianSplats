@@ -2,4 +2,16 @@
 # Settings here override global config (~/.config/xcb/config.toml).
 
 [defaults]
-target = "MetalGaussianSplatsDemo"
+# destination = "iphone-sim"    # Default build destination
+scheme = "MetalSprocketsGaussianSplatsDemo"              # Default scheme to build
+# target = "MyApp"              # Default target
+# xcode_version = "16.0"        # Xcode version to use
+
+[output]
+# formatter = "xcbeautify"      # "raw", "xcpretty", or "xcbeautify"
+# formatter_args = []           # Extra args for formatter
+# fallback_to_raw = true        # Fall back if formatter fails
+
+[new]
+# license = "MIT"               # Default license (run `licensor -l` for options)
+# copyright = "Your Name"       # Default copyright holder
