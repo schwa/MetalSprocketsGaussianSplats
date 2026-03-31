@@ -61,10 +61,29 @@ public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where S
 public struct SplatIndices: Sendable, Equatable {
     var parameters: SortParameters
     var indices: TypedMTLBuffer<IndexedDistance>
+    /// The pool this buffer was acquired from. Stored so release is independent
+    /// of which pool the sort manager currently holds (pools are swapped on resize).
+    private var pool: Pool<TypedMTLBuffer<IndexedDistance>>?
 
     public init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>) {
         self.parameters = parameters
         self.indices = indices
+        self.pool = nil
+    }
+
+    internal init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>, pool: Pool<TypedMTLBuffer<IndexedDistance>>) {
+        self.parameters = parameters
+        self.indices = indices
+        self.pool = pool
+    }
+
+    /// Release the index buffer back to the pool it was acquired from.
+    public func release() {
+        pool?.release(indices)
+    }
+
+    public static func == (lhs: SplatIndices, rhs: SplatIndices) -> Bool {
+        lhs.parameters == rhs.parameters && lhs.indices == rhs.indices
     }
 }
 

@@ -40,7 +40,7 @@ public struct SortEvent: Sendable {
 /// 2. Subscribe to ``sortedIndicesStream`` to receive sorted indices as they complete.
 /// 3. Call ``requestSort(_:)`` whenever the camera or model matrix changes.
 /// 4. Pass the received ``SplatIndices`` to a render pipeline.
-/// 5. Return used index buffers to ``indexBufferPool`` in your command buffer's completion handler.
+/// 5. Call ``release(_:)`` when you receive new sorted indices to return the old buffer to the pool.
 ///
 /// ```swift
 /// let sortManager = try AsyncSortManager(device: device, splatCloud: cloud, capacity: cloud.count)
@@ -73,7 +73,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     nonisolated(unsafe) private var sortingTask: Task<Void, Never>?
     private let device: MTLDevice
     private var capacity: Int
-    nonisolated(unsafe) private var _indexBufferPool: Pool<TypedMTLBuffer<IndexedDistance>>
+    private var _indexBufferPool: Pool<TypedMTLBuffer<IndexedDistance>>
 
     /// Whether at least one sort has completed
     public private(set) var isSorted: Bool = false
@@ -173,16 +173,6 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         _sortEventStream
     }
 
-    /// Pool of index buffers for reuse.
-    ///
-    /// Use ``release(_:)`` to return buffers to the pool when they are no longer needed.
-    ///
-    /// If buffers are not released, the pool will allocate new buffers on each sort
-    /// (with a warning logged), defeating the purpose of pooling.
-    nonisolated public var indexBufferPool: Pool<TypedMTLBuffer<IndexedDistance>> {
-        _indexBufferPool
-    }
-
     /// Release sorted indices back to the pool for reuse.
     ///
     /// Call this when you receive new indices and are done with the old ones:
@@ -198,7 +188,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     ///
     /// - Parameter indices: The sorted indices to release.
     nonisolated public func release(_ indices: SplatIndices) {
-        _indexBufferPool.release(indices.indices)
+        indices.release()
     }
 
     /// Replace the active splat clouds without recreating the sort manager.
@@ -301,7 +291,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         let end = CFAbsoluteTimeGetCurrent()
         let duration = end - start
 
-        let result = SplatIndices(parameters: parameters, indices: outputBuffer)
+        let result = SplatIndices(parameters: parameters, indices: outputBuffer, pool: _indexBufferPool)
         currentSortedIndices = result
         isSorted = true
 
@@ -317,18 +307,23 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         try Task.checkCancellation()
         assertNotMainThread("processSortRequest")
         let start = CFAbsoluteTimeGetCurrent()
-        var outputBuffer = _indexBufferPool.acquire()
+        // Snapshot pool and clouds atomically on the actor before doing any work.
+        // This ensures we always use a pool buffer whose capacity matches the current
+        // splatClouds — even if setSplatCloud/resize races with this call.
+        let pool = _indexBufferPool
+        let clouds = splatClouds
+        var outputBuffer = pool.acquire()
         let totalSplats: Int
-        if splatClouds.count == 1 {
+        if clouds.count == 1 {
             // Single cloud path - combine scene model with cloud transform
-            let cloud = splatClouds[0]
+            let cloud = clouds[0]
             let combinedModel = parameters.model * cloud.modelTransform
             sorter.sort(splats: cloud.splats, into: &outputBuffer, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
             totalSplats = cloud.splats.count
         } else {
             // Multi-cloud path - sorter handles per-cloud transforms internally
-            sorter.sort(clouds: splatClouds, into: &outputBuffer, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
-            totalSplats = splatClouds.reduce(0) { $0 + $1.splats.count }
+            sorter.sort(clouds: clouds, into: &outputBuffer, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
+            totalSplats = clouds.reduce(0) { $0 + $1.splats.count }
         }
         let end = CFAbsoluteTimeGetCurrent()
         let duration = end - start
@@ -336,7 +331,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
             logger?.warning("### Sort took longer than expected (\(duration * 1_000) msec, \(duration / 0.033)x).")
         }
 
-        let result = SplatIndices(parameters: parameters, indices: outputBuffer)
+        let result = SplatIndices(parameters: parameters, indices: outputBuffer, pool: pool)
         currentSortedIndices = result
         isSorted = true
 

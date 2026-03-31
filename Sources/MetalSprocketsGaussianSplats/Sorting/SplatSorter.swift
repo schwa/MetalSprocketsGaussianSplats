@@ -13,6 +13,10 @@ import Splats
 ///
 /// For continuous interactive rendering, use ``AsyncSortManager`` instead.
 ///
+/// > Note: ``SplatIndices`` returned by `SplatSorter` are not pool-managed.
+/// > Calling ``SplatIndices/release()`` on them is a no-op. The underlying
+/// > buffer will be deallocated normally when the ``SplatIndices`` value is discarded.
+///
 /// ## Usage
 ///
 /// ```swift
