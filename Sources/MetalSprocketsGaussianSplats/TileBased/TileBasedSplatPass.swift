@@ -8,6 +8,10 @@ import MetalSprocketsUI
 internal import os
 import SwiftUI
 
+/// A tile-based splat rendering pass that bins, sorts, and renders splats per-tile.
+///
+/// - Important: This renderer is **experimental** and may have significant changes
+///   or be removed in future versions. Use ``SparkSplatRenderPipeline`` for production.
 public struct TileBasedSplatPass: Element {
     private var splatCloud: GPUSplatCloud<SparkSplat>
     private var projection: any ProjectionProtocol

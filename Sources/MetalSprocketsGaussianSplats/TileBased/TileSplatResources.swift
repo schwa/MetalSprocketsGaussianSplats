@@ -5,8 +5,12 @@ import MetalSprocketsGaussianSplatShaders
 import simd
 import Splats
 
-/// Resources for tile-based splat rendering
-/// Manages GPU buffers for tile binning, sorting, and rendering
+/// Resources for tile-based splat rendering.
+///
+/// Manages GPU buffers for tile binning, sorting, and rendering.
+///
+/// - Important: This type is part of the **experimental** tile-based renderer
+///   and may have significant changes or be removed in future versions.
 public final class TileSplatResources {
     // MARK: - Configuration
 

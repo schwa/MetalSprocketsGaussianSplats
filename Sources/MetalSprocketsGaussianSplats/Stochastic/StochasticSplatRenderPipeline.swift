@@ -6,6 +6,13 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
+/// A stochastic splat renderer that uses random sampling for transparency.
+///
+/// - Important: This renderer is **experimental** and may have significant changes
+///   or be removed in future versions. Use ``SparkSplatRenderPipeline`` for production.
+///
+/// This renderer uses stochastic (random) sampling to approximate alpha blending,
+/// which can produce noisy results but doesn't require depth sorting.
 public struct StochasticSplatRenderPipeline: Element {
     var splatCloud: GPUSplatCloud<SparkSplat>
     var projectionMatrix: simd_float4x4

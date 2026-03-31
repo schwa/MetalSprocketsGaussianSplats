@@ -4,9 +4,12 @@ import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 
-/// Complete tile-based splat rendering pipeline
-/// Combines binning, sorting, and rendering passes
-/// Note: This is an Element-based pipeline for use within RenderPass contexts.
+/// Complete tile-based splat rendering pipeline that combines binning, sorting, and rendering passes.
+///
+/// - Important: This renderer is **experimental** and may have significant changes
+///   or be removed in future versions. Use ``SparkSplatRenderPipeline`` for production.
+///
+/// This is an Element-based pipeline for use within RenderPass contexts.
 /// For SwiftUI integration, use TileBasedSplatView instead.
 public struct TileBasedSplatPipeline: Element {
     // MARK: - Properties

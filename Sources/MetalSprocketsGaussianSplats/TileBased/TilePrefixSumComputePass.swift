@@ -4,9 +4,13 @@ import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 
-/// Compute pass that computes exclusive prefix sum of tile counters
-/// Output: tileOffsets[i] = starting index for tile i in the compacted buffer
-/// Also computes maxTileCount for heatmap normalization
+/// Compute pass that computes exclusive prefix sum of tile counters.
+///
+/// Output: `tileOffsets[i]` = starting index for tile i in the compacted buffer.
+/// Also computes `maxTileCount` for heatmap normalization.
+///
+/// - Important: This type is part of the **experimental** tile-based renderer
+///   and may have significant changes or be removed in future versions.
 public struct TilePrefixSumComputePass: Element {
     // MARK: - Properties
 

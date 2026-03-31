@@ -5,10 +5,14 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-/// Render pass that uses Metal's native tile shading with imageblock
+/// Render pass that uses Metal's native tile shading with imageblock.
+///
 /// Two-pass approach:
 /// 1. Fragment shader computes splat colors and writes to imageblock
 /// 2. Blit shader reads from imageblock and outputs to color attachment
+///
+/// - Important: This type is part of the **experimental** tile-based renderer
+///   and may have significant changes or be removed in future versions.
 public struct TileSplatRenderPass: Element {
     // MARK: - Properties
 

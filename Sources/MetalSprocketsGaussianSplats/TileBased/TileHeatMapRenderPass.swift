@@ -5,7 +5,10 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-/// Renders a heatmap overlay showing splat density per tile
+/// Renders a heatmap overlay showing splat density per tile.
+///
+/// - Important: This type is part of the **experimental** tile-based renderer
+///   and may have significant changes or be removed in future versions.
 public struct TileHeatMapRenderPass: Element {
     var tileSplatResources: TileSplatResources
     var showTileBorders: Bool

@@ -4,7 +4,10 @@ import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 
-/// Compute pass that counts splats per tile (phase 1 of two-phase binning)
+/// Compute pass that counts splats per tile (phase 1 of two-phase binning).
+///
+/// - Important: This type is part of the **experimental** tile-based renderer
+///   and may have significant changes or be removed in future versions.
 public struct TileBinningCountPass: Element {
     // MARK: - Properties
 
@@ -77,7 +80,10 @@ public struct TileBinningCountPass: Element {
     }
 }
 
-/// Compute pass that writes splats to compacted buffer (phase 2 of two-phase binning)
+/// Compute pass that writes splats to compacted buffer (phase 2 of two-phase binning).
+///
+/// - Important: This type is part of the **experimental** tile-based renderer
+///   and may have significant changes or be removed in future versions.
 public struct TileBinningWritePass: Element {
     // MARK: - Properties
 
