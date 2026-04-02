@@ -102,8 +102,11 @@ jobs:
         with:
           xcode-version: ${{ env.XCODE_VERSION }}
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Download MetalToolchain
-        run: xcodebuild -downloadComponent MetalToolchain
+      - name: Download platforms
+        run: |
+          xcodebuild -downloadComponent MetalToolchain
+          xcodebuild -downloadPlatform iOS
+          xcodebuild -downloadPlatform visionOS
       - name: Trust plugins
         run: defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
       - name: Build Simple Demo (${{ matrix.destination }})
