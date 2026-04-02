@@ -28,9 +28,9 @@ jobs:
       - name: Trust plugins
         run: defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
       - name: Build (macOS)
-        run: swift build -v
+        run: swift build -v --disable-sandbox
       - name: Test (macOS)
-        run: swift test -v
+        run: swift test -v --disable-sandbox
         env:
           CI: "true"
 
