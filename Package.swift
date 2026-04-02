@@ -64,6 +64,7 @@ let package = Package(
         .target(
             name: "MetalSprocketsGaussianSplatShaders",
             dependencies: [
+                .product(name: "MetalSprocketsShaders", package: "MetalSprockets"),
             ],
             exclude: ["Metal"],
             plugins: [
