@@ -1,13 +1,13 @@
 {
-  "originHash" : "e0bcc9961503c72b8634c128a35c62781c5a05591948757272bf3c54c9a5c4b6",
+  "originHash" : "1cae153d860b6f33a072d92a798a25849909286503cf9e8fc1b972dbde20addc",
   "pins" : [
     {
       "identity" : "geometrylite3d",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GeometryLite3D",
       "state" : {
-        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7",
-        "version" : "0.1.0"
+        "revision" : "898b2f439607760e3c9f8c239f51664c9bbd3692",
+        "version" : "0.1.1"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GoldenImage",
       "state" : {
-        "revision" : "6f134ad54fa8877c8245775078986038ea38ac42",
-        "version" : "0.1.2"
+        "revision" : "6b8468e6ce15e1d4d90cfc757f27b55163b82aa1",
+        "version" : "0.1.3"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalCompilerPlugin",
       "state" : {
-        "revision" : "36c761478a8e3fb934acf8ef2db4696af95069b4",
-        "version" : "0.1.5"
+        "revision" : "9c11db3648fa4e4f02bd4918c4b7db3472a73c64",
+        "version" : "0.1.6"
       }
     },
     {
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
-        "revision" : "a9b12fbeb174b40d4ecc68965f851fcb60a51b05",
-        "version" : "0.1.5"
+        "revision" : "20125f181f8571eca25ae9b5e160628f4e44177e",
+        "version" : "0.1.7"
       }
     },
     {
@@ -42,17 +42,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser",
       "state" : {
-        "revision" : "c5d11a805e765f52ba34ec7284bd4fcd6ba68615",
-        "version" : "1.7.0"
+        "revision" : "626b5b7b2f45e1b0b1c6f4a309296d1d21d7311b",
+        "version" : "1.7.1"
       }
     },
     {
       "identity" : "swift-collections",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-collections.git",
+      "location" : "https://github.com/apple/swift-collections",
       "state" : {
-        "revision" : "7b847a3b7008b2dc2f47ca3110d8c782fb2e5c7e",
-        "version" : "1.3.0"
+        "revision" : "6675bc0ff86e61436e615df6fc5174e043e57924",
+        "version" : "1.4.1"
       }
     },
     {
