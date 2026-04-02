@@ -1,5 +1,23 @@
 # Release Notes
 
+## 0.1.7
+
+### Features
+
+- Added `SplatView` to encapsulate `AsyncSortManager` complexity
+- Added `SplatSorter` one-shot sorter; `gsplat-render` migrated to use it
+- Buffer pooling for index/distance buffers in sort manager
+- Stochastic and tile-based renderers marked as experimental
+
+### Fixes
+
+- Fixed buffer pool use-after-resize crash when switching splat clouds
+- Fixed stray "that" text in MetalSupport.h
+
+### Other
+
+- Replaced local `BUFFER` macro with `MetalSprocketsShaders` import
+
 ## 0.1.6
 
 ### Changes
