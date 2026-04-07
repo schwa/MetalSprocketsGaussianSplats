@@ -681,3 +681,22 @@ closed: 2026-04-07T22:24:39Z
 
 ---
 
+## 32: Splat buffer pool preallocation is one buffer too low
+status: new
+priority: medium
+kind: none
+created: 2026-04-07T23:16:01Z
+updated: 2026-04-07T23:16:10Z
+
+On startup of SplatView, a single `Pool exhausted, allocating new object (id: 5)` warning fires from the AsyncSortManager's index buffer pool.
+
+The pool is currently preallocated with `pendingReleaseDepth + 2 = 5` buffers (see SplatView.swift), but the steady-state demand is one higher than that during the first few frames: the pending-release queue (3) + the in-flight sort buffer + the just-acquired buffer for the next sort = 5, plus apparently one more transient buffer in the very first frames.
+
+Bumping `preallocatedBufferCount` from `pendingReleaseDepth + 2` to `pendingReleaseDepth + 3` should silence the warning.
+
+Not a correctness issue — the pool grows on demand and stabilizes after the first allocation. Purely a startup-log-cleanliness fix.
+
+Observed during the adaptive sort instrumentation work; see ~/Desktop/adaptive-sort-findings.md for the test runs that surfaced it.
+
+---
+
