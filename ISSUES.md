@@ -40,20 +40,26 @@ closed: 2026-02-17T00:00:00Z
 ---
 
 ## 3: Investigate testAntimatter15Rendering test failure
-status: new
+status: open
 priority: low
 kind: bug
+labels: effort:s
 created: 2026-02-19T00:00:00Z
+updated: 2026-04-09T16:59:20Z
 
 Test may have pre-existing golden image mismatch. Needs investigation.
+
+- `2026-04-09T16:57:35Z`: Related to #23 (deprecate antimatter15). If #23 is completed, this becomes moot.
 
 ---
 
 ## 4: Investigate splat rendering lag vs bounding boxes
-status: new
+status: open
 priority: medium
 kind: bug
+labels: effort:m
 created: 2026-02-19T00:00:00Z
+updated: 2026-04-09T16:59:20Z
 
 When camera moves, bounding box overlays move immediately but splats lag behind.
 
@@ -88,10 +94,12 @@ Architecture refactor: Move sort management from SparkSplatRenderPipeline to the
 ---
 
 ## 6: Multi-splat mode FPS drops to ~10fps during camera rotation
-status: new
+status: open
 priority: high
 kind: bug
+labels: effort:xl
 created: 2026-02-20T00:00:00Z
+updated: 2026-04-09T16:59:20Z
 
 ## Problem
 In multi-splat mode (.splatscene files), FPS drops dramatically (to ~10fps or less) during camera rotation, while single-splat mode maintains 60fps.
@@ -176,20 +184,27 @@ In AsyncSortManager.startSorting(), _sortEventChannel.send() and _sortedIndicesC
 ---
 
 ## 9: renderTargetArrayLength = 1 required on macOS due to visionOS cruft
-status: new
+status: closed
 priority: medium
 kind: bug
+labels: effort:s
 created: 2026-03-05T00:00:00Z
+updated: 2026-04-09T18:29:58Z
+closed: 2026-04-09T18:29:58Z
 
 SparkSplatRenderPipeline requires .renderPassDescriptorModifier { $0.renderTargetArrayLength = 1 } on macOS. This is visionOS stereo rendering cruft leaking into macOS. Should be handled internally by the pipeline or MetalSprockets so callers don't need to set it.
+
+- `2026-04-09T18:29:58Z`: Fixed: renderTargetArrayLength=1 now only applied on non-visionOS via #if. visionOS uses layered rendering with correct array length.
 
 ---
 
 ## 10: Add rendering unit tests with golden image comparisons
-status: new
+status: open
 priority: high
 kind: task
+labels: effort:l
 created: 2026-03-05T00:00:00Z
+updated: 2026-04-09T16:59:20Z
 
 We need unit tests that render splats via OffscreenRenderer and compare against golden images. Should cover: Spark renderer with test-grid fixture, Spark renderer with butterfly sample, different camera angles, SH on/off. Use the GoldenImage framework for comparisons.
 
@@ -241,10 +256,12 @@ Same issue likely applies to Antimatter15SplatRenderPipeline and SparkSplatDebug
 ---
 
 ## 13: Stop using placeholder Metal debug labels
-status: new
+status: open
 priority: medium
-kind: none
+kind: task
+labels: effort:s
 created: 2026-03-19T00:00:00Z
+updated: 2026-04-09T16:59:20Z
 
 
 ---
@@ -262,10 +279,12 @@ closed: 2026-03-25T00:00:00Z
 ---
 
 ## 15: Create docc docs for entire project.
-status: new
+status: open
 priority: medium
-kind: none
+kind: documentation
+labels: effort:l
 created: 2026-03-25T00:00:00Z
+updated: 2026-04-09T16:59:20Z
 
 
 ---
@@ -362,11 +381,13 @@ CPUSplatRadixSorter already has internal static convenience methods (sort(device
 ---
 
 ## 20: Adaptive sort algorithm: insertion sort for small camera deltas, radix sort fallback
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: performance, sorting
 created: 2026-03-30T00:00:00Z
+updated: 2026-04-07T23:28:48Z
+closed: 2026-04-07T23:28:48Z
 
 ## Summary
 
@@ -442,9 +463,14 @@ This gives us access to both the old and new buffers at the transition point. Fo
 
 The pool infrastructure is in place to support this.
 
+TL;DR: insertion-sort-from-previous-frame is ~1000x slower than radix sort for 100k+ splats under interactive rotation. The previous-frame permutation has ~13,700 inversions per element on the demo butterfly (149k splats), so the 'nearly sorted' premise doesn't hold. Hybrid mode (insertion with radix fallback) bails out every frame and is ~2x slower than radix-only due to wasted adaptive work.
+
+Adaptive code and MSGS_ADAPTIVE_SORT instrumentation will be reverted in a follow-up commit; the timing log line is worth keeping.
+
 - `2026-04-02T20:21:37Z`: ## Addendum: Timsort instead of insertion sort
 - `2026-04-02T20:21:37Z`: ## Note on Timsort complexity
 - `2026-04-02T20:21:37Z`: ## Buffer pooling enables copy-from-previous optimization
+- `2026-04-07T23:28:48Z`: Experiment rejected. See RFC 0001 (RFCs/0001-adaptive-splat-sort.md) for full findings.
 
 ---
 
@@ -538,11 +564,12 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
 ---
 
 ## 23: Deprecate antimatter15 code
-status: new
+status: open
 priority: low
 kind: task
-labels: cleanup, deprecation
+labels: cleanup, deprecation, effort:m
 created: 2026-03-31T15:59:44Z
+updated: 2026-04-09T16:59:20Z
 
 The antimatter15 splat format and rendering code should be deprecated and eventually removed.
 
@@ -593,20 +620,23 @@ All types now have documentation comments with:
 ---
 
 ## 25: AsyncSortManager.grow -> resize
-status: new
+status: open
 priority: medium
-kind: none
+kind: enhancement
+labels: effort:xs
 created: 2026-03-31T16:10:00Z
+updated: 2026-04-09T16:59:20Z
 
 
 ---
 
 ## 26: Simplify buffer release pattern for sortedIndicesStream consumers
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: api, ergonomics
+labels: api, ergonomics, effort:m
 created: 2026-03-31T19:59:36Z
+updated: 2026-04-09T16:59:20Z
 
 The current pattern requires manual release handling:
 
@@ -631,19 +661,24 @@ This may be superseded by #16 (SplatView) which would hide this complexity entir
 ---
 
 ## 27: Add a simple VIsionPro example to the demo.
-status: new
+status: closed
 priority: medium
 kind: none
 created: 2026-03-31T20:32:59Z
+updated: 2026-04-09T16:57:35Z
+closed: 2026-04-09T16:57:35Z
 
+- `2026-04-09T16:57:35Z`: Duplicate of #30
 
 ---
 
 ## 28: SplatIndices public init sets pool to nil causing silent release no-op
-status: new
+status: open
 priority: medium
-kind: none
+kind: bug
+labels: effort:s
 created: 2026-03-31T21:11:46Z
+updated: 2026-04-09T16:59:20Z
 
 The public init(parameters:indices:) on SplatIndices sets pool to nil, meaning release() on indices created outside of AsyncSortManager is a silent no-op. This is a footgun for callers constructing SplatIndices manually (e.g. tests, SplatSorter). Consider making the pool non-optional or removing the public init in favour of the internal one.
 
@@ -662,11 +697,17 @@ MetalSupport.h defines its own BUFFER macro and #ifdef __METAL_VERSION__ scaffol
 ---
 
 ## 30: Get sample butterfly-wings-closed.spz working on visionOS headset in simple demo
-status: new
+status: closed
 priority: medium
 kind: task
+labels: effort:m
 created: 2026-04-02T20:21:37Z
+updated: 2026-04-09T18:29:58Z
+closed: 2026-04-09T18:29:58Z
 
+- `2026-04-09T16:57:52Z`: Related: #27 closed as duplicate of this issue.
+- `2026-04-09T17:41:00Z`: Basic implementation done: SplatImmersiveElement + SplatImmersiveRenderState render butterfly in immersive space. Demo updated with windowed SplatView + immersive space button. Remaining polish tracked in #35, #36, #37.
+- `2026-04-09T18:29:58Z`: Done: SplatImmersiveElement + demo with windowed SplatView and immersive space. Remaining polish in #35, #36, #37.
 
 ---
 
@@ -698,6 +739,262 @@ Bumping `preallocatedBufferCount` from `pendingReleaseDepth + 2` to `pendingRele
 Not a correctness issue — the pool grows on demand and stabilizes after the first allocation. Purely a startup-log-cleanliness fix.
 
 Observed during the adaptive sort instrumentation work; see ~/Desktop/adaptive-sort-findings.md for the test runs that surfaced it.
+
+---
+
+## 33: Provide a simple enum / modifier to change SplatView renderer
+status: closed
+priority: medium
+kind: feature
+created: 2026-04-09T17:00:29Z
+updated: 2026-04-09T19:22:51Z
+closed: 2026-04-09T19:22:51Z
+
+Add an enum for selecting the splat renderer (e.g. spark, stochastic, tile-based) and expose it as a SwiftUI modifier on SplatView.
+
+- `2026-04-09T19:22:51Z`: Done: SplatRenderer enum (.spark, .stochastic) with .splatRenderer() SwiftUI modifier. SplatView reads from environment and switches renderer.
+
+---
+
+## 34: Add public SplatScene for visionOS immersive mode
+status: closed
+priority: medium
+kind: feature
+labels: effort:l
+created: 2026-04-09T17:03:09Z
+updated: 2026-04-09T18:29:58Z
+closed: 2026-04-09T18:29:58Z
+
+Provide a public RealityKit Scene (or ImmersiveSpace content) in the library that renders a splat cloud in visionOS immersive mode. This would let consumers drop in a splat immersive experience without wiring up Metal rendering manually. The simple demo (#30) can then just use this.
+
+- `2026-04-09T17:41:05Z`: Partial: SplatImmersiveElement is the public reusable element, but it's not as turnkey as SplatView. Consumer must wire up ImmersiveRenderContent → ImmersiveRenderPass → SplatImmersiveElement manually. A convenience ImmersiveSpaceContent wrapper (like the original SplatImmersiveContent attempt) would make this a one-liner. See #37.
+- `2026-04-09T18:29:58Z`: Done: SplatImmersiveElement and SplatImmersiveRenderState are the public API. Convenience wrapper tracked in #37.
+
+---
+
+## 35: Support per-eye sorting for visionOS stereo rendering
+status: new
+priority: medium
+kind: enhancement
+labels: visionOS, sorting, effort:l
+created: 2026-04-09T17:40:46Z
+updated: 2026-04-09T18:02:11Z
+
+Currently SplatImmersiveElement sorts once using the left eye's camera matrix and shares the sorted index buffer for both eyes. For distant splats the depth order can differ between eyes, causing flicker. Since CPU sort is cheap (~2ms for 150k splats), we could sort twice — once per eye — using separate buffers. This would eliminate any depth-order disagreement between eyes.
+
+- `2026-04-09T18:02:07Z`: More complex than expected. SparkSplatRenderPipeline uses vertex amplification — both eyes share a single draw call with one sort order. Per-eye sorting requires dropping vertex amplification and rendering each eye separately: two SparkSplatRenderPipeline elements, each with its own sort buffer, projection matrix, camera matrix, and render target layer. This is a meaningful rendering architecture change, not just two sort managers.
+
+---
+
+## 36: Investigate constant minor flicker in visionOS immersive rendering
+status: new
+priority: medium
+kind: bug
+labels: effort:s, visionOS, sorting
+created: 2026-04-09T17:40:54Z
+updated: 2026-04-09T17:57:55Z
+
+Distant splats flicker during immersive rendering. Likely cause: the pending release depth (3 buffers) is too shallow for visionOS stereo rendering, which has more in-flight GPU work. A pool buffer may be returned and overwritten by a new sort while the GPU is still reading it. To diagnose: disable pool release entirely (just allocate fresh buffers) and see if flicker disappears. If confirmed, either increase the pending release depth for visionOS or make it configurable.
+
+1. Sort instability from head tracking micro-movements: splats at similar depths swap order every frame as the camera position changes slightly. Gaussian splats are inherently sensitive to sort stability.
+2. Alpha blending differences with rgba16Float (linear HDR) vs bgra8Unorm_srgb (8-bit sRGB): linear color space + alpha blending may behave differently for semi-transparent splats.
+3. Sort using only eye 0 camera — minor depth order disagreements between eyes (unlikely to be the cause given small IPD vs splat depths).
+
+The flicker is constant and minor, present even when head is relatively stationary (still tracked).
+
+- `2026-04-09T17:52:31Z`: Pool reuse ruled out — disabling pool release did not fix the flicker. Remaining theories:
+- `2026-04-09T17:57:50Z`: Pool reuse confirmed not the cause. Re-enabled pool release. Also tried averaged eye position (#39) — no change. Flicker remains open for further investigation.
+
+---
+
+## 37: Add turnkey SplatImmersiveContent convenience wrapper
+status: new
+priority: medium
+kind: enhancement
+labels: effort:s, visionOS, api
+created: 2026-04-09T17:41:13Z
+
+SplatImmersiveElement works but requires the consumer to set up ImmersiveRenderContent → ImmersiveRenderPass → SplatImmersiveElement + SplatImmersiveRenderState. SplatView is a single-line drop-in for windowed rendering — we should have the equivalent for immersive. A SplatImmersiveContent: ImmersiveSpaceContent that hides the boilerplate, so usage is just:
+
+```swift
+ImmersiveSpace(id: "Splat") {
+    SplatImmersiveContent(splatCloud: cloud)
+}
+```
+
+The earlier attempt failed due to the renderTargetArrayLength bug (now fixed via #if !os(visionOS) in SparkSplatRenderPipeline). Should be straightforward to reintroduce.
+
+---
+
+## 38: Immersive splat rendering looks washed out compared to windowed rendering
+status: closed
+priority: medium
+kind: bug
+labels: effort:xs, visionOS
+created: 2026-04-09T17:50:31Z
+updated: 2026-04-09T17:57:41Z
+closed: 2026-04-09T17:57:41Z
+
+The immersive butterfly appears dull and desaturated compared to the same splat rendered in a window. The windowed SplatView uses bgra8Unorm_srgb with convertSRGBToLinear: true (default). The immersive path uses rgba16Float (linear HDR) with convertSRGBToLinear: false. The splat color data is in sRGB, so when rendered into a linear framebuffer without conversion, colors are interpreted as linear values — making them appear washed out. Fix: set convertSRGBToLinear: true in SplatImmersiveElement.
+
+- `2026-04-09T17:57:41Z`: Fixed: convertSRGBToLinear set to true in SplatImmersiveElement
+
+---
+
+## 39: Use averaged eye position for immersive sort camera
+status: closed
+priority: low
+kind: enhancement
+labels: effort:xs, visionOS, sorting
+created: 2026-04-09T17:51:37Z
+updated: 2026-04-09T17:57:45Z
+closed: 2026-04-09T17:57:45Z
+
+SplatImmersiveElement currently uses eye 0's camera matrix for sorting. Using the average of both eyes' positions would minimize worst-case sort error for either eye. Unlikely to fix the constant minor flicker but is more correct for stereo.
+
+- `2026-04-09T17:57:45Z`: Implemented: averaging both eye positions for sort. Did not fix flicker but is more correct for stereo.
+
+---
+
+## 40: Demo app icon not showing on visionOS
+status: closed
+priority: low
+kind: bug
+labels: effort:s, visionOS, demo
+created: 2026-04-09T18:09:00Z
+updated: 2026-04-09T19:13:38Z
+closed: 2026-04-09T19:13:38Z
+
+The demo has an AppIcon.icon file (Icon Composer format) but no icon appears. Icon Composer .icon files only support iOS, iPadOS, macOS, and watchOS. visionOS (and tvOS) require layered image stacks in the asset catalog. The demo needs either a visionOS-specific AppIcon.solidimagestack in Assets.xcassets, or at minimum a fallback single-layer icon in the asset catalog.
+
+- `2026-04-09T19:13:38Z`: Added AppIcon.solidimagestack to asset catalog. Back layer opacity fixed with imagemagick. Filed icon-generator bug (icon-generator#10).
+
+---
+
+## 41: Splat rendering fails silently in visionOS and iPad simulators
+status: new
+priority: low
+kind: bug
+labels: effort:m, simulator
+created: 2026-04-09T19:09:47Z
+
+SplatView renders nothing in visionOS and iPad simulators — sorting runs but no pixels appear. No errors logged. Works fine on device and on macOS native. The MetalSprockets cube demo renders fine on simulator, so it's specific to the splat pipeline. Likely cause: GPU buffer addresses (gpuAddressAsUnsafeMutablePointer), argument buffers, or other advanced Metal features used by SparkSplatRenderPipeline that aren't supported by simulator Metal.
+
+- `2026-04-09T19:16:07Z`: Root cause found: 'pointers to an argument buffer inside another argument buffer are not supported in the simulator'. SparkSplatRenderPipeline uses nested argument buffers (MultiCloudArgumentBuffer → SplatCloudData → GPU buffer pointers). This is a simulator Metal limitation, not fixable without restructuring the shader argument passing.
+
+---
+
+## 42: Add MetalSprockets FPS counter to demo
+status: new
+priority: low
+kind: enhancement
+labels: effort:xs, demo
+created: 2026-04-09T19:17:42Z
+
+The MetalSprockets FrameTimingView provides an FPS overlay. Add it to the demo app for both windowed and immersive rendering to help diagnose performance issues.
+
+---
+
+## 43: Add ARKit camera passthrough mode to iOS demo
+status: new
+priority: low
+kind: feature
+labels: effort:m, demo, iOS
+created: 2026-04-09T19:19:51Z
+
+The MetalSprockets demo has an ARKit mode that renders the camera feed (YCbCr billboard) with 3D content overlaid using ARKit world tracking. Add similar support to the splat demo on iOS — render splats on top of the AR camera feed with proper AR projection/view matrices from ARKit. See MetalSprockets Example MobileDemoView for the pattern: ARSessionDelegate + .arkit() modifier + YCbCrBillboardRenderPass.
+
+---
+
+## 44: Investigate why stochastic renderer requires depth buffer
+status: new
+priority: low
+kind: bug
+labels: effort:s, stochastic
+created: 2026-04-09T20:05:59Z
+
+Switching to stochastic mode in SplatView crashes with 'MTLDepthStencilDescriptor sets depth test but MTLRenderPassDescriptor has a nil depthAttachment texture'. The stochastic renderer shouldn't need depth testing — it uses stochastic alpha sampling. Something in the pipeline or MetalSprockets is setting up depth state unexpectedly. Currently worked around by setting .metalDepthStencilPixelFormat(.depth32Float) when in stochastic mode.
+
+---
+
+## 45: SplatView renders blank when used with .toolbar or NavigationStack on macOS
+status: new
+priority: medium
+kind: bug
+labels: effort:xs, macOS, demo
+created: 2026-04-09T20:07:10Z
+
+SplatView (via RenderView/MTKView) renders nothing when .toolbar is applied or when wrapped in NavigationStack on macOS. Resizing the window triggers rendering. Root cause is in MetalSprockets (filed as MetalSprockets#311) — MTKView gets zero initial size and never redraws. Workaround: use .overlay for UI controls instead of .toolbar.
+
+---
+
+## 46: Add tile-based renderer to SplatRenderer enum
+status: new
+priority: low
+kind: enhancement
+labels: effort:m, tile-based
+created: 2026-04-09T20:08:11Z
+
+SplatRenderer currently has .spark and .stochastic but not .tileBased. TileBasedSplatPipeline requires TileSplatResources to be created and managed, so it's not a trivial drop-in. SplatView would need to lazily create and hold TileSplatResources when tile-based mode is selected.
+
+---
+
+## 47: SplatView still sorts in stochastic mode
+status: closed
+priority: medium
+kind: bug
+labels: effort:s, stochastic, performance
+created: 2026-04-09T20:08:30Z
+updated: 2026-04-09T20:10:24Z
+closed: 2026-04-09T20:10:24Z
+
+When SplatView is set to .stochastic renderer, the AsyncSortManager continues sorting every frame even though the stochastic renderer doesn't use sorted index buffers. SplatView should skip sort requests (and ideally pause the sort manager) when the active renderer doesn't need sorting.
+
+- `2026-04-09T20:10:24Z`: Fixed: sort requests are skipped when renderer != .spark. Sort is re-triggered when switching back to spark.
+
+---
+
+## 48: Support magnify gesture and scroll wheel for camera zoom in demo
+status: new
+priority: medium
+kind: enhancement
+labels: effort:m, demo
+created: 2026-04-09T20:09:00Z
+
+The demo only supports turntable drag rotation via .interactiveCamera(). Add pinch-to-zoom (MagnifyGesture) on iOS/visionOS and scroll wheel zoom on macOS. This may need changes in Interaction3D or custom gesture handling in the demo.
+
+---
+
+## 49: Metal GPU performance HUD disappears during drag/pan gestures
+status: new
+priority: low
+kind: bug
+labels: effort:xs, macOS
+created: 2026-04-09T20:13:18Z
+
+The Metal GPU performance overlay disappears while dragging/panning the camera. Reappears when gesture ends. Same issue as MetalSprockets#34/#312. Flickering is reduced when shader validation is enabled (slower frame rate). Likely a SwiftUI overlay/z-ordering issue during gesture handling in RenderView.
+
+---
+
+## 50: Support stochastic renderer in visionOS immersive mode
+status: new
+priority: low
+kind: feature
+labels: effort:m, visionOS, stochastic
+created: 2026-04-09T20:13:29Z
+
+SplatImmersiveElement currently only uses SparkSplatRenderPipeline. Add support for switching to StochasticSplatRenderPipeline in immersive mode, which would eliminate the need for sorting entirely on visionOS. Would need to handle the depth buffer requirement and stereo rendering setup for stochastic mode.
+
+---
+
+## 51: Investigate stochastic seed behavior when camera is stationary
+status: new
+priority: low
+kind: enhancement
+labels: effort:s, stochastic
+created: 2026-04-09T20:13:57Z
+
+Currently frameTime (frame counter) is passed as the stochastic seed every frame, so the noise pattern changes even when the camera isn't moving. This causes constant visual shimmer. When the camera is stationary, we could either freeze the seed (stable but noisy image) or accumulate/average multiple frames for temporal convergence. Need to investigate what looks best.
 
 ---
 
