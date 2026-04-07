@@ -19,8 +19,8 @@ let package = Package(
             targets: ["MetalSprocketsGaussianSplats"]
         ),
         .executable(
-            name: "gsplat-render",
-            targets: ["gsplat-render"]
+            name: "metalsprockets-gaussian-splat",
+            targets: ["metalsprockets-gaussian-splat"]
         )
     ],
     dependencies: [
@@ -72,7 +72,7 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "gsplat-render",
+            name: "metalsprockets-gaussian-splat",
             dependencies: [
                 "MetalSprocketsGaussianSplats",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),

@@ -5,20 +5,20 @@
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:MetalSprocketsGaussianSplats}",
-            "name": "Debug gsplat-render",
-            "target": "gsplat-render",
+            "name": "Debug metalsprockets-gaussian-splat",
+            "target": "metalsprockets-gaussian-splat",
             "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug gsplat-render"
+            "preLaunchTask": "swift: Build Debug metalsprockets-gaussian-splat"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:MetalSprocketsGaussianSplats}",
-            "name": "Release gsplat-render",
-            "target": "gsplat-render",
+            "name": "Release metalsprockets-gaussian-splat",
+            "target": "metalsprockets-gaussian-splat",
             "configuration": "release",
-            "preLaunchTask": "swift: Build Release gsplat-render"
+            "preLaunchTask": "swift: Build Release metalsprockets-gaussian-splat"
         }
     ]
 }

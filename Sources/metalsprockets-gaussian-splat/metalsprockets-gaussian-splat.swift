@@ -15,7 +15,7 @@ import SwiftUI
 @main
 struct GaussianSplatRenderer: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "gsplat-render",
+        commandName: "metalsprockets-gaussian-splat",
         abstract: "Render Gaussian splat files to PNG images"
     )
 
@@ -432,7 +432,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
         if useSparkRenderer {
             guard let cloud = sparkGPUSplatCloud else {
-                throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Spark splat cloud is nil"])
+                throw NSError(domain: "metalsprockets-gaussian-splat", code: 1, userInfo: [NSLocalizedDescriptionKey: "Spark splat cloud is nil"])
             }
             splatCount = cloud.count
             let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
@@ -455,7 +455,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             }
         } else {
             guard let cloud = antimatter15GPUSplatCloud else {
-                throw NSError(domain: "gsplat-render", code: 1, userInfo: [NSLocalizedDescriptionKey: "Antimatter15 splat cloud is nil"])
+                throw NSError(domain: "metalsprockets-gaussian-splat", code: 1, userInfo: [NSLocalizedDescriptionKey: "Antimatter15 splat cloud is nil"])
             }
             splatCount = cloud.count
             let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
