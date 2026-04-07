@@ -671,10 +671,12 @@ created: 2026-04-02T20:21:37Z
 ---
 
 ## 31: Buffer pooling causes visual glitches when rotating demo butterfly
-status: new
+status: closed
 priority: medium
 kind: none
 created: 2026-04-07T22:18:08Z
+updated: 2026-04-07T22:24:39Z
+closed: 2026-04-07T22:24:39Z
 
 
 ---

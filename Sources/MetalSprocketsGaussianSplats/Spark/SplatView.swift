@@ -42,7 +42,14 @@ public struct SplatView: View {
     private let projection: PerspectiveProjection
 
     @State private var sortedIndices: SplatIndices?
+    /// Queue of recently-superseded indices awaiting release. We hold the last
+    /// few so the GPU can finish rendering with them before their buffers are
+    /// returned to the pool and overwritten by the next sort. Sized to cover
+    /// MTKView's typical in-flight frame count (3) plus a margin.
+    @State private var pendingRelease: [SplatIndices] = []
     @State private var sortManager: AsyncSortManager<SparkSplat>
+
+    private static let pendingReleaseDepth = 3
 
     /// Creates a `SplatView` that renders the given splat cloud.
     ///
@@ -68,7 +75,8 @@ public struct SplatView: View {
         _sortManager = State(initialValue: try! AsyncSortManager<SparkSplat>(
             device: device,
             splatCloud: splatCloud,
-            capacity: splatCloud.count
+            capacity: splatCloud.count,
+            preallocatedBufferCount: Self.pendingReleaseDepth + 2
         ))
     }
 
@@ -96,7 +104,10 @@ public struct SplatView: View {
             sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             for await indices in sortManager.sortedIndicesStream {
                 if let old = sortedIndices {
-                    sortManager.release(old)
+                    pendingRelease.append(old)
+                    while pendingRelease.count > Self.pendingReleaseDepth {
+                        sortManager.release(pendingRelease.removeFirst())
+                    }
                 }
                 sortedIndices = indices
             }
