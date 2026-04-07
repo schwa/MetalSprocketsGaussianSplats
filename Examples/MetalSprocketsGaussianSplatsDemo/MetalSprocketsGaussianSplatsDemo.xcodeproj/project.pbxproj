@@ -10,7 +10,6 @@
 		45104CF22F5A319600C49BCE /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 45104CF12F5A319600C49BCE /* MetalSprocketsGaussianSplats */; };
 		45104CF42F5A319600C49BCE /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 45104CF32F5A319600C49BCE /* Interaction3D */; };
 		45104CF62F5A319600C49BCE /* Splats in Frameworks */ = {isa = PBXBuildFile; productRef = 45104CF52F5A319600C49BCE /* Splats */; };
-
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,7 +32,6 @@
 				45104CF22F5A319600C49BCE /* MetalSprocketsGaussianSplats in Frameworks */,
 				45104CF42F5A319600C49BCE /* Interaction3D in Frameworks */,
 				45104CF62F5A319600C49BCE /* Splats in Frameworks */,
-
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,7 +77,6 @@
 				45104CF12F5A319600C49BCE /* MetalSprocketsGaussianSplats */,
 				45104CF32F5A319600C49BCE /* Interaction3D */,
 				45104CF52F5A319600C49BCE /* Splats */,
-
 			);
 			productName = MetalSprocketsGaussianSplatsDemo;
 			productReference = 45104CDC2F5A313700C49BCE /* MetalSprocketsGaussianSplatsDemo.app */;
@@ -405,7 +402,6 @@
 			package = 45104CFA2F5A319600C49BCE /* XCLocalSwiftPackageReference "../../" */;
 			productName = Splats;
 		};
-
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 45104CD42F5A313700C49BCE /* Project object */;
