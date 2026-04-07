@@ -76,7 +76,7 @@ public struct SplatView: View {
             device: device,
             splatCloud: splatCloud,
             capacity: splatCloud.count,
-            preallocatedBufferCount: Self.pendingReleaseDepth + 2
+            preallocatedBufferCount: Self.pendingReleaseDepth + 3
         ))
     }
 

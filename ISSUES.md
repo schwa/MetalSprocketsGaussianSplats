@@ -682,11 +682,12 @@ closed: 2026-04-07T22:24:39Z
 ---
 
 ## 32: Splat buffer pool preallocation is one buffer too low
-status: new
+status: closed
 priority: medium
 kind: none
 created: 2026-04-07T23:16:01Z
-updated: 2026-04-07T23:16:10Z
+updated: 2026-04-07T23:24:52Z
+closed: 2026-04-07T23:24:52Z
 
 On startup of SplatView, a single `Pool exhausted, allocating new object (id: 5)` warning fires from the AsyncSortManager's index buffer pool.
 
