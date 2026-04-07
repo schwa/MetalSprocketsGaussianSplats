@@ -9,6 +9,20 @@ import Splats
 
 private let signposter: OSSignposter = .init(subsystem: "io.schwa.MetalSprockets-examples", category: OSLog.Category.pointsOfInterest)
 
+/// Whether to emit per-frame sort timing logs at info level. Controlled by the
+/// `MSGS_SORT_LOG` environment variable, read once at process start. Default
+/// off (logs are noisy at frame rate). Set to `1`, `true`, `yes`, or `on` to
+/// enable. Slow-sort warnings (>16 ms) are always emitted regardless.
+private let sortLoggingEnabled: Bool = {
+    guard let raw = ProcessInfo.processInfo.environment["MSGS_SORT_LOG"]?.lowercased() else {
+        return false
+    }
+    switch raw {
+    case "1", "true", "yes", "on": return true
+    default: return false
+    }
+}()
+
 internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
     private var device: MTLDevice
     private var temporaryIndexedDistances: [IndexedDistance]
@@ -43,8 +57,11 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
         let startTime = CFAbsoluteTimeGetCurrent()
         defer {
             let durationMS = (CFAbsoluteTimeGetCurrent() - startTime) * 1_000
+            let line = "CPU splat sort: \(durationMS.formatted(.number.precision(.fractionLength(2))))ms (\(splats.count) splats)"
             if durationMS > 16 {
-                logger?.warning("CPU splat sort: \(durationMS.formatted(.number.precision(.fractionLength(2))))ms (\(splats.count) splats)")
+                logger?.warning("\(line)")
+            } else if sortLoggingEnabled {
+                logger?.info("\(line)")
             }
         }
         signposter.withIntervalSignpost("CPUSplatRadixSorter.sort()", id: signpost) {
@@ -70,8 +87,11 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
         let startTime = CFAbsoluteTimeGetCurrent()
         defer {
             let durationMS = (CFAbsoluteTimeGetCurrent() - startTime) * 1_000
+            let line = "CPU multi-cloud splat sort: \(durationMS.formatted(.number.precision(.fractionLength(2))))ms (\(totalCount) splats across \(clouds.count) clouds)"
             if durationMS > 16 {
-                logger?.warning("CPU multi-cloud splat sort: \(durationMS.formatted(.number.precision(.fractionLength(2))))ms (\(totalCount) splats across \(clouds.count) clouds)")
+                logger?.warning("\(line)")
+            } else if sortLoggingEnabled {
+                logger?.info("\(line)")
             }
         }
 

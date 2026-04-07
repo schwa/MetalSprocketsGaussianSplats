@@ -68,6 +68,20 @@ let renderPass = try RenderPass {
 
 The render pipelines are pure rendering elements — they don't manage sorting or async state. The caller owns the `AsyncSortManager`, subscribes to its `sortedIndicesStream`, requests sorts when the camera moves, and passes the results in.
 
+## Environment Variables
+
+- `MSGS_SORT_LOG` — when set to `1`, `true`, `yes`, or `on`, the CPU splat
+  sorter emits a per-frame info-level log line with the sort duration and
+  splat count. Default is off (logs are noisy at frame rate). Slow-sort
+  warnings (>16 ms) are always emitted regardless of this setting.
+
+  Logs go to the unified logging system under subsystem
+  `MetalSprocketsGaussianSplats`. Tail them in a terminal with:
+
+  ```sh
+  log stream --level info --predicate 'subsystem == "MetalSprocketsGaussianSplats"'
+  ```
+
 ## License
 
 MIT License. See LICENSE file for details.
