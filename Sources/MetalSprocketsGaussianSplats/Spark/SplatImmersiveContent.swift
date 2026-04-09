@@ -8,6 +8,7 @@ import MetalSprocketsUI
 import simd
 import Splats
 internal import os
+import QuartzCore
 import SwiftUI
 
 /// A MetalSprockets `Element` that renders a Gaussian splat cloud in a visionOS immersive space.
@@ -161,9 +162,16 @@ public final class SplatImmersiveRenderState: Sendable {
         var pendingRelease: [SplatIndices] = []
     }
 
+    private struct TimingState: Sendable {
+        var frameCount: UInt32 = 0
+        var lastTimestamp: CFAbsoluteTime = 0
+        var fps: Double = 0
+        var frameDuration: Double = 0
+    }
+
     private let sortManager: AsyncSortManager<SparkSplat>
     private let state: OSAllocatedUnfairLock<State>
-    private let frameCounter: OSAllocatedUnfairLock<UInt32>
+    private let timing: OSAllocatedUnfairLock<TimingState>
     private let listenerTask: Task<Void, Never>
 
     private static let pendingReleaseDepth = 3
@@ -179,7 +187,7 @@ public final class SplatImmersiveRenderState: Sendable {
         self.sortManager = sortManager
         let state = OSAllocatedUnfairLock(initialState: State())
         self.state = state
-        self.frameCounter = OSAllocatedUnfairLock(initialState: UInt32(0))
+        self.timing = OSAllocatedUnfairLock(initialState: TimingState())
 
         self.listenerTask = Task {
             for await indices in sortManager.sortedIndicesStream {
@@ -215,10 +223,29 @@ public final class SplatImmersiveRenderState: Sendable {
     }
 
     public func nextFrameCount() -> UInt32 {
-        frameCounter.withLock { count in
-            count &+= 1
-            return count
+        timing.withLock { state in
+            let now = CACurrentMediaTime()
+            let delta = now - state.lastTimestamp
+            state.lastTimestamp = now
+            state.frameCount &+= 1
+            if delta > 0 {
+                state.frameDuration = delta
+                // Exponential moving average
+                let alpha = 0.1
+                state.fps = state.fps == 0 ? (1.0 / delta) : (state.fps * (1.0 - alpha) + (1.0 / delta) * alpha)
+            }
+            return state.frameCount
         }
+    }
+
+    /// Current FPS (exponential moving average).
+    public var fps: Double {
+        timing.withLock { $0.fps }
+    }
+
+    /// Duration of the last frame in seconds.
+    public var frameDuration: Double {
+        timing.withLock { $0.frameDuration }
     }
 }
 

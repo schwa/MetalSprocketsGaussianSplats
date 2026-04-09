@@ -14,6 +14,9 @@ struct ContentView: View {
 
     let splatCloud: GPUSplatCloud<SparkSplat>
     @Bindable var demoState: DemoState
+    #if os(visionOS)
+    let renderState: SplatImmersiveRenderState?
+    #endif
 
     var body: some View {
         #if os(visionOS)
@@ -41,6 +44,11 @@ struct ContentView: View {
                 .labelsHidden()
                 .frame(width: 200)
                 ImmersiveToggle(demoState: demoState)
+                if demoState.isImmersive {
+                    Text("\(renderState?.fps ?? 0, specifier: "%.0f") fps")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding()
             .glassBackgroundEffect()

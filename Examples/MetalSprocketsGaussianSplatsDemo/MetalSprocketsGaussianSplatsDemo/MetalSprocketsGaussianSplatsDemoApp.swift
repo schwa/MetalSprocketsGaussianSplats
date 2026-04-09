@@ -31,7 +31,11 @@ struct MetalSprocketsGaussianSplatsDemoApp: App {
 
     var body: some Scene {
         WindowGroup {
+            #if os(visionOS)
+            ContentView(splatCloud: splatCloud, demoState: demoState, renderState: renderState)
+            #else
             ContentView(splatCloud: splatCloud, demoState: demoState)
+            #endif
         }
         #if os(visionOS)
         SplatImmersiveScene(splatCloud: splatCloud, renderState: renderState, demoState: demoState)
