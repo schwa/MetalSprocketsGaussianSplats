@@ -620,13 +620,15 @@ All types now have documentation comments with:
 ---
 
 ## 25: AsyncSortManager.grow -> resize
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: effort:xs
 created: 2026-03-31T16:10:00Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-04-09T20:32:10Z
+closed: 2026-04-09T20:32:10Z
 
+- `2026-04-09T20:32:10Z`: Won't fix — grow only grows, renaming to resize without changing behavior would be misleading.
 
 ---
 
@@ -957,13 +959,17 @@ When SplatView is set to .stochastic renderer, the AsyncSortManager continues so
 ---
 
 ## 48: Support magnify gesture and scroll wheel for camera zoom in demo
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: effort:m, demo
 created: 2026-04-09T20:09:00Z
+updated: 2026-04-09T20:23:49Z
+closed: 2026-04-09T20:23:49Z
 
 The demo only supports turntable drag rotation via .interactiveCamera(). Add pinch-to-zoom (MagnifyGesture) on iOS/visionOS and scroll wheel zoom on macOS. This may need changes in Interaction3D or custom gesture handling in the demo.
+
+- `2026-04-09T20:23:49Z`: Already supported — Interaction3D's InteractiveCameraModifier includes MagnifyGesture (pinch-to-zoom) and .onScrollWheel (macOS scroll wheel) out of the box.
 
 ---
 
