@@ -121,7 +121,9 @@ public struct SplatView: View {
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalDepthStencilPixelFormat(renderer == .stochastic ? .depth32Float : .invalid)
         .task {
-            sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+            if renderer == .spark {
+                sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+            }
             for await indices in sortManager.sortedIndicesStream {
                 if let old = sortedIndices {
                     pendingRelease.append(old)
@@ -135,14 +137,25 @@ public struct SplatView: View {
         .onChange(of: splatCloud, initial: false) { _, newCloud in
             Task {
                 await sortManager.setSplatCloud(newCloud)
-                sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+                if renderer == .spark {
+                    sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+                }
             }
         }
         .onChange(of: cameraMatrix) {
-            sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+            if renderer == .spark {
+                sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+            }
         }
         .onChange(of: modelMatrix) {
-            sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+            if renderer == .spark {
+                sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+            }
+        }
+        .onChange(of: renderer) {
+            if renderer == .spark {
+                sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+            }
         }
     }
 }
