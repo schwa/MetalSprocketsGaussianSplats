@@ -25,7 +25,8 @@ struct ContentView: View {
                 )
                 .splatRenderer(demoState.renderer)
                 .onFrameTimingChange { frameTimingStatistics = $0 }
-                .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
+                // swiftlint:disable:next trailing_closure
+        .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
             } else {
                 ContentUnavailableView("Immersive Mode", systemImage: "visionpro", description: Text("Viewing splat in immersive space."))
             }
@@ -78,7 +79,6 @@ struct ContentView: View {
         #endif
     }
 }
-
 
 #else
 import SwiftUI

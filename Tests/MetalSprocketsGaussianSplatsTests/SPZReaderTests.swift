@@ -135,5 +135,4 @@ struct SPZReaderTests {
             _ = try SPZReader(data: emptyData)
         }
     }
-
 }

@@ -18,8 +18,10 @@ private let sortLoggingEnabled: Bool = {
         return false
     }
     switch raw {
-    case "1", "true", "yes", "on": return true
-    default: return false
+    case "1", "true", "yes", "on":
+        return true
+    default:
+        return false
     }
 }()
 

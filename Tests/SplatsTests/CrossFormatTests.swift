@@ -195,5 +195,4 @@ struct CrossFormatTests {
             #expect(spzColor.isApproximatelyEqual(to: expectedColor, absoluteTolerance: 0.01))
         }
     }
-
 }

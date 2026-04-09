@@ -5,9 +5,9 @@ import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsUI
+internal import os
 import simd
 import Splats
-internal import os
 import SwiftUI
 
 /// A MetalSprockets `Element` that renders a Gaussian splat cloud in a visionOS immersive space.

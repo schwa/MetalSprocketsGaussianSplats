@@ -90,8 +90,6 @@ struct GoldenImageRenderingTests {
         return try rendering.cgImage
     }
 
-
-
     private func compareGoldenImage(_ image: CGImage, named name: String) throws {
         let goldenImagesDir = try #require(Bundle.module.resourceURL?.appendingPathComponent("Golden Images"))
         let comparison = GoldenImageComparison(imageDirectory: goldenImagesDir, options: .none)
