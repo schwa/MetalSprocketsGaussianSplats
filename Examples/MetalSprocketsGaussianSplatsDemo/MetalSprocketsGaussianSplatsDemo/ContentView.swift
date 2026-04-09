@@ -23,6 +23,7 @@ struct ContentView: View {
         .splatRenderer(renderer)
         .onFrameTimingChange { frameTimingStatistics = $0 }
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+        #if !os(visionOS)
         .overlay(alignment: .top) {
             Picker("Renderer", selection: $renderer) {
                 ForEach(SplatRenderer.allCases, id: \.self) { r in
@@ -35,15 +36,28 @@ struct ContentView: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
             .padding()
         }
-		.overlay(alignment: .bottomTrailing) {
-            if let frameTimingStatistics {
-                FrameTimingView(statistics: frameTimingStatistics, options: .all)
-                .padding()
-            }
-		}
+        #endif
+//		.overlay(alignment: .bottomTrailing) {
+//            if let frameTimingStatistics {
+//                FrameTimingView(statistics: frameTimingStatistics, options: .all)
+//                .padding()
+//            }
+//		}
         #if os(visionOS)
         .ornament(attachmentAnchor: .scene(.bottom)) {
-            ImmersiveToggle()
+            HStack {
+                Picker("Renderer", selection: $renderer) {
+                    ForEach(SplatRenderer.allCases, id: \.self) { r in
+                        Text(r.rawValue.capitalized).tag(r)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 200)
+                ImmersiveToggle()
+            }
+            .padding()
+            .glassBackgroundEffect()
         }
         #endif
     }

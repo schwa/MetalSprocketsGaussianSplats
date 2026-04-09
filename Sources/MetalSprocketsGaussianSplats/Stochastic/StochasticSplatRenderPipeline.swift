@@ -165,6 +165,7 @@ public struct StochasticSplatRenderPipeline: Element {
             .vertexDescriptor(vertexDescriptor)
             .depthCompare(function: .less, enabled: true)
             .renderPipelineDescriptorModifier { [amplificationCount] descriptor in
+                descriptor.inputPrimitiveTopology = .triangle
                 descriptor.maxVertexAmplificationCount = amplificationCount
             }
         }

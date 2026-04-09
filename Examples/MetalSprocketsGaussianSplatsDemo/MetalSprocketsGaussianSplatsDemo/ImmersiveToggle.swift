@@ -25,8 +25,6 @@ struct ImmersiveToggle: View {
         }
         .disabled(isTransitioning)
         .buttonStyle(.borderedProminent)
-        .padding()
-        .glassBackgroundEffect()
     }
 }
 #endif

@@ -99,11 +99,9 @@ public struct SplatView: View {
                             sortedIndices: sortedIndices
                         )
                     }
-                    #if !os(visionOS)
                     .renderPassDescriptorModifier { descriptor in
                         descriptor.renderTargetArrayLength = 1
                     }
-                    #endif
                 }
             case .stochastic:
                 try RenderPass {
@@ -115,6 +113,9 @@ public struct SplatView: View {
                         drawableSize: size,
                         frameTime: context.frameUniforms.index
                     )
+                }
+                .renderPassDescriptorModifier { descriptor in
+                    descriptor.renderTargetArrayLength = 1
                 }
             }
         }
