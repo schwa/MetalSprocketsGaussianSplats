@@ -41,6 +41,8 @@ public struct SplatView: View {
     private let modelMatrix: simd_float4x4
     private let projection: PerspectiveProjection
 
+    @Environment(\.splatRenderer) private var renderer
+
     @State private var sortedIndices: SplatIndices?
     /// Queue of recently-superseded indices awaiting release. We hold the last
     /// few so the GPU can finish rendering with them before their buffers are
@@ -81,21 +83,38 @@ public struct SplatView: View {
     }
 
     public var body: some View {
-        RenderView { _, drawableSize in
+        RenderView { context, drawableSize in
             let projectionMatrix = projection.projectionMatrix(for: drawableSize)
-            if let sortedIndices {
+            let size = SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
+            switch renderer {
+            case .spark:
+                if let sortedIndices {
+                    try RenderPass {
+                        try SparkSplatRenderPipeline(
+                            splatCloud: splatCloud,
+                            projectionMatrix: projectionMatrix,
+                            modelMatrix: modelMatrix,
+                            cameraMatrix: cameraMatrix,
+                            drawableSize: size,
+                            sortedIndices: sortedIndices
+                        )
+                    }
+                    #if !os(visionOS)
+                    .renderPassDescriptorModifier { descriptor in
+                        descriptor.renderTargetArrayLength = 1
+                    }
+                    #endif
+                }
+            case .stochastic:
                 try RenderPass {
-                    try SparkSplatRenderPipeline(
+                    try StochasticSplatRenderPipeline(
                         splatCloud: splatCloud,
                         projectionMatrix: projectionMatrix,
                         modelMatrix: modelMatrix,
                         cameraMatrix: cameraMatrix,
-                        drawableSize: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)),
-                        sortedIndices: sortedIndices
+                        drawableSize: size,
+                        frameTime: context.frameUniforms.index
                     )
-                }
-                .renderPassDescriptorModifier { descriptor in
-                    descriptor.renderTargetArrayLength = 1
                 }
             }
         }
