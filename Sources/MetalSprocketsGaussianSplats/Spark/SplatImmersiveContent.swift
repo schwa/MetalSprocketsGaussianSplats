@@ -54,7 +54,12 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
         self.splatCloud = splatCloud
         self.modelMatrix = modelMatrix
 
-        let cameraMatrix = context.viewMatrix(eye: 0).inverse
+        // Average both eyes' positions for sort — minimizes worst-case depth error for stereo
+        let cam0 = context.viewMatrix(eye: 0).inverse
+        let cam1 = context.viewCount > 1 ? context.viewMatrix(eye: 1).inverse : cam0
+        let avgPosition = (cam0.columns.3 + cam1.columns.3) * 0.5
+        var cameraMatrix = cam0
+        cameraMatrix.columns.3 = avgPosition
         renderState.requestSort(cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
         self.sortedIndices = renderState.currentSortedIndices
     }
