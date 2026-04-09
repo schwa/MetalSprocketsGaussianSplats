@@ -16,7 +16,15 @@ struct MetalSprocketsGaussianSplatsDemoApp: App {
     let renderState: SplatImmersiveRenderState
 
     init() {
-        let cloud = loadSplatCloud()
+        let device = MTLCreateSystemDefaultDevice()!
+        let url = Bundle.main.url(forResource: "butterfly-wings-closed", withExtension: "spz")!
+        let reader = try! SplatReader(url: url)
+        var splats: [SparkSplat] = []
+        splats.reserveCapacity(reader.splatCount)
+        try! reader.read { _, extendedSplat in
+            splats.append(SparkSplat(extendedSplat.genericSplat))
+        }
+        let cloud = try! GPUSplatCloud<SparkSplat>(device: device, splats: splats)
         self.splatCloud = cloud
         self.renderState = SplatImmersiveRenderState(splatCloud: cloud)
     }
