@@ -12,18 +12,6 @@ struct ContentView: View {
 
     let splatCloud: GPUSplatCloud<SparkSplat>
 
-    init() {
-        let device = MTLCreateSystemDefaultDevice()!
-        let url = Bundle.main.url(forResource: "butterfly-wings-closed", withExtension: "spz")!
-        let reader = try! SplatReader(url: url)
-        var splats: [SparkSplat] = []
-        splats.reserveCapacity(reader.splatCount)
-        try! reader.read { _, extendedSplat in
-            splats.append(SparkSplat(extendedSplat.genericSplat))
-        }
-        self.splatCloud = try! GPUSplatCloud<SparkSplat>(device: device, splats: splats)
-    }
-
     var body: some View {
         SplatView(
             splatCloud: splatCloud,

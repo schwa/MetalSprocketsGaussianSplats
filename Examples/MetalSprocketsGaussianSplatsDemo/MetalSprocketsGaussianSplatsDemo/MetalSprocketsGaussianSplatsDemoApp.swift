@@ -1,19 +1,21 @@
-#if os(visionOS)
 import GeometryLite3D
 import Metal
-import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
+#if os(visionOS)
+import MetalSprockets
 import MetalSprocketsUI
-import Splats
 #endif
+import Splats
 import SwiftUI
 
 @main
 struct MetalSprocketsGaussianSplatsDemoApp: App {
-    #if os(visionOS)
     let splatCloud: GPUSplatCloud<SparkSplat>
+
+    #if os(visionOS)
     let renderState: SplatImmersiveRenderState
+    #endif
 
     init() {
         let device = MTLCreateSystemDefaultDevice()!
@@ -26,13 +28,14 @@ struct MetalSprocketsGaussianSplatsDemoApp: App {
         }
         let cloud = try! GPUSplatCloud<SparkSplat>(device: device, splats: splats)
         self.splatCloud = cloud
+        #if os(visionOS)
         self.renderState = SplatImmersiveRenderState(splatCloud: cloud)
+        #endif
     }
-    #endif
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(splatCloud: splatCloud)
         }
         #if os(visionOS)
         ImmersiveSpace(id: "SplatImmersive") {
