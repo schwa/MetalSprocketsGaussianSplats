@@ -1034,15 +1034,18 @@ When the user enters immersive mode, the windowed SplatView keeps rendering in t
 ---
 
 ## 53: Add render stats overlay for immersive mode
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: effort:m, visionOS, demo
 created: 2026-04-09T21:48:27Z
+updated: 2026-04-09T22:32:36Z
+closed: 2026-04-09T22:32:36Z
 
 FrameTimingView is available for windowed SplatView via .onFrameTimingChange but there's no equivalent for the immersive CompositorServices render loop. Would be useful to have FPS/frame timing stats visible in immersive mode for performance debugging.
 
 - `2026-04-09T21:58:31Z`: Root cause is MetalSprockets — ImmersiveRuntime doesn't expose frame timing. Filed MetalSprockets#313. Can work around by tracking timestamps in SplatImmersiveRenderState but proper fix belongs upstream.
+- `2026-04-09T22:32:36Z`: Done: using MetalSprockets .onFrameTimingChange on ImmersiveRenderContent. FrameTimingView shown in ornament when immersive mode is active.
 
 ---
 
