@@ -40,16 +40,18 @@ closed: 2026-02-17T00:00:00Z
 ---
 
 ## 3: Investigate testAntimatter15Rendering test failure
-status: open
+status: closed
 priority: low
 kind: bug
 labels: effort:s
 created: 2026-02-19T00:00:00Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-04-09T22:56:28Z
+closed: 2026-04-09T22:56:28Z
 
 Test may have pre-existing golden image mismatch. Needs investigation.
 
 - `2026-04-09T16:57:35Z`: Related to #23 (deprecate antimatter15). If #23 is completed, this becomes moot.
+- `2026-04-09T22:56:28Z`: Moot: Antimatter15 code removed entirely in #23.
 
 ---
 
@@ -564,12 +566,13 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
 ---
 
 ## 23: Deprecate antimatter15 code
-status: open
+status: closed
 priority: low
 kind: task
 labels: cleanup, deprecation, effort:m
 created: 2026-03-31T15:59:44Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-04-09T22:56:21Z
+closed: 2026-04-09T22:56:21Z
 
 The antimatter15 splat format and rendering code should be deprecated and eventually removed.
 
@@ -578,6 +581,8 @@ The antimatter15 splat format and rendering code should be deprecated and eventu
 - Add deprecation warnings/documentation
 - Identify all usages and plan migration path
 - Eventually remove the code once no longer needed
+
+- `2026-04-09T22:56:21Z`: Done: all Antimatter15 code removed — types, render pipeline, reader, shaders, headers, tests, fixtures, CLI paths. IndexedDistance moved to SparkSplatRenderShader.h.
 
 ---
 
