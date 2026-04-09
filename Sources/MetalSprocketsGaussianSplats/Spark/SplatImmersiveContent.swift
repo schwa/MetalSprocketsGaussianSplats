@@ -93,7 +93,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                     modelMatrix: modelMatrix,
                     cameraMatrices: cameraMatrices,
                     drawableSize: drawableSize,
-                    convertSRGBToLinear: false,
+                    convertSRGBToLinear: true,
                     sortedIndices: sortedIndices
                 )
                 .depthCompare(function: .greater, enabled: true)
