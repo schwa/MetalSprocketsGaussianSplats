@@ -19,46 +19,6 @@ func loadSplatCloud() -> GPUSplatCloud<SparkSplat> {
     return try! GPUSplatCloud<SparkSplat>(device: device, splats: splats)
 }
 
-#if os(visionOS)
-struct ContentView: View {
-    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
-    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
-    @State private var isImmersive = false
-    @State private var cameraMatrix = simd_float4x4(translation: SIMD3<Float>(0, 0, 3))
-
-    let splatCloud: GPUSplatCloud<SparkSplat>
-
-    init() {
-        self.splatCloud = loadSplatCloud()
-    }
-
-    var body: some View {
-        VStack {
-            SplatView(
-                splatCloud: splatCloud,
-                cameraMatrix: cameraMatrix
-            )
-            .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
-
-            Button(isImmersive ? "Exit Immersive" : "View in Immersive Space") {
-                Task {
-                    if isImmersive {
-                        await dismissImmersiveSpace()
-                        isImmersive = false
-                    } else {
-                        let result = await openImmersiveSpace(id: "SplatImmersive")
-                        if case .opened = result {
-                            isImmersive = true
-                        }
-                    }
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .padding()
-        }
-    }
-}
-#else
 struct ContentView: View {
     @State private var cameraMatrix = simd_float4x4(translation: SIMD3<Float>(0, 0, 3))
 
@@ -74,6 +34,41 @@ struct ContentView: View {
             cameraMatrix: cameraMatrix
         )
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+        #if os(visionOS)
+        .ornament(attachmentAnchor: .scene(.bottom)) {
+            ImmersiveToggle()
+        }
+        #endif
+    }
+}
+
+#if os(visionOS)
+struct ImmersiveToggle: View {
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @State private var isImmersive = false
+    @State private var isTransitioning = false
+
+    var body: some View {
+        Button(isImmersive ? "Exit Immersive" : "View in Immersive Space") {
+            isTransitioning = true
+            Task {
+                if isImmersive {
+                    await dismissImmersiveSpace()
+                    isImmersive = false
+                } else {
+                    let result = await openImmersiveSpace(id: "SplatImmersive")
+                    if case .opened = result {
+                        isImmersive = true
+                    }
+                }
+                isTransitioning = false
+            }
+        }
+        .disabled(isTransitioning)
+        .buttonStyle(.borderedProminent)
+        .padding()
+        .glassBackgroundEffect()
     }
 }
 #endif
