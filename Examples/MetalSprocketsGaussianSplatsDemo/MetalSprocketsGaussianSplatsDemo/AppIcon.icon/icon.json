@@ -1,12 +1,12 @@
 {
   "fill" : {
-    "automatic-gradient" : "srgb:0.10196,0.10196,0.18039,1.00000"
+    "automatic-gradient" : "srgb:0.10196,0.01961,0.20000,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "glass" : true,
+          "glass" : false,
           "image-name" : "center.svg",
           "name" : "center"
         }
