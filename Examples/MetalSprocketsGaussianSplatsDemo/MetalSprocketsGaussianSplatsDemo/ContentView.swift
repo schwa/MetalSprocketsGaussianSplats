@@ -27,7 +27,7 @@ struct ContentView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .frame(width: 200)
+            .labelsHidden()
             .padding(8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
             .padding()
