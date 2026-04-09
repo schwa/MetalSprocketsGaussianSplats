@@ -25,28 +25,6 @@ struct GoldenImageRenderingTests {
     // MARK: - Spark Renderer Tests
 
     @Test @MainActor
-    func testSparkRenderRainbowRing() throws {
-        let image = try renderSplatsWithSpark(
-            fixture: "RainbowRing",
-            extension: "splat",
-            cameraPosition: [0.1, 0.5, 3],
-            size: CGSize(width: 512, height: 512)
-        )
-        try compareGoldenImage(image, named: "SparkRainbowRing")
-    }
-
-    @Test @MainActor
-    func testSparkRenderSixSplats() throws {
-        let image = try renderSplatsWithSpark(
-            fixture: "6Splats",
-            extension: "splat",
-            cameraPosition: [0.1, 0.5, 5],
-            size: CGSize(width: 512, height: 512)
-        )
-        try compareGoldenImage(image, named: "SparkSixSplats")
-    }
-
-    @Test @MainActor
     func testSparkRenderTestGrid() throws {
         let image = try renderSplatsWithSpark(
             fixture: "test-grid",
@@ -55,30 +33,6 @@ struct GoldenImageRenderingTests {
             size: CGSize(width: 512, height: 512)
         )
         try compareGoldenImage(image, named: "SparkTestGrid")
-    }
-
-    // MARK: - Antimatter15 Renderer Tests
-
-    @Test @MainActor
-    func testAntimatter15RenderRainbowRing() throws {
-        let image = try renderSplatsWithAntimatter15(
-            fixture: "RainbowRing",
-            extension: "splat",
-            cameraPosition: [0.1, 0.5, 3],
-            size: CGSize(width: 512, height: 512)
-        )
-        try compareGoldenImage(image, named: "Antimatter15RainbowRing")
-    }
-
-    @Test @MainActor
-    func testAntimatter15RenderSixSplats() throws {
-        let image = try renderSplatsWithAntimatter15(
-            fixture: "6Splats",
-            extension: "splat",
-            cameraPosition: [0.1, 0.5, 5],
-            size: CGSize(width: 512, height: 512)
-        )
-        try compareGoldenImage(image, named: "Antimatter15SixSplats")
     }
 
     // MARK: - Helpers
@@ -136,33 +90,7 @@ struct GoldenImageRenderingTests {
         return try rendering.cgImage
     }
 
-    @MainActor
-    private func renderSplatsWithAntimatter15(fixture: String, extension ext: String, cameraPosition: SIMD3<Float>, size: CGSize) throws -> CGImage {
-        let genericSplats = try loadSplats(fixture: fixture, extension: ext)
-        let gpuSplats = genericSplats.map { Antimatter15GPUSplat($0) }
-        let cloud = try GPUSplatCloud<Antimatter15GPUSplat>(device: device, splats: gpuSplats)
-        let sortManager = try AsyncSortManager<Antimatter15GPUSplat>(device: device, splatCloud: cloud, capacity: cloud.count)
 
-        let cameraMatrix = makeCameraMatrix(position: cameraPosition)
-        let projectionMatrix = makeProjectionMatrix(size: size)
-        let sortParameters = SortParameters(camera: cameraMatrix, model: .identity)
-        let sortedIndices = sortManager.sortNowSync(sortParameters)
-
-        let renderer = try OffscreenRenderer(size: size)
-        let renderPass = try RenderPass {
-            try Antimatter15SplatRenderPipeline(
-                splatCloud: cloud,
-                projectionMatrix: projectionMatrix,
-                modelMatrix: .identity,
-                cameraMatrix: cameraMatrix,
-                drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                debugMode: .off,
-                sortedIndices: sortedIndices
-            )
-        }
-        let rendering = try renderer.render(renderPass)
-        return try rendering.cgImage
-    }
 
     private func compareGoldenImage(_ image: CGImage, named name: String) throws {
         let goldenImagesDir = try #require(Bundle.module.resourceURL?.appendingPathComponent("Golden Images"))

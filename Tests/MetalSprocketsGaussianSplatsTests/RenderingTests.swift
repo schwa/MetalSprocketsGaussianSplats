@@ -99,23 +99,6 @@ struct GenericSplatConversionTests {
     }
 
     @Test
-    func testGenericSplatToAntimatter15GPUSplat() throws {
-        let genericSplat = GenericSplat(
-            position: [1, 2, 3],
-            scale: [0.1, 0.2, 0.3],
-            color: [1, 0, 0, 1],
-            rotation: .init(ix: 0, iy: 0, iz: 0, r: 1)
-        )
-
-        let gpuSplat = Antimatter15GPUSplat(genericSplat)
-        #expect(gpuSplat.position.x == 1)
-        #expect(gpuSplat.position.y == 2)
-        #expect(gpuSplat.position.z == 3)
-        #expect(gpuSplat.color.x == 255)  // Red channel
-        #expect(gpuSplat.color.w == 255)  // Alpha channel
-    }
-
-    @Test
     func testGenericSplatToSparkSplat() throws {
         let genericSplat = GenericSplat(
             position: [4, 5, 6],
@@ -146,51 +129,29 @@ struct GPUSplatCloudTests {
 
     @Test
     func testGPUSplatCloudCreation() throws {
-        let splats = [
-            Antimatter15GPUSplat.testSplat(position: [0, 0, 0]),
-            Antimatter15GPUSplat.testSplat(position: [1, 0, 0])
+        let genericSplats = [
+            GenericSplat(position: [0, 0, 0], scale: [0.1, 0.1, 0.1], color: [1, 0, 0, 1], rotation: .init(ix: 0, iy: 0, iz: 0, r: 1)),
+            GenericSplat(position: [1, 0, 0], scale: [0.1, 0.1, 0.1], color: [0, 1, 0, 1], rotation: .init(ix: 0, iy: 0, iz: 0, r: 1))
         ]
-
+        let splats = genericSplats.map { SparkSplat($0) }
         let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
-        let cloud = GPUSplatCloud<Antimatter15GPUSplat>(
-            splats: splatBuffer
-        )
-
+        let cloud = GPUSplatCloud<SparkSplat>(splats: splatBuffer)
         #expect(cloud.count == 2)
     }
 
     @Test
     func testGPUSplatCloudWithManySplats() throws {
-        // Test with a larger number of splats
         let splats = (0..<100).map { i in
-            Antimatter15GPUSplat.testSplat(position: [Float(i), 0, 0])
+            SparkSplat(GenericSplat(position: [Float(i), 0, 0], scale: [0.1, 0.1, 0.1], color: [1, 0, 0, 1], rotation: .init(ix: 0, iy: 0, iz: 0, r: 1)))
         }
-
         let splatBuffer = try device.makeTypedBuffer(values: splats, options: [])
-        let cloud = GPUSplatCloud<Antimatter15GPUSplat>(
-            splats: splatBuffer
-        )
-
+        let cloud = GPUSplatCloud<SparkSplat>(splats: splatBuffer)
         #expect(cloud.count == 100)
     }
 }
 
-// MARK: - Test Helpers
-
 enum TestError: Error {
     case noMetalDevice
-}
-
-extension Antimatter15GPUSplat {
-    static func testSplat(position: SIMD3<Float>) -> Antimatter15GPUSplat {
-        Antimatter15GPUSplat(
-            position: position,
-            u1: simd_half2(1, 0),
-            u2: simd_half2(0, 1),
-            u3: simd_half2(0, 0),
-            color: SIMD4<UInt8>(255, 0, 0, 255)
-        )
-    }
 }
 
 extension simd_float4x4 {

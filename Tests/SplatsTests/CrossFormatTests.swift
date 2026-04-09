@@ -196,41 +196,4 @@ struct CrossFormatTests {
         }
     }
 
-    // MARK: - Antimatter15 vs CSV
-
-    @Test
-    func testAntimatter15MatchesCSV() throws {
-        let csvSplats = try loadCSVGroundTruth().sorted { sortKeyCSV($0).lexicographicallyPrecedes(sortKeyCSV($1)) }
-
-        let splatURL = Bundle.module.url(forResource: "test-grid", withExtension: "splat", subdirectory: "Fixtures")!
-        let splatReader = try Antimatter15Reader(url: splatURL)
-        var splatSplats: [GenericSplat] = []
-        try splatReader.read { _, extendedSplat in splatSplats.append(extendedSplat.genericSplat) }
-        splatSplats.sort { sortKey($0).lexicographicallyPrecedes(sortKey($1)) }
-
-        #expect(splatSplats.count == csvSplats.count, "Count mismatch: SPLAT=\(splatSplats.count), CSV=\(csvSplats.count)")
-
-        for i in 0..<splatSplats.count {
-            let splat = splatSplats[i]
-            let csv = csvSplats[i]
-
-            #expect(splat.position.isApproximatelyEqual(to: csv.position, absoluteTolerance: 0.0001))
-
-            let expectedScale = SIMD3<Float>(exp(csv.scale.x), exp(csv.scale.y), exp(csv.scale.z))
-            #expect(splat.scale.isApproximatelyEqual(to: expectedScale, absoluteTolerance: 0.0001))
-
-            let splatQuat = splat.rotation
-            let csvQuat = SIMD4<Float>(csv.rotation.imag.x, csv.rotation.imag.y, csv.rotation.imag.z, csv.rotation.real)
-            #expect(splatQuat.isApproximatelyEqual(to: csvQuat, absoluteTolerance: 0.01))
-
-            let SH_C0: Float = 0.28209479177387814
-            let expectedColor = SIMD3<Float>(
-                csv.color.x * SH_C0 + 0.5,
-                csv.color.y * SH_C0 + 0.5,
-                csv.color.z * SH_C0 + 0.5
-            )
-            let splatColor = SIMD3<Float>(splat.color.x, splat.color.y, splat.color.z)
-            #expect(splatColor.isApproximatelyEqual(to: expectedColor, absoluteTolerance: 0.01))
-        }
-    }
 }

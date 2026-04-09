@@ -61,8 +61,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Enable Metal frame capture for debugging in Xcode")
     var capture: Bool = false
 
-    @Option(help: "Renderer to use: antimatter15 or spark")
-    var renderer: String = "antimatter15"
+    @Option(help: "Renderer to use (currently only spark is supported)")
+    var renderer: String = "spark"
 
     @Flag(help: "Convert sRGB to linear in fragment shader (for Spark renderer)")
     var srgbToLinear: Bool = false
@@ -102,13 +102,11 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
         let modelMatrix = try parseModelMatrix(from: renderConfig)
         let cameraMatrix = try parseCameraMatrix(from: renderConfig)
-        let useSparkRenderer = (renderConfig.renderer ?? "antimatter15").lowercased() == "spark"
         let useSrgbToLinear = renderConfig.srgbToLinear ?? false
 
-        let (antimatter15GPUSplatCloud, sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree) = try createGPUSplatClouds(
+        let (sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree) = try createGPUSplatClouds(
             loadResult: loadResult,
             device: device,
-            useSparkRenderer: useSparkRenderer,
             modelMatrix: modelMatrix
         )
 
@@ -119,23 +117,18 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let bgColor = renderConfig.getBackground()
 
         let (rendering, splatCount) = try performRender(
-            renderConfig: renderConfig,
             size: size,
             projection: projection,
             bgColor: bgColor,
-            useSparkRenderer: useSparkRenderer,
             useSrgbToLinear: useSrgbToLinear,
             modelMatrix: modelMatrix,
             cameraMatrix: cameraMatrix,
-            antimatter15GPUSplatCloud: antimatter15GPUSplatCloud,
-            sparkGPUSplatCloud: sparkGPUSplatCloud,
-            shCoefficientsBuffer: shCoefficientsBuffer,
-            effectiveSHDegree: effectiveSHDegree
+            sparkGPUSplatCloud: sparkGPUSplatCloud
         )
 
         var cgImage = try rendering.cgImage
         if label {
-            cgImage = addLabel(to: cgImage, renderConfig: renderConfig, splatCount: splatCount, useSparkRenderer: useSparkRenderer, useSrgbToLinear: useSrgbToLinear, effectiveSHDegree: effectiveSHDegree)
+            cgImage = addLabel(to: cgImage, renderConfig: renderConfig, splatCount: splatCount, useSrgbToLinear: useSrgbToLinear, effectiveSHDegree: effectiveSHDegree)
         }
 
         try saveOutput(cgImage: cgImage, to: renderConfig.output, reveal: reveal)
@@ -193,7 +186,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         if near != 0.1 { renderConfig.near = near }
         if far != 100.0 { renderConfig.far = far }
         if let s = splat { renderConfig.splat = s }
-        if renderer != "antimatter15" { renderConfig.renderer = renderer }
+        if renderer != "spark" { renderConfig.renderer = renderer }
         if srgbToLinear { renderConfig.srgbToLinear = true }
     }
 
@@ -266,12 +259,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                         shCoefficients.append(contentsOf: coeff)
                     }
                 }
-            }
-
-        case "splat":
-            let reader = try Antimatter15Reader(url: splatURL)
-            try reader.read { _, extendedSplat in
-                splats.append(extendedSplat.genericSplat)
             }
 
         case "sog":
@@ -355,10 +342,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     func createGPUSplatClouds(
         loadResult: SplatLoadResult,
         device: MTLDevice,
-        useSparkRenderer: Bool,
         modelMatrix: simd_float4x4
-    ) throws -> (GPUSplatCloud<Antimatter15GPUSplat>?, GPUSplatCloud<SparkSplat>?, TypedMTLBuffer<Float>?, UInt8) {
-        // Apply --sh-degree override if specified
+    ) throws -> (GPUSplatCloud<SparkSplat>, TypedMTLBuffer<Float>?, UInt8) {
         let effectiveSHDegree: UInt8
         if let override = shDegree {
             effectiveSHDegree = UInt8(override)
@@ -366,57 +351,41 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             effectiveSHDegree = loadResult.shDegree
         }
 
-        // Create SH buffer if we have SH data and it's enabled
         var shCoefficientsBuffer: TypedMTLBuffer<Float>?
         if !loadResult.shCoefficients.isEmpty, effectiveSHDegree > 0 {
             shCoefficientsBuffer = try device.makeTypedBuffer(values: loadResult.shCoefficients, options: [])
         }
 
-        if useSparkRenderer {
-            let gpuSplats = loadResult.splats.map { SparkSplat($0) }
-            let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-            let sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>
-            // Attach SH data to the cloud
-            if let shBuffer = shCoefficientsBuffer {
-                sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(
-                    splats: splatBuffer,
-                    modelTransform: modelMatrix,
-                    shCoefficients: shBuffer,
-                    shDegree: effectiveSHDegree
-                )
-            } else {
-                sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(
-                    splats: splatBuffer,
-                    modelTransform: modelMatrix
-                )
-            }
-            return (nil, sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
-        }
-        let gpuSplats = loadResult.splats.map { Antimatter15GPUSplat($0) }
+        let gpuSplats = loadResult.splats.map { SparkSplat($0) }
         let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
-        let antimatter15GPUSplatCloud = GPUSplatCloud<Antimatter15GPUSplat>(
-            splats: splatBuffer,
-            modelTransform: modelMatrix
-        )
-        return (antimatter15GPUSplatCloud, nil, shCoefficientsBuffer, effectiveSHDegree)
+        let sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>
+        if let shBuffer = shCoefficientsBuffer {
+            sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(
+                splats: splatBuffer,
+                modelTransform: modelMatrix,
+                shCoefficients: shBuffer,
+                shDegree: effectiveSHDegree
+            )
+        } else {
+            sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(
+                splats: splatBuffer,
+                modelTransform: modelMatrix
+            )
+        }
+        return (sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
     }
 
     // MARK: - Rendering
 
     @MainActor
     func performRender(
-        renderConfig _: RenderConfig,
         size: CGSize,
         projection: any ProjectionProtocol,
         bgColor: SIMD4<Float>,
-        useSparkRenderer: Bool,
         useSrgbToLinear: Bool,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
-        antimatter15GPUSplatCloud: GPUSplatCloud<Antimatter15GPUSplat>?,
-        sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>?,
-        shCoefficientsBuffer _: TypedMTLBuffer<Float>?,
-        effectiveSHDegree _: UInt8
+        sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>
     ) throws -> (OffscreenRenderer.Rendering, Int) {
         let renderer = try OffscreenRenderer(size: size)
         renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
@@ -427,55 +396,25 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         )
 
         let captureManager = MTLCaptureManager.shared()
-        let splatCount: Int
-        let rendering: OffscreenRenderer.Rendering
-
-        if useSparkRenderer {
-            guard let cloud = sparkGPUSplatCloud else {
-                throw NSError(domain: "metalsprockets-gaussian-splat", code: 1, userInfo: [NSLocalizedDescriptionKey: "Spark splat cloud is nil"])
-            }
-            splatCount = cloud.count
-            let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
-            let sortedIndices = try SplatSorter.sort(device: renderer.device, splatCloud: cloud, parameters: sortParameters)
-            let renderContent = try RenderPass {
-                let aspectRatio = Float(size.width) / Float(size.height)
-                let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
-                try SparkSplatRenderPipeline(
-                    splatCloud: cloud,
-                    projectionMatrix: projectionMatrix,
-                    modelMatrix: modelMatrix,
-                    cameraMatrix: cameraMatrix,
-                    drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                    convertSRGBToLinear: useSrgbToLinear,
-                    sortedIndices: sortedIndices
-                )
-            }
-            rendering = try captureManager.with(enabled: capture) {
-                try renderer.render(renderContent)
-            }
-        } else {
-            guard let cloud = antimatter15GPUSplatCloud else {
-                throw NSError(domain: "metalsprockets-gaussian-splat", code: 1, userInfo: [NSLocalizedDescriptionKey: "Antimatter15 splat cloud is nil"])
-            }
-            splatCount = cloud.count
-            let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
-            let sortedIndices = try SplatSorter.sort(device: renderer.device, splatCloud: cloud, parameters: sortParameters)
+        let cloud = sparkGPUSplatCloud
+        let splatCount = cloud.count
+        let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
+        let sortedIndices = try SplatSorter.sort(device: renderer.device, splatCloud: cloud, parameters: sortParameters)
+        let renderContent = try RenderPass {
             let aspectRatio = Float(size.width) / Float(size.height)
             let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
-            let renderContent = try RenderPass {
-                try Antimatter15SplatRenderPipeline(
-                    splatCloud: cloud,
-                    projectionMatrix: projectionMatrix,
-                    modelMatrix: modelMatrix,
-                    cameraMatrix: cameraMatrix,
-                    drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                    debugMode: .off,
-                    sortedIndices: sortedIndices
-                )
-            }
-            rendering = try captureManager.with(enabled: capture) {
-                try renderer.render(renderContent)
-            }
+            try SparkSplatRenderPipeline(
+                splatCloud: cloud,
+                projectionMatrix: projectionMatrix,
+                modelMatrix: modelMatrix,
+                cameraMatrix: cameraMatrix,
+                drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
+                convertSRGBToLinear: useSrgbToLinear,
+                sortedIndices: sortedIndices
+            )
+        }
+        let rendering = try captureManager.with(enabled: capture) {
+            try renderer.render(renderContent)
         }
 
         return (rendering, splatCount)
@@ -484,14 +423,14 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     // MARK: - Label Overlay
 
     @MainActor
-    func addLabel(to cgImage: CGImage, renderConfig: RenderConfig, splatCount: Int, useSparkRenderer: Bool, useSrgbToLinear: Bool, effectiveSHDegree: UInt8) -> CGImage {
+    func addLabel(to cgImage: CGImage, renderConfig: RenderConfig, splatCount: Int, useSrgbToLinear: Bool, effectiveSHDegree: UInt8) -> CGImage {
         let fovStr = renderConfig.projectionFov.map { $0.formatted(.number.precision(.fractionLength(1))) + "°" } ?? "60°"
         let camPos = renderConfig.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
         let modelPos = renderConfig.getModelPosition() ?? SIMD3<Float>(0, 0, 0)
 
-        let shInfo = useSparkRenderer ? " | SH: \(effectiveSHDegree > 0 ? "deg \(effectiveSHDegree)" : "off")" : ""
+        let shInfo = " | SH: \(effectiveSHDegree > 0 ? "deg \(effectiveSHDegree)" : "off")"
         let labelText = """
-        Renderer: \(useSparkRenderer ? "Spark" : "Antimatter15") | sRGB→Linear: \(useSrgbToLinear)\(shInfo)
+        Renderer: Spark | sRGB→Linear: \(useSrgbToLinear)\(shInfo)
         Size: \(renderConfig.width)x\(renderConfig.height) | FOV: \(fovStr)
         Splats: \(splatCount) | Near/Far: \(renderConfig.near)/\(renderConfig.far)
         Camera: (\(camPos.x.formatted(.number.precision(.fractionLength(2)))), \(camPos.y.formatted(.number.precision(.fractionLength(2)))), \(camPos.z.formatted(.number.precision(.fractionLength(2)))))

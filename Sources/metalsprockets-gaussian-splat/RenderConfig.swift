@@ -36,10 +36,10 @@ struct RenderConfig: Codable {
     /// Camera far clipping plane
     var far: Float = 100.0
 
-    /// Path to splat file (.splat, .ply, .spz, .sog) to render
+    /// Path to splat file (.ply, .spz, .sog) to render
     var splat: String
 
-    /// Renderer to use: "antimatter15" or "spark"
+    /// Renderer to use (currently only "spark" is supported)
     var renderer: String?
 
     /// Convert sRGB to linear in fragment shader (for Spark renderer)
