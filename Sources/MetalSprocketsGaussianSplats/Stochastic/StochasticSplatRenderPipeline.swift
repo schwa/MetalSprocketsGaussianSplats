@@ -15,9 +15,9 @@ import MetalSprocketsSupport
 /// which can produce noisy results but doesn't require depth sorting.
 public struct StochasticSplatRenderPipeline: Element {
     var splatCloud: GPUSplatCloud<SparkSplat>
-    var projectionMatrix: simd_float4x4
+    var projectionMatrices: [simd_float4x4]
     var modelMatrix: simd_float4x4
-    var cameraMatrix: simd_float4x4
+    var cameraMatrices: [simd_float4x4]
     var drawableSize: SIMD2<Float>
     var frameTime: UInt32
     var alphaThreshold: Float
@@ -35,6 +35,7 @@ public struct StochasticSplatRenderPipeline: Element {
     var vertexDescriptor: MTLVertexDescriptor
 
     /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when data is available.
+    /// Convenience initializer for single-view (mono) rendering.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
@@ -47,10 +48,39 @@ public struct StochasticSplatRenderPipeline: Element {
         useBlueNoise: Bool = true,
         useSphericalHarmonics: Bool? = nil
     ) throws {
+        try self.init(
+            splatCloud: splatCloud,
+            projectionMatrices: [projectionMatrix],
+            modelMatrix: modelMatrix,
+            cameraMatrices: [cameraMatrix],
+            drawableSize: drawableSize,
+            frameTime: frameTime,
+            alphaThreshold: alphaThreshold,
+            convertSRGBToLinear: convertSRGBToLinear,
+            useBlueNoise: useBlueNoise,
+            useSphericalHarmonics: useSphericalHarmonics
+        )
+    }
+
+    /// Full initializer supporting stereo/amplification rendering.
+    public init(
+        splatCloud: GPUSplatCloud<SparkSplat>,
+        projectionMatrices: [simd_float4x4],
+        modelMatrix: simd_float4x4,
+        cameraMatrices: [simd_float4x4],
+        drawableSize: SIMD2<Float>,
+        frameTime: UInt32,
+        alphaThreshold: Float = 0.95,
+        convertSRGBToLinear: Bool = true,
+        useBlueNoise: Bool = true,
+        useSphericalHarmonics: Bool? = nil
+    ) throws {
+        precondition(projectionMatrices.count == cameraMatrices.count)
+        precondition(!projectionMatrices.isEmpty)
         self.splatCloud = splatCloud
-        self.projectionMatrix = projectionMatrix
+        self.projectionMatrices = projectionMatrices
         self.modelMatrix = modelMatrix
-        self.cameraMatrix = cameraMatrix
+        self.cameraMatrices = cameraMatrices
         self.drawableSize = drawableSize
         self.frameTime = frameTime
         self.alphaThreshold = alphaThreshold
@@ -100,12 +130,16 @@ public struct StochasticSplatRenderPipeline: Element {
             let degree = useSphericalHarmonics ? splatCloud.shDegree : 0
             var time = frameTime
             var threshold = alphaThreshold
+            let viewMatrices = cameraMatrices.map(\.inverse)
+            let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
+            let amplificationCount = cameraMatrices.count
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     let vertices: [SIMD2<Float>] = [
                         [-1, -1], [-1, 1], [1, -1], [1, 1]
                     ]
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
+                    commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
                     // Set time uniform for fragment shader hash
                     commandEncoder.setFragmentBytes(&time, length: MemoryLayout<UInt32>.size, index: 0)
                     // Set alpha threshold for fragment shader
@@ -122,14 +156,17 @@ public struct StochasticSplatRenderPipeline: Element {
                 }
                 .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
                 .parameter("modelMatrix", value: modelMatrix)
-                .parameter("viewMatrix", value: cameraMatrix.inverse)
-                .parameter("projectionMatrix", value: projectionMatrix)
+                .parameter("viewMatrices", values: viewMatrices)
+                .parameter("projectionMatrices", values: projectionMatrices)
                 .parameter("drawableSize", value: drawableSize)
                 .parameter("scale", value: Float(2.0))
-                .parameter("cameraPosition", value: SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z))
+                .parameter("cameraPositions", values: cameraPositions)
             }
             .vertexDescriptor(vertexDescriptor)
             .depthCompare(function: .less, enabled: true)
+            .renderPipelineDescriptorModifier { [amplificationCount] descriptor in
+                descriptor.maxVertexAmplificationCount = amplificationCount
+            }
         }
     }
 }
