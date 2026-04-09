@@ -78,6 +78,18 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Whether at least one sort has completed
     public private(set) var isSorted: Bool = false
 
+    /// When true, released index buffers are not returned to the pool.
+    /// Useful for diagnosing buffer reuse issues (e.g. GPU still reading a released buffer).
+    public var poolReleaseDisabled: Bool {
+        get { _indexBufferPool.releaseDisabled }
+        set { _indexBufferPool.releaseDisabled = newValue }
+    }
+
+    /// Actor-isolated setter for ``poolReleaseDisabled``.
+    public func setPoolReleaseDisabled(_ disabled: Bool) {
+        poolReleaseDisabled = disabled
+    }
+
     /// The current capacity of the internal sorter. Exposed for testing.
     internal var sorterCapacity: Int {
         sorter.capacity
@@ -95,13 +107,14 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     ///   - preallocatedBufferCount: Number of index buffers to preallocate in the pool.
     ///     Typical value is 4 (in-flight MTKView buffers + 1 for sorting). Default is 0
     ///     which allocates buffers on demand.
-    public init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int, preallocatedBufferCount: Int = 0) throws {
+    public init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int, preallocatedBufferCount: Int = 0, poolReleaseDisabled: Bool = false) throws {
         self.device = device
         self.capacity = capacity
         self.sorter = .init(device: device, capacity: capacity)
         self.splatClouds = splatClouds
         self.logger = nil
         self._indexBufferPool = Self.makeIndexBufferPool(device: device, capacity: capacity, preallocatedCount: preallocatedBufferCount)
+        self._indexBufferPool.releaseDisabled = poolReleaseDisabled
         let stream = _sortRequestStream
         self.sortingTask = Task(priority: .high) { [weak self] in
             for await parameters in stream {
@@ -141,8 +154,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     }
 
     /// Convenience initializer for single cloud
-    public init(device: MTLDevice, splatCloud: GPUSplatCloud<Splat>, capacity: Int, preallocatedBufferCount: Int = 0) throws {
-        try self.init(device: device, splatClouds: [splatCloud], capacity: capacity, preallocatedBufferCount: preallocatedBufferCount)
+    public init(device: MTLDevice, splatCloud: GPUSplatCloud<Splat>, capacity: Int, preallocatedBufferCount: Int = 0, poolReleaseDisabled: Bool = false) throws {
+        try self.init(device: device, splatClouds: [splatCloud], capacity: capacity, preallocatedBufferCount: preallocatedBufferCount, poolReleaseDisabled: poolReleaseDisabled)
     }
 
     deinit {

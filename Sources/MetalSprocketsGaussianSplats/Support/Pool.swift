@@ -34,6 +34,10 @@ import Synchronization
 /// the allocator closure and logs a warning. This helps identify when the
 /// preallocated count is too low.
 public final class Pool<T: Sendable>: @unchecked Sendable {
+    /// When true, `release()` is a no-op — objects are never returned to the pool.
+    /// Useful for diagnosing buffer reuse issues (e.g. GPU still reading a released buffer).
+    public var releaseDisabled: Bool = false
+
     private let allocator: @Sendable (Int) -> T
     private let state: Mutex<State>
 
@@ -72,7 +76,9 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
             // Pool exhausted — allocate new
             let id = state.nextID
             state.nextID += 1
-            logger?.warning("Pool exhausted, allocating new object (id: \(id))")
+            if !releaseDisabled {
+                logger?.warning("Pool exhausted, allocating new object (id: \(id))")
+            }
             return allocator(id)
         }
     }
@@ -84,6 +90,9 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
     ///
     /// - Parameter item: The object to return to the pool.
     public func release(_ item: T) {
+        guard !releaseDisabled else {
+            return
+        }
         state.withLock { state in
             state.available.append(item)
         }

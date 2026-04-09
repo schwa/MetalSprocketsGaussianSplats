@@ -135,11 +135,13 @@ public final class SplatImmersiveRenderState: Sendable {
 
     public init(splatCloud: GPUSplatCloud<SparkSplat>) {
         let device = MTLCreateSystemDefaultDevice()!
+        // TODO: Remove poolReleaseDisabled once #36 is resolved — disables pool reuse to diagnose flicker
         let sortManager = try! AsyncSortManager<SparkSplat>(
             device: device,
             splatCloud: splatCloud,
             capacity: splatCloud.count,
-            preallocatedBufferCount: Self.pendingReleaseDepth + 3
+            preallocatedBufferCount: Self.pendingReleaseDepth + 3,
+            poolReleaseDisabled: true
         )
         self.sortManager = sortManager
         let state = OSAllocatedUnfairLock(initialState: State())
