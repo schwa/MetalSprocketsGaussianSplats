@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var cameraMatrix = simd_float4x4(translation: SIMD3<Float>(0, 0, 3))
+    @State private var renderer: SplatRenderer = .spark
 
     let splatCloud: GPUSplatCloud<SparkSplat>
 
@@ -17,7 +18,18 @@ struct ContentView: View {
             splatCloud: splatCloud,
             cameraMatrix: cameraMatrix
         )
+        .splatRenderer(renderer)
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+        .toolbar {
+            ToolbarItem {
+                Picker("Renderer", selection: $renderer) {
+                    ForEach(SplatRenderer.allCases, id: \.self) { r in
+                        Text(r.rawValue.capitalized).tag(r)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+        }
         #if os(visionOS)
         .ornament(attachmentAnchor: .scene(.bottom)) {
             ImmersiveToggle()
