@@ -16,18 +16,43 @@ struct ContentView: View {
     @Bindable var demoState: DemoState
 
     var body: some View {
+        #if os(visionOS)
+        Group {
+            if !demoState.isImmersive {
+                SplatView(
+                    splatCloud: splatCloud,
+                    cameraMatrix: cameraMatrix
+                )
+                .splatRenderer(demoState.renderer)
+                .onFrameTimingChange { frameTimingStatistics = $0 }
+                .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
+            } else {
+                Color.clear
+            }
+        }
+        .ornament(attachmentAnchor: .scene(.bottom)) {
+            HStack {
+                Picker("Renderer", selection: $demoState.renderer) {
+                    ForEach(SplatRenderer.allCases, id: \.self) { r in
+                        Text(r.rawValue.capitalized).tag(r)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 200)
+                ImmersiveToggle(demoState: demoState)
+            }
+            .padding()
+            .glassBackgroundEffect()
+        }
+        #else
         SplatView(
             splatCloud: splatCloud,
             cameraMatrix: cameraMatrix
         )
         .splatRenderer(demoState.renderer)
         .onFrameTimingChange { frameTimingStatistics = $0 }
-        #if os(visionOS)
-        .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
-        #else
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
-        #endif
-        #if !os(visionOS)
         .overlay(alignment: .top) {
             Picker("Renderer", selection: $demoState.renderer) {
                 ForEach(SplatRenderer.allCases, id: \.self) { r in
@@ -40,35 +65,18 @@ struct ContentView: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
             .padding()
         }
-        #endif
-		.overlay(alignment: .bottomTrailing) {
+        .overlay(alignment: .bottomTrailing) {
             if let frameTimingStatistics {
                 FrameTimingView(statistics: frameTimingStatistics, options: .all)
-                .padding()
+                    .padding()
             }
-		}
+        }
         .overlay(alignment: .bottomLeading) {
             MatrixView(value: cameraMatrix, style: .number.precision(.fractionLength(2)), colorize: true)
                 .font(.caption.monospaced())
                 .padding(8)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                 .padding()
-        }
-        #if os(visionOS)
-        .ornament(attachmentAnchor: .scene(.bottom)) {
-            HStack {
-                Picker("Renderer", selection: $demoState.renderer) {
-                    ForEach(SplatRenderer.allCases, id: \.self) { r in
-                        Text(r.rawValue.capitalized).tag(r)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 200)
-                ImmersiveToggle()
-            }
-            .padding()
-            .glassBackgroundEffect()
         }
         #endif
     }

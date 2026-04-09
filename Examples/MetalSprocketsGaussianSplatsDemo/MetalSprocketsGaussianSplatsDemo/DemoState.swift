@@ -5,5 +5,8 @@ import Observation
 @Observable
 class DemoState {
     var renderer: SplatRenderer = .spark
+    #if os(visionOS)
+    var isImmersive = false
+    #endif
 }
 #endif

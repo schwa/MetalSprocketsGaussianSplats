@@ -1,5 +1,5 @@
 {
-  "originHash" : "502753d1be3591794796824c358bc5a391a2caa3756a5cd7fb7fd28a7fa2b0ab",
+  "originHash" : "e83ab3286c9a4141023c38ca961b1bfc95f09b2421fb36f789c9fee7de240ab2",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7",
         "version" : "0.1.0"
-      }
-    },
-    {
-      "identity" : "interaction3d",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/Interaction3D",
-      "state" : {
-        "revision" : "b8a08213091674c7e85c566a1eeec86ef1bbd25c",
-        "version" : "0.1.3"
       }
     },
     {
