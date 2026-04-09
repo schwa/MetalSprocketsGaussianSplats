@@ -912,13 +912,19 @@ The MetalSprockets demo has an ARKit mode that renders the camera feed (YCbCr bi
 ---
 
 ## 44: Investigate why stochastic renderer requires depth buffer
-status: new
+status: closed
 priority: low
 kind: bug
 labels: effort:s, stochastic
 created: 2026-04-09T20:05:59Z
+updated: 2026-04-09T20:41:51Z
+closed: 2026-04-09T20:41:51Z
 
 Switching to stochastic mode in SplatView crashes with 'MTLDepthStencilDescriptor sets depth test but MTLRenderPassDescriptor has a nil depthAttachment texture'. The stochastic renderer shouldn't need depth testing — it uses stochastic alpha sampling. Something in the pipeline or MetalSprockets is setting up depth state unexpectedly. Currently worked around by setting .metalDepthStencilPixelFormat(.depth32Float) when in stochastic mode.
+
+- `2026-04-09T20:39:41Z`: Confirmed: stochastic shader and pipeline don't reference depth at all. The depth error comes from MetalSprockets applying a default depth state somewhere. The .metalDepthStencilPixelFormat(.depth32Float) workaround in SplatView is masking a MetalSprockets issue, not a real stochastic requirement.
+- `2026-04-09T20:41:45Z`: Stochastic algorithm itself (random alpha thresholding) doesn't use depth. But depth testing IS required for front-to-back occlusion — without it, distant splats overwrite closer ones that already passed the stochastic coin flip. The depth buffer serves as an 'already filled' mask. So the depth requirement is correct, just not for the reason originally assumed.
+- `2026-04-09T20:41:51Z`: Resolved: depth is needed for front-to-back occlusion. Current workaround (.metalDepthStencilPixelFormat when stochastic) is correct.
 
 ---
 
@@ -986,13 +992,18 @@ The Metal GPU performance overlay disappears while dragging/panning the camera. 
 ---
 
 ## 50: Support stochastic renderer in visionOS immersive mode
-status: new
+status: closed
 priority: low
 kind: feature
-labels: effort:m, visionOS, stochastic
+labels: visionOS, stochastic, effort:s
 created: 2026-04-09T20:13:29Z
+updated: 2026-04-09T21:29:56Z
+closed: 2026-04-09T21:29:56Z
 
 SplatImmersiveElement currently only uses SparkSplatRenderPipeline. Add support for switching to StochasticSplatRenderPipeline in immersive mode, which would eliminate the need for sorting entirely on visionOS. Would need to handle the depth buffer requirement and stereo rendering setup for stochastic mode.
+
+- `2026-04-09T20:44:44Z`: Stochastic pipeline has no vertex amplification support — shader and pipeline are mono only. Needs: 1) amplification_id/render_target_array_index in shader vertex output 2) per-eye view/projection matrix arrays in pipeline 3) maxVertexAmplificationCount on render pipeline descriptor 4) reverse-Z depth handling for visionOS. Same stereo work Spark already has, ported to stochastic.
+- `2026-04-09T21:29:56Z`: Done: SplatImmersiveElement accepts renderer parameter. Stochastic pipeline updated with stereo amplification support. Depth compare moved to caller (reverse-Z on visionOS, standard on macOS/iOS). Demo shares renderer state between windowed and immersive via DemoState.
 
 ---
 
@@ -1004,6 +1015,60 @@ labels: effort:s, stochastic
 created: 2026-04-09T20:13:57Z
 
 Currently frameTime (frame counter) is passed as the stochastic seed every frame, so the noise pattern changes even when the camera isn't moving. This causes constant visual shimmer. When the camera is stationary, we could either freeze the seed (stable but noisy image) or accumulate/average multiple frames for temporal convergence. Need to investigate what looks best.
+
+---
+
+## 52: Hide windowed SplatView when immersive space is active
+status: closed
+priority: medium
+kind: enhancement
+labels: effort:xs, demo, visionOS
+created: 2026-04-09T21:46:47Z
+updated: 2026-04-09T21:55:41Z
+closed: 2026-04-09T21:55:41Z
+
+When the user enters immersive mode, the windowed SplatView keeps rendering in the background — wasting GPU/CPU on sorting and rendering that isn't visible. The windowed content should be replaced with a placeholder or hidden when the immersive space is open.
+
+- `2026-04-09T21:55:41Z`: Done: SplatView replaced with Color.clear when immersive mode is active. Ornament with picker and toggle stays visible.
+
+---
+
+## 53: Add render stats overlay for immersive mode
+status: new
+priority: low
+kind: enhancement
+labels: effort:m, visionOS, demo
+created: 2026-04-09T21:48:27Z
+
+FrameTimingView is available for windowed SplatView via .onFrameTimingChange but there's no equivalent for the immersive CompositorServices render loop. Would be useful to have FPS/frame timing stats visible in immersive mode for performance debugging.
+
+- `2026-04-09T21:58:31Z`: Root cause is MetalSprockets — ImmersiveRuntime doesn't expose frame timing. Filed MetalSprockets#313. Can work around by tracking timestamps in SplatImmersiveRenderState but proper fix belongs upstream.
+
+---
+
+## 54: Support gestures in visionOS immersive mode
+status: new
+priority: medium
+kind: feature
+labels: effort:m, visionOS, demo
+created: 2026-04-09T21:57:38Z
+
+The immersive splat currently has no gesture interaction — the splat is static in space. Add gesture support for manipulating the splat in immersive mode.
+
+---
+
+## 55: Generate both macOS (.icon) and visionOS (.solidimagestack) app icons from same content
+status: closed
+priority: low
+kind: task
+labels: effort:s, demo
+created: 2026-04-09T22:00:25Z
+updated: 2026-04-09T22:02:16Z
+closed: 2026-04-09T22:02:16Z
+
+The demo currently has separate AppIcon.icon (macOS/iOS) and AppIcon.solidimagestack (visionOS) that were generated independently. Should generate both from the same source content to keep them consistent. Could use icon-generator to produce both formats in one step.
+
+- `2026-04-09T22:02:16Z`: Done: both .icon and .solidimagestack generated with butterfly emoji on dark purple gradient/background.
 
 ---
 
