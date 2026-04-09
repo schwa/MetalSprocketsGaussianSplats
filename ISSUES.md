@@ -885,11 +885,13 @@ SplatView renders nothing in visionOS and iPad simulators — sorting runs but n
 ---
 
 ## 42: Add MetalSprockets FPS counter to demo
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: effort:xs, demo
 created: 2026-04-09T19:17:42Z
+updated: 2026-04-09T19:53:34Z
+closed: 2026-04-09T19:53:34Z
 
 The MetalSprockets FrameTimingView provides an FPS overlay. Add it to the demo app for both windowed and immersive rendering to help diagnose performance issues.
 
