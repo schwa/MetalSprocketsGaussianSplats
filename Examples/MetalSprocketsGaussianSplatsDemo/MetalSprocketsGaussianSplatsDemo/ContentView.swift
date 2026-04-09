@@ -10,22 +10,22 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var cameraMatrix = simd_float4x4(translation: SIMD3<Float>(0, 0, 3))
-    @State private var renderer: SplatRenderer = .spark
     @State private var frameTimingStatistics: FrameTimingStatistics?
 
     let splatCloud: GPUSplatCloud<SparkSplat>
+    @Bindable var demoState: DemoState
 
     var body: some View {
         SplatView(
             splatCloud: splatCloud,
             cameraMatrix: cameraMatrix
         )
-        .splatRenderer(renderer)
+        .splatRenderer(demoState.renderer)
         .onFrameTimingChange { frameTimingStatistics = $0 }
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
         #if !os(visionOS)
         .overlay(alignment: .top) {
-            Picker("Renderer", selection: $renderer) {
+            Picker("Renderer", selection: $demoState.renderer) {
                 ForEach(SplatRenderer.allCases, id: \.self) { r in
                     Text(r.rawValue.capitalized).tag(r)
                 }
@@ -46,7 +46,7 @@ struct ContentView: View {
         #if os(visionOS)
         .ornament(attachmentAnchor: .scene(.bottom)) {
             HStack {
-                Picker("Renderer", selection: $renderer) {
+                Picker("Renderer", selection: $demoState.renderer) {
                     ForEach(SplatRenderer.allCases, id: \.self) { r in
                         Text(r.rawValue.capitalized).tag(r)
                     }

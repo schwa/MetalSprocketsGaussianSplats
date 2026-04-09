@@ -113,6 +113,7 @@ public struct SplatView: View {
                         drawableSize: size,
                         frameTime: context.frameUniforms.index
                     )
+                    .depthCompare(function: .less, enabled: true)
                 }
                 .renderPassDescriptorModifier { descriptor in
                     descriptor.renderTargetArrayLength = 1

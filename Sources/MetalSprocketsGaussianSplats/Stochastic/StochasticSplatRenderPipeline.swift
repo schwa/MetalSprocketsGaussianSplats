@@ -163,7 +163,6 @@ public struct StochasticSplatRenderPipeline: Element {
                 .parameter("cameraPositions", values: cameraPositions)
             }
             .vertexDescriptor(vertexDescriptor)
-            .depthCompare(function: .less, enabled: true)
             .renderPipelineDescriptorModifier { [amplificationCount] descriptor in
                 descriptor.inputPrimitiveTopology = .triangle
                 descriptor.maxVertexAmplificationCount = amplificationCount

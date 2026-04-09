@@ -7,6 +7,7 @@ import SwiftUI
 @main
 struct MetalSprocketsGaussianSplatsDemoApp: App {
     let splatCloud: GPUSplatCloud<SparkSplat>
+    @State private var demoState = DemoState()
 
     #if os(visionOS)
     let renderState: SplatImmersiveRenderState
@@ -30,10 +31,10 @@ struct MetalSprocketsGaussianSplatsDemoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(splatCloud: splatCloud)
+            ContentView(splatCloud: splatCloud, demoState: demoState)
         }
         #if os(visionOS)
-        SplatImmersiveScene(splatCloud: splatCloud, renderState: renderState)
+        SplatImmersiveScene(splatCloud: splatCloud, renderState: renderState, demoState: demoState)
         #endif
     }
 }
