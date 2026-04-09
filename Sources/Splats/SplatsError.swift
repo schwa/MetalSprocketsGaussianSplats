@@ -1,9 +1,6 @@
 import Foundation
 
 internal enum SplatsError: Error, Equatable {
-    // Antimatter15 errors
-    case invalidFileSize
-
     // PLY errors
     case invalidEncoding
     case invalidHeader

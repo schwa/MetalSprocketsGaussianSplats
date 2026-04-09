@@ -4,7 +4,7 @@ public extension UTType {
     /// Polygon File Format (.ply)
     nonisolated static let ply = UTType(importedAs: "public.polygon-file-format")
 
-    /// Antimatter15 Splat (.splat) format
+    /// Antimatter15 Splat (.splat) format (deprecated — format no longer supported)
     nonisolated static let antimatter15Splat = UTType(importedAs: "com.antimatter15.splat")
 
     /// Gaussian Splat SPZ (.spz) format (Niantic Labs)

@@ -13,7 +13,7 @@ public struct SplatReader: SplatReaderProtocol {
         case "ply":
             inner = try PLYSplatReader(url: url)
         case "splat":
-            inner = try Antimatter15Reader(url: url)
+            throw SplatsError.unsupportedFormat("splat (Antimatter15 format has been removed, use .spz or .ply)")
         case "sog":
             inner = try SOGReaderCPU(url: url)
         case "spz":

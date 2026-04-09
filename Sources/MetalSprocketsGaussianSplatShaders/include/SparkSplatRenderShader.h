@@ -47,6 +47,23 @@ struct DebugCloudIndexParams {
     simd_float3 cloudColors[MAX_DEBUG_CLOUD_COLORS];  // Custom colors for each cloud
 };
 
+// MARK: - IndexedDistance structure
+
+/// Sorted index with distance for depth-ordered rendering
+#ifdef __METAL_VERSION__
+struct IndexedDistance {
+    unsigned int splatIndex;
+    unsigned short cloudIndex;
+    half distanceToCamera;
+};
+#else
+struct IndexedDistance {
+    unsigned int splatIndex;
+    unsigned short cloudIndex;
+    simd_half1 distanceToCamera;
+};
+#endif
+
 // MARK: - SparkSplat structure
 
 /// SparkSplat - 32-byte format using half-floats
