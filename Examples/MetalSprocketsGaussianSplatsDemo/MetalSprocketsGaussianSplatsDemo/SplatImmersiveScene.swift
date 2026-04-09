@@ -26,6 +26,11 @@ struct SplatImmersiveScene: Scene {
                     )
                 }
             }
+            .onFrameTimingChange { [weak demoState] statistics in
+                Task { @MainActor in
+                    demoState?.immersiveFrameTiming = statistics
+                }
+            }
         }
         .immersionStyle(selection: .constant(.mixed), in: .mixed)
     }

@@ -41,6 +41,9 @@ struct ContentView: View {
                 .labelsHidden()
                 .frame(width: 200)
                 ImmersiveToggle(demoState: demoState)
+                if demoState.isImmersive, let timing = demoState.immersiveFrameTiming {
+                    FrameTimingView(statistics: timing)
+                }
             }
             .padding()
             .glassBackgroundEffect()
