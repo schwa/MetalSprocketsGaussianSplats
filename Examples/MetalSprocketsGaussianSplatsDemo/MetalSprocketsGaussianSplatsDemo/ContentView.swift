@@ -27,7 +27,7 @@ struct ContentView: View {
                 .onFrameTimingChange { frameTimingStatistics = $0 }
                 .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
             } else {
-                Color.clear
+                ContentUnavailableView("Immersive Mode", systemImage: "visionpro", description: Text("Viewing splat in immersive space."))
             }
         }
         .ornament(attachmentAnchor: .scene(.bottom)) {
