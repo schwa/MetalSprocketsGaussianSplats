@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GeometryLite3D",
       "state" : {
-        "revision" : "2b63646cf7290361567cafaf89f82206ee0ff3e7",
-        "version" : "0.1.0"
+        "revision" : "898b2f439607760e3c9f8c239f51664c9bbd3692",
+        "version" : "0.1.1"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalCompilerPlugin",
       "state" : {
-        "revision" : "36c761478a8e3fb934acf8ef2db4696af95069b4",
-        "version" : "0.1.5"
+        "revision" : "9c11db3648fa4e4f02bd4918c4b7db3472a73c64",
+        "version" : "0.1.6"
       }
     },
     {
@@ -25,7 +25,7 @@
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
         "branch" : "main",
-        "revision" : "d2fe0521b232e359edf1af37904997408cc5e2a5"
+        "revision" : "c14358675e3ba2bd2de58950146892a9cbcab1dd"
       }
     },
     {
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser",
       "state" : {
-        "revision" : "c5d11a805e765f52ba34ec7284bd4fcd6ba68615",
-        "version" : "1.7.0"
+        "revision" : "626b5b7b2f45e1b0b1c6f4a309296d1d21d7311b",
+        "version" : "1.7.1"
       }
     },
     {
@@ -58,10 +58,10 @@
     {
       "identity" : "swift-collections",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-collections.git",
+      "location" : "https://github.com/apple/swift-collections",
       "state" : {
-        "revision" : "7b847a3b7008b2dc2f47ca3110d8c782fb2e5c7e",
-        "version" : "1.3.0"
+        "revision" : "6675bc0ff86e61436e615df6fc5174e043e57924",
+        "version" : "1.4.1"
       }
     },
     {
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/SwiftFormats",
       "state" : {
-        "revision" : "6b51ccec7fccf2f1d4f28f03def6c6b97d17c05b",
-        "version" : "0.3.6"
+        "revision" : "0f0929852e7709fcd2a006efda19925ee773d752",
+        "version" : "0.3.7"
       }
     },
     {
