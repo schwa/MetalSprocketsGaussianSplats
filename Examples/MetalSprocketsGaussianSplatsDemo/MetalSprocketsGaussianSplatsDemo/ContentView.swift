@@ -71,13 +71,7 @@ struct ContentView: View {
                     .padding()
             }
         }
-        .overlay(alignment: .bottomLeading) {
-            MatrixView(value: cameraMatrix, style: .number.precision(.fractionLength(2)), colorize: true)
-                .font(.caption.monospaced())
-                .padding(8)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-                .padding()
-        }
+
         #endif
     }
 }
