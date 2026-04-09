@@ -675,12 +675,13 @@ closed: 2026-04-09T16:57:35Z
 ---
 
 ## 28: SplatIndices public init sets pool to nil causing silent release no-op
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: effort:s
 created: 2026-03-31T21:11:46Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-04-09T20:30:24Z
+closed: 2026-04-09T20:30:24Z
 
 The public init(parameters:indices:) on SplatIndices sets pool to nil, meaning release() on indices created outside of AsyncSortManager is a silent no-op. This is a footgun for callers constructing SplatIndices manually (e.g. tests, SplatSorter). Consider making the pool non-optional or removing the public init in favour of the internal one.
 

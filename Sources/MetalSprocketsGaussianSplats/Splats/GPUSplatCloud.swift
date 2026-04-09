@@ -65,13 +65,7 @@ public struct SplatIndices: Sendable, Equatable {
     /// of which pool the sort manager currently holds (pools are swapped on resize).
     private var pool: Pool<TypedMTLBuffer<IndexedDistance>>?
 
-    public init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>) {
-        self.parameters = parameters
-        self.indices = indices
-        self.pool = nil
-    }
-
-    internal init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>, pool: Pool<TypedMTLBuffer<IndexedDistance>>) {
+    internal init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>, pool: Pool<TypedMTLBuffer<IndexedDistance>>? = nil) {
         self.parameters = parameters
         self.indices = indices
         self.pool = pool
