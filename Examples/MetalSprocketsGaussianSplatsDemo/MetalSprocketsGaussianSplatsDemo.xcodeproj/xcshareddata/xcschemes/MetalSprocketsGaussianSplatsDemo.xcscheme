@@ -60,12 +60,12 @@
          <EnvironmentVariable
             key = "MS_LOGGING"
             value = "1"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "MS_RENDERVIEW_LOG_FRAME"
             value = "1"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "MTL_DEBUG_LAYER"
@@ -80,7 +80,7 @@
          <EnvironmentVariable
             key = "MS_VERBOSE"
             value = "1"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
       </EnvironmentVariables>
    </LaunchAction>

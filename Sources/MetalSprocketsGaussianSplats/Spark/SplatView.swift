@@ -119,6 +119,7 @@ public struct SplatView: View {
             }
         }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
+        .metalDepthStencilPixelFormat(renderer == .stochastic ? .depth32Float : .invalid)
         .task {
             sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             for await indices in sortManager.sortedIndicesStream {

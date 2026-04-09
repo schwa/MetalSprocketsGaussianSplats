@@ -20,15 +20,17 @@ struct ContentView: View {
         )
         .splatRenderer(renderer)
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
-        .toolbar {
-            ToolbarItem {
-                Picker("Renderer", selection: $renderer) {
-                    ForEach(SplatRenderer.allCases, id: \.self) { r in
-                        Text(r.rawValue.capitalized).tag(r)
-                    }
+        .overlay(alignment: .top) {
+            Picker("Renderer", selection: $renderer) {
+                ForEach(SplatRenderer.allCases, id: \.self) { r in
+                    Text(r.rawValue.capitalized).tag(r)
                 }
-                .pickerStyle(.segmented)
             }
+            .pickerStyle(.segmented)
+            .frame(width: 200)
+            .padding(8)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .padding()
         }
         #if os(visionOS)
         .ornament(attachmentAnchor: .scene(.bottom)) {
