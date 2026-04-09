@@ -280,9 +280,11 @@ public struct SparkSplatRenderPipeline: Element {
             .parameter("clouds", value: argumentBuffer)
         }
         .vertexDescriptor(vertexDescriptor)
+        #if !os(visionOS)
         .renderPassDescriptorModifier { descriptor in
             descriptor.renderTargetArrayLength = 1
         }
+        #endif
         .renderPipelineDescriptorModifier { [amplificationCount] renderPipelineDescriptor in
             renderPipelineDescriptor.inputPrimitiveTopology = .triangle
             renderPipelineDescriptor.maxVertexAmplificationCount = amplificationCount

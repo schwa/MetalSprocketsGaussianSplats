@@ -272,6 +272,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xros*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xrsimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsMultipleScenes[sdk=xros*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsMultipleScenes[sdk=xrsimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
@@ -316,6 +320,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xros*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xrsimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsMultipleScenes[sdk=xros*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsMultipleScenes[sdk=xrsimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
