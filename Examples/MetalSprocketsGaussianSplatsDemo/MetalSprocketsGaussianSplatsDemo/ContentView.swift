@@ -22,7 +22,11 @@ struct ContentView: View {
         )
         .splatRenderer(demoState.renderer)
         .onFrameTimingChange { frameTimingStatistics = $0 }
+        #if os(visionOS)
+        .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
+        #else
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+        #endif
         #if !os(visionOS)
         .overlay(alignment: .top) {
             Picker("Renderer", selection: $demoState.renderer) {
@@ -37,12 +41,19 @@ struct ContentView: View {
             .padding()
         }
         #endif
-//		.overlay(alignment: .bottomTrailing) {
-//            if let frameTimingStatistics {
-//                FrameTimingView(statistics: frameTimingStatistics, options: .all)
-//                .padding()
-//            }
-//		}
+		.overlay(alignment: .bottomTrailing) {
+            if let frameTimingStatistics {
+                FrameTimingView(statistics: frameTimingStatistics, options: .all)
+                .padding()
+            }
+		}
+        .overlay(alignment: .bottomLeading) {
+            MatrixView(value: cameraMatrix, style: .number.precision(.fractionLength(2)), colorize: true)
+                .font(.caption.monospaced())
+                .padding(8)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .padding()
+        }
         #if os(visionOS)
         .ornament(attachmentAnchor: .scene(.bottom)) {
             HStack {
