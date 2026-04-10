@@ -8,13 +8,13 @@ import Splats
 import SwiftUI
 
 struct SplatImmersiveScene: Scene {
-    let splatCloud: GPUSplatCloud<SparkSplat>
-    let renderState: SplatImmersiveRenderState
     let demoState: DemoState
 
     var body: some Scene {
         ImmersiveSpace(id: "SplatImmersive") {
-            ImmersiveRenderContent { [splatCloud, renderState, demoState] context in
+            ImmersiveRenderContent { [demoState] context in
+                let splatCloud = demoState.splatCloud
+                let renderState = demoState.renderState
                 try ImmersiveRenderPass(context: context, label: "Splat") {
                     try SplatImmersiveElement(
                         context: context,

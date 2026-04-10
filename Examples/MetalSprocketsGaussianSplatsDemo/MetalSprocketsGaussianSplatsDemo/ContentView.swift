@@ -33,6 +33,14 @@ struct ContentView: View {
         }
         .ornament(attachmentAnchor: .scene(.bottom)) {
             HStack {
+                Picker("Model", selection: $demoState.selectedModel) {
+                    ForEach(SplatModel.allCases) { model in
+                        Text(model.rawValue).tag(model)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 200)
                 Picker("Renderer", selection: $demoState.renderer) {
                     ForEach(SplatRenderer.allCases, id: \.self) { r in
                         Text(r.rawValue.capitalized).tag(r)
@@ -58,13 +66,22 @@ struct ContentView: View {
         .onFrameTimingChange { frameTimingStatistics = $0 }
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
         .overlay(alignment: .top) {
-            Picker("Renderer", selection: $demoState.renderer) {
-                ForEach(SplatRenderer.allCases, id: \.self) { r in
-                    Text(r.rawValue.capitalized).tag(r)
+            HStack {
+                Picker("Model", selection: $demoState.selectedModel) {
+                    ForEach(SplatModel.allCases) { model in
+                        Text(model.rawValue).tag(model)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Picker("Renderer", selection: $demoState.renderer) {
+                    ForEach(SplatRenderer.allCases, id: \.self) { r in
+                        Text(r.rawValue.capitalized).tag(r)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             .padding(8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
             .padding()
