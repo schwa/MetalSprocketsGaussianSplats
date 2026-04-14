@@ -16,15 +16,19 @@ enum SplatModel: String, CaseIterable, Identifiable {
 
     var resourceName: String {
         switch self {
-        case .butterfly: "butterfly-wings-closed"
-        case .helmet: "Helmet"
+        case .butterfly:
+            "butterfly-wings-closed"
+        case .helmet:
+            "Helmet"
         }
     }
 
     var resourceExtension: String {
         switch self {
-        case .butterfly: "spz"
-        case .helmet: "sog"
+        case .butterfly:
+            "spz"
+        case .helmet:
+            "sog"
         }
     }
 }
