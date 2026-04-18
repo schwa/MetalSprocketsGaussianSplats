@@ -1,5 +1,5 @@
 {
-  "originHash" : "e83ab3286c9a4141023c38ca961b1bfc95f09b2421fb36f789c9fee7de240ab2",
+  "originHash" : "ad0f0cb010772c22bfac1f32bdbeffc0a9c5c13ef736122c3406c426b425b45c",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -26,6 +26,15 @@
       "state" : {
         "branch" : "main",
         "revision" : "c14358675e3ba2bd2de58950146892a9cbcab1dd"
+      }
+    },
+    {
+      "identity" : "spacemouse",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/SpaceMouse",
+      "state" : {
+        "branch" : "main",
+        "revision" : "52a4dac46dbf2704e00010523274ada3a4d5c4e2"
       }
     },
     {
