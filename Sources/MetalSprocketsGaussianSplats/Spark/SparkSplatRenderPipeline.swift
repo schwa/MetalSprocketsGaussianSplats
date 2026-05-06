@@ -4,7 +4,6 @@ import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
-import MetalSupport
 import Splats
 
 /// A MetalSprockets render pipeline for Gaussian splats using the Spark renderer.
@@ -255,7 +254,7 @@ public struct SparkSplatRenderPipeline: Element {
         }
 
         return try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-            Draw { [argumentBuffer, maxSHDegree, boundingBox] commandEncoder in
+            Draw { [maxSHDegree, boundingBox] commandEncoder in
                 let vertices: [SIMD2<Float>] = [
                     [-1, -1], [-1, 1], [1, -1], [1, 1]
                 ]

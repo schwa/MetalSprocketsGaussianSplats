@@ -4,7 +4,6 @@ import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
-import MetalSupport
 import simd
 import Splats
 
@@ -272,7 +271,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         }
 
         return try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-            Draw { [argumentBuffer, boundingBox, debugParams] commandEncoder in
+            Draw { [boundingBox, debugParams] commandEncoder in
                 let vertices: [SIMD2<Float>] = [
                     [-1, -1], [-1, 1], [1, -1], [1, 1]
                 ]

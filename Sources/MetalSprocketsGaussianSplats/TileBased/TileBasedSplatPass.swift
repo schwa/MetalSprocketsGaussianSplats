@@ -5,7 +5,6 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSprocketsUI
-import MetalSupport
 internal import os
 import SwiftUI
 
