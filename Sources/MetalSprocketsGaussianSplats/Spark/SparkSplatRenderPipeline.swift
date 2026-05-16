@@ -5,6 +5,7 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import Splats
+import MetalSupport
 
 /// A MetalSprockets render pipeline for Gaussian splats using the Spark renderer.
 ///

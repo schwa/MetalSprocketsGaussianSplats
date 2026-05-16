@@ -6,6 +6,7 @@ import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import simd
 import Splats
+import MetalSupport
 
 /// Debug visualization modes for Gaussian splat rendering
 public enum SplatDebugMode: String, CaseIterable, Sendable {
@@ -240,7 +241,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         cameraPositions: [SIMD3<Float>],
         amplificationCount: Int
     ) throws -> some Element {
-        let device = _MTLCreateSystemDefaultDevice()
+        let device = MTLCreateSystemDefaultDevice()!
 
         // Build per-cloud data array
         var cloudDataArray: [SplatCloudData] = []
