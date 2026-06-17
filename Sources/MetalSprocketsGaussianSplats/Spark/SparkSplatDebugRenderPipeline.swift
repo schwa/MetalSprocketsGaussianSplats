@@ -4,9 +4,9 @@ import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
+import MetalSupport
 import simd
 import Splats
-import MetalSupport
 
 /// Debug visualization modes for Gaussian splat rendering
 public enum SplatDebugMode: String, CaseIterable, Sendable {

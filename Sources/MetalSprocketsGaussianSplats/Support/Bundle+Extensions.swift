@@ -3,8 +3,8 @@ import MetalCompilerPluginSupport
 
 public extension Bundle {
     static var metalSprocketsGaussianSplatShaders: Bundle {
-        guard let bundle = Bundle.module.peerBundle(withSuffix: "MetalSprocketsGaussianSplatShaders") else {
-            fatalError("Failed to load MetalSprocketsGaussianSplatShaders bundle. Parent bundle: \(String(describing: Bundle.module.parentBundle)), searched for suffix: MetalSprocketsGaussianSplatShaders")
+        guard let bundle = Self.module.peerBundle(withSuffix: "MetalSprocketsGaussianSplatShaders") else {
+            fatalError("Failed to load MetalSprocketsGaussianSplatShaders bundle. Parent bundle: \(String(describing: Self.module.parentBundle)), searched for suffix: MetalSprocketsGaussianSplatShaders")
         }
         return bundle
     }
