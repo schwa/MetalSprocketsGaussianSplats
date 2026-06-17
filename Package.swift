@@ -52,6 +52,7 @@ let package = Package(
                 "Splats",
                 "MetalSprocketsGaussianSplatShaders",
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
+                .product(name: "MetalSprocketsSupport", package: "MetalSprockets"),
                 .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
                 .product(name: "MetalSprocketsUI", package: "MetalSprockets"),
                 .product(name: "Collections", package: "swift-collections"),

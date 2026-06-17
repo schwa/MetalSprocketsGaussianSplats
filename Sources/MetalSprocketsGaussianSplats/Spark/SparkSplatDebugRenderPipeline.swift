@@ -4,7 +4,7 @@ import Metal
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
-import MetalSupport
+import MetalSprocketsSupport
 import simd
 import Splats
 
