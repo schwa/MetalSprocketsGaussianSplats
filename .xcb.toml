@@ -4,6 +4,7 @@
 [defaults]
 # destination = "iphone-sim"    # Default build destination
 scheme = "MetalSprocketsGaussianSplatsDemo"              # Default scheme to build
+skip_plugin_validation = true
 # target = "MyApp"              # Default target
 # xcode_version = "16.0"        # Xcode version to use
 
