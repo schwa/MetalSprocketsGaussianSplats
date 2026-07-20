@@ -1308,14 +1308,18 @@ Expected: matching color/contrast. Actual: Tile output is visibly washed out.
 ## 60: Investigate reusing GPU pipeline frustum cull in tile-based renderer
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: tile-based
 created: 2026-07-20T18:53:32Z
+updated: 2026-07-20T18:55:19Z
+closed: 2026-07-20T18:55:19Z
 +++
 
 The GPU-sorted pipeline (SplatGPUSort) culls splats against the frustum before sorting, so downstream passes only process survivors. The tile-based renderer bins every splat with no pre-cull. Investigate whether running the same cull ahead of binning improves tile-based performance and/or the washed-out blending (fewer overlapping contributions per tile).
+
+- `2026-07-20T18:55:19Z`: Not needed: the binning kernel already culls — splats behind the camera, off-screen, or below the alpha threshold return false from tile-bounds computation and never produce tile entries. A separate pre-cull/compact pass would itself be a full per-splat pass, so it would roughly break even on binning cost, and it cannot affect the washed-out blending (#59), which is an ordering/accumulation problem within visible tiles.
 
 ---
 
@@ -1330,5 +1334,37 @@ created: 2026-07-20T18:53:32Z
 +++
 
 The GPU-sorted pipeline has a proper stable two-pass 8-bit radix sort over the half depth key (SplatGPUSort). The tile-based renderer uses its own per-tile sort (TileSplatSort). Investigate whether the per-tile depth ordering is currently incorrect or unstable (a possible contributor to the washed-out blending) and whether the SplatGPUSort radix approach could replace or feed the per-tile sort.
+
+- `2026-07-20T18:58:32Z`: Findings from code review (2026-07-20):
+
+tile_sort (TileSplatSort.metal) is one thread per tile running a serial 4-pass 8-bit radix: 8 full walks of the tile's list (histogram + scatter x 4 passes) with a 256-entry thread-private histogram. Dense tiles serialize on a single thread — likely the bulk of the poor performance in #58. A 32-bit key is also overkill for depth ordering.
+
+Preferred direction (classic 3DGS pipeline, as in the original CUDA implementation): drop the per-tile sort pass entirely and globally sort the binned tile entries (splat-tile pairs) with a combined key (tileID << 16) | flippedHalfDepth, using the cooperative SplatGPUSort radix already in the codebase (4 x 8-bit passes for the 32-bit key). Entries come out grouped by tile (contiguous, matching existing tileOffsets ranges) and depth-ordered within each tile. Per-tile imageblock rendering is unchanged — the range just arrives pre-sorted.
+
+Note: this is a sort of the binned entries, not the splats — a splat overlapping N tiles appears N times with different tileID keys.
+
+May also be relevant to #59: guarantees a stable, correct front-to-back order per tile (the current kernel sorts descending via key inversion; worth verifying direction against the renderer's expectation).
+
+Related: #58, #59.
+
+---
+
+## 62: Unified splat pipeline: shared cull + global sort front-end feeding tile-based rendering
+
++++
+status: new
+priority: medium
+kind: feature
+labels: tile-based
+created: 2026-07-20T19:01:34Z
++++
+
+The GPU-sorted pipeline (SplatGPUSort) and the tile-based renderer are converging on the same front-end tools: frustum cull, depth keys, radix sort. They differ only in back-end — sorted instanced quads with hardware blending (Spark/GPU) vs per-pixel front-to-back imageblock accumulation with early termination (tile).
+
+In practice overdraw is extreme in typical splat scenes, so the Spark/GPU path pays heavily in blend bandwidth. The tile back-end is the structural cure (early termination kills overdraw per pixel), but today it loses everywhere because of its serial per-tile sort (#61) and blending bugs (#59), with overall poor performance (#58).
+
+Target architecture: one shared front-end — cull (from SplatGPUSort), bin, global radix sort of tile entries keyed (tileID, depth) — feeding the per-tile imageblock renderer. The existing quad back-end remains as a consumer of the same cull + depth-sort passes.
+
+Related: #58 (tile perf), #59 (tile blending), #61 (global tile|depth sort replacing per-tile sort).
 
 ---
