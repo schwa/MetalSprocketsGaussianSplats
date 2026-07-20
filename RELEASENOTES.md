@@ -1,5 +1,18 @@
 # Release Notes
 
+## Unreleased
+
+### Features
+
+- Added GPU-sorted splat pipeline with frustum culling (`GPUSortedSplatRenderPipeline`):
+  cull + stable compaction + two-pass radix sort encoded in the same GPU workload as
+  rendering, drawing survivors via indirect draw. New `gpu` renderer mode in `SplatView`
+  with a splat count / cull percentage stats overlay.
+
+### Other
+
+- Demo project resolves Interaction3D from GitHub instead of a local package override
+
 ## 0.1.7
 
 ### Features

@@ -51,7 +51,9 @@ public final class GPUSortResources {
 
     /// Grow all slots to hold at least `newCapacity` splats. No-op when smaller.
     public func ensure(capacity newCapacity: Int) throws {
-        guard newCapacity > capacity else { return }
+        guard newCapacity > capacity else {
+            return
+        }
         capacity = newCapacity
         slots = try (0..<slotCount).map { try Self.makeSlot(device: device, capacity: newCapacity, index: $0) }
     }
