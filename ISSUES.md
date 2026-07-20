@@ -1367,4 +1367,6 @@ Target architecture: one shared front-end — cull (from SplatGPUSort), bin, glo
 
 Related: #58 (tile perf), #59 (tile blending), #61 (global tile|depth sort replacing per-tile sort).
 
+- `2026-07-20T19:45:10Z`: RFC 0002 (RFCs/0002-tilealt-cull-globalsort-bin-render.md) proposes TileAlt: cull -> global depth sort -> ordered (atomics-free) bin -> stable tileID partition -> tile render, as a sibling of the existing tile renderer. Depends on MetalSprockets#351 (indirect compute dispatch).
+
 ---
