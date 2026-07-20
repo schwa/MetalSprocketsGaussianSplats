@@ -65,6 +65,16 @@ public final class GPUSortResources {
         return SplatIndices(parameters: parameters, indices: slot.output, indirectDrawArgs: slot.drawArgs)
     }
 
+    /// Cull survivor count from the most recently sorted slot's indirect draw
+    /// args (`instanceCount`). Approximate: the GPU may still be writing the
+    /// newest slot, so this can lag a frame or two. Intended for stats display.
+    public var lastSurvivorCount: Int {
+        // Read the previous slot: the current one may still be in flight.
+        let drawArgs = slots[(slotIndex + slotCount - 1) % slotCount].drawArgs
+        let args = drawArgs.contents().bindMemory(to: UInt32.self, capacity: 4)
+        return Int(args[1])
+    }
+
     /// Advance to the next slot and return its index. Call once per frame.
     func advance() -> Int {
         slotIndex = (slotIndex + 1) % slotCount

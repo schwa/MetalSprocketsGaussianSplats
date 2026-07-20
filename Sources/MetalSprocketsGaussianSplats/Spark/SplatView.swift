@@ -132,6 +132,34 @@ public struct SplatView: View {
                 }
             }
         }
+        .overlay(alignment: .bottomLeading) {
+            if renderer == .gpu {
+                TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+                    let total = splatCloud.count
+                    let survivors = min(sortResources.lastSurvivorCount, total)
+                    let culledPercent = total > 0 ? Double(total - survivors) / Double(total) * 100 : 0
+                    Group {
+                        #if os(macOS)
+                        Form {
+                            LabeledContent("Splats", value: "\(survivors.formatted()) / \(total.formatted())")
+                            LabeledContent("Culled", value: "\(culledPercent.formatted(.number.precision(.fractionLength(1))))%")
+                        }
+                        #else
+                        VStack(spacing: 4) {
+                            LabeledContent("Splats", value: "\(survivors.formatted()) / \(total.formatted())")
+                            LabeledContent("Culled", value: "\(culledPercent.formatted(.number.precision(.fractionLength(1))))%")
+                        }
+                        .fixedSize()
+                        #endif
+                    }
+                    .monospacedDigit()
+                    .padding(8)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .foregroundStyle(.white)
+                    .padding()
+                }
+            }
+        }
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalDepthStencilPixelFormat(renderer == .stochastic ? .depth32Float : .invalid)
         .task {
