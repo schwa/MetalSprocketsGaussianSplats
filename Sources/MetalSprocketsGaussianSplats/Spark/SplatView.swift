@@ -115,6 +115,14 @@ public struct SplatView: View {
                     drawableSize: size,
                     resources: sortResources
                 )
+            case .tileBased:
+                try TileBasedSplatPass(
+                    splatCloud: splatCloud,
+                    projection: projection,
+                    drawableSize: size,
+                    cameraMatrix: cameraMatrix,
+                    modelMatrix: modelMatrix
+                )
             case .stochastic:
                 try RenderPass {
                     try StochasticSplatRenderPipeline(
@@ -133,6 +141,14 @@ public struct SplatView: View {
             }
         }
         .overlay(alignment: .bottomLeading) {
+            if renderer == .tileBased {
+                Text("Work in progress")
+                    .font(.caption)
+                    .padding(8)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .foregroundStyle(.white)
+                    .padding()
+            }
             if renderer == .gpu {
                 TimelineView(.periodic(from: .now, by: 0.25)) { _ in
                     let total = splatCloud.count

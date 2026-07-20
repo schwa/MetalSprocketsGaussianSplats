@@ -10,6 +10,10 @@ public enum SplatRenderer: String, CaseIterable, Sendable {
     /// same GPU workload as rendering; no CPU sort latency.
     case gpu
 
+    /// Experimental tile-based renderer. Bins and sorts splats per screen tile
+    /// and composites with an imageblock fragment shader.
+    case tileBased = "tile"
+
     /// Experimental stochastic renderer. Uses random sampling for transparency — doesn't require sorting but produces noisier results.
     case stochastic
 }

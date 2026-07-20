@@ -1269,3 +1269,66 @@ created: 2026-07-20T18:42:44Z
 SplatImmersiveContent drives immersive visionOS rendering via the CPU AsyncSortManager path. Once stereo support exists in the GPU-sorted pipeline, immersive content should be able to opt into GPU sorting/culling, removing CPU sort latency in head-tracked rendering where stale sort order is most visible.
 
 ---
+
+## 58: Tile-based renderer performance is poor
+
++++
+status: new
+priority: medium
+kind: bug
+labels: tile-based
+created: 2026-07-20T18:53:32Z
++++
+
+The tile-based renderer runs significantly slower than the Spark and GPU-sorted renderers on the same scenes (observed in the demo app on macOS). Frame times are noticeably worse when switching the Renderer picker to Tile.
+
+---
+
+## 59: Tile-based renderer blending is broken - output is washed out
+
++++
+status: new
+priority: medium
+kind: bug
+labels: tile-based
+created: 2026-07-20T18:53:32Z
++++
+
+With the tile-based renderer selected, the butterfly model renders washed out compared to the Spark renderer on the same scene: colors are pale and low-contrast, as if alpha accumulation or the sRGB/linear conversion in the tile shader's front-to-back blend is wrong.
+
+Repro:
+1. Run MetalSprocketsGaussianSplatsDemo on macOS
+2. Select the Butterfly model
+3. Switch Renderer between Spark and Tile
+
+Expected: matching color/contrast. Actual: Tile output is visibly washed out.
+
+---
+
+## 60: Investigate reusing GPU pipeline frustum cull in tile-based renderer
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: tile-based
+created: 2026-07-20T18:53:32Z
++++
+
+The GPU-sorted pipeline (SplatGPUSort) culls splats against the frustum before sorting, so downstream passes only process survivors. The tile-based renderer bins every splat with no pre-cull. Investigate whether running the same cull ahead of binning improves tile-based performance and/or the washed-out blending (fewer overlapping contributions per tile).
+
+---
+
+## 61: Investigate using SplatGPUSort radix sort for tile-based per-tile ordering
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: tile-based
+created: 2026-07-20T18:53:32Z
++++
+
+The GPU-sorted pipeline has a proper stable two-pass 8-bit radix sort over the half depth key (SplatGPUSort). The tile-based renderer uses its own per-tile sort (TileSplatSort). Investigate whether the per-tile depth ordering is currently incorrect or unstable (a possible contributor to the washed-out blending) and whether the SplatGPUSort radix approach could replace or feed the per-tile sort.
+
+---

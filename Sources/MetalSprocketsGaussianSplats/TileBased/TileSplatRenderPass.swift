@@ -100,13 +100,25 @@ public struct TileSplatRenderPass: Element {
                 fragmentShader = try! Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileBorders: debugTileBorders)
             }
 
-            // Step 2: Blit imageblock to color attachment (framebuffer)
-            // No blending needed - tile shader does all blending internally
+            // Step 2: Blit imageblock to color attachment (framebuffer).
+            // The tile shader blends splats internally, but the result is
+            // premultiplied with coverage alpha — composite it over the cleared
+            // background so empty pixels stay opaque instead of punching a
+            // transparent hole in the layer.
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: blitFragmentShader) {
                 Draw { commandEncoder in
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
                     commandEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
                 }
+            }
+            .renderPipelineDescriptorModifier { descriptor in
+                descriptor.colorAttachments[0].isBlendingEnabled = true
+                descriptor.colorAttachments[0].rgbBlendOperation = .add
+                descriptor.colorAttachments[0].alphaBlendOperation = .add
+                descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
+                descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+                descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+                descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
             }
         }
     }
