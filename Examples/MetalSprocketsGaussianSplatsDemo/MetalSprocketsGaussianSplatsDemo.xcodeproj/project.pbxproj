@@ -14,7 +14,6 @@
 
 /* Begin PBXFileReference section */
 		45104CDC2F5A313700C49BCE /* MetalSprocketsGaussianSplatsDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MetalSprocketsGaussianSplatsDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		458A20622F8853F000CAF914 /* Interaction3D */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Interaction3D; path = /Users/schwa/Shared/Projects/Current/Interaction3D; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -44,7 +43,6 @@
 			children = (
 				45104CDE2F5A313700C49BCE /* MetalSprocketsGaussianSplatsDemo */,
 				45104CDD2F5A313700C49BCE /* Products */,
-				458A20622F8853F000CAF914 /* Interaction3D */,
 			);
 			sourceTree = "<group>";
 		};

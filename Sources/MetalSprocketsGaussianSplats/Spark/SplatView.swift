@@ -50,6 +50,8 @@ public struct SplatView: View {
     /// MTKView's typical in-flight frame count (3) plus a margin.
     @State private var pendingRelease: [SplatIndices] = []
     @State private var sortManager: AsyncSortManager<SparkSplat>
+    /// Scratch + output buffers for the GPU sorter (``SplatRenderer/gpu``).
+    @State private var sortResources: GPUSortResources
 
     private static let pendingReleaseDepth = 3
 
@@ -80,6 +82,7 @@ public struct SplatView: View {
             capacity: splatCloud.count,
             preallocatedBufferCount: Self.pendingReleaseDepth + 3
         ))
+        _sortResources = State(initialValue: try! GPUSortResources(device: device, capacity: splatCloud.count))
     }
 
     public var body: some View {
@@ -103,6 +106,15 @@ public struct SplatView: View {
                         descriptor.renderTargetArrayLength = 1
                     }
                 }
+            case .gpu:
+                try GPUSortedSplatRenderPipeline(
+                    splatCloud: splatCloud,
+                    projectionMatrix: projectionMatrix,
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrix,
+                    drawableSize: size,
+                    resources: sortResources
+                )
             case .stochastic:
                 try RenderPass {
                     try StochasticSplatRenderPipeline(

@@ -269,7 +269,13 @@ public struct SparkSplatRenderPipeline: Element {
                     commandEncoder.setVertexBytes(&bbox, length: MemoryLayout<BoundingBox3D>.size, index: 12)
                 }
                 commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
-                commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)
+                if let indirectArgs = sortedIndices.indirectDrawArgs {
+                    // GPU sort path: instanceCount is the cull survivor count
+                    // written by the sort's block-scan kernel.
+                    commandEncoder.drawPrimitives(type: .triangleStrip, indirectBuffer: indirectArgs, indirectBufferOffset: 0)
+                } else {
+                    commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)
+                }
             }
             .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
             .parameter("viewMatrices", values: viewMatrices)

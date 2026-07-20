@@ -6,6 +6,10 @@ public enum SplatRenderer: String, CaseIterable, Sendable {
     /// The default production renderer. Uses sorted alpha blending.
     case spark
 
+    /// Spark renderer with GPU-side sorting and frustum culling. Sorts in the
+    /// same GPU workload as rendering; no CPU sort latency.
+    case gpu
+
     /// Experimental stochastic renderer. Uses random sampling for transparency — doesn't require sorting but produces noisier results.
     case stochastic
 }

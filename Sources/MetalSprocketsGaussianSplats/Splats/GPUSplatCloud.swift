@@ -1,7 +1,7 @@
 #if !arch(x86_64)
 
 import GeometryLite3D
-import Metal
+@preconcurrency import Metal
 import MetalSprocketsGaussianSplatShaders
 internal import os
 import simd
@@ -64,11 +64,16 @@ public struct SplatIndices: Sendable, Equatable {
     /// The pool this buffer was acquired from. Stored so release is independent
     /// of which pool the sort manager currently holds (pools are swapped on resize).
     private var pool: Pool<TypedMTLBuffer<IndexedDistance>>?
+    /// Indirect draw arguments (`MTLDrawPrimitivesIndirectArguments`) whose
+    /// `instanceCount` is the GPU-cull survivor count. Nil for CPU-sorted
+    /// indices, where every index should be drawn.
+    public internal(set) var indirectDrawArgs: MTLBuffer?
 
-    internal init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>, pool: Pool<TypedMTLBuffer<IndexedDistance>>? = nil) {
+    internal init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>, pool: Pool<TypedMTLBuffer<IndexedDistance>>? = nil, indirectDrawArgs: MTLBuffer? = nil) {
         self.parameters = parameters
         self.indices = indices
         self.pool = pool
+        self.indirectDrawArgs = indirectDrawArgs
     }
 
     /// Release the index buffer back to the pool it was acquired from.

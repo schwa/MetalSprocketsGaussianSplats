@@ -1,5 +1,5 @@
 {
-  "originHash" : "ad0f0cb010772c22bfac1f32bdbeffc0a9c5c13ef736122c3406c426b425b45c",
+  "originHash" : "1a6f1ebb79e6050a31c7b538846af48d3c283385252dab0a46d9862b9cb76606",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "898b2f439607760e3c9f8c239f51664c9bbd3692",
         "version" : "0.1.1"
+      }
+    },
+    {
+      "identity" : "interaction3d",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/Interaction3D",
+      "state" : {
+        "revision" : "ee708cc99d47404fbc296adbe0c209bfae42e738",
+        "version" : "0.1.4"
       }
     },
     {
@@ -26,15 +35,6 @@
       "state" : {
         "branch" : "main",
         "revision" : "c14358675e3ba2bd2de58950146892a9cbcab1dd"
-      }
-    },
-    {
-      "identity" : "spacemouse",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/schwa/SpaceMouse",
-      "state" : {
-        "branch" : "main",
-        "revision" : "52a4dac46dbf2704e00010523274ada3a4d5c4e2"
       }
     },
     {
