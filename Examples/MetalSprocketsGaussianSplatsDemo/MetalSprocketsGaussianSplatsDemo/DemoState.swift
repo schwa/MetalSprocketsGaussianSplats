@@ -69,7 +69,8 @@ class DemoState {
         let cloud = Self.loadSplatCloud(device: device, model: .butterfly)
         self.splatCloud = cloud
         #if os(visionOS)
-        self.renderState = SplatImmersiveRenderState(splatCloud: cloud)
+        // Demo-only: a missing Metal device is unrecoverable here.
+        self.renderState = try! SplatImmersiveRenderState(splatCloud: cloud)
         #endif
     }
 
@@ -77,7 +78,7 @@ class DemoState {
         let cloud = Self.loadSplatCloud(device: device, model: model)
         splatCloud = cloud
         #if os(visionOS)
-        renderState = SplatImmersiveRenderState(splatCloud: cloud)
+        renderState = try! SplatImmersiveRenderState(splatCloud: cloud)
         #endif
     }
 
@@ -104,7 +105,7 @@ class DemoState {
             customModelName = url.lastPathComponent
             selectedModel = nil
             #if os(visionOS)
-            renderState = SplatImmersiveRenderState(splatCloud: cloud)
+            renderState = try SplatImmersiveRenderState(splatCloud: cloud)
             #endif
         } catch {
             Self.logger.error("Load failed for \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")

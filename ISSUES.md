@@ -2120,12 +2120,13 @@ All splat readers stream via read(_ handler:) and conform to SplatReaderProtocol
 ## 103: SplatImmersiveRenderState.init uses try! on a public API path
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: api, visionOS, effort:xs
 created: 2026-07-21T23:52:20Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:59:38Z
+closed: 2026-07-21T23:59:38Z
 +++
 
 SplatImmersiveRenderState.init constructs its per-eye AsyncSortManagers with try!, crashing instead of throwing on failure. Public API should not force-unwrap; make the init throwing (same class of issue as #98).

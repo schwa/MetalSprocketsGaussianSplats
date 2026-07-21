@@ -17,7 +17,7 @@ import SwiftUI
 ///
 /// ```swift
 /// ImmersiveSpace(id: "Splat") {
-///     SplatImmersiveContent(splatCloud: cloud)
+///     try! SplatImmersiveContent(splatCloud: cloud)
 /// }
 /// ```
 ///
@@ -39,11 +39,11 @@ public struct SplatImmersiveContent: ImmersiveSpaceContent {
         splatCloud: GPUSplatCloud<SparkSplat>,
         modelMatrix: simd_float4x4 = .identity,
         renderer: SplatRenderer = .spark
-    ) {
+    ) throws {
         self.splatCloud = splatCloud
         self.modelMatrix = modelMatrix
         self.renderer = renderer
-        self.renderState = SplatImmersiveRenderState(splatCloud: splatCloud)
+        self.renderState = try SplatImmersiveRenderState(splatCloud: splatCloud)
     }
 
     public var body: some ImmersiveSpaceContent {
@@ -334,7 +334,7 @@ public struct SplatImmersiveGPUSortElement: Element, @unchecked Sendable {
 /// Create one of these and pass it to ``SplatImmersiveElement`` each frame.
 ///
 /// ```swift
-/// let renderState = SplatImmersiveRenderState(splatCloud: splatCloud)
+/// let renderState = try SplatImmersiveRenderState(splatCloud: splatCloud)
 ///
 /// ImmersiveRenderContent { context in
 ///     try ImmersiveRenderPass(context: context) {
@@ -347,6 +347,12 @@ public struct SplatImmersiveGPUSortElement: Element, @unchecked Sendable {
 /// }
 /// ```
 public final class SplatImmersiveRenderState: Sendable {
+    /// Failures creating the render state.
+    public enum Error: Swift.Error {
+        /// No Metal device is available on this system.
+        case noMetalDevice
+    }
+
     private struct State: Sendable {
         var sortedIndices: SplatIndices?
     }
@@ -367,13 +373,15 @@ public final class SplatImmersiveRenderState: Sendable {
     private static let pendingReleaseDepth = 3
     private static let eyeCount = 2
 
-    public init(splatCloud: GPUSplatCloud<SparkSplat>) {
-        let device = MTLCreateSystemDefaultDevice()!
+    public init(splatCloud: GPUSplatCloud<SparkSplat>) throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            throw Error.noMetalDevice
+        }
         var sortManagers: [AsyncSortManager<SparkSplat>] = []
         var states: [OSAllocatedUnfairLock<State>] = []
         var listenerTasks: [Task<Void, Never>] = []
         for _ in 0 ..< Self.eyeCount {
-            let sortManager = try! AsyncSortManager<SparkSplat>(
+            let sortManager = try AsyncSortManager<SparkSplat>(
                 device: device,
                 splatCloud: splatCloud,
                 capacity: splatCloud.count,
