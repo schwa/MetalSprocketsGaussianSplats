@@ -1044,12 +1044,13 @@ The MetalSprockets FrameTimingView provides an FPS overlay. Add it to the demo a
 ## 43: Add ARKit camera passthrough mode to iOS demo
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: effort:m, demo, iOS, not-testable
 created: 2026-04-09T19:19:51Z
-updated: 2026-07-21T20:45:36Z
+updated: 2026-07-21T23:05:17Z
+closed: 2026-07-21T23:05:17Z
 +++
 
 The MetalSprockets demo has an ARKit mode that renders the camera feed (YCbCr billboard) with 3D content overlaid using ARKit world tracking. Add similar support to the splat demo on iOS — render splats on top of the AR camera feed with proper AR projection/view matrices from ARKit. See MetalSprockets Example MobileDemoView for the pattern: ARSessionDelegate + .arkit() modifier + YCbCrBillboardRenderPass.

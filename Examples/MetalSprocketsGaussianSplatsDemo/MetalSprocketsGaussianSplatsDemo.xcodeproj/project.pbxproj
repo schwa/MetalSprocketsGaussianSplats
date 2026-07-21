@@ -16,9 +16,22 @@
 		45104CDC2F5A313700C49BCE /* MetalSprocketsGaussianSplatsDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MetalSprocketsGaussianSplatsDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		45104CFF2F5A320000C49BCE /* Exceptions for "MetalSprocketsGaussianSplatsDemo" folder in "MetalSprocketsGaussianSplatsDemo" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 45104CDB2F5A313700C49BCE /* MetalSprocketsGaussianSplatsDemo */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		45104CDE2F5A313700C49BCE /* MetalSprocketsGaussianSplatsDemo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				45104CFF2F5A320000C49BCE /* Exceptions for "MetalSprocketsGaussianSplatsDemo" folder in "MetalSprocketsGaussianSplatsDemo" target */,
+			);
 			path = MetalSprocketsGaussianSplatsDemo;
 			sourceTree = "<group>";
 		};

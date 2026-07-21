@@ -13,6 +13,9 @@ struct ContentView: View {
     @State private var cameraMatrix = simd_float4x4(translation: SIMD3<Float>(0, 0, 3))
     @State private var frameTimingStatistics: FrameTimingStatistics?
     @State private var isImporting = false
+    #if os(iOS)
+    @State private var isARMode = false
+    #endif
 
     let splatCloud: GPUSplatCloud<SparkSplat>
     @Bindable var demoState: DemoState
@@ -61,7 +64,29 @@ struct ContentView: View {
             .glassBackgroundEffect()
         }
         .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
+        #elseif os(iOS)
+        if isARMode {
+            ARSplatView(splatCloud: splatCloud)
+                .ignoresSafeArea()
+                .overlay(alignment: .top) {
+                    Button("Exit AR", systemImage: "arkit") {
+                        isARMode = false
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(8)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .padding()
+                }
+        } else {
+            standardContent
+        }
         #else
+        standardContent
+        #endif
+    }
+
+    #if !os(visionOS)
+    private var standardContent: some View {
         SplatView(
             splatCloud: splatCloud,
             cameraMatrix: cameraMatrix
@@ -95,6 +120,11 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 loadButton
+                #if os(iOS)
+                Button("AR", systemImage: "arkit") {
+                    isARMode = true
+                }
+                #endif
                 if let name = demoState.customModelName {
                     Text(name)
                         .font(.caption)
@@ -119,9 +149,8 @@ struct ContentView: View {
             }
         }
         .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
-
-        #endif
     }
+    #endif
 
     private var loadButton: some View {
         Button("Load\u{2026}") {
