@@ -1476,16 +1476,19 @@ The resolve/accumulation textures hold raw (sRGB-encoded) splat color values in 
 ## 69: PointSplat: occlusion culling and temporal reprojection deferred
 
 +++
-status: new
+status: closed
 priority: low
 kind: none
 labels: pointsplat
 created: 2026-07-21T14:52:11Z
+updated: 2026-07-21T19:07:30Z
+closed: 2026-07-21T19:07:30Z
 +++
 
 RFC 0003 defers hierarchical/occlusion culling (two-phase scheme, depth mip chain) and reprojection-based temporal reuse. Without them, large occluded scenes waste splat work, and any camera motion resets accumulation to 1 SPP noise. Tracking issue for the follow-up.
 
 - `2026-07-21T19:06:12Z`: Occlusion culling half implemented (WIP commit d9fde5d7): hierarchical max-depth pyramid, two-phase cull per the paper. Known render issues being debugged. Temporal reprojection not started.
+- `2026-07-21T19:07:30Z`: Occlusion culling implemented (two-phase hierarchical depth cull, WIP commit d9fde5d7 - render issues being debugged in follow-up work). Temporal reprojection split out to #73.
 
 ---
 
@@ -1533,5 +1536,19 @@ closed: 2026-07-21T18:40:09Z
 Loading large SOG files (e.g. sphere-48M.sog) through SOGReaderCPU takes minutes: per-splat Swift closure over 48M splats plus huge intermediate GenericSplat/ExtendedSplat arrays before the GPU buffer is built. ~/Shared/Projects/Work/gaussiansplats-ios has a GPU path to port: Sources/GaussianSplatMetal/IO/SOGReaderGPU.swift (unzips, decodes the WebP planes concurrently into rgba8Uint textures) + Sources/GaussianSplatShaders/SOGDecodeShader.metal (compute kernel dequantizes per splat straight into a SparkSplat buffer and flattened SH buffer) + SplatCloudBuilder + its MiniZip dependency. Produces the same SparkSplat layout we use. Note: it still decodes WebP via ImageIO, so it does not address #71 (palette+alpha decode failure); large generated files may need both fixes. The demo already parses off-main with a loading indicator, so this slots in behind the existing loadCustomSplat path.
 
 - `2026-07-21T18:40:09Z`: Ported SOGReaderGPU + SOGDecodeShader from gaussiansplats-ios (adapted to ZIPFoundation and this repo's shader bundle lookup). Parity test vs SOGReaderCPU on test-ring.sog passes. Demo loads all .sog files (bundled helmet + custom loads) through the GPU path.
+
+---
+
+## 73: PointSplat: temporal reprojection for camera motion
+
++++
+status: new
+priority: low
+kind: feature
+labels: pointsplat
+created: 2026-07-21T19:07:30Z
++++
+
+Accumulation resets to 1 SPP noise the moment the camera moves. The paper's reprojection (Sec 3.6) warps the previous accumulated frame into the new view using last frame's depth and view-projection matrices, clamps against the 3x3 color neighborhood to limit ghosting, and blends with EMA weight 0.9. They call it basic and prone to detail loss; a proper spatiotemporal denoiser would do better. Split out from #69.
 
 ---
