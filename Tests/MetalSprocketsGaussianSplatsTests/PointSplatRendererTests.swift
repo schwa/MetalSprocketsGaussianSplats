@@ -165,5 +165,23 @@ struct PointSplatRendererTests {
         #expect(center.y > 0.9, "center should be green (closer splat), got \(center)")
         #expect(center.x < 0.05)
     }
+
+    @Test("nextAccumulationStep is idempotent per frame index")
+    func accumulationStepIdempotent() throws {
+        let resources = try PointSplatResources(drawableSize: SIMD2<Float>(8, 8), splatCount: 1, supersampling: 1, pointsPerThread: 1)
+        let first = resources.nextAccumulationStep(frameIndex: 0, cameraMatrix: .identity, modelMatrix: .identity, projectionMatrix: .identity)
+        #expect(resources.accumulatedFrames == 1)
+        // Re-evaluating body for the same frame must not advance parity or count.
+        let repeated = resources.nextAccumulationStep(frameIndex: 0, cameraMatrix: .identity, modelMatrix: .identity, projectionMatrix: .identity)
+        #expect(resources.accumulatedFrames == 1)
+        #expect(repeated.input === first.input)
+        #expect(repeated.output === first.output)
+        #expect(repeated.blendFactor == first.blendFactor)
+        // A new frame advances: ping-pong swaps and the mean weight drops.
+        let next = resources.nextAccumulationStep(frameIndex: 1, cameraMatrix: .identity, modelMatrix: .identity, projectionMatrix: .identity)
+        #expect(resources.accumulatedFrames == 2)
+        #expect(next.input === first.output)
+        #expect(next.blendFactor == 0.5)
+    }
 }
 #endif

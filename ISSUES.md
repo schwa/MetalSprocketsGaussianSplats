@@ -1726,15 +1726,18 @@ The Draw closure in StochasticSplatRenderPipeline binds `time`, `alphaThreshold`
 ## 82: PointSplatRenderPipeline: accumulation step advances ping-pong state inside body
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: pointsplat, code-style, effort:s
 created: 2026-07-21T20:28:46Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T21:32:07Z
+closed: 2026-07-21T21:32:07Z
 +++
 
 `PointSplatRenderPipeline.body` calls `resources.nextAccumulationStep(...)`, which mutates `frameParity`, `accumulatedFrames`, and the last-matrix tracking. `body` can be evaluated multiple times per frame, so the ping-pong parity and accumulation count can advance more than once per rendered frame, corrupting the running mean. Unlike `validatedResources()` (which has a comment explaining its eager mutation), this side effect is unacknowledged.
+
+- `2026-07-21T21:32:07Z`: nextAccumulationStep is now idempotent per frameIndex: repeat body evaluations for the same frame return the cached step instead of advancing ping-pong parity and accumulation count. Regression test added.
 
 ---
 

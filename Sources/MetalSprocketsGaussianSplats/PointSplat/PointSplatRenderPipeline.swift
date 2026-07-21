@@ -112,7 +112,7 @@ public struct PointSplatRenderPipeline: Element {
             // Running mean: weight the new frame by 1/(n+1); camera or model
             // motion reprojects history (#73) or, with reprojection disabled
             // (#74), hard-resets so motion shows raw 1-SPP noise.
-            let accumulation = resources.nextAccumulationStep(cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix, allowReprojection: reprojection)
+            let accumulation = resources.nextAccumulationStep(frameIndex: frameIndex, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix, allowReprojection: reprojection)
             try ComputePass(label: "PointSplat") {
                 try ComputePipeline(computeKernel: resolveKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
@@ -225,6 +225,8 @@ final class PointSplatResources {
     private var lastCameraMatrix: simd_float4x4?
     private var lastModelMatrix: simd_float4x4?
     private var lastProjectionMatrix: simd_float4x4?
+    private var lastAccumulationFrameIndex: UInt32?
+    private var lastAccumulationStep: AccumulationStep?
 
     var clearValue: UInt64 {
         UInt64(GPS_DEPTH_MAX) << UInt64(GPS_DEPTH_SHIFT)
@@ -437,7 +439,15 @@ final class PointSplatResources {
     /// projection motion switches to reprojection against the previous
     /// view-projection (model changes still hard-reset — reprojection can't
     /// warp content change).
-    func nextAccumulationStep(cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4, projectionMatrix: simd_float4x4, allowReprojection: Bool = true) -> AccumulationStep {
+    ///
+    /// Idempotent per `frameIndex`: `body` can be evaluated multiple times
+    /// per frame (diffing/re-expansion), so repeat calls for the same frame
+    /// return the cached step instead of advancing the ping-pong parity and
+    /// accumulation count again (#82).
+    func nextAccumulationStep(frameIndex: UInt32, cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4, projectionMatrix: simd_float4x4, allowReprojection: Bool = true) -> AccumulationStep {
+        if frameIndex == lastAccumulationFrameIndex, let lastAccumulationStep {
+            return lastAccumulationStep
+        }
         let viewMoved = lastCameraMatrix != cameraMatrix || lastProjectionMatrix != projectionMatrix
         let modelChanged = lastModelMatrix != modelMatrix
         let previousViewProjection: simd_float4x4? = if let lastCameraMatrix, let lastProjectionMatrix {
@@ -471,6 +481,8 @@ final class PointSplatResources {
         )
         accumulatedFrames += 1
         frameParity = (frameParity + 1) % 2
+        lastAccumulationFrameIndex = frameIndex
+        lastAccumulationStep = step
         return step
     }
 }
