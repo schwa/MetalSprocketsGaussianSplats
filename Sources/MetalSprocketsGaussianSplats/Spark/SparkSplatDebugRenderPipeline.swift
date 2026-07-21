@@ -260,12 +260,6 @@ public struct SparkSplatDebugRenderPipeline: Element {
         // Create buffer for cloud data array
         let cloudDataBuffer = try device.makeTypedBuffer(values: cloudDataArray, options: []).labeled("CloudData")
 
-        // Create the argument buffer struct
-        let argumentBuffer = MultiCloudArgumentBuffer(
-            cloudCount: UInt32(splatClouds.count),
-            clouds: cloudDataBuffer.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SplatCloudData.self)
-        )
-
         // Collect all resources that need to be marked as in use
         var resourcesToUse: [MTLResource] = [cloudDataBuffer.unsafeMTLBuffer]
         for cloud in splatClouds {
@@ -287,7 +281,10 @@ public struct SparkSplatDebugRenderPipeline: Element {
             .parameter("drawableSize", value: drawableSize)
             .parameter("scale", value: Float(2.0))
             .parameter("cameraPositions", values: cameraPositions)
-            .parameter("clouds", value: argumentBuffer)
+            // Bound directly (not nested in another argument buffer) for
+            // simulator Metal compatibility.
+            .parameter("cloudCount", functionType: .vertex, value: UInt32(splatClouds.count))
+            .parameter("clouds", buffer: cloudDataBuffer.unsafeMTLBuffer)
             // Bounding box for vertex culling. When boundingBox is nil the
             // use_bounding_box function constant is false, the binding is absent
             // from reflection, and the placeholder value is silently skipped.

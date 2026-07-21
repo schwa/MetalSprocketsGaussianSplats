@@ -53,7 +53,11 @@ namespace SparkSplatRenderShader {
         constant float3 *cameraPositions [[buffer(10)]],
         constant uint &shDegree [[buffer(11), function_constant(use_sh)]],
         constant BoundingBox3D &boundingBox [[buffer(12), function_constant(use_bounding_box)]],
-        constant MultiCloudArgumentBuffer &clouds [[buffer(14)]]
+        constant uint &cloudCount [[buffer(13)]],
+        // Bound as a flat array (not nested in another argument buffer):
+        // simulator Metal rejects pointers to an argument buffer inside
+        // another argument buffer.
+        device const SplatCloudData *clouds [[buffer(14)]]
     ) {
         // Select matrices based on amplification_id (0 for mono, 0/1 for stereo)
         float4x4 viewMatrix = viewMatrices[amplification_id];
@@ -78,7 +82,7 @@ namespace SparkSplatRenderShader {
         ushort cloudIndex = indexedDistance.cloudIndex;
 
         // Bounds check cloud index
-        if (cloudIndex >= clouds.cloudCount) {
+        if (cloudIndex >= cloudCount) {
             return out;
         }
 
@@ -86,7 +90,7 @@ namespace SparkSplatRenderShader {
         out.cloudIndex = cloudIndex;
 
         // Get per-cloud data from argument buffer
-        SplatCloudData cloudData = clouds.clouds[cloudIndex];
+        SplatCloudData cloudData = clouds[cloudIndex];
         device const SparkSplat* splats = cloudData.splats;
         float4x4 modelMatrix = cloudData.modelMatrix;
         float cloudOpacity = cloudData.opacity;

@@ -272,12 +272,6 @@ public struct SparkSplatRenderPipeline: Element {
             cloudDataCache = CloudDataCache(modelMatrix: modelMatrix, clouds: splatClouds, buffer: cloudDataBuffer)
         }
 
-        // Create the argument buffer struct
-        let argumentBuffer = MultiCloudArgumentBuffer(
-            cloudCount: UInt32(splatClouds.count),
-            clouds: cloudDataBuffer.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SplatCloudData.self)
-        )
-
         // Get max SH degree across all clouds
         let maxSHDegree = splatClouds.compactMap { $0.shCoefficients != nil ? $0.shDegree : nil }.max() ?? 0
 
@@ -316,7 +310,11 @@ public struct SparkSplatRenderPipeline: Element {
             .parameter("drawableSize", value: drawableSize)
             .parameter("scale", value: Float(2.0))
             .parameter("cameraPositions", values: cameraPositions)
-            .parameter("clouds", value: argumentBuffer)
+            // The cloud data array is bound directly (not nested inside
+            // another argument buffer) because simulator Metal does not
+            // support nested argument buffers.
+            .parameter("cloudCount", functionType: .vertex, value: UInt32(splatClouds.count))
+            .parameter("clouds", buffer: cloudDataBuffer.unsafeMTLBuffer)
             // SH degree for multi-cloud (shader looks up per-cloud SH buffers).
             // Reflection comes from the pipeline state, so this binds whenever
             // the PSO has use_sh baked in (even from a previous cloud) and is
