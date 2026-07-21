@@ -23,6 +23,17 @@ public final class PointSplatWorkloadDistributor {
     /// Elements per scan block. Must match WORKLOAD_BLOCK in PointSplatWorkload.metal.
     static let blockSize = 256
 
+    /// Point budget per supersampled pixel. The paper's default budget
+    /// (250M points at 1920x1080 with 2x2 supersampling) works out to
+    /// ~30 points per pixel; 32 gives similar headroom. Cost: 4 bytes of
+    /// index storage per point.
+    static let pointsPerPixelBudget = 32
+
+    /// Frame point budget (T) derived from the supersampled framebuffer size.
+    public static func capacity(forSupersampledPixels pixels: Int) -> Int {
+        max(pixels, 1) * pointsPerPixelBudget
+    }
+
     public struct Result {
         /// Maps splat-thread index to Gaussian index; valid in `[0, totalPoints)`.
         public let indices: MTLBuffer

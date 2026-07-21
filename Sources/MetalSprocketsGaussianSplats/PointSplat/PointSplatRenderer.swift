@@ -30,8 +30,6 @@ public final class PointSplatRenderer {
         public var nearPlane: Float
         /// View-space far distance for depth quantization.
         public var farPlane: Float
-        /// Point budget per frame (T in the paper).
-        public var maxPointsPerFrame: Int
         public var backgroundColor: SIMD3<Float>
         /// Linear supersampling factor S; the framebuffer is S x S larger
         /// and resolved with a box filter. Paper default is 2.
@@ -39,15 +37,19 @@ public final class PointSplatRenderer {
         /// Points splatted per thread (K). Paper pairs K = S^2.
         public var pointsPerThread: Int
 
-        public init(width: Int, height: Int, nearPlane: Float = 0.2, farPlane: Float = 100.0, maxPointsPerFrame: Int = 4_000_000, backgroundColor: SIMD3<Float> = .zero, supersampling: Int = 1, pointsPerThread: Int = 1) {
+        public init(width: Int, height: Int, nearPlane: Float = 0.2, farPlane: Float = 100.0, backgroundColor: SIMD3<Float> = .zero, supersampling: Int = 1, pointsPerThread: Int = 1) {
             self.width = width
             self.height = height
             self.nearPlane = nearPlane
             self.farPlane = farPlane
-            self.maxPointsPerFrame = maxPointsPerFrame
             self.backgroundColor = backgroundColor
             self.supersampling = supersampling
             self.pointsPerThread = pointsPerThread
+        }
+
+        /// Frame point budget (T), derived from the supersampled size.
+        var pointBudget: Int {
+            PointSplatWorkloadDistributor.capacity(forSupersampledPixels: width * height * supersampling * supersampling)
         }
     }
 
@@ -115,7 +117,7 @@ public final class PointSplatRenderer {
             farPlane: configuration.farPlane,
             splatCount: UInt32(splatCount),
             frameSeed: frameSeed,
-            capacity: UInt32(configuration.maxPointsPerFrame),
+            capacity: UInt32(configuration.pointBudget),
             supersampling: UInt32(supersampling),
             pointsPerThread: UInt32(max(configuration.pointsPerThread, 1)),
             cameraPosition: .zero,
@@ -131,7 +133,7 @@ public final class PointSplatRenderer {
             throw RendererError.bufferAllocationFailed
         }
         if distributor == nil || distributor?.maxSplats ?? 0 < splatCount {
-            distributor = try PointSplatWorkloadDistributor(device: device, capacity: configuration.maxPointsPerFrame, maxSplats: splatCount)
+            distributor = try PointSplatWorkloadDistributor(device: device, capacity: configuration.pointBudget, maxSplats: splatCount)
         }
         guard let distributor else {
             throw RendererError.bufferAllocationFailed
@@ -166,7 +168,7 @@ public final class PointSplatRenderer {
         encoder.setBuffer(distributor.totalsBuffer, offset: 0, index: 4)
         encoder.setBuffer(framebuffer, offset: 0, index: 5)
         encoder.setBuffer(colors, offset: 0, index: 6)
-        encoder.dispatchThreads(MTLSize(width: configuration.maxPointsPerFrame, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+        encoder.dispatchThreads(MTLSize(width: configuration.pointBudget, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
         encoder.setComputePipelineState(resolve)
         encoder.setBuffer(framebuffer, offset: 0, index: 0)

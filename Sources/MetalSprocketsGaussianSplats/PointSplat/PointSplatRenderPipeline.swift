@@ -37,7 +37,7 @@ public struct PointSplatRenderPipeline: Element {
     private var supersampling: Int
     private var pointsPerThread: Int
 
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, maxPointsPerFrame: Int = 4_000_000, supersampling: Int = 2, pointsPerThread: Int = 4) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, supersampling: Int = 2, pointsPerThread: Int = 4) throws {
         self.supersampling = max(supersampling, 1)
         self.pointsPerThread = max(pointsPerThread, 1)
         self.splatCloud = splatCloud
@@ -63,7 +63,7 @@ public struct PointSplatRenderPipeline: Element {
         blitConstants["convert_srgb_to_linear"] = .bool(true)
         blitFragmentShader = try blitLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: blitConstants)
 
-        resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, maxPointsPerFrame: maxPointsPerFrame, supersampling: max(supersampling, 1))
+        resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, supersampling: max(supersampling, 1))
     }
 
     /// `@MSState` persists resources across body evaluations, so a splat
@@ -73,7 +73,7 @@ public struct PointSplatRenderPipeline: Element {
         let width = max(Int(drawableSize.x), 1)
         let height = max(Int(drawableSize.y), 1)
         if resources.splatCount != splatCloud.count || resources.width != width || resources.height != height {
-            resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, maxPointsPerFrame: resources.distributor.capacity, supersampling: supersampling)
+            resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, supersampling: supersampling)
         }
         return resources
     }
@@ -190,7 +190,7 @@ final class PointSplatResources {
         UInt64(GPS_DEPTH_MAX) << UInt64(GPS_DEPTH_SHIFT)
     }
 
-    init(drawableSize: SIMD2<Float>, splatCount: Int, maxPointsPerFrame: Int, supersampling: Int) throws {
+    init(drawableSize: SIMD2<Float>, splatCount: Int, supersampling: Int) throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw PointSplatRenderer.RendererError.unsupportedDevice
         }
@@ -211,7 +211,8 @@ final class PointSplatResources {
         self.colors = colors
         self.dummySHBuffer = dummySHBuffer
         self.splatCount = splatCount
-        distributor = try PointSplatWorkloadDistributor(device: device, capacity: maxPointsPerFrame, maxSplats: splatCount)
+        // Point budget scales with the supersampled framebuffer size.
+        distributor = try PointSplatWorkloadDistributor(device: device, capacity: PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixelCount), maxSplats: splatCount)
 
         let textureWidth = width
         let textureHeight = height

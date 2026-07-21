@@ -70,7 +70,7 @@ struct PointSplatConvergenceTests {
         let sparkPixels = try rgbPixels(from: sparkImage)
 
         // Candidate: PointSplat accumulated over many stochastic frames.
-        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, maxPointsPerFrame: 2_000_000))
+        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size))
         guard let buffer = device.makeBuffer(bytes: splats, length: MemoryLayout<SparkSplat>.stride * splats.count) else {
             throw TestError.bufferAllocationFailed
         }
