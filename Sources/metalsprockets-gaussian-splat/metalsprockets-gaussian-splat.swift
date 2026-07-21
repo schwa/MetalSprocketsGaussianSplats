@@ -16,7 +16,8 @@ import SwiftUI
 struct GaussianSplatRenderer: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "metalsprockets-gaussian-splat",
-        abstract: "Render Gaussian splat files to PNG images"
+        abstract: "Render Gaussian splat files to PNG images",
+        subcommands: [BenchCommand.self]
     )
 
     @Option(help: "Background color in RGBA format (e.g., 0,0,0,1 for black)")

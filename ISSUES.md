@@ -1438,6 +1438,8 @@ created: 2026-07-21T14:52:10Z
 
 RFC 0003 verification plan items not yet done: GPU capture to confirm even occupancy across the splat dispatch (the paper's central claim) and atomic throughput; record the frame-time scaling curve vs Spark/GPU/Stochastic on small and multi-million-splat scenes.
 
+- `2026-07-21T19:49:48Z`: Scaling curve done via new 'bench' CLI subcommand (synthetic seeded clouds, no fixtures; Release, 1024x1024, 20 frames, median ms): 100k: point 1.4 / spark 2.9 / gpu 2.9. 1M: 10.7 / 14.2 / 6.7. 4M: 14.7 / 53.0 / 20.5. 8M: 18.2 / 115.7 / 39.8. PointSplat flattens as predicted (bounded by points/pixel); spark is CPU-sort-bound (linear); gpu-sort wins the ~1M middle. Remaining: GPU capture for splat-dispatch occupancy and atomic throughput.
+
 ---
 
 ## 67: PointSplat: near/far planes hardcoded in interactive pipeline
