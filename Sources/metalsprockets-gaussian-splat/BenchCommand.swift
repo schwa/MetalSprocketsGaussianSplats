@@ -132,7 +132,7 @@ struct BenchRunner {
     let supersampling: Int
     let pointsPerThread: Int
     let device: MTLDevice
-    let commandQueue: MTLCommandQueue
+    let runner: Runner
     let packed: Bool
 
     init(size: Int, frames: Int, supersampling: Int = 2, pointsPerThread: Int = 4, packed: Bool = false) throws {
@@ -141,10 +141,7 @@ struct BenchRunner {
             throw BenchCommand.BenchError(message: "No Metal device")
         }
         self.device = device
-        guard let commandQueue = device.makeCommandQueue() else {
-            throw BenchCommand.BenchError(message: "No command queue")
-        }
-        self.commandQueue = commandQueue
+        self.runner = try Runner(device: device)
         self.size = size
         self.frames = frames
         self.supersampling = supersampling
@@ -394,13 +391,13 @@ struct BenchRunner {
         let pixelCount = texture.width * texture.height
         var rgba = [Float](repeating: 0, count: pixelCount * 4)
         if texture.storageMode == .managed {
-            guard let commandBuffer = commandQueue.makeCommandBuffer(), let blit = commandBuffer.makeBlitCommandEncoder() else {
-                throw BenchCommand.BenchError(message: "Blit encoding failed")
-            }
-            blit.synchronize(resource: texture)
-            blit.endEncoding()
-            commandBuffer.commit()
-            commandBuffer.waitUntilCompleted()
+            try runner.run(
+                BlitPass {
+                    Blit { encoder in
+                        encoder.synchronize(resource: texture)
+                    }
+                }
+            )
         }
         rgba.withUnsafeMutableBytes { pointer in
             guard let baseAddress = pointer.baseAddress else {

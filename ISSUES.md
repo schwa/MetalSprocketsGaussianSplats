@@ -1945,11 +1945,13 @@ SOGReaderGPU.load builds a raw command queue/encoder and binds 6 buffers and 7 t
 ## 92: BenchCommand: texture readback uses a raw blit encoder
 
 +++
-status: new
+status: closed
 priority: low
 kind: task
 labels: code-style, effort:xs
 created: 2026-07-21T23:43:53Z
+updated: 2026-07-21T23:46:34Z
+closed: 2026-07-21T23:46:34Z
 +++
 
 BenchCommand creates its own command queue and a raw MTLBlitCommandEncoder to synchronize a texture for CPU readback. Could use a BlitPass element (or a Runner-driven tree) instead of raw encoding.
