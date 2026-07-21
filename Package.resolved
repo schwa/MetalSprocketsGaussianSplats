@@ -1,5 +1,5 @@
 {
-  "originHash" : "66fb823ae6929f371cd3aa2f82a305b79a385b2d0b317f1b8abfe9e0299d8aab",
+  "originHash" : "332703fa65813cee85778a3d6ee324638fc679037766eac9b4892c4cb109a59c",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -34,7 +34,16 @@
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
         "branch" : "main",
-        "revision" : "c14358675e3ba2bd2de58950146892a9cbcab1dd"
+        "revision" : "92dbfa0203b0ab242bcbb114831d66ae5b1c5cfd"
+      }
+    },
+    {
+      "identity" : "metalsupport",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/MetalSupport",
+      "state" : {
+        "revision" : "4546c33a93435d7fce1f172fcc77fd1371a6a927",
+        "version" : "1.0.3"
       }
     },
     {
@@ -69,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax.git",
       "state" : {
-        "revision" : "0687f71944021d616d34d922343dcef086855920",
-        "version" : "600.0.1"
+        "revision" : "4799286537280063c85a32f09884cfbca301b1a1",
+        "version" : "602.0.0"
       }
     },
     {
