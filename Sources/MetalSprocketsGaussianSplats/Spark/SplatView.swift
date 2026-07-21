@@ -147,6 +147,15 @@ public struct SplatView: View {
                     descriptor.renderTargetArrayLength = 1
                 }
             case .pointSplat:
+                // PointSplat's fixed-point depth needs a finite range; derive
+                // it from the projection (reversed-infinite-Z gets a finite
+                // far solely for quantization).
+                let depthRange: ClosedRange<Float> = switch projection.depthMode {
+                case .standard(let zClip):
+                    zClip
+                case .reversed(let zMin):
+                    zMin...1_000
+                }
                 try PointSplatRenderPipeline(
                     splatCloud: splatCloud,
                     projectionMatrix: projectionMatrix,
@@ -154,6 +163,7 @@ public struct SplatView: View {
                     cameraMatrix: cameraMatrix,
                     drawableSize: size,
                     frameIndex: UInt32(truncatingIfNeeded: context.frameUniforms.index),
+                    depthRange: depthRange,
                     supersampling: Self.pointSplatSupersampling,
                     pointsPerThread: Self.pointSplatPointsPerThread,
                     reprojection: pointSplatReprojection,

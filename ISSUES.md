@@ -1450,14 +1450,18 @@ RFC 0003 verification plan items not yet done: GPU capture to confirm even occup
 ## 67: PointSplat: near/far planes hardcoded in interactive pipeline
 
 +++
-status: new
+status: closed
 priority: medium
 kind: none
 labels: pointsplat
 created: 2026-07-21T14:52:10Z
+updated: 2026-07-21T20:36:39Z
+closed: 2026-07-21T20:36:39Z
 +++
 
 PointSplatRenderPipeline hardcodes nearPlane 0.2 / farPlane 200 for the 28-bit fixed-point depth quantization, ignoring the projection's zClip range. Scenes larger than 200 units or with tighter near planes will quantize depth badly. RFC 0003 open question 2 (reversed-infinite-Z reconciliation) is also unresolved.
+
+- `2026-07-21T20:36:39Z`: PointSplatRenderPipeline takes depthRange: ClosedRange<Float>; SplatView derives it from the projection's depthMode (standard zClip directly; reversed-infinite-Z gets a finite far for quantization only). RFC 0003 open question 2 marked resolved.
 
 ---
 

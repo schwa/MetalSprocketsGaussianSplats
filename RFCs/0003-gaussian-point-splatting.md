@@ -201,10 +201,11 @@ nice-to-have; with it, static views converge in tens of frames.
 1. **Apple9-only?** 64-bit atomics gate this to A17/M3+. Given the README
    already requires macOS 26/iOS 26, probably acceptable — confirm before
    building the fallback.
-2. **Color/depth packing** — adopt the paper's 28-bit fixed-point depth +
-   3×12-bit sRGB [0,16) as-is, or trade bits? 28-bit fixed-point depth needs
-   sane near/far; our cameras currently use reversed-infinite-Z in some paths
-   — reconcile.
+2. **Color/depth packing** — resolved: the paper's packing adopted as-is.
+   The pipeline takes an explicit `depthRange` derived from the projection's
+   clip range; reversed-infinite-Z callers supply a finite far used only for
+   depth quantization (28 bits of linear fixed point is ample across any
+   reasonable range).
 3. **Li₂ fits** — resolved: lift the FMA chains from
    `src/core/random/random.cuh` verbatim (see Reference implementation
    notes); sanity-check against the Shadertoy.

@@ -36,8 +36,14 @@ public struct PointSplatRenderPipeline: Element {
     private var pointsPerThread: Int
     private var statistics: PointSplatStatistics?
     private var reprojection: Bool
+    private var depthRange: ClosedRange<Float>
 
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, supersampling: Int = 2, pointsPerThread: Int = 4, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) throws {
+    /// - Parameter depthRange: view-space range for the framebuffer's 28-bit
+    ///   fixed-point depth quantization and the near cull. Should match the
+    ///   projection's clip range; reversed-infinite-Z callers must supply a
+    ///   finite far for quantization purposes.
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, depthRange: ClosedRange<Float> = 0.2...200.0, supersampling: Int = 2, pointsPerThread: Int = 4, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) throws {
+        self.depthRange = depthRange
         self.supersampling = max(supersampling, 1)
         self.pointsPerThread = max(pointsPerThread, 1)
         self.reprojection = reprojection
@@ -90,8 +96,8 @@ public struct PointSplatRenderPipeline: Element {
                 viewMatrix: cameraMatrix.inverse,
                 projectionMatrix: projectionMatrix,
                 drawableSize: SIMD2<Float>(Float(bufferWidth), Float(bufferHeight)),
-                nearPlane: 0.2,
-                farPlane: 200.0,
+                nearPlane: depthRange.lowerBound,
+                farPlane: depthRange.upperBound,
                 splatCount: UInt32(splatCloud.count),
                 frameSeed: frameIndex,
                 capacity: UInt32(resources.distributor.capacity),
