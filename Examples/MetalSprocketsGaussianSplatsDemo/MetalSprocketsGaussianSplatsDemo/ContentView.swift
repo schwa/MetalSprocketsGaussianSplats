@@ -113,7 +113,12 @@ struct ContentView: View {
         }
         .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.splatContentTypes) { result in
             if case .success(let url) = result {
-                demoState.loadCustomSplat(url: url)
+                // Defer the load so the importer finishes dismissing before the
+                // splat-cloud change rebuilds this view; loading synchronously
+                // here leaves isImporting stuck and the picker won't reopen.
+                Task { @MainActor in
+                    demoState.loadCustomSplat(url: url)
+                }
             }
         }
         .alert("Load Failed", isPresented: Binding(get: { demoState.loadError != nil }, set: { if !$0 { demoState.loadError = nil } })) {
