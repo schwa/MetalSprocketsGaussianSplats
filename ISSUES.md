@@ -1797,12 +1797,13 @@ TileSplatRenderPass's first Draw closure binds the splat buffer, tile indices, t
 ## 85: Shader recreation in .onChange hooks uses try!/fatalError on failure
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: spark, tile-based, code-style, effort:s
 created: 2026-07-21T20:28:54Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T22:39:16Z
+closed: 2026-07-21T22:39:16Z
 +++
 
 Three renderers recreate function-constant-specialized shaders inside `.onChange` hooks and crash on failure instead of surfacing the error:

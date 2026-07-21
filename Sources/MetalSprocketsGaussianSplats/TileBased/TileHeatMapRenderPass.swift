@@ -19,6 +19,11 @@ public struct TileHeatMapRenderPass: Element {
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
+    /// Function-constant value baked into `fragmentShader`. Body recompiles the
+    /// shader when this drifts from `showTileBorders`, propagating compile
+    /// errors instead of crashing.
+    @MSState
+    private var lastShowTileBorders: Bool?
 
     var vertexDescriptor: MTLVertexDescriptor
 
@@ -45,8 +50,20 @@ public struct TileHeatMapRenderPass: Element {
         return try shaderLibrary.function(named: "tile_heatmap_fragment", type: FragmentShader.self, constants: fragmentConstants)
     }
 
+    /// Returns the fragment shader matching the current `showTileBorders`,
+    /// recompiling it when the flag changed. Errors propagate to the caller
+    /// instead of crashing.
+    private func updatedFragmentShader() throws -> FragmentShader {
+        if lastShowTileBorders != showTileBorders {
+            fragmentShader = try Self.makeFragmentShader(shaderLibrary: shaderLibrary, showTileBorders: showTileBorders)
+            lastShowTileBorders = showTileBorders
+        }
+        return fragmentShader
+    }
+
     public var body: some Element {
         get throws {
+            let fragmentShader = try updatedFragmentShader()
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     // Full-screen quad vertices in NDC
@@ -62,9 +79,6 @@ public struct TileHeatMapRenderPass: Element {
                 .parameter("drawableSize", value: tileSplatResources.drawableSize)
             }
             .vertexDescriptor(vertexDescriptor)
-            .onChange(of: showTileBorders, initial: true) { _, _ in
-                fragmentShader = try! Self.makeFragmentShader(shaderLibrary: shaderLibrary, showTileBorders: showTileBorders)
-            }
             .renderPipelineDescriptorModifier { renderPipelineDescriptor in
                 renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
                 renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add

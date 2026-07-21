@@ -95,8 +95,11 @@ public struct SparkSplatRenderPipeline: Element {
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
+    /// Function-constant value baked into the current shaders. Body recompiles
+    /// them when this drifts from `boundingBox != nil`, propagating compile
+    /// errors instead of crashing.
     @MSState
-    private var lastUseBoundingBox: Bool = false
+    private var lastUseBoundingBox: Bool?
     /// Cached per-cloud argument data, rebuilt only when the clouds or model
     /// matrix change. Body can be evaluated many times per frame, so
     /// allocating here per evaluation was churning a fresh MTLBuffer each
@@ -211,36 +214,39 @@ public struct SparkSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
+            let shaders = try updatedShaders()
             try Group {
-                try renderPipeline(sortedIndices: sortedIndices)
-            }
-            .onChange(of: boundingBox != nil, initial: true) { _, useBoundingBox in
-                // Recreate shaders when bounding box presence changes (function constant changes)
-                if useBoundingBox != lastUseBoundingBox {
-                    lastUseBoundingBox = useBoundingBox
-                    do {
-                        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
-
-                        var vertexConstants = FunctionConstants()
-                        vertexConstants["use_sh"] = .bool(useSphericalHarmonics)
-                        vertexConstants["use_bounding_box"] = .bool(useBoundingBox)
-
-                        var fragmentConstants = FunctionConstants()
-                        fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
-
-                        vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
-                        fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
-                    } catch {
-                        fatalError("Failed to recreate shaders: \(error)")
-                    }
-                }
+                try renderPipeline(sortedIndices: sortedIndices, vertexShader: shaders.vertex, fragmentShader: shaders.fragment)
             }
         }
     }
 
+    /// Returns shaders matching the current bounding-box presence, recompiling
+    /// them when the `use_bounding_box` function constant changed. Errors
+    /// propagate to the caller instead of crashing.
+    private func updatedShaders() throws -> (vertex: VertexShader, fragment: FragmentShader) {
+        let useBoundingBox = boundingBox != nil
+        if lastUseBoundingBox != useBoundingBox {
+            lastUseBoundingBox = useBoundingBox
+
+            let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
+
+            var vertexConstants = FunctionConstants()
+            vertexConstants["use_sh"] = .bool(useSphericalHarmonics)
+            vertexConstants["use_bounding_box"] = .bool(useBoundingBox)
+
+            var fragmentConstants = FunctionConstants()
+            fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
+
+            vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
+            fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
+        }
+        return (vertexShader, fragmentShader)
+    }
+
     // MARK: - Render Pipeline
 
-    private func renderPipeline(sortedIndices: SplatIndices) throws -> some Element {
+    private func renderPipeline(sortedIndices: SplatIndices, vertexShader: VertexShader, fragmentShader: FragmentShader) throws -> some Element {
         let viewMatrices = cameraMatrices.map(\.inverse)
         let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
         let amplificationCount = cameraMatrices.count

@@ -31,6 +31,11 @@ public struct TileSplatRenderPass: Element {
     var fragmentShader: FragmentShader
     @MSState
     var blitFragmentShader: FragmentShader
+    /// Function-constant value baked into `fragmentShader`. Body recompiles the
+    /// shader when this drifts from `debugTileBorders`, propagating compile
+    /// errors instead of crashing.
+    @MSState
+    private var lastDebugTileBorders: Bool?
 
     // MARK: - Initialization
 
@@ -62,10 +67,23 @@ public struct TileSplatRenderPass: Element {
         return try shaderLibrary.function(named: "tile_fragment", type: FragmentShader.self, constants: fragmentConstants)
     }
 
+    /// Returns the fragment shader matching the current `debugTileBorders`,
+    /// recompiling it when the flag changed. Errors propagate to the caller
+    /// instead of crashing.
+    private func updatedFragmentShader() throws -> FragmentShader {
+        if lastDebugTileBorders != debugTileBorders {
+            fragmentShader = try Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileBorders: debugTileBorders)
+            lastDebugTileBorders = debugTileBorders
+        }
+        return fragmentShader
+    }
+
     // MARK: - Element Body
 
     public var body: some Element {
         get throws {
+            let fragmentShader = try updatedFragmentShader()
+
             let uniforms = tileSplatResources.makeUniforms(
                 modelMatrix: modelMatrix,
                 viewMatrix: cameraMatrix.inverse,
@@ -89,9 +107,6 @@ public struct TileSplatRenderPass: Element {
                 .parameter("tileSplatIndices", buffer: tileSplatResources.tileSplatIndicesA.unsafeMTLBuffer)
                 .parameter("tileOffsets", buffer: tileSplatResources.tileOffsets.unsafeMTLBuffer)
                 .parameter("uniforms", value: uniforms)
-            }
-            .onChange(of: debugTileBorders, initial: true) { _, _ in
-                fragmentShader = try! Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileBorders: debugTileBorders)
             }
 
             // Step 2: Blit imageblock to color attachment (framebuffer).
