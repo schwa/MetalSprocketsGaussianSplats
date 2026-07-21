@@ -2,10 +2,10 @@
 import GeometryLite3D
 import Metal
 import MetalSprockets
-import MetalSupport
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSprocketsUI
+import MetalSupport
 internal import os
 import SwiftUI
 

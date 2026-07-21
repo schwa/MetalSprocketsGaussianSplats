@@ -70,7 +70,6 @@ public struct SplatView: View {
     /// in-flight frame count (3) plus a margin.
     private static let pendingReleaseDepth = 3
 
-
     /// Creates a `SplatView` that renders the given splat cloud.
     ///
     /// - Parameters:

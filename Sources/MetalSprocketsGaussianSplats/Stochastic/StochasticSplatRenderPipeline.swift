@@ -3,9 +3,9 @@ import Foundation
 import Metal
 import MetalKit
 import MetalSprockets
-import MetalSupport
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
+import MetalSupport
 
 /// A stochastic splat renderer that uses random sampling for transparency.
 ///

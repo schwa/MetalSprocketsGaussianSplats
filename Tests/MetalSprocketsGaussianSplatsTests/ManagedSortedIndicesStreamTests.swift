@@ -86,7 +86,9 @@ struct ManagedSortedIndicesStreamTests {
 
         let consumer = Task {
             // Large depth: nothing is released during iteration.
-            for await _ in sortManager.managedSortedIndicesStream(pendingReleaseDepth: 100) {}
+            for await _ in sortManager.managedSortedIndicesStream(pendingReleaseDepth: 100) {
+                // Consume without releasing; depth check happens after cancellation.
+            }
         }
 
         let parameters = SortParameters(camera: .identity, model: .identity)

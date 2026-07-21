@@ -192,7 +192,6 @@ public struct PointSplatRenderPipeline: Element {
                     .parameter("texture", texture: accumulation.output)
                 }
             }
-
         }
     }
 }
@@ -208,6 +207,7 @@ public final class PointSplatStatistics: @unchecked Sendable {
     public var pointBudget: Int = 0
 
     public init() {
+        // No stored configuration; all fields start at zero.
     }
 }
 

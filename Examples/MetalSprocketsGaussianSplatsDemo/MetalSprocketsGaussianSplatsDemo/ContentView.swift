@@ -28,7 +28,7 @@ struct ContentView: View {
                 .splatRenderer(demoState.renderer)
                 .onFrameTimingChange { frameTimingStatistics = $0 }
                 // swiftlint:disable:next trailing_closure
-        .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
+                .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
             } else {
                 ContentUnavailableView("Immersive Mode", systemImage: "visionpro", description: Text("Viewing splat in immersive space."))
             }
@@ -160,7 +160,9 @@ private struct SplatImporter: ViewModifier {
             .background {
                 Color.clear
                     .alert("Load Failed", isPresented: Binding(get: { demoState.loadError != nil }, set: { if !$0 { demoState.loadError = nil } })) {
-                        Button("OK", role: .cancel) {}
+                        Button("OK", role: .cancel) {
+                            // Dismissal only; the binding's setter clears the error.
+                        }
                     } message: {
                         Text(demoState.loadError ?? "")
                     }

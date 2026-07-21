@@ -44,7 +44,7 @@ struct MortonReorderTests {
         var splats = [
             TestSplat(floatPosition: SIMD3<Float>(10, 10, 10), id: 0),
             TestSplat(floatPosition: SIMD3<Float>(0, 0, 0), id: 1),
-            TestSplat(floatPosition: SIMD3<Float>(5, 5, 5), id: 2),
+            TestSplat(floatPosition: SIMD3<Float>(5, 5, 5), id: 2)
         ]
         // 3 floats per splat, tagged by original splat id.
         var shCoefficients: [Float] = [0, 0.1, 0.2, 1, 1.1, 1.2, 2, 2.1, 2.2]

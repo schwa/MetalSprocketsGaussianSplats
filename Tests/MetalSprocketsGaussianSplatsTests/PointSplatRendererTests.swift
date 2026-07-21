@@ -136,7 +136,7 @@ struct PointSplatRendererTests {
         // the one visible red splat.
         let size = 64
         var splats = [SparkSplat]()
-        for i in 0..<1200 {
+        for i in 0..<1_200 {
             // Behind the camera (camera at z=5 looking at origin).
             let offset = Float(i % 7)
             splats.append(SparkSplat(position: simd_half3(Float16(offset), Float16(offset), 50), scale: simd_half3(repeating: 0.2), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 255, 0, 255)))
