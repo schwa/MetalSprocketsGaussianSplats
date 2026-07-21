@@ -230,15 +230,18 @@ SparkSplatRenderPipeline requires .renderPassDescriptorModifier { $0.renderTarge
 ## 10: Add rendering unit tests with golden image comparisons
 
 +++
-status: open
+status: closed
 priority: high
 kind: task
 labels: effort:l
 created: 2026-03-05T00:00:00Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-07-21T20:57:00Z
+closed: 2026-07-21T20:57:00Z
 +++
 
 We need unit tests that render splats via OffscreenRenderer and compare against golden images. Should cover: Spark renderer with test-grid fixture, Spark renderer with butterfly sample, different camera angles, SH on/off. Use the GoldenImage framework for comparisons.
+
+- `2026-07-21T20:57:00Z`: Added golden-image rendering tests: test-grid alternate camera angle, butterfly sample (resolved from Samples/ via #filePath, with SH), and butterfly SH-on vs SH-off with a guard asserting SH actually changes the image (test-ring.sog turned out to carry no SH, which would have made the test vacuous).
 
 ---
 
