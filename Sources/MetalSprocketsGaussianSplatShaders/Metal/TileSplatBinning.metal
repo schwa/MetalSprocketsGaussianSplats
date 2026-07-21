@@ -56,7 +56,7 @@ namespace TileSplatBinning {
             return false;
         }
 
-        // Store depth for sorting (negative Z, closer = more negative)
+        // Store depth for sorting (negative Z, closer = less negative / larger value)
         depth = viewCenter.z;
 
         // Compute clip space center

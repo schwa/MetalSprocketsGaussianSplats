@@ -1364,12 +1364,13 @@ The GPU-sorted pipeline (SplatGPUSort) culls splats against the frustum before s
 ## 61: Investigate using SplatGPUSort radix sort for tile-based per-tile ordering
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: tile-based, effort:m
 created: 2026-07-20T18:53:32Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T23:01:46Z
+closed: 2026-07-21T23:01:46Z
 +++
 
 The GPU-sorted pipeline has a proper stable two-pass 8-bit radix sort over the half depth key (SplatGPUSort). The tile-based renderer uses its own per-tile sort (TileSplatSort). Investigate whether the per-tile depth ordering is currently incorrect or unstable (a possible contributor to the washed-out blending) and whether the SplatGPUSort radix approach could replace or feed the per-tile sort.
@@ -1385,6 +1386,14 @@ Note: this is a sort of the binned entries, not the splats — a splat overlappi
 May also be relevant to #59: guarantees a stable, correct front-to-back order per tile (the current kernel sorts descending via key inversion; worth verifying direction against the renderer's expectation).
 
 Related: #58, #59.
+
+- `2026-07-21T23:01:46Z`: Investigation complete (2026-07-21):
+
+Correctness: per-tile ordering is correct and stable. Camera-space z is negative in front of the camera, so closer = larger value; tile_sort's descending sort (inverted key) therefore yields front-to-back order, matching TileSplatRender's front-to-back accumulation. The LSB-first counting radix is stable. Verified with a new GPU regression test (TileSplatSortTests: ordering across multiple tiles + stability for equal depths). The washed-out blending is NOT caused by sort order/instability.
+
+Also fixed a misleading comment in TileSplatBinning.metal that claimed 'closer = more negative' (it's the opposite).
+
+Performance: the one-thread-per-tile serial radix remains the known bottleneck. The preferred replacement — global SplatGPUSort radix over binned (tileID << 16 | flippedHalfDepth) keys, dropping the per-tile sort pass — is a performance rework and is tracked under #58.
 
 ---
 
