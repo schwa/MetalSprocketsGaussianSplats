@@ -61,8 +61,21 @@ public struct PointSplatRenderPipeline: Element {
         resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, maxPointsPerFrame: maxPointsPerFrame, supersampling: max(supersampling, 1))
     }
 
+    /// `@MSState` persists resources across body evaluations, so a splat
+    /// cloud swap (e.g. switching models in the demo) can outgrow the counts
+    /// buffer and distributor before `.onChange` fires. Validate eagerly.
+    private func validatedResources() throws -> PointSplatResources {
+        let width = max(Int(drawableSize.x), 1)
+        let height = max(Int(drawableSize.y), 1)
+        if resources.splatCount != splatCloud.count || resources.width != width || resources.height != height {
+            resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, maxPointsPerFrame: resources.distributor.capacity, supersampling: supersampling)
+        }
+        return resources
+    }
+
     public var body: some Element {
         get throws {
+            let resources = try validatedResources()
             let width = resources.width
             let height = resources.height
             let bufferWidth = width * supersampling
@@ -111,7 +124,7 @@ public struct PointSplatRenderPipeline: Element {
                 }
                 // Encode the workload distribution (prefix sum, scatter,
                 // max-scan) into the encoder just before the splat dispatch.
-                .onWorkloadEnter { [resources, splatCloud] environmentValues in
+                .onWorkloadEnter { [splatCloud] environmentValues in
                     guard let encoder = environmentValues.computeCommandEncoder else {
                         preconditionFailure("No compute command encoder found.")
                     }
@@ -139,12 +152,7 @@ public struct PointSplatRenderPipeline: Element {
                     .parameter("texture", texture: accumulation.output)
                 }
             }
-            .onChange(of: drawableSize) { [supersampling] _, newSize in
-                resources = try! PointSplatResources(drawableSize: newSize, splatCount: splatCloud.count, maxPointsPerFrame: resources.distributor.capacity, supersampling: supersampling)
-            }
-            .onChange(of: splatCloud) { [supersampling] _, newCloud in
-                resources = try! PointSplatResources(drawableSize: drawableSize, splatCount: newCloud.count, maxPointsPerFrame: resources.distributor.capacity, supersampling: supersampling)
-            }
+
         }
     }
 }
@@ -155,6 +163,7 @@ final class PointSplatResources {
     let height: Int
     let framebuffer: MTLBuffer
     let counts: MTLBuffer
+    let splatCount: Int
     let distributor: PointSplatWorkloadDistributor
     let resolveTexture: MTLTexture
     private let accumulationTextures: [MTLTexture]
@@ -185,6 +194,7 @@ final class PointSplatResources {
         framebuffer.label = "PointSplat framebuffer64"
         self.framebuffer = framebuffer
         self.counts = counts
+        self.splatCount = splatCount
         distributor = try PointSplatWorkloadDistributor(device: device, capacity: maxPointsPerFrame, maxSplats: splatCount)
 
         let textureWidth = width
