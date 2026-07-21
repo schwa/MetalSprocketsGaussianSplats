@@ -70,9 +70,9 @@ Test may have pre-existing golden image mismatch. Needs investigation.
 status: open
 priority: medium
 kind: bug
-labels: effort:m
+labels: effort:m, punted
 created: 2026-02-19T00:00:00Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-07-21T22:48:16Z
 +++
 
 When camera moves, bounding box overlays move immediately but splats lag behind.
@@ -911,9 +911,9 @@ Currently SplatImmersiveElement sorts once using the left eye's camera matrix an
 status: open
 priority: medium
 kind: bug
-labels: effort:s, visionOS, sorting, not-testable
+labels: effort:s, visionOS, sorting, not-testable, punted
 created: 2026-04-09T17:40:54Z
-updated: 2026-07-21T20:45:36Z
+updated: 2026-07-21T22:48:16Z
 +++
 
 Distant splats flicker during immersive rendering. Likely cause: the pending release depth (3 buffers) is too shallow for visionOS stereo rendering, which has more in-flight GPU work. A pool buffer may be returned and overwritten by a new sort while the GPU is still reading it. To diagnose: disable pool release entirely (just allocate fresh buffers) and see if flicker disappears. If confirmed, either increase the pending release depth for visionOS or make it configurable.
@@ -1152,9 +1152,9 @@ The demo only supports turntable drag rotation via .interactiveCamera(). Add pin
 status: open
 priority: low
 kind: bug
-labels: effort:xs, macOS
+labels: effort:xs, macOS, punted
 created: 2026-04-09T20:13:18Z
-updated: 2026-07-21T20:43:22Z
+updated: 2026-07-21T22:48:16Z
 +++
 
 The Metal GPU performance overlay disappears while dragging/panning the camera. Reappears when gesture ends. Same issue as MetalSprockets#34/#312. Flickering is reduced when shader validation is enabled (slower frame rate). Likely a SwiftUI overlay/z-ordering issue during gesture handling in RenderView.
@@ -1241,9 +1241,9 @@ FrameTimingView is available for windowed SplatView via .onFrameTimingChange but
 status: open
 priority: medium
 kind: feature
-labels: effort:m, visionOS, demo, not-testable
+labels: effort:m, visionOS, demo, not-testable, punted
 created: 2026-04-09T21:57:38Z
-updated: 2026-07-21T20:45:37Z
+updated: 2026-07-21T22:48:16Z
 +++
 
 The immersive splat currently has no gesture interaction — the splat is static in space. Add gesture support for manipulating the splat in immersive mode.
@@ -1684,12 +1684,14 @@ SparkSplat is 32 bytes plus float32 SH coefficients; the paper packs a Gaussian 
 status: open
 priority: low
 kind: enhancement
-labels: pointsplat, effort:m
+labels: pointsplat, effort:m, punted
 created: 2026-07-21T20:37:59Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T22:48:16Z
 +++
 
 MetalSprockets 92dbfa0 added declarative indirect dispatch (ComputeDispatch(indirectBuffer:threadsPerThreadgroup:), MetalSprockets#351), but all three indirect dispatch sites here still call encoder.dispatchThreadgroups(indirectBuffer:) on raw encoders: PointSplatWorkloadDistributor.encode, PointSplatResources.encodePhase, and PointSplatRenderer. The surrounding PointSplat frame is raw-encoded for more than just the old dispatch gap (mid-frame distributor re-runs, two-phase occlusion), so adopting the element means refactoring that flow back into declarative elements, not a drop-in swap. Related: #62 (TileAlt, was blocked on MetalSprockets#351), #63 (where the raw workaround landed).
+
+- `2026-07-21T22:41:36Z`: Looked at adopting ComputeDispatch(indirectBuffer:) here. Confirmed the element exists (MetalSprockets 92dbfa0) and works for standalone dispatches, but all three indirect sites live inside the raw-encoded frame flow: PointSplatResources.encodeFrame/encodePhase sequences ~10 pipeline states (clear, group bounds/cull, indirect preprocess, distributor, indirect splat, pyramid build) on one raw encoder, re-running the distributor mid-frame for the two-phase occlusion pass, and PointSplatRenderer drives the same code offscreen with no element System at all. Adopting the element means rewriting that entire flow as declarative ComputePipeline/ComputeDispatch elements (including converting the MTLComputePipelineState-based kernels to ComputeKernel + .parameter bindings) and giving the offscreen renderer an element host. That is a substantial refactor, not a batch-sized change. Unblocker: split this into (1) convert encodePhase to element-built ComputePipelines inside the live pipeline body, (2) port the offscreen PointSplatRenderer to run the same element tree, then the indirect dispatches fall out naturally.
 
 ---
 
@@ -1836,17 +1838,20 @@ In SparkSplatRenderPipeline's Draw closure, `shDegreeValue` (index 11) and `boun
 ## 87: Support .lcc2 splat format
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
-labels: splats, effort:l
+labels: splats, effort:l, punted
 created: 2026-07-21T21:44:25Z
-updated: 2026-07-21T22:30:08Z
+updated: 2026-07-21T22:58:34Z
+closed: 2026-07-21T22:58:34Z
 +++
 
 The LCC2 format (from XGRIDS) is a Gaussian splat container format that is not currently supported for loading/rendering.
 
 Whitepaper/spec: https://github.com/xgrids/LCC2Whitepaper
+
+- `2026-07-21T22:58:34Z`: Closing: LCC2 is a container format wrapping compressed splat payloads; not planning a reader for it right now.
 
 ---
 
