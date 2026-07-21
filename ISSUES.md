@@ -1460,18 +1460,20 @@ The splat kernel has an early depth test (plain aliased read) before atomic_min,
 ## 66: PointSplat: profile occupancy, atomic throughput, and scaling vs sorted pipelines
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: performance, pointsplat, effort:m
 created: 2026-07-21T14:52:10Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T21:37:44Z
+closed: 2026-07-21T21:37:44Z
 +++
 
 RFC 0003 verification plan items not yet done: GPU capture to confirm even occupancy across the splat dispatch (the paper's central claim) and atomic throughput; record the frame-time scaling curve vs Spark/GPU/Stochastic on small and multi-million-splat scenes.
 
 - `2026-07-21T19:49:48Z`: Scaling curve done via new 'bench' CLI subcommand (synthetic seeded clouds, no fixtures; Release, 1024x1024, 20 frames, median ms): 100k: point 1.4 / spark 2.9 / gpu 2.9. 1M: 10.7 / 14.2 / 6.7. 4M: 14.7 / 53.0 / 20.5. 8M: 18.2 / 115.7 / 39.8. PointSplat flattens as predicted (bounded by points/pixel); spark is CPU-sort-bound (linear); gpu-sort wins the ~1M middle. Remaining: GPU capture for splat-dispatch occupancy and atomic throughput.
 - `2026-07-21T20:23:36Z`: Atomic-throughput half answered via the #65 measurement: atomics cost ~nothing (see #65). The flat scaling curve plus this strongly supports the paper's even-workload claim; a formal occupancy capture remains optional.
+- `2026-07-21T21:37:38Z`: Occupancy capture done (M5 Max, macOS 27, gpucapture + gpudebug profile run; 1M synthetic splats, 1024x1024, point renderer). Findings: pointSplatSplat executes as a single contiguous 2.78 ms interval with no straggler tail (interval timeline: one 2µs warmup blip then 11.18-13.96 ms solid), confirming even workload distribution across the dispatch. Kernel occupancy during the splat dispatch ramps to a steady 69.7% and holds flat for the entire back half; per-invocation cost is uniform (31.3M invocations, 0.15% ALU inefficiency, 1 device atomic + 8 device loads per invocation, no spills, 30 temp regs). Cost ranking: splat kernel 30.5% of frame; the workload-distributor scan (workloadScanBlockSums) dominates at 46.6% in this capture — worth a separate look but unrelated to the paper's splat-dispatch claim. Combined with the #65 atomic result (~zero cost) and the flat scaling curve, all RFC 0003 verification items are now done.
 
 ---
 
