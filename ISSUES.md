@@ -1289,16 +1289,19 @@ GPUSortedSplatRenderPipeline and GPUSplatSortComputePass take a single projectio
 ## 57: SplatImmersiveContent should be able to use the GPU sort pipeline
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: visionOS, effort:m, not-testable
 depends: 56
 created: 2026-07-20T18:42:44Z
-updated: 2026-07-21T20:45:37Z
+updated: 2026-07-21T23:02:59Z
+closed: 2026-07-21T23:02:59Z
 +++
 
 SplatImmersiveContent drives immersive visionOS rendering via the CPU AsyncSortManager path. Once stereo support exists in the GPU-sorted pipeline, immersive content should be able to opt into GPU sorting/culling, removing CPU sort latency in head-tracked rendering where stale sort order is most visible.
+
+- `2026-07-21T23:02:59Z`: Already implemented by the stereo GPU sort work (#56): SplatImmersiveContent(renderer: .gpu) encodes SplatImmersiveGPUSortElement before the render pass and renders both eyes from the GPU-sorted indices via an amplified indirect draw. Verified visionOS build.
 
 ---
 
