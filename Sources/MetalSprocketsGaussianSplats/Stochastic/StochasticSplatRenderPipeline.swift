@@ -3,6 +3,7 @@ import Foundation
 import Metal
 import MetalKit
 import MetalSprockets
+import MetalSupport
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 

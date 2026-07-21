@@ -30,7 +30,8 @@ let package = Package(
         .package(url: "https://github.com/schwa/MetalSprockets", branch: "main"),
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
-        .package(url: "https://github.com/schwa/GoldenImage", from: "0.1.2")
+        .package(url: "https://github.com/schwa/GoldenImage", from: "0.1.2"),
+        .package(url: "https://github.com/schwa/MetalSupport", from: "1.0.0")
     ],
     targets: [
         .target(
@@ -51,6 +52,7 @@ let package = Package(
             dependencies: [
                 "Splats",
                 "MetalSprocketsGaussianSplatShaders",
+                .product(name: "MetalSupport", package: "MetalSupport"),
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
                 .product(name: "MetalSprocketsSupport", package: "MetalSprockets"),
                 .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
@@ -77,6 +79,7 @@ let package = Package(
             dependencies: [
                 "MetalSprocketsGaussianSplats",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "MetalSupport", package: "MetalSupport"),
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
                 .product(name: "GeometryLite3D", package: "GeometryLite3D")
             ]

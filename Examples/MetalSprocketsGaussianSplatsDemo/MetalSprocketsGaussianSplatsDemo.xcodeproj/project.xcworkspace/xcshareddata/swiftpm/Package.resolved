@@ -38,6 +38,15 @@
       }
     },
     {
+      "identity" : "metalsupport",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/MetalSupport",
+      "state" : {
+        "revision" : "4546c33a93435d7fce1f172fcc77fd1371a6a927",
+        "version" : "1.0.3"
+      }
+    },
+    {
       "identity" : "swift-algorithms",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-algorithms",

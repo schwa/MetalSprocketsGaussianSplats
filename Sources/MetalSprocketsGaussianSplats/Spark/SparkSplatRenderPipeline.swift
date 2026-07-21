@@ -2,6 +2,7 @@
 import Foundation
 import Metal
 import MetalSprockets
+import MetalSupport
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import Splats

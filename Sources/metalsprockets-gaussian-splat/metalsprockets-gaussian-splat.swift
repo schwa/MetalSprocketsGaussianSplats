@@ -5,6 +5,7 @@ import GeometryLite3D
 import ImageIO
 import Metal
 import MetalSprockets
+import MetalSupport
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
