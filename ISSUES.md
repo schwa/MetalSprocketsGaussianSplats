@@ -1991,12 +1991,13 @@ AsyncSortManager.managedSortedIndicesStream uses the closure AsyncStream initial
 ## 95: ARSplatView: per-frame unstructured tasks can deliver ARKit frames out of order
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: concurrency, demo, iOS, effort:xs
 created: 2026-07-21T23:49:07Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:55:05Z
+closed: 2026-07-21T23:55:05Z
 +++
 
 ARSplatSessionModel.session(_:didUpdate:) spawns an unstructured Task { @MainActor in currentFrame = frame } per ARKit frame (60 Hz). Task start order is not FIFO, so currentFrame can go backwards under load, and task creation is unbounded. A latest-value AsyncStream (bufferingNewest(1)) with a single consumer preserves order.

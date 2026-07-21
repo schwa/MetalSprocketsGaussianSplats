@@ -18,9 +18,31 @@ final class ARSplatSessionModel: NSObject, ARSessionDelegate {
     let session = ARSession()
     var currentFrame: ARFrame?
 
+    /// Latest-value stream from the ARKit delegate queue to the main actor.
+    /// A single consumer task drains it, so frames are delivered in order and
+    /// stale frames are dropped instead of queueing unbounded work (#95).
+    private let frameStream: AsyncStream<ARFrame>
+    private let frameContinuation: AsyncStream<ARFrame>.Continuation
+
     override init() {
+        (frameStream, frameContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         super.init()
         session.delegate = self
+        Task { [weak self] in
+            guard let stream = self?.frameStream else {
+                return
+            }
+            for await frame in stream {
+                guard let self else {
+                    return
+                }
+                self.currentFrame = frame
+            }
+        }
+    }
+
+    deinit {
+        frameContinuation.finish()
     }
 
     func start() {
@@ -33,7 +55,7 @@ final class ARSplatSessionModel: NSObject, ARSessionDelegate {
     }
 
     nonisolated func session(_: ARSession, didUpdate frame: ARFrame) {
-        Task { @MainActor in currentFrame = frame }
+        frameContinuation.yield(frame)
     }
 }
 
