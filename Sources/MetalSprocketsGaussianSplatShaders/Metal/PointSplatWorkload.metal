@@ -74,6 +74,33 @@ namespace PointSplatWorkload {
         return min(totals[0], capacity);
     }
 
+    // Phase 1.5 (per Gaussian): when raw demand exceeds capacity, scale
+    // every count down proportionally with stochastic rounding. Without
+    // this the prefix-sum tail is truncated, which deletes whole regions
+    // (tail Gaussian indices correlate with spatial position); uniform
+    // scaling degrades to extra noise instead.
+    kernel void workloadScaleCounts(device uint       *counts      [[buffer(0)]],
+                                    device const uint *totals      [[buffer(1)]],
+                                    constant uint     &capacity    [[buffer(2)]],
+                                    constant uint     &numElements [[buffer(3)]],
+                                    constant uint     &seed        [[buffer(4)]],
+                                    uint gid [[thread_position_in_grid]]) {
+        if (gid >= numElements) {
+            return;
+        }
+        uint total = totals[1];
+        if (total <= capacity) {
+            return;
+        }
+        uint count = counts[gid];
+        if (count == 0) {
+            return;
+        }
+        float scale = float(capacity) / float(total);
+        GPSUInt2 state = gps_make_seed(gid, seed ^ 0xA5A5A5A5u);
+        counts[gid] = uint(gps_stochastic_round(float(count) * scale, gps_pcg2d(&state).x));
+    }
+
     // Phase 2.1 (single thread): convert the GPU-side total into indirect
     // dispatch arguments so later stages launch ceil(total/256) threadgroups
     // instead of capacity-sized grids (RFC 0002's indirect-dispatch gap,

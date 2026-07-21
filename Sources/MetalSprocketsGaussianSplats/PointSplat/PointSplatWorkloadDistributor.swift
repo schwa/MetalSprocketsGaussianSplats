@@ -52,14 +52,28 @@ public final class PointSplatWorkloadDistributor {
 
     /// Thread-to-Gaussian map, valid after the encoded work completes.
     public let indicesBuffer: MTLBuffer
-    /// One uint32: the total point count, written on the GPU timeline.
+    /// Two uint32s, written on the GPU timeline: [0] the thread count after
+    /// over-budget scaling (what the splat stage consumes), [1] the raw
+    /// pre-scaling demand.
     public let totalsBuffer: MTLBuffer
+
+    /// Threads consumed by the last completed frame (post-scaling).
+    public var lastThreadCount: Int {
+        Int(totalsBuffer.contents().load(as: UInt32.self))
+    }
+
+    /// Raw thread demand of the last completed frame; exceeds `capacity`
+    /// when the scene wants more points than the budget allows.
+    public var lastThreadDemand: Int {
+        Int(totalsBuffer.contents().load(fromByteOffset: MemoryLayout<UInt32>.stride, as: UInt32.self))
+    }
     /// `MTLDispatchThreadgroupsIndirectArguments` for ceil(total/256)
     /// threadgroups, written on the GPU timeline. Use for any dispatch that
     /// should cover exactly the active threads (e.g. the splat stage).
     public let dispatchArgsBuffer: MTLBuffer
 
     private let scanCountsBlock: MTLComputePipelineState
+    private let scaleCounts: MTLComputePipelineState
     private let writeDispatchArgs: MTLComputePipelineState
     private let scanBlockSums: MTLComputePipelineState
     private let clearIndices: MTLComputePipelineState
@@ -87,6 +101,7 @@ public final class PointSplatWorkloadDistributor {
             return try device.makeComputePipelineState(function: function)
         }
         scanCountsBlock = try pipeline("workloadScanCountsBlock")
+        scaleCounts = try pipeline("workloadScaleCounts")
         scanBlockSums = try pipeline("workloadScanBlockSums")
         writeDispatchArgs = try pipeline("workloadWriteDispatchArgs")
         clearIndices = try pipeline("workloadClearIndices")
@@ -99,7 +114,7 @@ public final class PointSplatWorkloadDistributor {
         let capacityBlocks = (capacity + Self.blockSize - 1) / Self.blockSize
         let uintStride = MemoryLayout<UInt32>.stride
         guard let indices = device.makeBuffer(length: uintStride * max(capacity, 1), options: .storageModePrivate),
-              let totals = device.makeBuffer(length: uintStride, options: .storageModeShared),
+              let totals = device.makeBuffer(length: uintStride * 2, options: .storageModeShared),
               let dispatchArgs = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 4, options: .storageModePrivate),
               let localPrefix = device.makeBuffer(length: uintStride * max(maxSplats, 1), options: .storageModePrivate),
               let countBlockSums = device.makeBuffer(length: uintStride * max(countBlocks, 1), options: .storageModePrivate),
@@ -126,7 +141,7 @@ public final class PointSplatWorkloadDistributor {
     /// GPU-side total, so cost scales with actual demand rather than
     /// capacity; entries past the total are garbage and must not be
     /// consumed.
-    public func encode(encoder: MTLComputeCommandEncoder, counts: MTLBuffer, count: Int) throws {
+    public func encode(encoder: MTLComputeCommandEncoder, counts: MTLBuffer, count: Int, seed: UInt32 = 0) throws {
         guard count <= maxSplats else {
             throw DistributorError.splatCountExceedsMaximum(count: count, maximum: maxSplats)
         }
@@ -141,6 +156,35 @@ public final class PointSplatWorkloadDistributor {
         let countGroups = MTLSize(width: countBlocks, height: 1, depth: 1)
         let uintStride = MemoryLayout<UInt32>.stride
 
+        var seedValue = seed
+
+        // Pass A: raw demand into totals[1].
+        encoder.setComputePipelineState(scanCountsBlock)
+        encoder.setBuffer(counts, offset: 0, index: 0)
+        encoder.setBuffer(localPrefix, offset: 0, index: 1)
+        encoder.setBuffer(countBlockSums, offset: 0, index: 2)
+        encoder.setBytes(&numElements, length: uintStride, index: 3)
+        encoder.dispatchThreadgroups(countGroups, threadsPerThreadgroup: blockThreads)
+
+        encoder.setComputePipelineState(scanBlockSums)
+        encoder.setBuffer(countBlockSums, offset: 0, index: 0)
+        encoder.setBuffer(countBlockBase, offset: 0, index: 1)
+        encoder.setBuffer(totalsBuffer, offset: uintStride, index: 2)
+        encoder.setBytes(&numCountBlocks, length: uintStride, index: 3)
+        encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
+
+        // Over-budget? Scale all counts down proportionally (stochastic
+        // rounding keeps the expectation right), then re-scan. Turns budget
+        // overflow into uniform noise instead of truncating whole regions.
+        encoder.setComputePipelineState(scaleCounts)
+        encoder.setBuffer(counts, offset: 0, index: 0)
+        encoder.setBuffer(totalsBuffer, offset: 0, index: 1)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 2)
+        encoder.setBytes(&numElements, length: uintStride, index: 3)
+        encoder.setBytes(&seedValue, length: uintStride, index: 4)
+        encoder.dispatchThreadgroups(countGroups, threadsPerThreadgroup: blockThreads)
+
+        // Pass B: scan the (possibly scaled) counts into totals[0].
         encoder.setComputePipelineState(scanCountsBlock)
         encoder.setBuffer(counts, offset: 0, index: 0)
         encoder.setBuffer(localPrefix, offset: 0, index: 1)
@@ -209,7 +253,8 @@ public final class PointSplatWorkloadDistributor {
         commandBuffer.waitUntilCompleted()
 
         let rawTotal = Int(totalsBuffer.contents().load(as: UInt32.self))
-        assert(rawTotal <= capacity, "PointSplat budget exceeded: \(rawTotal) > \(capacity); tail Gaussians will drop points")
+        // Stochastic rounding in the over-budget scaling pass can land a
+        // hair above capacity; consumption is clamped either way.
         return Result(indices: indicesBuffer, totalPoints: min(rawTotal, capacity))
     }
 }

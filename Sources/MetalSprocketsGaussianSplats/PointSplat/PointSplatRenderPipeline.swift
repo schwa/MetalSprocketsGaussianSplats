@@ -35,10 +35,12 @@ public struct PointSplatRenderPipeline: Element {
 
     private var supersampling: Int
     private var pointsPerThread: Int
+    private var statistics: PointSplatStatistics?
 
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, supersampling: Int = 2, pointsPerThread: Int = 4) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, supersampling: Int = 2, pointsPerThread: Int = 4, statistics: PointSplatStatistics? = nil) throws {
         self.supersampling = max(supersampling, 1)
         self.pointsPerThread = max(pointsPerThread, 1)
+        self.statistics = statistics
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
@@ -131,11 +133,19 @@ public struct PointSplatRenderPipeline: Element {
                 // raw encoding: the splat dispatch is indirect (sized by the
                 // GPU-side total), which MetalSprockets' ComputeDispatch
                 // doesn't support.
-                .onWorkloadEnter { [splatCloud] environmentValues in
+                .onWorkloadEnter { [splatCloud, statistics, pointsPerThread, frameIndex] environmentValues in
                     guard let encoder = environmentValues.computeCommandEncoder else {
                         preconditionFailure("No compute command encoder found.")
                     }
-                    try resources.distributor.encode(encoder: encoder, counts: resources.counts, count: splatCloud.count)
+                    // Publish the previous frame's totals before encoding
+                    // overwrites them (the shared buffer holds last frame's
+                    // GPU-written values at this point).
+                    if let statistics {
+                        statistics.pointCount = resources.distributor.lastThreadCount * pointsPerThread
+                        statistics.pointDemand = resources.distributor.lastThreadDemand * pointsPerThread
+                        statistics.pointBudget = resources.distributor.capacity * pointsPerThread
+                    }
+                    try resources.distributor.encode(encoder: encoder, counts: resources.counts, count: splatCloud.count, seed: frameIndex)
                     var uniformsCopy = uniforms
                     encoder.setComputePipelineState(resources.splatPipelineState)
                     encoder.setBuffer(splatCloud.splats.unsafeMTLBuffer, offset: 0, index: 0)
@@ -165,6 +175,20 @@ public struct PointSplatRenderPipeline: Element {
             }
 
         }
+    }
+}
+
+/// Live PointSplat workload numbers, updated once per frame from the
+/// previous frame's GPU-written totals. Poll (rather than observe) from UI.
+public final class PointSplatStatistics: @unchecked Sendable {
+    /// Points splatted last frame (after any over-budget scaling).
+    public var pointCount: Int = 0
+    /// Raw point demand last frame; exceeding the budget means splats are
+    /// being thinned proportionally.
+    public var pointDemand: Int = 0
+    public var pointBudget: Int = 0
+
+    public init() {
     }
 }
 

@@ -51,6 +51,7 @@ public struct SplatView: View {
     /// MTKView's typical in-flight frame count (3) plus a margin.
     @State private var pendingRelease: [SplatIndices] = []
     @State private var sortManager: AsyncSortManager<SparkSplat>
+    @State private var pointSplatStatistics = PointSplatStatistics()
     /// Scratch + output buffers for the GPU sorter (``SplatRenderer/gpu``).
     @State private var sortResources: GPUSortResources
 
@@ -153,7 +154,8 @@ public struct SplatView: View {
                     drawableSize: size,
                     frameIndex: UInt32(truncatingIfNeeded: context.frameUniforms.index),
                     supersampling: Self.pointSplatSupersampling,
-                    pointsPerThread: Self.pointSplatPointsPerThread
+                    pointsPerThread: Self.pointSplatPointsPerThread,
+                    statistics: pointSplatStatistics
                 )
             }
         }
@@ -253,6 +255,12 @@ public struct SplatView: View {
                 LabeledContent("Supersampling", value: "\(supersampling)\u{00D7}\(supersampling)")
                 LabeledContent("Points/thread (K)", value: Self.pointSplatPointsPerThread.formatted())
                 LabeledContent("Point budget", value: budget.formatted(.number.notation(.compactName)))
+                TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+                    let demand = pointSplatStatistics.pointDemand
+                    let used = pointSplatStatistics.pointCount
+                    LabeledContent("Points", value: "\(used.formatted(.number.notation(.compactName))) / \(demand.formatted(.number.notation(.compactName)))")
+                        .foregroundStyle(demand > budget ? .orange : .white)
+                }
                 LabeledContent("SH degree", value: splatCloud.shCoefficients != nil ? splatCloud.shDegree.formatted() : "off")
             }
             .fixedSize()

@@ -158,7 +158,7 @@ public final class PointSplatRenderer {
         encoder.setBuffer(colors, offset: 0, index: 4)
         encoder.dispatchThreads(MTLSize(width: splatCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
-        try distributor.encode(encoder: encoder, counts: counts, count: splatCount)
+        try distributor.encode(encoder: encoder, counts: counts, count: splatCount, seed: frameSeed)
 
         encoder.setComputePipelineState(splat)
         encoder.setBuffer(splats, offset: 0, index: 0)
