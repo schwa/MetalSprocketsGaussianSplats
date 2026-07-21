@@ -114,10 +114,13 @@ namespace PointSplatRender {
     }
 
     // Per Gaussian: cull, project, Poisson-sample the opacity-corrected
-    // point count (paper Secs. 3.3-3.4), write counts for the distributor.
+    // point count (paper Secs. 3.3-3.4), write counts for the distributor,
+    // and cache the packed (SH-evaluated) color for the splat stage.
     kernel void pointSplatPreprocess(device const SparkSplat *splats [[buffer(0)]],
                                      device uint *counts [[buffer(1)]],
                                      constant PointSplatUniforms &uniforms [[buffer(2)]],
+                                     device const float *shCoefficients [[buffer(3)]],
+                                     device ulong *colors [[buffer(4)]],
                                      uint gid [[thread_position_in_grid]]) {
         if (gid >= uniforms.splatCount) {
             return;
@@ -128,6 +131,16 @@ namespace PointSplatRender {
         if (!projected.valid) {
             return;
         }
+
+        // SH color depends only on the view direction to the Gaussian's
+        // mean, so evaluate once here rather than per point.
+        float3 rgb = float3(splats[gid].color.xyz) / 255.0;
+        if (uniforms.shDegree > 0) {
+            float3 worldCenter = (uniforms.modelMatrix * float4(float3(splats[gid].position), 1.0)).xyz;
+            float3 viewDir = normalize(worldCenter - uniforms.cameraPosition);
+            rgb = max(rgb + evaluateSH(viewDir, shCoefficients, gid, uniforms.shDegree), 0.0);
+        }
+        colors[gid] = gps_pack_color(rgb.r, rgb.g, rgb.b);
 
         // Expected point count: lambda = 2 pi sqrt(|Sigma|) Li2(alpha).
         float sqrtDet = projected.c0 * projected.c2;
@@ -157,6 +170,7 @@ namespace PointSplatRender {
                                 constant PointSplatUniforms &uniforms [[buffer(3)]],
                                 device const uint *totals [[buffer(4)]],
                                 device const ulong *framebufferRead [[buffer(5)]],
+                                device const ulong *colors [[buffer(6)]],
                                 uint gid [[thread_position_in_grid]]) {
         // Dispatched over the full capacity; totals[0] is the actual thread
         // count written by the workload distributor on the GPU timeline.
@@ -169,9 +183,8 @@ namespace PointSplatRender {
             return;
         }
 
-        float4 rgba = float4(splats[gaussianIndex].color) / 255.0;
         ulong packed = (gps_pack_depth(projected.viewDepth, uniforms.nearPlane, uniforms.farPlane) << GPS_DEPTH_SHIFT)
-            | gps_pack_color(rgba.r, rgba.g, rgba.b);
+            | colors[gaussianIndex];
 
         GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed * 2654435761u + 1u);
         uint k = max(uniforms.pointsPerThread, 1u);

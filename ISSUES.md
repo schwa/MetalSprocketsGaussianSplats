@@ -1392,14 +1392,18 @@ The splat kernel is dispatched over maxPointsPerFrame (default 4M) threads every
 ## 64: PointSplat: no spherical harmonics support
 
 +++
-status: new
+status: closed
 priority: medium
 kind: none
 labels: pointsplat
 created: 2026-07-21T14:52:10Z
+updated: 2026-07-21T15:17:45Z
+closed: 2026-07-21T15:17:45Z
 +++
 
 PointSplat renders base splat color only; view-dependent SH color (used by Spark and Stochastic renderers) is ignored. Scenes with SH will look flat compared to other renderers in the demo picker.
+
+- `2026-07-21T15:17:45Z`: SH evaluated once per Gaussian in the preprocess kernel (view direction to the mean), cached as packed 36-bit color for the splat stage. Verified visually against Spark.
 
 ---
 

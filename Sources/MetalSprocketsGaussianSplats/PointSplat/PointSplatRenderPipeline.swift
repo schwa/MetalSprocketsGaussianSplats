@@ -97,8 +97,11 @@ public struct PointSplatRenderPipeline: Element {
                 frameSeed: frameIndex,
                 capacity: UInt32(resources.distributor.capacity),
                 supersampling: UInt32(supersampling),
-                pointsPerThread: UInt32(pointsPerThread)
+                pointsPerThread: UInt32(pointsPerThread),
+                cameraPosition: SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z),
+                shDegree: UInt32(splatCloud.shCoefficients != nil ? splatCloud.shDegree : 0)
             )
+            let shBuffer = splatCloud.shCoefficients?.unsafeMTLBuffer ?? resources.dummySHBuffer
             // Running mean: weight the new frame by 1/(n+1); camera or model
             // motion resets n so stale accumulation never ghosts.
             let accumulation = resources.nextAccumulationStep(cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix)
@@ -117,6 +120,8 @@ public struct PointSplatRenderPipeline: Element {
                         .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
                         .parameter("counts", buffer: resources.counts)
                         .parameter("uniforms", value: uniforms)
+                        .parameter("shCoefficients", buffer: shBuffer)
+                        .parameter("colors", buffer: resources.colors)
                 }
                 try ComputePipeline(computeKernel: splatKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: resources.distributor.capacity, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
@@ -126,6 +131,7 @@ public struct PointSplatRenderPipeline: Element {
                         .parameter("uniforms", value: uniforms)
                         .parameter("totals", buffer: resources.distributor.totalsBuffer)
                         .parameter("framebufferRead", buffer: resources.framebuffer)
+                        .parameter("colors", buffer: resources.colors)
                 }
                 // Encode the workload distribution (prefix sum, scatter,
                 // max-scan) into the encoder just before the splat dispatch.
@@ -168,6 +174,8 @@ final class PointSplatResources {
     let height: Int
     let framebuffer: MTLBuffer
     let counts: MTLBuffer
+    let colors: MTLBuffer
+    let dummySHBuffer: MTLBuffer
     let splatCount: Int
     let distributor: PointSplatWorkloadDistributor
     let resolveTexture: MTLTexture
@@ -193,12 +201,15 @@ final class PointSplatResources {
         height = max(Int(drawableSize.y), 1)
         let pixelCount = width * height * supersampling * supersampling
 
-        guard let framebuffer = device.makeBuffer(length: MemoryLayout<UInt64>.stride * pixelCount, options: .storageModePrivate), let counts = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate) else {
+        guard let framebuffer = device.makeBuffer(length: MemoryLayout<UInt64>.stride * pixelCount, options: .storageModePrivate), let counts = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate), let colors = device.makeBuffer(length: MemoryLayout<UInt64>.stride * max(splatCount, 1), options: .storageModePrivate), let dummySHBuffer = device.makeBuffer(length: MemoryLayout<Float>.stride, options: .storageModePrivate) else {
             throw PointSplatRenderer.RendererError.bufferAllocationFailed
         }
         framebuffer.label = "PointSplat framebuffer64"
+        colors.label = "PointSplat colors"
         self.framebuffer = framebuffer
         self.counts = counts
+        self.colors = colors
+        self.dummySHBuffer = dummySHBuffer
         self.splatCount = splatCount
         distributor = try PointSplatWorkloadDistributor(device: device, capacity: maxPointsPerFrame, maxSplats: splatCount)
 

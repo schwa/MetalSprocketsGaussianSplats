@@ -117,7 +117,9 @@ public final class PointSplatRenderer {
             frameSeed: frameSeed,
             capacity: UInt32(configuration.maxPointsPerFrame),
             supersampling: UInt32(supersampling),
-            pointsPerThread: UInt32(max(configuration.pointsPerThread, 1))
+            pointsPerThread: UInt32(max(configuration.pointsPerThread, 1)),
+            cameraPosition: .zero,
+            shDegree: 0
         )
         let pixelCount = configuration.width * configuration.height * supersampling * supersampling
         var pixelCountValue = UInt32(pixelCount)
@@ -125,7 +127,7 @@ public final class PointSplatRenderer {
         let background = configuration.backgroundColor
         var clearValue = (UInt64(GPS_DEPTH_MAX) << UInt64(GPS_DEPTH_SHIFT)) | gps_pack_color(background.x, background.y, background.z)
 
-        guard let counts = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate) else {
+        guard let counts = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate), let colors = device.makeBuffer(length: MemoryLayout<UInt64>.stride * max(splatCount, 1), options: .storageModePrivate), let dummySH = device.makeBuffer(length: MemoryLayout<Float>.stride, options: .storageModePrivate) else {
             throw RendererError.bufferAllocationFailed
         }
         if distributor == nil || distributor?.maxSplats ?? 0 < splatCount {
@@ -150,6 +152,8 @@ public final class PointSplatRenderer {
         encoder.setBuffer(splats, offset: 0, index: 0)
         encoder.setBuffer(counts, offset: 0, index: 1)
         encoder.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 2)
+        encoder.setBuffer(dummySH, offset: 0, index: 3)
+        encoder.setBuffer(colors, offset: 0, index: 4)
         encoder.dispatchThreads(MTLSize(width: splatCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
         try distributor.encode(encoder: encoder, counts: counts, count: splatCount)
@@ -161,6 +165,7 @@ public final class PointSplatRenderer {
         encoder.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
         encoder.setBuffer(distributor.totalsBuffer, offset: 0, index: 4)
         encoder.setBuffer(framebuffer, offset: 0, index: 5)
+        encoder.setBuffer(colors, offset: 0, index: 6)
         encoder.dispatchThreads(MTLSize(width: configuration.maxPointsPerFrame, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
         encoder.setComputePipelineState(resolve)

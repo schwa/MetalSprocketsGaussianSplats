@@ -7,10 +7,12 @@
 #include <stdint.h>
 typedef simd_float4x4 GPSFloat4x4;
 typedef simd_float2 GPSDrawableSize;
+typedef simd_float3 GPSFloat3;
 typedef unsigned long long GPSPacked;
 #else
 typedef float4x4 GPSFloat4x4;
 typedef float2 GPSDrawableSize;
+typedef float3 GPSFloat3;
 typedef ulong GPSPacked;
 #endif
 
@@ -33,6 +35,8 @@ struct PointSplatUniforms {
     unsigned int capacity;          // max threads per frame (T / K)
     unsigned int supersampling;     // linear supersampling factor S (1 or 2)
     unsigned int pointsPerThread;   // K; counts are in threads, each splats K points
+    GPSFloat3 cameraPosition;       // world-space, for SH view direction
+    unsigned int shDegree;          // 0 disables spherical harmonics
 };
 
 // Quantizes positive view-space depth to 28-bit fixed point between near/far.
