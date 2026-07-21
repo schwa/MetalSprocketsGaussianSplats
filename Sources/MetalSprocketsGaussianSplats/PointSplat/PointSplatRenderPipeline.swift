@@ -55,10 +55,12 @@ public struct PointSplatRenderPipeline: Element {
     ///     finite far for quantization purposes.
     ///   - supersampling: Framebuffer supersampling factor. Clamped to at least 1.
     ///   - pointsPerThread: Number of points each compute thread splats. Clamped to at least 1.
+    ///     Default is 16: on Apple GPUs the bench sweep measured no PSNR cost for K up to 16 at
+    ///     fixed S, and K = 16 is ~2x faster than the paper's K = 4 (issue #76).
     ///   - reprojection: Whether the previous frame's accumulation is reprojected
     ///     when the camera moves, reducing convergence noise.
     ///   - statistics: Optional collector for per-frame render statistics.
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, depthRange: ClosedRange<Float> = 0.2...200.0, supersampling: Int = 2, pointsPerThread: Int = 4, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, depthRange: ClosedRange<Float> = 0.2...200.0, supersampling: Int = 2, pointsPerThread: Int = 16, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) throws {
         self.depthRange = depthRange
         self.supersampling = max(supersampling, 1)
         self.pointsPerThread = max(pointsPerThread, 1)

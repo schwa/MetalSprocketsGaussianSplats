@@ -1658,17 +1658,19 @@ Per-Gaussian preprocess is O(total splats) every frame even when most of the clo
 ## 76: PointSplat: sweep K and supersampling settings on Apple GPUs
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: pointsplat, performance, effort:s
 created: 2026-07-21T20:18:36Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T23:03:48Z
+closed: 2026-07-21T23:03:48Z
 +++
 
 We use the paper's defaults (2x2 supersampling, K=4) untested on our hardware. The paper measured K=1 vs K=4 as +37% frame time on NVIDIA; K=8/16, 1x1+accumulation, and 4x4 are unswept here. The bench subcommand makes this a quick experiment: quality (PSNR vs converged) and frame time per configuration, pick per-platform defaults.
 
 - `2026-07-21T20:33:04Z`: Timing sweep done via bench --supersampling/--points-per-thread (1M/8M synthetic, Release, median ms): S1K1 9.6/17.0, S1K4 3.5/10.4, S2K1 40.7/50.9, S2K4 (default) 10.7/19.4, S2K8 6.5/15.3, S2K16 4.6/12.9, S4K4 42.2/72.8, S4K16 20.3/51.3. K dominates: S2K16 is 2.3x faster than the default. Caveat: counts round stochastically to multiples of K, so large K adds per-frame variance on small splats. Demo overlay now has live S and K pickers for the visual half; defaults unchanged pending that judgment.
+- `2026-07-21T23:03:48Z`: Quality half done via new 'bench --point-quality' PSNR sweep (single-frame PSNR vs 512-frame converged S2K4 reference, 1M and 8M synthetic, 512px): K has no measurable PSNR cost (S2K1=34.98, S2K4=34.97, S2K8=34.99, S2K16=35.00 dB at 1M; same story at 8M), while S dominates quality (~+6 dB per doubling: S1~29, S2~35, S4~41 dB). Combined with the timing sweep (S2K16 2.3x faster than S2K4), picked S=2, K=16 as the Apple-GPU default: PointSplatRenderPipeline default pointsPerThread 4 -> 16, demo overlay default likewise. Supersampling default stays 2 (S4 doubles quality but is 3-4x slower).
 
 ---
 

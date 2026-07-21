@@ -57,7 +57,7 @@ public struct SplatView: View {
     @State private var pointSplatStatistics = PointSplatStatistics()
     @State private var pointSplatReprojection = true
     @State private var pointSplatSupersamplingSetting = 2
-    @State private var pointSplatPointsPerThreadSetting = 4
+    @State private var pointSplatPointsPerThreadSetting = 16
     /// Scratch + output buffers for the GPU sorter (``SplatRenderer/gpu``).
     @State private var sortResources: GPUSortResources
     /// Seed for the stochastic renderer's noise pattern. Advances once per

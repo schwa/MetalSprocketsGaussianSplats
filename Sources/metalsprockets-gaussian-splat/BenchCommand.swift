@@ -53,6 +53,12 @@ struct BenchCommand: AsyncParsableCommand {
     @Option(help: "PointSplat points per thread K")
     var pointsPerThread: Int = 4
 
+    @Flag(help: "Sweep PointSplat S/K configs for single-frame PSNR vs a converged reference (ignores --renderers)")
+    var pointQuality = false
+
+    @Option(help: "Accumulated frames for the converged PSNR reference")
+    var referenceFrames: Int = 512
+
     struct BenchError: Error {
         var message: String
     }
@@ -77,6 +83,18 @@ struct BenchCommand: AsyncParsableCommand {
             #if DEBUG
             print("warning: Debug build; numbers will not be representative")
             #endif
+            if pointQuality {
+                if let splat {
+                    let splats = try BenchRunner.loadSplats(url: URL(fileURLWithPath: splat))
+                    try runner.pointQualitySweep(label: URL(fileURLWithPath: splat).lastPathComponent, splats: splats, referenceFrames: referenceFrames)
+                } else {
+                    for count in countList {
+                        let splats = BenchRunner.syntheticCloud(count: count)
+                        try runner.pointQualitySweep(label: count.formatted(.number.grouping(.never)), splats: splats, referenceFrames: referenceFrames)
+                    }
+                }
+                return
+            }
             if let splat {
                 let splats = try BenchRunner.loadSplats(url: URL(fileURLWithPath: splat))
                 rows += try runner.benchmark(label: URL(fileURLWithPath: splat).lastPathComponent, splats: splats, renderers: renderers)
@@ -110,12 +128,17 @@ struct BenchRunner {
     let supersampling: Int
     let pointsPerThread: Int
     let device: MTLDevice
+    let commandQueue: MTLCommandQueue
 
     init(size: Int, frames: Int, supersampling: Int = 2, pointsPerThread: Int = 4) throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw BenchCommand.BenchError(message: "No Metal device")
         }
         self.device = device
+        guard let commandQueue = device.makeCommandQueue() else {
+            throw BenchCommand.BenchError(message: "No command queue")
+        }
+        self.commandQueue = commandQueue
         self.size = size
         self.frames = frames
         self.supersampling = supersampling
@@ -296,6 +319,87 @@ struct BenchRunner {
             times.append(Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) * 1e-18)
         }
         return times
+    }
+
+    // MARK: - PointSplat quality sweep
+
+    /// Single-frame PSNR per (S, K) configuration against a converged
+    /// reference (mean of many stochastic frames at the S = 2, K = 4
+    /// default). Complements the timing sweep for picking defaults.
+    func pointQualitySweep(label: String, splats: [SparkSplat], referenceFrames: Int) throws {
+        let cameraMatrix = LookAt(position: SIMD3<Float>(0, 0, 2.5), target: .zero, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
+        let projection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01...100))
+        let projectionMatrix = projection.projectionMatrix(for: CGSize(width: size, height: size))
+        guard let buffer = device.makeBuffer(bytes: splats, length: MemoryLayout<SparkSplat>.stride * splats.count) else {
+            throw BenchCommand.BenchError(message: "Buffer allocation failed")
+        }
+        buffer.label = "Bench splats"
+
+        func frames(supersampling: Int, pointsPerThread: Int, count: Int, seedBase: UInt32) throws -> [[Float]] {
+            let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, supersampling: supersampling, pointsPerThread: pointsPerThread))
+            var result: [[Float]] = []
+            for frame in 0..<count {
+                let texture = try renderer.render(splats: buffer, splatCount: splats.count, modelMatrix: .identity, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: seedBase &+ UInt32(frame))
+                result.append(try readRGB(texture))
+            }
+            return result
+        }
+
+        print("\(label): accumulating \(referenceFrames)-frame reference (S=2, K=4)...")
+        var reference = [Double](repeating: 0, count: size * size * 3)
+        for frame in try frames(supersampling: 2, pointsPerThread: 4, count: referenceFrames, seedBase: 0) {
+            for index in reference.indices {
+                reference[index] += Double(frame[index])
+            }
+        }
+        for index in reference.indices {
+            reference[index] /= Double(referenceFrames)
+        }
+
+        let configs = [(1, 1), (1, 4), (2, 1), (2, 4), (2, 8), (2, 16), (4, 4), (4, 16)]
+        let evaluationFrames = 8
+        print("")
+        print("config  psnr_db")
+        for (supersampling, pointsPerThread) in configs {
+            let samples = try frames(supersampling: supersampling, pointsPerThread: pointsPerThread, count: evaluationFrames, seedBase: 10_000)
+            var psnrSum = 0.0
+            for sample in samples {
+                var mse = 0.0
+                for index in reference.indices {
+                    let difference = Double(sample[index]) - reference[index]
+                    mse += difference * difference
+                }
+                mse /= Double(reference.count)
+                psnrSum += 10.0 * log10(1.0 / max(mse, 1e-12))
+            }
+            let configColumn = "S\(supersampling)K\(pointsPerThread)".padding(toLength: 7, withPad: " ", startingAt: 0)
+            print("\(configColumn) \((psnrSum / Double(samples.count)).formatted(.number.precision(.fractionLength(2))))")
+        }
+    }
+
+    /// Reads back RGB (dropping alpha) from an rgba32Float texture.
+    private func readRGB(_ texture: MTLTexture) throws -> [Float] {
+        let pixelCount = texture.width * texture.height
+        var rgba = [Float](repeating: 0, count: pixelCount * 4)
+        if texture.storageMode == .managed {
+            guard let commandBuffer = commandQueue.makeCommandBuffer(), let blit = commandBuffer.makeBlitCommandEncoder() else {
+                throw BenchCommand.BenchError(message: "Blit encoding failed")
+            }
+            blit.synchronize(resource: texture)
+            blit.endEncoding()
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+        }
+        rgba.withUnsafeMutableBytes { pointer in
+            texture.getBytes(pointer.baseAddress!, bytesPerRow: texture.width * 16, from: MTLRegionMake2D(0, 0, texture.width, texture.height), mipmapLevel: 0)
+        }
+        var rgb = [Float](repeating: 0, count: pixelCount * 3)
+        for pixel in 0..<pixelCount {
+            rgb[pixel * 3] = rgba[pixel * 4]
+            rgb[pixel * 3 + 1] = rgba[pixel * 4 + 1]
+            rgb[pixel * 3 + 2] = rgba[pixel * 4 + 2]
+        }
+        return rgb
     }
 
     // MARK: - Output
