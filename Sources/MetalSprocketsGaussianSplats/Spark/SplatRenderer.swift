@@ -16,6 +16,11 @@ public enum SplatRenderer: String, CaseIterable, Sendable {
 
     /// Experimental stochastic renderer. Uses random sampling for transparency — doesn't require sorting but produces noisier results.
     case stochastic
+
+    /// Experimental sort-free stochastic point renderer (RFC 0003). Splats
+    /// pixel-sized opaque points via 64-bit atomics with temporal
+    /// accumulation. Requires Apple9/Mac2 GPU families.
+    case pointSplat = "point"
 }
 
 // MARK: - Environment

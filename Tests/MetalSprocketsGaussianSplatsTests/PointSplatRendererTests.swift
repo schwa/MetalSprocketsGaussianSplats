@@ -53,7 +53,7 @@ struct PointSplatRendererTests {
             rotation: simd_half4(0, 0, 0, 1),
             color: simd_uchar4(255, 0, 0, 255)
         )
-        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size))
+        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, maxPointsPerFrame: 200_000))
         let buffer = try makeSplatBuffer([splat])
         let (view, projection) = makeMatrices(size: size)
 
@@ -87,7 +87,7 @@ struct PointSplatRendererTests {
             let color = simd_uchar4(UInt8(50 + i * 10), 100, 200, 200)
             splats.append(SparkSplat(position: position, scale: simd_half3(repeating: 0.2), rotation: simd_half4(0, 0, 0, 1), color: color))
         }
-        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size))
+        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, maxPointsPerFrame: 200_000))
         let buffer = try makeSplatBuffer(splats)
         let (view, projection) = makeMatrices(size: size)
 
@@ -102,7 +102,7 @@ struct PointSplatRendererTests {
     func emptyScene() throws {
         let size = 16
         let background = SIMD3<Float>(0.25, 0.5, 0.75)
-        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, backgroundColor: background))
+        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, maxPointsPerFrame: 200_000, backgroundColor: background))
         let splat = SparkSplat(position: simd_half3(0, 0, 0), scale: simd_half3(repeating: 0.1), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(255, 255, 255, 0))
         let buffer = try makeSplatBuffer([splat])
         let (view, projection) = makeMatrices(size: size)
@@ -121,7 +121,7 @@ struct PointSplatRendererTests {
         // Two overlapping opaque splats; green is closer to the camera.
         let red = SparkSplat(position: simd_half3(0, 0, -1), scale: simd_half3(repeating: 0.5), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(255, 0, 0, 255))
         let green = SparkSplat(position: simd_half3(0, 0, 1), scale: simd_half3(repeating: 0.5), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 255, 0, 255))
-        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size))
+        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, maxPointsPerFrame: 200_000))
         let buffer = try makeSplatBuffer([red, green])
         let (view, projection) = makeMatrices(size: size)
 

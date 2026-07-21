@@ -22,7 +22,7 @@ struct PointSplatWorkloadTests {
     }
 
     private func run(counts: [UInt32], capacity: Int) throws -> (indices: [UInt32], total: Int) {
-        let distributor = try PointSplatWorkloadDistributor(device: device, capacity: capacity)
+        let distributor = try PointSplatWorkloadDistributor(device: device, capacity: capacity, maxSplats: counts.count)
         guard let countsBuffer = device.makeBuffer(bytes: counts, length: MemoryLayout<UInt32>.stride * counts.count) else {
             throw TestError.bufferAllocationFailed
         }

@@ -52,7 +52,7 @@ public final class PointSplatRenderer {
     private let preprocess: MTLComputePipelineState
     private let splat: MTLComputePipelineState
     private let resolve: MTLComputePipelineState
-    private let distributor: PointSplatWorkloadDistributor
+    private var distributor: PointSplatWorkloadDistributor?
     private let framebuffer: MTLBuffer
     private let outTexture: MTLTexture
 
@@ -79,8 +79,6 @@ public final class PointSplatRenderer {
         preprocess = try pipeline("pointSplatPreprocess")
         splat = try pipeline("pointSplatSplat")
         resolve = try pipeline("pointSplatResolve")
-
-        distributor = try PointSplatWorkloadDistributor(device: device, capacity: configuration.maxPointsPerFrame)
 
         let pixelCount = configuration.width * configuration.height
         guard let framebuffer = device.makeBuffer(length: MemoryLayout<UInt64>.stride * pixelCount, options: .storageModePrivate) else {
@@ -120,52 +118,49 @@ public final class PointSplatRenderer {
         guard let counts = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate) else {
             throw RendererError.bufferAllocationFailed
         }
+        if distributor == nil || distributor?.maxSplats ?? 0 < splatCount {
+            distributor = try PointSplatWorkloadDistributor(device: device, capacity: configuration.maxPointsPerFrame, maxSplats: splatCount)
+        }
+        guard let distributor else {
+            throw RendererError.bufferAllocationFailed
+        }
 
-        // Stage 1: clear + preprocess.
-        guard let commandBufferA = commandQueue.makeCommandBuffer(), let encoderA = commandBufferA.makeComputeCommandEncoder() else {
+        // Whole frame in one serial compute encoder; the splat dispatch is
+        // sized to capacity and exits threads past the GPU-side total.
+        guard let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw RendererError.commandEncodingFailed
         }
-        encoderA.setComputePipelineState(clear)
-        encoderA.setBuffer(framebuffer, offset: 0, index: 0)
-        encoderA.setBytes(&clearValue, length: MemoryLayout<UInt64>.stride, index: 1)
-        encoderA.setBytes(&pixelCountValue, length: MemoryLayout<UInt32>.stride, index: 2)
-        encoderA.dispatchThreads(MTLSize(width: pixelCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+        encoder.setComputePipelineState(clear)
+        encoder.setBuffer(framebuffer, offset: 0, index: 0)
+        encoder.setBytes(&clearValue, length: MemoryLayout<UInt64>.stride, index: 1)
+        encoder.setBytes(&pixelCountValue, length: MemoryLayout<UInt32>.stride, index: 2)
+        encoder.dispatchThreads(MTLSize(width: pixelCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
-        encoderA.setComputePipelineState(preprocess)
-        encoderA.setBuffer(splats, offset: 0, index: 0)
-        encoderA.setBuffer(counts, offset: 0, index: 1)
-        encoderA.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 2)
-        encoderA.dispatchThreads(MTLSize(width: splatCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
-        encoderA.endEncoding()
-        commandBufferA.commit()
-        commandBufferA.waitUntilCompleted()
+        encoder.setComputePipelineState(preprocess)
+        encoder.setBuffer(splats, offset: 0, index: 0)
+        encoder.setBuffer(counts, offset: 0, index: 1)
+        encoder.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 2)
+        encoder.dispatchThreads(MTLSize(width: splatCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
-        // Stage 2: work distribution (blocking, includes its own readback).
-        let workload = try distributor.build(counts: counts, count: splatCount, commandQueue: commandQueue)
+        try distributor.encode(encoder: encoder, counts: counts, count: splatCount)
 
-        // Stage 3: splat + resolve.
-        guard let commandBufferB = commandQueue.makeCommandBuffer(), let encoderB = commandBufferB.makeComputeCommandEncoder() else {
-            throw RendererError.commandEncodingFailed
-        }
-        if workload.totalPoints > 0 {
-            var numPoints = UInt32(workload.totalPoints)
-            encoderB.setComputePipelineState(splat)
-            encoderB.setBuffer(splats, offset: 0, index: 0)
-            encoderB.setBuffer(workload.indices, offset: 0, index: 1)
-            encoderB.setBuffer(framebuffer, offset: 0, index: 2)
-            encoderB.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
-            encoderB.setBytes(&numPoints, length: MemoryLayout<UInt32>.stride, index: 4)
-            encoderB.setBuffer(framebuffer, offset: 0, index: 5)
-            encoderB.dispatchThreads(MTLSize(width: workload.totalPoints, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
-        }
-        encoderB.setComputePipelineState(resolve)
-        encoderB.setBuffer(framebuffer, offset: 0, index: 0)
-        encoderB.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 1)
-        encoderB.setTexture(outTexture, index: 0)
-        encoderB.dispatchThreads(MTLSize(width: configuration.width, height: configuration.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
-        encoderB.endEncoding()
-        commandBufferB.commit()
-        commandBufferB.waitUntilCompleted()
+        encoder.setComputePipelineState(splat)
+        encoder.setBuffer(splats, offset: 0, index: 0)
+        encoder.setBuffer(distributor.indicesBuffer, offset: 0, index: 1)
+        encoder.setBuffer(framebuffer, offset: 0, index: 2)
+        encoder.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
+        encoder.setBuffer(distributor.totalsBuffer, offset: 0, index: 4)
+        encoder.setBuffer(framebuffer, offset: 0, index: 5)
+        encoder.dispatchThreads(MTLSize(width: configuration.maxPointsPerFrame, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+
+        encoder.setComputePipelineState(resolve)
+        encoder.setBuffer(framebuffer, offset: 0, index: 0)
+        encoder.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 1)
+        encoder.setTexture(outTexture, index: 0)
+        encoder.dispatchThreads(MTLSize(width: configuration.width, height: configuration.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
 
         return outTexture
     }

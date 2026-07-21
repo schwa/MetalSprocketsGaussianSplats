@@ -69,6 +69,16 @@ namespace PointSplatWorkload {
         totals[0] = running;
     }
 
+    // Phase 2.5: zero the indices array ahead of the scatter, so the whole
+    // pipeline can run in one compute encoder without a blit fill.
+    kernel void workloadClearIndices(device uint   *indices  [[buffer(0)]],
+                                     constant uint &capacity [[buffer(1)]],
+                                     uint gid [[thread_position_in_grid]]) {
+        if (gid < capacity) {
+            indices[gid] = 0;
+        }
+    }
+
     // Phase 3: scatter Gaussian index g into indices[t_g] where t_g is the
     // global exclusive prefix sum. indices must be zero-initialized.
     // Entries past `capacity` are dropped (points silently missing, per paper).

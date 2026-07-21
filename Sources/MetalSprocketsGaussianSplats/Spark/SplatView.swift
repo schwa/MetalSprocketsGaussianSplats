@@ -138,10 +138,19 @@ public struct SplatView: View {
                 .renderPassDescriptorModifier { descriptor in
                     descriptor.renderTargetArrayLength = 1
                 }
+            case .pointSplat:
+                try PointSplatRenderPipeline(
+                    splatCloud: splatCloud,
+                    projectionMatrix: projectionMatrix,
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrix,
+                    drawableSize: size,
+                    frameIndex: UInt32(truncatingIfNeeded: context.frameUniforms.index)
+                )
             }
         }
         .overlay(alignment: .bottomLeading) {
-            if renderer == .tileBased {
+            if renderer == .tileBased || renderer == .pointSplat {
                 Text("Work in progress")
                     .font(.caption)
                     .padding(8)

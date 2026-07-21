@@ -8,16 +8,16 @@ import MetalSprocketsGaussianSplatShaders
 /// Converts per-Gaussian point counts into a thread-to-Gaussian index map:
 /// exclusive prefix sum, scatter, inclusive max-scan. The output `indices`
 /// buffer maps each splat-thread `t` to the Gaussian it samples, sorted by
-/// Gaussian index.
-///
-/// v0 performs a blocking CPU readback of the total point count between the
-/// scatter and max-scan stages (RFC 0002's indirect-dispatch gap).
+/// Gaussian index. The total point count lands in `totalsBuffer[0]` on the
+/// GPU timeline, so consumers can stay readback-free by dispatching over
+/// `capacity` and exiting threads past the total (RFC 0002's
+/// indirect-dispatch gap).
 public final class PointSplatWorkloadDistributor {
     public enum DistributorError: Error {
         case bufferAllocationFailed
         case commandEncodingFailed
         case functionNotFound(String)
-        case capacityExceeded(total: Int, capacity: Int)
+        case splatCountExceedsMaximum(count: Int, maximum: Int)
     }
 
     /// Elements per scan block. Must match WORKLOAD_BLOCK in PointSplatWorkload.metal.
@@ -33,20 +33,32 @@ public final class PointSplatWorkloadDistributor {
     public let device: MTLDevice
     /// Maximum number of points per frame (T in the paper).
     public let capacity: Int
+    /// Maximum number of Gaussians per `encode` call.
+    public let maxSplats: Int
+
+    /// Thread-to-Gaussian map, valid after the encoded work completes.
+    public let indicesBuffer: MTLBuffer
+    /// One uint32: the total point count, written on the GPU timeline.
+    public let totalsBuffer: MTLBuffer
 
     private let scanCountsBlock: MTLComputePipelineState
     private let scanBlockSums: MTLComputePipelineState
+    private let clearIndices: MTLComputePipelineState
     private let scatterIndices: MTLComputePipelineState
     private let maxScanBlock: MTLComputePipelineState
     private let scanBlockMaxes: MTLComputePipelineState
     private let applyBlockMax: MTLComputePipelineState
 
-    private let indices: MTLBuffer
-    private let totals: MTLBuffer
+    private let localPrefix: MTLBuffer
+    private let countBlockSums: MTLBuffer
+    private let countBlockBase: MTLBuffer
+    private let maxBlockMaxes: MTLBuffer
+    private let maxBlockCarry: MTLBuffer
 
-    public init(device: MTLDevice, capacity: Int) throws {
+    public init(device: MTLDevice, capacity: Int, maxSplats: Int) throws {
         self.device = device
         self.capacity = capacity
+        self.maxSplats = maxSplats
 
         let library = try device.makeDefaultLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
         func pipeline(_ name: String) throws -> MTLComputePipelineState {
@@ -57,110 +69,117 @@ public final class PointSplatWorkloadDistributor {
         }
         scanCountsBlock = try pipeline("workloadScanCountsBlock")
         scanBlockSums = try pipeline("workloadScanBlockSums")
+        clearIndices = try pipeline("workloadClearIndices")
         scatterIndices = try pipeline("workloadScatterIndices")
         maxScanBlock = try pipeline("workloadMaxScanBlock")
         scanBlockMaxes = try pipeline("workloadScanBlockMaxes")
         applyBlockMax = try pipeline("workloadApplyBlockMax")
 
-        guard let indices = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(capacity, 1), options: .storageModePrivate), let totals = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared) else {
+        let countBlocks = (maxSplats + Self.blockSize - 1) / Self.blockSize
+        let capacityBlocks = (capacity + Self.blockSize - 1) / Self.blockSize
+        let uintStride = MemoryLayout<UInt32>.stride
+        guard let indices = device.makeBuffer(length: uintStride * max(capacity, 1), options: .storageModePrivate),
+              let totals = device.makeBuffer(length: uintStride, options: .storageModeShared),
+              let localPrefix = device.makeBuffer(length: uintStride * max(maxSplats, 1), options: .storageModePrivate),
+              let countBlockSums = device.makeBuffer(length: uintStride * max(countBlocks, 1), options: .storageModePrivate),
+              let countBlockBase = device.makeBuffer(length: uintStride * max(countBlocks, 1), options: .storageModePrivate),
+              let maxBlockMaxes = device.makeBuffer(length: uintStride * max(capacityBlocks, 1), options: .storageModePrivate),
+              let maxBlockCarry = device.makeBuffer(length: uintStride * max(capacityBlocks, 1), options: .storageModePrivate) else {
             throw DistributorError.bufferAllocationFailed
         }
         indices.label = "PointSplat indices"
         totals.label = "PointSplat totals"
-        self.indices = indices
-        self.totals = totals
+        indicesBuffer = indices
+        totalsBuffer = totals
+        self.localPrefix = localPrefix
+        self.countBlockSums = countBlockSums
+        self.countBlockBase = countBlockBase
+        self.maxBlockMaxes = maxBlockMaxes
+        self.maxBlockCarry = maxBlockCarry
     }
 
-    /// Builds the thread-to-Gaussian map for the given per-Gaussian counts.
-    /// Blocks until the GPU work completes.
-    public func build(counts: MTLBuffer, count: Int, commandQueue: MTLCommandQueue) throws -> Result {
-        let blockSize = Self.blockSize
-        let numBlocks = (count + blockSize - 1) / blockSize
-        var numElements = UInt32(count)
-        var numBlocksValue = UInt32(numBlocks)
-        var capacityValue = UInt32(capacity)
-
-        guard let localPrefix = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(count, 1), options: .storageModePrivate), let blockScratchA = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(numBlocks, 1), options: .storageModePrivate), let blockScratchB = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(numBlocks, 1), options: .storageModePrivate) else {
-            throw DistributorError.bufferAllocationFailed
+    /// Encodes the full distribution pipeline into an open compute encoder.
+    /// The max-scan is sized to `capacity` so no CPU readback is required;
+    /// entries past the total are garbage and must not be consumed.
+    public func encode(encoder: MTLComputeCommandEncoder, counts: MTLBuffer, count: Int) throws {
+        guard count <= maxSplats else {
+            throw DistributorError.splatCountExceedsMaximum(count: count, maximum: maxSplats)
         }
+        let blockSize = Self.blockSize
+        let countBlocks = (count + blockSize - 1) / blockSize
+        let capacityBlocks = (capacity + blockSize - 1) / blockSize
+        var numElements = UInt32(count)
+        var numCountBlocks = UInt32(countBlocks)
+        var capacityValue = UInt32(capacity)
+        var numCapacityBlocks = UInt32(capacityBlocks)
 
         let blockThreads = MTLSize(width: blockSize, height: 1, depth: 1)
         let single = MTLSize(width: 1, height: 1, depth: 1)
+        let countGroups = MTLSize(width: countBlocks, height: 1, depth: 1)
+        let capacityGroups = MTLSize(width: capacityBlocks, height: 1, depth: 1)
+        let uintStride = MemoryLayout<UInt32>.stride
 
-        // Stage A: prefix sums + scatter.
-        guard let commandBufferA = commandQueue.makeCommandBuffer(), let blit = commandBufferA.makeBlitCommandEncoder() else {
+        encoder.setComputePipelineState(scanCountsBlock)
+        encoder.setBuffer(counts, offset: 0, index: 0)
+        encoder.setBuffer(localPrefix, offset: 0, index: 1)
+        encoder.setBuffer(countBlockSums, offset: 0, index: 2)
+        encoder.setBytes(&numElements, length: uintStride, index: 3)
+        encoder.dispatchThreadgroups(countGroups, threadsPerThreadgroup: blockThreads)
+
+        encoder.setComputePipelineState(scanBlockSums)
+        encoder.setBuffer(countBlockSums, offset: 0, index: 0)
+        encoder.setBuffer(countBlockBase, offset: 0, index: 1)
+        encoder.setBuffer(totalsBuffer, offset: 0, index: 2)
+        encoder.setBytes(&numCountBlocks, length: uintStride, index: 3)
+        encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
+
+        encoder.setComputePipelineState(clearIndices)
+        encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 1)
+        encoder.dispatchThreadgroups(capacityGroups, threadsPerThreadgroup: blockThreads)
+
+        encoder.setComputePipelineState(scatterIndices)
+        encoder.setBuffer(counts, offset: 0, index: 0)
+        encoder.setBuffer(localPrefix, offset: 0, index: 1)
+        encoder.setBuffer(countBlockBase, offset: 0, index: 2)
+        encoder.setBuffer(indicesBuffer, offset: 0, index: 3)
+        encoder.setBytes(&numElements, length: uintStride, index: 4)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 5)
+        encoder.dispatchThreadgroups(countGroups, threadsPerThreadgroup: blockThreads)
+
+        encoder.setComputePipelineState(maxScanBlock)
+        encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
+        encoder.setBuffer(maxBlockMaxes, offset: 0, index: 1)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 2)
+        encoder.dispatchThreadgroups(capacityGroups, threadsPerThreadgroup: blockThreads)
+
+        encoder.setComputePipelineState(scanBlockMaxes)
+        encoder.setBuffer(maxBlockMaxes, offset: 0, index: 0)
+        encoder.setBuffer(maxBlockCarry, offset: 0, index: 1)
+        encoder.setBytes(&numCapacityBlocks, length: uintStride, index: 2)
+        encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
+
+        encoder.setComputePipelineState(applyBlockMax)
+        encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
+        encoder.setBuffer(maxBlockCarry, offset: 0, index: 1)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 2)
+        encoder.dispatchThreadgroups(capacityGroups, threadsPerThreadgroup: blockThreads)
+    }
+
+    /// Builds the thread-to-Gaussian map, blocking until the GPU work
+    /// completes, and reads back the total. Convenience for offline/test use.
+    public func build(counts: MTLBuffer, count: Int, commandQueue: MTLCommandQueue) throws -> Result {
+        guard let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw DistributorError.commandEncodingFailed
         }
-        blit.fill(buffer: indices, range: 0..<indices.length, value: 0)
-        blit.endEncoding()
-        guard let encoderA = commandBufferA.makeComputeCommandEncoder() else {
-            throw DistributorError.commandEncodingFailed
-        }
-        encoderA.setComputePipelineState(scanCountsBlock)
-        encoderA.setBuffer(counts, offset: 0, index: 0)
-        encoderA.setBuffer(localPrefix, offset: 0, index: 1)
-        encoderA.setBuffer(blockScratchA, offset: 0, index: 2)
-        encoderA.setBytes(&numElements, length: MemoryLayout<UInt32>.stride, index: 3)
-        encoderA.dispatchThreadgroups(MTLSize(width: numBlocks, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+        try encode(encoder: encoder, counts: counts, count: count)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
 
-        encoderA.setComputePipelineState(scanBlockSums)
-        encoderA.setBuffer(blockScratchA, offset: 0, index: 0)
-        encoderA.setBuffer(blockScratchB, offset: 0, index: 1)
-        encoderA.setBuffer(totals, offset: 0, index: 2)
-        encoderA.setBytes(&numBlocksValue, length: MemoryLayout<UInt32>.stride, index: 3)
-        encoderA.dispatchThreadgroups(single, threadsPerThreadgroup: single)
-
-        encoderA.setComputePipelineState(scatterIndices)
-        encoderA.setBuffer(counts, offset: 0, index: 0)
-        encoderA.setBuffer(localPrefix, offset: 0, index: 1)
-        encoderA.setBuffer(blockScratchB, offset: 0, index: 2)
-        encoderA.setBuffer(indices, offset: 0, index: 3)
-        encoderA.setBytes(&numElements, length: MemoryLayout<UInt32>.stride, index: 4)
-        encoderA.setBytes(&capacityValue, length: MemoryLayout<UInt32>.stride, index: 5)
-        encoderA.dispatchThreadgroups(MTLSize(width: numBlocks, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
-        encoderA.endEncoding()
-        commandBufferA.commit()
-        commandBufferA.waitUntilCompleted()
-
-        let rawTotal = Int(totals.contents().load(as: UInt32.self))
+        let rawTotal = Int(totalsBuffer.contents().load(as: UInt32.self))
         assert(rawTotal <= capacity, "PointSplat budget exceeded: \(rawTotal) > \(capacity); tail Gaussians will drop points")
-        let totalPoints = min(rawTotal, capacity)
-        if totalPoints == 0 {
-            return Result(indices: indices, totalPoints: 0)
-        }
-
-        // Stage B: monotonic max-scan over [0, totalPoints).
-        var totalElements = UInt32(totalPoints)
-        let totalBlocks = (totalPoints + blockSize - 1) / blockSize
-        var totalBlocksValue = UInt32(totalBlocks)
-        guard let maxBlockMaxes = device.makeBuffer(length: MemoryLayout<UInt32>.stride * totalBlocks, options: .storageModePrivate), let maxBlockCarry = device.makeBuffer(length: MemoryLayout<UInt32>.stride * totalBlocks, options: .storageModePrivate) else {
-            throw DistributorError.bufferAllocationFailed
-        }
-        guard let commandBufferB = commandQueue.makeCommandBuffer(), let encoderB = commandBufferB.makeComputeCommandEncoder() else {
-            throw DistributorError.commandEncodingFailed
-        }
-        encoderB.setComputePipelineState(maxScanBlock)
-        encoderB.setBuffer(indices, offset: 0, index: 0)
-        encoderB.setBuffer(maxBlockMaxes, offset: 0, index: 1)
-        encoderB.setBytes(&totalElements, length: MemoryLayout<UInt32>.stride, index: 2)
-        encoderB.dispatchThreadgroups(MTLSize(width: totalBlocks, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
-
-        encoderB.setComputePipelineState(scanBlockMaxes)
-        encoderB.setBuffer(maxBlockMaxes, offset: 0, index: 0)
-        encoderB.setBuffer(maxBlockCarry, offset: 0, index: 1)
-        encoderB.setBytes(&totalBlocksValue, length: MemoryLayout<UInt32>.stride, index: 2)
-        encoderB.dispatchThreadgroups(single, threadsPerThreadgroup: single)
-
-        encoderB.setComputePipelineState(applyBlockMax)
-        encoderB.setBuffer(indices, offset: 0, index: 0)
-        encoderB.setBuffer(maxBlockCarry, offset: 0, index: 1)
-        encoderB.setBytes(&totalElements, length: MemoryLayout<UInt32>.stride, index: 2)
-        encoderB.dispatchThreadgroups(MTLSize(width: totalBlocks, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
-        encoderB.endEncoding()
-        commandBufferB.commit()
-        commandBufferB.waitUntilCompleted()
-
-        return Result(indices: indices, totalPoints: totalPoints)
+        return Result(indices: indicesBuffer, totalPoints: min(rawTotal, capacity))
     }
 }
 

@@ -138,10 +138,12 @@ namespace PointSplatRender {
                                 device const uint *indices [[buffer(1)]],
                                 device atomic_ulong *framebuffer [[buffer(2)]],
                                 constant PointSplatUniforms &uniforms [[buffer(3)]],
-                                constant uint &numPoints [[buffer(4)]],
+                                device const uint *totals [[buffer(4)]],
                                 device const ulong *framebufferRead [[buffer(5)]],
                                 uint gid [[thread_position_in_grid]]) {
-        if (gid >= numPoints) {
+        // Dispatched over the full capacity; totals[0] is the actual point
+        // count written by the workload distributor on the GPU timeline.
+        if (gid >= min(totals[0], uniforms.capacity)) {
             return;
         }
         uint gaussianIndex = indices[gid];
