@@ -116,11 +116,11 @@ Architecture refactor: Move sort management from SparkSplatRenderPipeline to the
 
 +++
 status: open
-priority: high
+priority: low
 kind: bug
 labels: effort:xl, not-testable
 created: 2026-02-20T00:00:00Z
-updated: 2026-07-21T20:45:36Z
+updated: 2026-07-21T22:29:46Z
 +++
 
 ## Problem
@@ -1388,11 +1388,11 @@ Related: #58, #59.
 
 +++
 status: open
-priority: medium
+priority: low
 kind: feature
 labels: tile-based, effort:xl
 created: 2026-07-20T19:01:34Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T22:29:46Z
 +++
 
 The GPU-sorted pipeline (SplatGPUSort) and the tile-based renderer are converging on the same front-end tools: frustum cull, depth keys, radix sort. They differ only in back-end — sorted instanced quads with hardware blending (Spark/GPU) vs per-pixel front-to-back imageblock accumulation with early termination (tile).
@@ -1827,10 +1827,12 @@ In SparkSplatRenderPipeline's Draw closure, `shDegreeValue` (index 11) and `boun
 ## 87: Support .lcc2 splat format
 
 +++
-status: new
+status: open
 priority: medium
-kind: none
+kind: feature
+labels: splats, effort:l
 created: 2026-07-21T21:44:25Z
+updated: 2026-07-21T22:30:08Z
 +++
 
 The LCC2 format (from XGRIDS) is a Gaussian splat container format that is not currently supported for loading/rendering.
@@ -1842,11 +1844,12 @@ Whitepaper/spec: https://github.com/xgrids/LCC2Whitepaper
 ## 88: Audit code comments against writing-comments skill
 
 +++
-status: new
+status: open
 priority: medium
 kind: task
 labels: code-style, effort:m
 created: 2026-07-21T21:54:29Z
+updated: 2026-07-21T22:30:04Z
 +++
 
 Source comments across the project have not been audited against the house writing-comments skill rules. Review comments in Sources/, Examples/, and Tests/ for violations (redundant narration, stale/incorrect comments, commented-out code, etc.) and clean them up.
@@ -1856,12 +1859,12 @@ Source comments across the project have not been audited against the house writi
 ## 89: PointSplat: Morton-reorder splats at load time for group culling coherence
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
-labels: pointsplat, performance
+labels: pointsplat, performance, effort:m
 created: 2026-07-21T21:57:34Z
-updated: 2026-07-21T22:01:42Z
+updated: 2026-07-21T22:30:09Z
 +++
 
 Group-level hierarchical culling (#75) uses groups of 256 consecutive Gaussians with precomputed AABBs. Culling effectiveness depends on groups being spatially coherent; PLY/SOG files are often only loosely ordered. Add an optional Morton (or BVH) reorder of the splat array at load time so group AABBs are tight and whole groups cull cleanly. Remember to reorder SH coefficient storage alongside positions.
