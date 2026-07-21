@@ -2,6 +2,7 @@
 
 import Metal
 import MetalSprockets
+internal import os
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import simd
@@ -194,13 +195,30 @@ public struct PointSplatRenderPipeline: Element {
 
 /// Live PointSplat workload numbers, updated once per frame from the
 /// previous frame's GPU-written totals. Poll (rather than observe) from UI.
-public final class PointSplatStatistics: @unchecked Sendable {
+public final class PointSplatStatistics: Sendable {
+    private struct State {
+        var pointCount = 0
+        var pointDemand = 0
+        var pointBudget = 0
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
     /// Points splatted last frame (after any over-budget scaling).
-    public var pointCount: Int = 0
+    public var pointCount: Int {
+        get { state.withLock(\.pointCount) }
+        set { state.withLock { $0.pointCount = newValue } }
+    }
     /// Raw point demand last frame; exceeding the budget means splats are
     /// being thinned proportionally.
-    public var pointDemand: Int = 0
-    public var pointBudget: Int = 0
+    public var pointDemand: Int {
+        get { state.withLock(\.pointDemand) }
+        set { state.withLock { $0.pointDemand = newValue } }
+    }
+    public var pointBudget: Int {
+        get { state.withLock(\.pointBudget) }
+        set { state.withLock { $0.pointBudget = newValue } }
+    }
 
     public init() {
         // No stored configuration; all fields start at zero.

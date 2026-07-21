@@ -2009,12 +2009,13 @@ ARSplatSessionModel.session(_:didUpdate:) spawns an unstructured Task { @MainAct
 ## 96: PointSplatStatistics: @unchecked Sendable without synchronization
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: concurrency, pointsplat, code-style, effort:xs
 created: 2026-07-21T23:49:07Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:55:56Z
+closed: 2026-07-21T23:55:56Z
 +++
 
 PointSplatStatistics is @unchecked Sendable but its three fields have no synchronization. Both writer (element workload phase) and reader (SwiftUI polling) are currently the main thread, so it works, but the conformance advertises cross-thread safety it does not have. Either drop the conformance and mark it @MainActor, or guard the fields with OSAllocatedUnfairLock.
