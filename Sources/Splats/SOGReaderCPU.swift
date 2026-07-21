@@ -21,7 +21,7 @@ public struct SOGReaderCPU: SplatReaderProtocol {
 
     /// Load SOG data
     public init(data: Data) throws {
-        // Write data to temp file since we need URL for ZIP extraction
+        // ZIP extraction requires a URL, so stage the data in a temp file.
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("sog")
@@ -60,7 +60,6 @@ public struct SOGReaderCPU: SplatReaderProtocol {
     }
 
     private static func loadSplats(from url: URL) throws -> LoadResult {
-        // Open archive
         let archive: Archive
         do {
             archive = try Archive(url: url, accessMode: .read)
@@ -68,18 +67,16 @@ public struct SOGReaderCPU: SplatReaderProtocol {
             throw SplatsError.failedToExtractZIP
         }
 
-        // Load metadata
         let metadataData = try extractData(from: archive, filename: "meta.json")
         let metadata = try JSONDecoder().decode(SOGReaderCPUMetadata.self, from: metadataData)
 
-        // Load image data directly from archive
         let meansLowData = try loadImageData(from: archive, filename: metadata.means.files[0])
         let meansHighData = try loadImageData(from: archive, filename: metadata.means.files[1])
         let scalesData = try loadImageData(from: archive, filename: metadata.scales.files[0])
         let quatsData = try loadImageData(from: archive, filename: metadata.quats.files[0])
         let sh0Data = try loadImageData(from: archive, filename: metadata.sh0.files[0])
 
-        // Load higher-order SH data if present
+        // Higher-order SH data is optional
         var shCentroids: [UInt8]?
         var shLabels: [UInt8]?
         var shCentroidsWidth: Int = 0
@@ -90,15 +87,12 @@ public struct SOGReaderCPU: SplatReaderProtocol {
             shLabels = try loadImageData(from: archive, filename: shN.files[1])
         }
 
-        // Extract mins/maxs from metadata
         let mins = SIMD3<Float>(metadata.means.mins[0], metadata.means.mins[1], metadata.means.mins[2])
         let maxs = SIMD3<Float>(metadata.means.maxs[0], metadata.means.maxs[1], metadata.means.maxs[2])
 
-        // Convert to splats
         var splats = [GenericSplat]()
         splats.reserveCapacity(metadata.count)
 
-        // Prepare SH storage if we have higher-order SH
         var sphericalHarmonics: [[[Float]]]? // [splat][coefficient][rgb]
         var shDegree = 0
         if let shN = metadata.shN, shCentroids != nil, shLabels != nil {
@@ -110,16 +104,13 @@ public struct SOGReaderCPU: SplatReaderProtocol {
         let scalesCodebook = metadata.scales.codebook
         let sh0Codebook = metadata.sh0.codebook
 
-        // Number of coefficients per band (excluding DC/SH0):
-        // Band 1 (degree 1): 3 coefficients
-        // Band 2 (degree 2): 5 coefficients (total 8 for bands 1-2)
-        // Band 3 (degree 3): 7 coefficients (total 15 for bands 1-3)
+        // Cumulative coefficients above DC for bands 1-3: 3, 3+5, 3+5+7.
         let coeffsPerBand = [3, 8, 15]
 
         for i in 0..<metadata.count {
             let offset = i * 4
 
-            // Position from means textures
+            // Position: 16-bit normalized log-space coords split across low/high textures.
             let rawX = (UInt16(meansHighData[offset]) << 8) | UInt16(meansLowData[offset])
             let rawY = (UInt16(meansHighData[offset + 1]) << 8) | UInt16(meansLowData[offset + 1])
             let rawZ = (UInt16(meansHighData[offset + 2]) << 8) | UInt16(meansLowData[offset + 2])
@@ -140,7 +131,7 @@ public struct SOGReaderCPU: SplatReaderProtocol {
 
             let position = SIMD3<Float>(invLog(logX), invLog(logY), invLog(logZ))
 
-            // Scale from codebook (each channel is a separate index)
+            // Scale: each channel is a separate codebook index.
             let scaleXIndex = Int(scalesData[offset])
             let scaleYIndex = Int(scalesData[offset + 1])
             let scaleZIndex = Int(scalesData[offset + 2])
@@ -150,8 +141,8 @@ public struct SOGReaderCPU: SplatReaderProtocol {
                 exp(scalesCodebook[scaleZIndex])
             )
 
-            // Rotation from texture using smallest-3 encoding
-            // RGB stores 3 quaternion components, alpha (252-255) indicates which was dropped
+            // Rotation: smallest-3 encoding. RGB stores 3 quaternion components,
+            // alpha (252-255) indicates which was dropped.
             let SQRT2: Float = 1.4142135623730951
             let r0 = (Float(quatsData[offset]) / 255.0 - 0.5) * SQRT2
             let r1 = (Float(quatsData[offset + 1]) / 255.0 - 0.5) * SQRT2
@@ -159,15 +150,14 @@ public struct SOGReaderCPU: SplatReaderProtocol {
             let rr = sqrt(max(0.0, 1.0 - r0 * r0 - r1 * r1 - r2 * r2))
             let rOrder = Int(quatsData[offset + 3]) - 252
 
-            // Reconstruct quaternion based on which component was dropped (matching JS reference)
+            // Reconstruction order matches the PlayCanvas JS reference.
             let qx = rOrder == 0 ? r0 : rOrder == 1 ? rr : r1
             let qy = rOrder <= 1 ? r1 : rOrder == 2 ? rr : r2
             let qz = rOrder <= 2 ? r2 : rr
             let qw = rOrder == 0 ? rr : r0
             let rotation = simd_quatf(ix: qx, iy: qy, iz: qz, r: qw).normalized
 
-            // Color from SH0 codebook
-            // Each RGB channel byte is a direct index into the 256-value codebook
+            // Color: each RGB channel byte indexes the 256-value SH0 codebook.
             let SH_C0: Float = 0.28209479177387814
             let rIndex = Int(sh0Data[offset])
             let gIndex = Int(sh0Data[offset + 1])
@@ -176,7 +166,6 @@ public struct SOGReaderCPU: SplatReaderProtocol {
             let g = max(0, min(1, sh0Codebook[gIndex] * SH_C0 + 0.5))
             let b = max(0, min(1, sh0Codebook[bIndex] * SH_C0 + 0.5))
 
-            // Alpha from texture alpha channel
             let alpha = Float(sh0Data[offset + 3]) / 255.0
 
             let splat = GenericSplat(
@@ -187,18 +176,13 @@ public struct SOGReaderCPU: SplatReaderProtocol {
             )
             splats.append(splat)
 
-            // Extract higher-order SH coefficients if present
             if let shN = metadata.shN, let centroids = shCentroids, let labels = shLabels {
                 let numCoeffs = coeffsPerBand[shN.bands - 1]
 
-                // Get 16-bit palette index from labels (R + G << 8)
+                // 16-bit palette index packed into label RG bytes.
                 let paletteIndex = Int(labels[offset]) + (Int(labels[offset + 1]) << 8)
 
-                // Look up SH coefficients from centroids palette
-                // Palette layout: 64 entries per row, each entry has numCoeffs pixels (RGB per pixel)
-                // For palette entry n and coefficient c:
-                //   u = (n % 64) * numCoeffs + c
-                //   v = n / 64
+                // Centroids palette: 64 entries per row, each entry numCoeffs RGB pixels wide.
                 let entriesPerRow = 64
                 let paletteU = (paletteIndex % entriesPerRow) * numCoeffs
                 let paletteV = paletteIndex / entriesPerRow
@@ -206,18 +190,16 @@ public struct SOGReaderCPU: SplatReaderProtocol {
                 var shCoeffs = [[Float]]()
                 shCoeffs.reserveCapacity(numCoeffs)
 
-                // Read each coefficient (each is an RGB pixel in the centroids texture)
                 for c in 0..<numCoeffs {
                     let pixelX = paletteU + c
                     let pixelY = paletteV
                     let pixelOffset = (pixelY * shCentroidsWidth + pixelX) * 4 // RGBA
 
-                    // RGB values are indices into the shN codebook
+                    // RGB values index the shN codebook.
                     let rIdx = Int(centroids[pixelOffset])
                     let gIdx = Int(centroids[pixelOffset + 1])
                     let bIdx = Int(centroids[pixelOffset + 2])
 
-                    // Look up actual SH values from codebook
                     let shR = shN.codebook[rIdx]
                     let shG = shN.codebook[gIdx]
                     let shB = shN.codebook[bIdx]

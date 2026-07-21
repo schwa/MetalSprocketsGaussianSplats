@@ -22,7 +22,6 @@ struct CrossFormatTests {
         let url = Bundle.module.url(forResource: "test-grid", withExtension: "csv", subdirectory: "Fixtures")!
         let dataFrame = try DataFrame(contentsOfCSVFile: url)
 
-        // Helper to get Float from any numeric type
         func toFloat(_ value: Any?) -> Float {
             switch value {
             case let v as Double:

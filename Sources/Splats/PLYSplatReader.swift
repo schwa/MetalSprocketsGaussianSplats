@@ -56,21 +56,8 @@ public struct PLYSplatReader: SplatReaderProtocol {
 
         let propertyNames = Set(element.properties.map(\.name))
 
-        // Check for f_rest properties to determine SH degree
-        // Degree 1: 3 basis functions (minus DC) = 3 * 3 = 9 values -> f_rest_0 to f_rest_8
-        // Degree 2: 8 basis functions (minus DC) = 8 * 3 = 24 values -> f_rest_0 to f_rest_23
-        // Degree 3: 15 basis functions (minus DC) = 15 * 3 = 45 values -> f_rest_0 to f_rest_44
-        //
-        // But actually, the way 3DGS stores it:
-        // - DC (l=0): 1 coefficient per channel = 3 total (f_dc_0, f_dc_1, f_dc_2)
-        // - Degree 1 (l=1): 3 coefficients per channel = 9 total
-        // - Degree 2 (l=2): 5 coefficients per channel = 15 total
-        // - Degree 3 (l=3): 7 coefficients per channel = 21 total
-        //
-        // So for "degree 3" (using all bands 1-3):
-        // (3 + 5 + 7) * 3 = 45 f_rest values
-
-        // Check from highest to lowest degree
+        // 3DGS stores (3 + 5 + 7) = 15 per-channel coefficients above DC, so
+        // degree 1 -> 9 f_rest values, degree 2 -> 24, degree 3 -> 45.
         if propertyNames.contains("f_rest_44") {
             return 3
         }
@@ -91,10 +78,7 @@ public struct PLYSplatReader: SplatReaderProtocol {
             return nil
         }
 
-        // Number of coefficients (basis functions) per degree, excluding DC:
-        // Degree 1: 3 (l=1 has 3 basis functions)
-        // Degree 2: 3 + 5 = 8 (l=1 + l=2)
-        // Degree 3: 3 + 5 + 7 = 15 (l=1 + l=2 + l=3)
+        // Basis functions above DC per degree: 3 (l=1), +5 (l=2), +7 (l=3).
         let numCoeffs: Int
         switch degree {
         case 1:
@@ -107,21 +91,16 @@ public struct PLYSplatReader: SplatReaderProtocol {
             return nil
         }
 
-        // PLY stores SH in a different order than we need
-        // PLY f_rest layout: all R values, then all G values, then all B values
-        // We need: [[R0,G0,B0], [R1,G1,B1], ...]
-
+        // PLY f_rest is planar (all R, then all G, then all B); output is interleaved [[R,G,B], ...].
         var coefficients: [[Float]] = []
         coefficients.reserveCapacity(numCoeffs)
 
         for i in 0..<numCoeffs {
-            // PLY stores: f_rest_0..f_rest_(n-1) for R, f_rest_n..f_rest_(2n-1) for G, etc.
             let rIndex = i
             let gIndex = i + numCoeffs
             let bIndex = i + numCoeffs * 2
 
             guard let r = record["f_rest_\(rIndex)"]?.floatValue, let g = record["f_rest_\(gIndex)"]?.floatValue, let b = record["f_rest_\(bIndex)"]?.floatValue else {
-                // If we can't get all values, return nil for this splat
                 return nil
             }
 
@@ -143,24 +122,22 @@ public extension GenericSplat {
     /// - Rotation: rot_0, rot_1, rot_2, rot_3 (quaternion)
     /// - Opacity: opacity
     init?(plyRecord record: PLYReader.Record) {
-        // Extract position (required)
         guard let x = record["x"]?.floatValue, let y = record["y"]?.floatValue, let z = record["z"]?.floatValue else {
             return nil
         }
 
-        // Extract scale - try scale_0/1/2 first, fall back to sx/sy/sz
+        // scale_0/1/2 with sx/sy/sz fallback
         let scaleX = record["scale_0"]?.floatValue ?? record["sx"]?.floatValue ?? 0.0
         let scaleY = record["scale_1"]?.floatValue ?? record["sy"]?.floatValue ?? 0.0
         let scaleZ = record["scale_2"]?.floatValue ?? record["sz"]?.floatValue ?? 0.0
 
-        // Extract color - try f_dc_0/1/2 (Gaussian splat format), fall back to red/green/blue
+        // f_dc_0/1/2 (Gaussian splat format) with red/green/blue fallback
         let colorR: Float
         let colorG: Float
         let colorB: Float
 
         if let fdc0 = record["f_dc_0"]?.floatValue, let fdc1 = record["f_dc_1"]?.floatValue, let fdc2 = record["f_dc_2"]?.floatValue {
-            // Convert from spherical harmonics DC coefficient to color
-            // SH C0 coefficient: 0.28209479177387814
+            // SH DC coefficient to color via the C0 basis constant
             let SH_C0: Float = 0.28209479177387814
             colorR = (fdc0 * SH_C0 + 0.5).clamped(to: 0...1)
             colorG = (fdc1 * SH_C0 + 0.5).clamped(to: 0...1)
@@ -177,28 +154,25 @@ public extension GenericSplat {
                 colorB = blue.clamped(to: 0...1)
             }
         } else {
-            // Default to white if no color found
             colorR = 1.0
             colorG = 1.0
             colorB = 1.0
         }
 
-        // Extract opacity/alpha
         let opacity: Float
         if let rawOpacity = record["opacity"]?.floatValue {
-            // Apply sigmoid to convert from logit space
+            // Sigmoid converts from logit space
             opacity = 1.0 / (1.0 + exp(-rawOpacity))
         } else {
             opacity = record["alpha"]?.floatValue ?? 1.0
         }
 
-        // Extract rotation - quaternion (w, x, y, z) - standard 3DGS PLY order
+        // Quaternion in standard 3DGS PLY order (w, x, y, z)
         let rotW = record["rot_0"]?.floatValue ?? 1.0
         let rotX = record["rot_1"]?.floatValue ?? 0.0
         let rotY = record["rot_2"]?.floatValue ?? 0.0
         let rotZ = record["rot_3"]?.floatValue ?? 0.0
 
-        // Normalize quaternion
         let rotation = simd_quatf(ix: rotX, iy: rotY, iz: rotZ, r: rotW).normalized
 
         self.init(

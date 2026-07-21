@@ -71,19 +71,16 @@ struct PoolTests {
     func threadSafety() async {
         let pool = Pool<Int>(preallocatedCount: 0) { id in id }
 
-        // Spawn many concurrent acquires and releases
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<100 {
                 group.addTask {
                     let item = pool.acquire()
-                    // Simulate some work
                     try? await Task.sleep(for: .microseconds(10))
                     pool.release(item)
                 }
             }
         }
 
-        // All items should be back in pool
         #expect(pool.availableCount == pool.totalAllocatedCount)
     }
 }

@@ -19,8 +19,7 @@ struct SPZReaderTests {
 
         #expect(splats.count == 100)
 
-        // Check first splat has valid data
-        // Note: SPZ stores scales in log space, so values can be negative
+        // SPZ stores scales in log space, so values can be negative.
         let first = splats[0]
         #expect(first.position.x.isFinite)
         #expect(first.position.y.isFinite)

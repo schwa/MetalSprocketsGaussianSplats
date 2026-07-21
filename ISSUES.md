@@ -1877,12 +1877,13 @@ Whitepaper/spec: https://github.com/xgrids/LCC2Whitepaper
 ## 88: Audit code comments against writing-comments skill
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: code-style, effort:m
 created: 2026-07-21T21:54:29Z
-updated: 2026-07-21T22:30:04Z
+updated: 2026-07-21T23:20:28Z
+closed: 2026-07-21T23:20:28Z
 +++
 
 Source comments across the project have not been audited against the house writing-comments skill rules. Review comments in Sources/, Examples/, and Tests/ for violations (redundant narration, stale/incorrect comments, commented-out code, etc.) and clean them up.

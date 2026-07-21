@@ -35,7 +35,6 @@ struct PLYReaderTests {
         #expect(reader.recordCount == 3)
         #expect(reader.recordStruct.count == 6)
 
-        // Verify properties
         let properties = reader.recordStruct
         #expect(properties[0].name == "x")
         #expect(properties[0].type == .float)
@@ -44,7 +43,6 @@ struct PLYReaderTests {
         #expect(properties[3].name == "red")
         #expect(properties[3].type == .uchar)
 
-        // Read records
         var records: [PLYReader.Record] = []
         try reader.read { record in
             records.append(record)
@@ -52,7 +50,6 @@ struct PLYReaderTests {
 
         #expect(records.count == 3)
 
-        // Check first vertex
         if case .float(let x) = records[0]["x"] { #expect(x == 0.0) }
         if case .float(let y) = records[0]["y"] { #expect(y == 0.0) }
         if case .float(let z) = records[0]["z"] { #expect(z == 0.0) }
@@ -60,11 +57,9 @@ struct PLYReaderTests {
         if case .uchar(let green) = records[0]["green"] { #expect(green == 0) }
         if case .uchar(let blue) = records[0]["blue"] { #expect(blue == 0) }
 
-        // Check second vertex
         if case .float(let x) = records[1]["x"] { #expect(x == 1.0) }
         if case .uchar(let green) = records[1]["green"] { #expect(green == 255) }
 
-        // Check third vertex
         if case .float(let y) = records[2]["y"] { #expect(y == 1.0) }
         if case .uchar(let blue) = records[2]["blue"] { #expect(blue == 255) }
     }
@@ -77,7 +72,6 @@ struct PLYReaderTests {
         #expect(reader.format == .ascii)
         #expect(reader.elements.count == 2)
 
-        // Check vertex element
         let vertexElement = reader.elements[0]
         #expect(vertexElement.name == "vertex")
         #expect(vertexElement.count == 2)
@@ -92,7 +86,6 @@ struct PLYReaderTests {
         if case .float(let y) = vertices[0]["y"] { #expect(y == 2.0) }
         if case .float(let z) = vertices[0]["z"] { #expect(z == 3.0) }
 
-        // Check face element
         let faceElement = reader.elements[1]
         #expect(faceElement.name == "face")
         #expect(faceElement.count == 1)

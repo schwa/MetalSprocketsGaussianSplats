@@ -19,7 +19,6 @@ struct SOGReaderCPUTests {
 
         #expect(splats.count == 100)
 
-        // Check first splat has valid data
         let first = splats[0]
         #expect(first.position.x.isFinite)
         #expect(first.position.y.isFinite)

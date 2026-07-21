@@ -126,7 +126,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
                 } catch is CancellationError {
                     break
                 } catch {
-                    // Silently fail - no logger
+                    // No logger available here; drop the error.
                 }
             }
         }
@@ -320,7 +320,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
             done.store(true, ordering: .releasing)
         }
 
-        // Spin wait (not ideal but simple)
+        // Spin wait: blocking a nonisolated caller on an async task without a
+        // semaphore; sorts finish in milliseconds so the busy-wait is bounded.
         while !done.load(ordering: .acquiring) {
             Thread.sleep(forTimeInterval: 0.0001)
         }
@@ -375,13 +376,13 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         var outputBuffer = pool.acquire()
         let totalSplats: Int
         if clouds.count == 1 {
-            // Single cloud path - combine scene model with cloud transform
+            // Single cloud: combine scene model with the cloud transform.
             let cloud = clouds[0]
             let combinedModel = parameters.model * cloud.modelTransform
             sorter.sort(splats: cloud.splats, into: &outputBuffer, camera: parameters.camera, model: combinedModel, reversed: parameters.reversed)
             totalSplats = cloud.splats.count
         } else {
-            // Multi-cloud path - sorter handles per-cloud transforms internally
+            // Multi-cloud: sorter handles per-cloud transforms internally.
             sorter.sort(clouds: clouds, into: &outputBuffer, camera: parameters.camera, sceneModel: parameters.model, reversed: parameters.reversed)
             totalSplats = clouds.reduce(0) { $0 + $1.splats.count }
         }

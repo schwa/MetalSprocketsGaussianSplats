@@ -73,7 +73,7 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
             if let item = state.available.popLast() {
                 return item
             }
-            // Pool exhausted — allocate new
+            // Pool exhausted; allocate a fresh element.
             let id = state.nextID
             state.nextID += 1
             if !releaseDisabled {

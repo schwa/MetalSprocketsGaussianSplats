@@ -92,10 +92,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let device = _MTLCreateSystemDefaultDevice()
         let loadResult = try loadSplats(from: renderConfig.splat)
 
-        // Print splat info
         print("Loaded \(loadResult.splats.count) splats, SH degree: \(loadResult.shDegree), SH coefficients: \(loadResult.shCoefficients.count)")
 
-        // Export to CSV if requested
         if let csvPath = dumpCsv {
             try exportToCSV(loadResult: loadResult, path: csvPath)
             print("Exported \(loadResult.splats.count) splats to \(csvPath)")
@@ -307,7 +305,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     func exportToCSV(loadResult: SplatLoadResult, path: String) throws {
         var csv = "index,pos_x,pos_y,pos_z,scale_x,scale_y,scale_z,rot_x,rot_y,rot_z,rot_w,r,g,b,a"
 
-        // Add SH coefficient headers
         let floatsPerSplat = Self.shFloatsPerSplat(degree: loadResult.shDegree)
         let numCoeffs = floatsPerSplat / 3
         for i in 0..<numCoeffs {
@@ -322,7 +319,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             row += ",\(splat.rotation.x),\(splat.rotation.y),\(splat.rotation.z),\(splat.rotation.w)"
             row += ",\(splat.color.x),\(splat.color.y),\(splat.color.z),\(splat.color.w)"
 
-            // Add SH coefficients
             if floatsPerSplat > 0, !loadResult.shCoefficients.isEmpty {
                 let baseOffset = index * floatsPerSplat
                 for i in 0..<numCoeffs {
@@ -521,21 +517,18 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         }
 
         if let position = config.getCameraPosition() {
-            // Simple translation
             return simd_float4x4(translation: position)
         }
 
-        // Default camera at (0, 0, 1.5) looking at origin
         return LookAt(position: SIMD3<Float>(0, 0, 1.5), target: SIMD3<Float>(0, 0, 0), up: SIMD3<Float>(0, 1, 0)).cameraMatrix
     }
 
     func parseCameraRotationMatrix(_ components: [Float], config: RenderConfig) throws -> simd_float4x4 {
         if components.count == 4 {
-            // Quaternion (x, y, z, w)
+            // Quaternion components in (x, y, z, w) order.
             let quat = simd_quatf(ix: components[0], iy: components[1], iz: components[2], r: components[3])
             let rotationMatrix = simd_float4x4(quat)
 
-            // Apply position if specified
             if let position = config.getCameraPosition() {
                 var matrix = rotationMatrix
                 matrix.columns.3 = SIMD4<Float>(position.x, position.y, position.z, 1)
@@ -544,7 +537,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             return rotationMatrix
         }
         if components.count == 9 {
-            // 3x3 rotation matrix
+            // Row-major 3x3 rotation matrix.
             let matrix = simd_float4x4(
                 SIMD4<Float>(components[0], components[1], components[2], 0),
                 SIMD4<Float>(components[3], components[4], components[5], 0),
@@ -552,7 +545,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 SIMD4<Float>(0, 0, 0, 1)
             )
 
-            // Apply position if specified
             if let position = config.getCameraPosition() {
                 var finalMatrix = matrix
                 finalMatrix.columns.3 = SIMD4<Float>(position.x, position.y, position.z, 1)

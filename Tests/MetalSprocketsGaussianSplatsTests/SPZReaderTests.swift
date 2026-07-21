@@ -23,7 +23,6 @@ struct SPZReaderTests {
     func testReadHornedLizard() throws {
         let url = Self.samplesURL.appendingPathComponent("hornedlizard.spz")
 
-        // Skip test if sample file doesn't exist
         guard FileManager.default.fileExists(atPath: url.path) else {
             print("Skipping test - sample file not found: \(url.path)")
             return
@@ -31,7 +30,6 @@ struct SPZReaderTests {
 
         let reader = try SPZReader(url: url)
 
-        // Read some splats
         var count = 0
         var firstSplat: GenericSplat?
 
@@ -90,22 +88,18 @@ struct SPZReaderTests {
 
             let splat = extendedSplat.genericSplat
 
-            // Position should be reasonable (not NaN or infinite)
             #expect(!splat.position.x.isNaN && !splat.position.x.isInfinite)
             #expect(!splat.position.y.isNaN && !splat.position.y.isInfinite)
             #expect(!splat.position.z.isNaN && !splat.position.z.isInfinite)
 
-            // Color components should be valid
             #expect(!splat.color.x.isNaN && !splat.color.x.isInfinite)
             #expect(!splat.color.y.isNaN && !splat.color.y.isInfinite)
             #expect(!splat.color.z.isNaN && !splat.color.z.isInfinite)
 
-            // Scale components should be valid
             #expect(!splat.scale.x.isNaN && !splat.scale.x.isInfinite)
             #expect(!splat.scale.y.isNaN && !splat.scale.y.isInfinite)
             #expect(!splat.scale.z.isNaN && !splat.scale.z.isInfinite)
 
-            // Rotation quaternion should be normalized (approximately)
             let rot = splat.rotation
             let length = sqrt(rot.x * rot.x + rot.y * rot.y + rot.z * rot.z + rot.w * rot.w)
             #expect(abs(length - 1.0) < 0.01, "Quaternion should be normalized")

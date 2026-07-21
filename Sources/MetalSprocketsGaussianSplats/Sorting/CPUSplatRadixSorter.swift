@@ -70,7 +70,6 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
             signposter.withIntervalSignpost("CPUSplatRadixSorter.cpuRadixSort()", id: signpost) {
                 cpuRadixSort(splats: splats, indexedDistances: &outputBuffer, temporaryIndexedDistances: &temporaryIndexedDistances, camera: camera, model: model, reversed: reversed)
             }
-            // Update count after sorting - the buffer now contains splats.count sorted indices
             outputBuffer.count = splats.count
         }
     }
@@ -101,7 +100,6 @@ internal class CPUSplatRadixSorter <Splat> where Splat: SortableSplatProtocol {
             signposter.withIntervalSignpost("CPUSplatRadixSorter.cpuRadixSortMultiCloud()", id: signpost) {
                 cpuRadixSortMultiCloud(clouds: clouds, indexedDistances: &outputBuffer, temporaryIndexedDistances: &temporaryIndexedDistances, camera: camera, sceneModel: sceneModel, reversed: reversed, totalCount: totalCount)
             }
-            // Update count after sorting - the buffer now contains totalCount sorted indices
             outputBuffer.count = totalCount
         }
     }
@@ -128,7 +126,6 @@ private func cpuRadixSort<Splat>(splats: TypedMTLBuffer<Splat>, indexedDistances
     releaseAssert(splats.count <= temporaryIndexedDistances.count, "Too few temporary indexed distances \(temporaryIndexedDistances.count) for \(splats.count) splats.")
     indexedDistances.withUnsafeMutableBufferPointer { indexedDistances in
         let indexedDistances = UnsafeMutableBufferPointer<IndexedDistance>(start: indexedDistances.baseAddress, count: splats.count)
-        // Compute distances.
         let modelView = camera.inverse * model
         releaseAssert(splats.count <= indexedDistances.count, "Cannot sort \(splats.count) splats into \(indexedDistances.count) indexed distances.")
         splats.withUnsafeBufferPointer { splats in
@@ -161,7 +158,6 @@ private func cpuRadixSortMultiCloud<Splat>(clouds: [GPUSplatCloud<Splat>], index
     indexedDistances.withUnsafeMutableBufferPointer { indexedDistances in
         let indexedDistances = UnsafeMutableBufferPointer<IndexedDistance>(start: indexedDistances.baseAddress, count: totalCount)
 
-        // Compute distances for all splats across all clouds
         var outputIndex = 0
         for (cloudIndex, cloud) in clouds.enumerated() {
             // Combine: view * sceneModel * cloudModelTransform
@@ -176,7 +172,6 @@ private func cpuRadixSortMultiCloud<Splat>(clouds: [GPUSplatCloud<Splat>], index
             }
         }
 
-        // Sort all indices together
         temporaryIndexedDistances.withUnsafeMutableBufferPointer { temporaryIndexedDistances in
             let temporaryIndexedDistances = UnsafeMutableBufferPointer<IndexedDistance>(start: temporaryIndexedDistances.baseAddress, count: totalCount)
             RadixSortCPU<IndexedDistance>().radixSort(input: indexedDistances, temp: temporaryIndexedDistances)

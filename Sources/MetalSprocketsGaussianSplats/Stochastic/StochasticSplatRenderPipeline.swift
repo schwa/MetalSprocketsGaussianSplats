@@ -24,7 +24,6 @@ public struct StochasticSplatRenderPipeline: Element {
     var alphaThreshold: Float
     var useSphericalHarmonics: Bool
 
-    // Noise method
     var useBlueNoise: Bool
 
     @MSState
@@ -110,13 +109,12 @@ public struct StochasticSplatRenderPipeline: Element {
         self.alphaThreshold = alphaThreshold
         self.useBlueNoise = useBlueNoise
 
-        // Determine if SH should be used: explicit override, or auto-detect from data
+        // SH: explicit override, else auto-detect from data.
         let hasSHData = splatCloud.shCoefficients != nil
         let useSH = useSphericalHarmonics ?? hasSHData
         let effectiveUseSH = useSH && hasSHData // Can only use SH if data exists
         self.useSphericalHarmonics = effectiveUseSH
 
-        // Load blue noise texture
         guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {
             throw CocoaError(.fileNoSuchFile)
         }
@@ -127,7 +125,6 @@ public struct StochasticSplatRenderPipeline: Element {
             .textureStorageMode: MTLStorageMode.private.rawValue
         ])
 
-        // Load Stochastic shaders
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("StochasticSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
@@ -140,7 +137,6 @@ public struct StochasticSplatRenderPipeline: Element {
         self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
         self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
 
-        // Setup vertex descriptor
         let vertexDescriptor = MTLVertexDescriptor()
         vertexDescriptor.attributes[0].format = .float2
         vertexDescriptor.attributes[0].offset = 0

@@ -93,7 +93,6 @@ public struct TileBasedSplatPipeline: Element {
                 )
             }
             .renderPassDescriptorModifier { descriptor in
-                // Configure for Metal tile shading with imageblock
                 descriptor.tileWidth = Int(TILE_SIZE)
                 descriptor.tileHeight = Int(TILE_SIZE)
                 // TileSplatImageblock contains half4 = 4 * 2 bytes = 8 bytes, aligned to 16

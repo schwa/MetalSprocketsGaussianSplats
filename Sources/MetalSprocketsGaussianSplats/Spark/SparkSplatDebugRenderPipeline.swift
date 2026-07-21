@@ -156,7 +156,6 @@ public struct SparkSplatDebugRenderPipeline: Element {
         self.boundingBox = boundingBox
         self.sortedIndices = sortedIndices
 
-        // Derive debug mode from params
         switch debugParams {
         case .distance:
             self.debugMode = .distanceFromCenter
@@ -174,17 +173,16 @@ public struct SparkSplatDebugRenderPipeline: Element {
             self.debugMode = .cloudIndex
         }
 
-        // Load shaders from the same namespace as SparkSplatRenderPipeline
+        // Same shader namespace as SparkSplatRenderPipeline.
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
         vertexConstants["use_sh"] = .bool(false)  // No SH for debug mode
         vertexConstants["use_bounding_box"] = .bool(boundingBox != nil)
 
-        // Reuse the same vertex shader as the normal render pipeline
+        // Same vertex shader as the normal render pipeline.
         self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
 
-        // Select debug fragment shader based on mode
         let fragmentName: String
         switch debugMode {
         case .distanceFromCenter:
@@ -204,7 +202,6 @@ public struct SparkSplatDebugRenderPipeline: Element {
         }
         self.fragmentShader = try shaderLibrary.function(named: fragmentName, type: FragmentShader.self)
 
-        // Setup vertex descriptor
         let vertexDescriptor = MTLVertexDescriptor()
         vertexDescriptor.attributes[0].format = .float2
         vertexDescriptor.attributes[0].offset = 0
@@ -214,13 +211,10 @@ public struct SparkSplatDebugRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
-            // Compute view matrices (inverse of camera matrices)
             let viewMatrices = cameraMatrices.map(\.inverse)
 
-            // Extract camera positions from camera matrices
             let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
 
-            // Amplification count for stereo rendering
             let amplificationCount = cameraMatrices.count
 
             try Group {
@@ -244,7 +238,6 @@ public struct SparkSplatDebugRenderPipeline: Element {
     ) throws -> some Element {
         let device = MTLCreateSystemDefaultDevice()!
 
-        // Build per-cloud data array
         var cloudDataArray: [SplatCloudData] = []
         for cloud in splatClouds {
             let combinedModel = modelMatrix * cloud.modelTransform
@@ -257,10 +250,9 @@ public struct SparkSplatDebugRenderPipeline: Element {
             cloudDataArray.append(cloudData)
         }
 
-        // Create buffer for cloud data array
         let cloudDataBuffer = try device.makeTypedBuffer(values: cloudDataArray, options: []).labeled("CloudData")
 
-        // Collect all resources that need to be marked as in use
+        // Cloud buffers are referenced via GPU addresses, so they must be marked in use.
         var resourcesToUse: [MTLResource] = [cloudDataBuffer.unsafeMTLBuffer]
         for cloud in splatClouds {
             resourcesToUse.append(cloud.splats.unsafeMTLBuffer)

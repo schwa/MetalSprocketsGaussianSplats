@@ -185,13 +185,12 @@ public struct SparkSplatRenderPipeline: Element {
         self.convertSRGBToLinear = convertSRGBToLinear
         self.sortedIndices = sortedIndices
 
-        // Determine if SH should be used: explicit override, or auto-detect from any cloud having SH data
+        // SH: explicit override, else auto-detect from any cloud having SH data.
         let hasSHData = splatClouds.contains { $0.shCoefficients != nil }
         let useSH = useSphericalHarmonics ?? hasSHData
         let effectiveUseSH = useSH && hasSHData
         self.useSphericalHarmonics = effectiveUseSH
 
-        // Load Spark shaders - use multi-cloud shader if more than one cloud
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
@@ -204,7 +203,6 @@ public struct SparkSplatRenderPipeline: Element {
         self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
         self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
 
-        // Setup vertex descriptor
         let vertexDescriptor = MTLVertexDescriptor()
         vertexDescriptor.attributes[0].format = .float2
         vertexDescriptor.attributes[0].offset = 0
@@ -272,11 +270,9 @@ public struct SparkSplatRenderPipeline: Element {
             cloudDataCache = CloudDataCache(modelMatrix: modelMatrix, clouds: splatClouds, buffer: cloudDataBuffer)
         }
 
-        // Get max SH degree across all clouds
         let maxSHDegree = splatClouds.compactMap { $0.shCoefficients != nil ? $0.shDegree : nil }.max() ?? 0
 
-        // Build element with useResource for all cloud buffers
-        // Collect all resources that need to be marked as in use
+        // Cloud buffers are referenced via GPU addresses, so they must be marked in use.
         var resourcesToUse: [MTLResource] = [cloudDataBuffer.unsafeMTLBuffer]
         for cloud in splatClouds {
             resourcesToUse.append(cloud.splats.unsafeMTLBuffer)

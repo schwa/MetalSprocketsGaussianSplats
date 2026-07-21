@@ -68,33 +68,30 @@ public final class TileSplatResources {
         self.device = device
         self.drawableSize = drawableSize
 
-        // Compute tile grid dimensions
         let gridWidth = (UInt32(drawableSize.x) + Self.tileSize - 1) / Self.tileSize
         let gridHeight = (UInt32(drawableSize.y) + Self.tileSize - 1) / Self.tileSize
         self.tileGridSize = SIMD2(gridWidth, gridHeight)
 
         let totalTiles = Int(gridWidth) * Int(gridHeight)
 
-        // Allocate two compacted tile splat index buffers for ping-pong sorting
+        // Two compacted index buffers for ping-pong sorting.
         self.tileSplatIndicesA = try device.makeTypedBuffer(element: TileSplatIndex.self, capacity: Self.maxTotalSplatTileIntersections, options: .storageModePrivate).labeled("TileSplatIndicesA")
         self.tileSplatIndicesA.count = Self.maxTotalSplatTileIntersections
 
         self.tileSplatIndicesB = try device.makeTypedBuffer(element: TileSplatIndex.self, capacity: Self.maxTotalSplatTileIntersections, options: .storageModePrivate).labeled("TileSplatIndicesB")
         self.tileSplatIndicesB.count = Self.maxTotalSplatTileIntersections
 
-        // Allocate tile counter buffer
         self.tileCounters = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModePrivate).labeled("TileCounters")
         self.tileCounters.count = totalTiles
 
-        // Allocate tile offsets buffer (numTiles + 1 for total count)
+        // numTiles + 1: last entry holds the total count.
         self.tileOffsets = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles + 1, options: .storageModePrivate).labeled("TileOffsets")
         self.tileOffsets.count = totalTiles + 1
 
-        // Allocate max tile count buffer (single uint for heatmap normalization)
+        // Single uint for heatmap normalization.
         self.maxTileCount = try device.makeTypedBuffer(element: UInt32.self, capacity: 1, options: .storageModePrivate).labeled("MaxTileCount")
         self.maxTileCount.count = 1
 
-        // Allocate readback buffer for CPU access to tile counts
         self.tileCountersReadback = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModeShared).labeled("TileCountersReadback")
         self.tileCountersReadback.count = totalTiles
 
@@ -135,17 +132,14 @@ public final class TileSplatResources {
 
         let totalTiles = Int(gridWidth) * Int(gridHeight)
 
-        // tileSplatIndices doesn't need resize - it's sized for max total intersections
+        // tileSplatIndices needs no resize; it is sized for max total intersections.
 
-        // Reallocate tile counter buffer
         self.tileCounters = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModePrivate).labeled("TileCounters")
         self.tileCounters.count = totalTiles
 
-        // Reallocate tile offsets buffer
         self.tileOffsets = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles + 1, options: .storageModePrivate).labeled("TileOffsets")
         self.tileOffsets.count = totalTiles + 1
 
-        // Reallocate readback buffer
         self.tileCountersReadback = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModeShared).labeled("TileCountersReadback")
         self.tileCountersReadback.count = totalTiles
     }
