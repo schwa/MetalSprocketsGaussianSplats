@@ -68,17 +68,23 @@ public struct GPUSortedSplatRenderPipeline: Element {
         self.guardBand = guardBand
         self.resources = resources
         try resources.ensure(capacity: splatCloud.count)
+        // Advance the frame slot here, not in body: the element is
+        // constructed once per frame, while body can be re-evaluated
+        // multiple times (diffing/re-expansion), which would burn through
+        // the frames-in-flight slot rotation.
+        slotIndex = resources.advance()
+        sortedIndices = resources.makeIndices(
+            slot: slotIndex,
+            count: splatCloud.count,
+            parameters: SortParameters(camera: cameraMatrix, model: modelMatrix)
+        )
     }
+
+    private let slotIndex: Int
+    private let sortedIndices: SplatIndices
 
     public var body: some Element {
         get throws {
-            let slotIndex = resources.advance()
-            let sortedIndices = resources.makeIndices(
-                slot: slotIndex,
-                count: splatCloud.count,
-                parameters: SortParameters(camera: cameraMatrix, model: modelMatrix)
-            )
-
             try GPUSplatSortComputePass(
                 splatCloud: splatCloud,
                 projectionMatrix: projectionMatrix,

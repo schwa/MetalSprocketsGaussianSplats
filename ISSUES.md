@@ -1693,15 +1693,18 @@ closed: 2026-07-21T21:09:07Z
 ## 80: GPUSortedSplatRenderPipeline: slot advance is a side effect in body
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: spark, gpu-sort, code-style, effort:s
 created: 2026-07-21T20:28:39Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T21:12:15Z
+closed: 2026-07-21T21:12:15Z
 +++
 
 `GPUSortedSplatRenderPipeline.body` calls `resources.advance()` and `resources.makeIndices(...)`, which mutate the shared `GPUSortResources` slot state. MetalSprockets `body` can be evaluated multiple times per frame (diffing, re-expansion), so the slot index can advance more than once per rendered frame, breaking the frames-in-flight slot rotation the type documents (slotCount default 3). Side effects belong in lifecycle hooks, not body.
+
+- `2026-07-21T21:12:15Z`: Slot advance and indices creation moved from body to init: the element value is constructed once per frame while body can re-evaluate, so the frames-in-flight rotation now ticks exactly once per constructed pipeline.
 
 ---
 
