@@ -6,17 +6,30 @@ import MetalSprocketsGaussianSplatShaders
 internal import os
 import simd
 import Splats
+import Synchronization
 
 /// A splat cloud whose splat data lives in Metal buffers, ready for GPU rendering.
 ///
 /// Holds the splat buffer, an optional spherical-harmonics coefficient buffer,
 /// a per-cloud model transform, and a cloud-level opacity. Equality is by
 /// reference; comparing buffer contents would be too expensive for large clouds.
-public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
+public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: SortableSplatProtocol {
     public let splats: TypedMTLBuffer<Splat>
 
+    /// Mutable state shared between the UI (writes) and the sort thread (reads).
+    /// Guarded by a mutex so a 64-byte matrix can't be torn mid-sort (#93).
+    private struct MutableState {
+        var modelTransform: simd_float4x4
+        var opacity: Float
+    }
+
+    private let state: Mutex<MutableState>
+
     /// Per-cloud model transform
-    public var modelTransform: simd_float4x4
+    public var modelTransform: simd_float4x4 {
+        get { state.withLock { $0.modelTransform } }
+        set { state.withLock { $0.modelTransform = newValue } }
+    }
 
     /// Spherical harmonics coefficients buffer (optional, for view-dependent color)
     public let shCoefficients: TypedMTLBuffer<Float>?
@@ -25,16 +38,18 @@ public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where S
     public let shDegree: UInt8
 
     /// Cloud-level opacity multiplier (0.0 - 1.0)
-    public var opacity: Float
+    public var opacity: Float {
+        get { state.withLock { $0.opacity } }
+        set { state.withLock { $0.opacity = newValue } }
+    }
 
     // MARK: -
 
     public init(splats: TypedMTLBuffer<Splat>, modelTransform: simd_float4x4 = .identity, shCoefficients: TypedMTLBuffer<Float>? = nil, shDegree: UInt8 = 0, opacity: Float = 1.0) {
         self.splats = splats
-        self.modelTransform = modelTransform
+        self.state = Mutex(MutableState(modelTransform: modelTransform, opacity: opacity))
         self.shCoefficients = shCoefficients
         self.shDegree = shDegree
-        self.opacity = opacity
     }
 
     /// - Parameter mortonOrdered: When true, reorders the splats along a

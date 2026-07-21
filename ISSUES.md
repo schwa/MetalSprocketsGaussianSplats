@@ -1961,12 +1961,13 @@ BenchCommand creates its own command queue and a raw MTLBlitCommandEncoder to sy
 ## 93: GPUSplatCloud: unsynchronized mutable state under @unchecked Sendable
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: concurrency, splats, effort:s
 created: 2026-07-21T23:48:54Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:55:14Z
+closed: 2026-07-21T23:55:14Z
 +++
 
 GPUSplatCloud is @unchecked Sendable but modelTransform and opacity are plain vars with no synchronization. The cloud is shared between the main thread (UI mutates transform/opacity) and the AsyncSortManager actor (reads during sorts); simd_float4x4 is 64 bytes so a torn read mid-sort is possible.
