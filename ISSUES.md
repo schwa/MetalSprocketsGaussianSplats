@@ -1379,13 +1379,16 @@ Related: #58 (tile perf), #59 (tile blending), #61 (global tile|depth sort repla
 
 +++
 status: new
-priority: medium
+priority: high
 kind: none
 labels: performance, pointsplat
 created: 2026-07-21T14:52:10Z
+updated: 2026-07-21T16:32:51Z
 +++
 
 The splat kernel is dispatched over maxPointsPerFrame (default 4M) threads every frame because the total point count only exists GPU-side; threads past totals[0] exit immediately. Wasteful for sparse frames. MetalSprockets doesn't expose dispatchThreadgroups(indirectBuffer:) (same gap noted in RFC 0002). Affects both PointSplatRenderer and PointSplatRenderPipeline.
+
+- `2026-07-21T16:32:51Z`: Now that the point budget auto-scales with drawable size (32/supersampled pixel, ~500M on large drawables), the capacity-sized splat dispatch is the dominant fixed cost. Either expose indirect dispatch in MetalSprockets or clamp thread count another way.
 
 ---
 
@@ -1479,5 +1482,18 @@ created: 2026-07-21T14:52:11Z
 +++
 
 RFC 0003 defers hierarchical/occlusion culling (two-phase scheme, depth mip chain) and reprojection-based temporal reuse. Without them, large occluded scenes waste splat work, and any camera motion resets accumulation to 1 SPP noise. Tracking issue for the follow-up.
+
+---
+
+## 70: Parallel code paths for offscreen vs live rendering
+
++++
+status: new
+priority: medium
+kind: none
+created: 2026-07-21T17:47:37Z
++++
+
+Offscreen and live rendering have largely parallel/duplicated code paths. Needs a dramatic cleanup to consolidate the shared logic.
 
 ---
