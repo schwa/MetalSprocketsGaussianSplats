@@ -7,6 +7,7 @@ import Splats
 import MetalSprocketsUI
 #endif
 import Observation
+import os
 
 enum SplatModel: String, CaseIterable, Identifiable {
     case butterfly = "Butterfly"
@@ -48,6 +49,10 @@ class DemoState {
     /// Display name of a user-loaded splat file; nil when a bundled model is shown.
     private(set) var customModelName: String?
     var loadError: String?
+    /// True while a user-picked file is being parsed off the main actor.
+    private(set) var isLoading = false
+
+    private static let logger = Logger(subsystem: "io.schwa.MetalSprocketsGaussianSplatsDemo", category: "loading")
 
     private(set) var splatCloud: GPUSplatCloud<SparkSplat>
     private let device: MTLDevice
@@ -86,11 +91,18 @@ class DemoState {
                 url.stopAccessingSecurityScopedResource()
             }
         }
+        isLoading = true
+        defer {
+            isLoading = false
+        }
+        Self.logger.info("Loading \(url.lastPathComponent, privacy: .public)…")
+        let start = ContinuousClock.now
         do {
             let device = self.device
             let cloud = try await Task.detached(priority: .userInitiated) {
                 try Self.readSplatCloud(device: device, url: url)
             }.value
+            Self.logger.info("Loaded \(cloud.count) splats in \((ContinuousClock.now - start).description, privacy: .public)")
             splatCloud = cloud
             customModelName = url.lastPathComponent
             selectedModel = nil
@@ -98,6 +110,7 @@ class DemoState {
             renderState = SplatImmersiveRenderState(splatCloud: cloud)
             #endif
         } catch {
+            Self.logger.error("Load failed for \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
             loadError = "Could not load \(url.lastPathComponent): \(error.localizedDescription)"
         }
     }

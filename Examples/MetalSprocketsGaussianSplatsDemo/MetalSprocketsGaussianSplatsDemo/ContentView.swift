@@ -111,6 +111,13 @@ struct ContentView: View {
                     .padding()
             }
         }
+        .overlay {
+            if demoState.isLoading {
+                ProgressView("Loading\u{2026}")
+                    .padding(16)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
         .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
 
         #endif
