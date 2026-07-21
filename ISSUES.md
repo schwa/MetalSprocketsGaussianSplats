@@ -1925,3 +1925,31 @@ PointSplatResources.encodeFrame/encodePhase sequences ~10 pipeline states on one
 Two stages: (1) convert encodePhase to element-built ComputePipelines (ComputeKernel + .parameter bindings) inside the live pipeline body; (2) port the offscreen PointSplatRenderer to run the same element tree. The indirect-dispatch element adoption then falls out naturally.
 
 ---
+
+## 91: SOGReaderGPU: decode dispatch uses raw encoder instead of MetalSprockets elements
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: splats, code-style, effort:s
+created: 2026-07-21T23:43:53Z
++++
+
+SOGReaderGPU.load builds a raw command queue/encoder and binds 6 buffers and 7 textures by index for the one-shot SOG decode compute dispatch. The Splats target already depends on MetalSprockets, so this could run a ComputePipeline/ComputeDispatch element tree through a Runner with .parameter name bindings, like PointSplatWorkloadDistributor.build().
+
+---
+
+## 92: BenchCommand: texture readback uses a raw blit encoder
+
++++
+status: new
+priority: low
+kind: task
+labels: code-style, effort:xs
+created: 2026-07-21T23:43:53Z
++++
+
+BenchCommand creates its own command queue and a raw MTLBlitCommandEncoder to synchronize a texture for CPU readback. Could use a BlitPass element (or a Runner-driven tree) instead of raw encoding.
+
+---
