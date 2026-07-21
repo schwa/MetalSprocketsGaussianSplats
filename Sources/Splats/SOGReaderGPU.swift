@@ -5,6 +5,7 @@ import Foundation
 import ImageIO
 @preconcurrency import Metal
 import MetalCompilerPluginSupport
+import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import simd
@@ -36,25 +37,16 @@ public struct SOGReaderGPU {
         self.device = device
     }
 
-    // Cache the decode pipeline per device. Building it compiles the compute
-    // function, which is expensive and identical for every load — so we do it
-    // once per device and reuse it across all `load` calls.
-    private static let pipelineCache = PipelineCache()
+    // Cache a Runner (and its element System) per device. Reusing the Runner
+    // keeps the compiled decode pipeline state cached across `load` calls,
+    // which would otherwise recompile the compute function every load.
+    private static let runnerCache = RunnerCache()
 
-    private func decodePipeline() throws -> MTLComputePipelineState {
-        try Self.pipelineCache.pipeline(for: device) {
-            guard let bundle = Bundle.module.peerBundle(withSuffix: "MetalSprocketsGaussianSplatShaders") else {
-                throw SplatsError.resourceCreationFailure("MetalSprocketsGaussianSplatShaders bundle")
-            }
-            let library = try device.makeDefaultLibrary(bundle: bundle)
-            guard let function = library.makeFunction(name: "SOGDecodeShader::decode") else {
-                throw SplatsError.resourceCreationFailure("SOGDecodeShader::decode not found")
-            }
-            let descriptor = MTLComputePipelineDescriptor()
-            descriptor.label = "SOGDecode"
-            descriptor.computeFunction = function
-            return try device.makeComputePipelineState(descriptor: descriptor, options: [], reflection: nil)
+    private func decodeKernel() throws -> ComputeKernel {
+        guard let bundle = Bundle.module.peerBundle(withSuffix: "MetalSprocketsGaussianSplatShaders") else {
+            throw SplatsError.resourceCreationFailure("MetalSprocketsGaussianSplatShaders bundle")
         }
+        return try ShaderLibrary(bundle: bundle).namespaced("SOGDecodeShader").function(named: "decode", type: ComputeKernel.self)
     }
 
     /// Loads a SOG archive and decodes its splat textures on the GPU.
@@ -122,8 +114,7 @@ public struct SOGReaderGPU {
         let shFloatCount = max(1, count * shFloatsPerSplat)
         let shOut = try device.makeTypedBuffer(element: Float.self, capacity: shFloatCount, options: [.storageModeShared]).labeled("SHCoefficients (\(cloudName))")
 
-        // Params.
-        var params = SOGDecodeParams(
+        let params = SOGDecodeParams(
             count: UInt32(count),
             meansMin: SIMD3<Float>(metadata.means.mins[0], metadata.means.mins[1], metadata.means.mins[2]),
             meansMax: SIMD3<Float>(metadata.means.maxs[0], metadata.means.maxs[1], metadata.means.maxs[2]),
@@ -135,36 +126,27 @@ public struct SOGReaderGPU {
             splatTexWidth: UInt32(splatTexWidth)
         )
 
-        // Pipeline (cached per device).
-        let pipeline = try decodePipeline()
-
-        guard let queue = device.makeCommandQueue(), let commandBuffer = queue.makeCommandBuffer(), let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw SplatsError.resourceCreationFailure("SOG decode command encoding")
+        let kernel = try decodeKernel()
+        try Self.runnerCache.run(device: device) {
+            try ComputePass(label: "SOGDecode") {
+                try ComputePipeline(computeKernel: kernel) {
+                    try ComputeDispatch(threadsPerGrid: MTLSize(width: count, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+                        .parameter("params", value: params)
+                        .parameter("splatsOut", buffer: splatsOut.unsafeMTLBuffer)
+                        .parameter("shOut", buffer: shOut.unsafeMTLBuffer)
+                        .parameter("scalesCodebook", buffer: scalesCodebook)
+                        .parameter("sh0Codebook", buffer: sh0Codebook)
+                        .parameter("shNCodebook", buffer: shNCodebook)
+                        .parameter("meansLow", texture: meansLow)
+                        .parameter("meansHigh", texture: meansHigh)
+                        .parameter("scales", texture: scales)
+                        .parameter("quats", texture: quats)
+                        .parameter("sh0", texture: sh0)
+                        .parameter("shCentroids", texture: shCentroidsTex ?? sh0)
+                        .parameter("shLabels", texture: shLabelsTex ?? sh0)
+                }
+            }
         }
-        queue.label = "SOGDecodeQueue"
-        commandBuffer.label = "SOGDecode"
-        encoder.label = "SOGDecode"
-        encoder.setComputePipelineState(pipeline)
-        encoder.setBytes(&params, length: MemoryLayout<SOGDecodeParams>.stride, index: 0)
-        encoder.setBuffer(splatsOut.unsafeMTLBuffer, offset: 0, index: 1)
-        encoder.setBuffer(shOut.unsafeMTLBuffer, offset: 0, index: 2)
-        encoder.setBuffer(scalesCodebook, offset: 0, index: 3)
-        encoder.setBuffer(sh0Codebook, offset: 0, index: 4)
-        encoder.setBuffer(shNCodebook, offset: 0, index: 5)
-        encoder.setTexture(meansLow, index: 0)
-        encoder.setTexture(meansHigh, index: 1)
-        encoder.setTexture(scales, index: 2)
-        encoder.setTexture(quats, index: 3)
-        encoder.setTexture(sh0, index: 4)
-        encoder.setTexture(shCentroidsTex ?? sh0, index: 5)
-        encoder.setTexture(shLabelsTex ?? sh0, index: 6)
-
-        let threadsPerGroup = min(pipeline.maxTotalThreadsPerThreadgroup, 256)
-        let groups = (count + threadsPerGroup - 1) / threadsPerGroup
-        encoder.dispatchThreadgroups(MTLSize(width: groups, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: threadsPerGroup, height: 1, depth: 1))
-        encoder.endEncoding()
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
 
         var splatsResult = splatsOut
         splatsResult.count = count
@@ -265,25 +247,30 @@ public struct SOGReaderGPU {
     }
 }
 
-// MARK: - Pipeline cache
+// MARK: - Runner cache
 
-/// Thread-safe per-device cache of the SOG decode compute pipeline.
-private final class PipelineCache: @unchecked Sendable {
+/// Thread-safe per-device cache of MetalSprockets Runners. A Runner is
+/// single-isolation, so the lock is held for the whole `run` — concurrent
+/// decode dispatches serialize here, but the dispatch is cheap next to the
+/// WebP decode, which stays parallel.
+private final class RunnerCache: @unchecked Sendable {
     private let lock = NSLock()
-    private var cache: [ObjectIdentifier: MTLComputePipelineState] = [:]
+    private var cache: [ObjectIdentifier: Runner] = [:]
 
-    func pipeline(for device: MTLDevice, build: () throws -> MTLComputePipelineState) rethrows -> MTLComputePipelineState {
-        let key = ObjectIdentifier(device)
+    func run(device: MTLDevice, @ElementBuilder content: () throws -> some Element) throws {
         lock.lock()
         defer {
             lock.unlock()
         }
+        let key = ObjectIdentifier(device)
+        let runner: Runner
         if let cached = cache[key] {
-            return cached
+            runner = cached
+        } else {
+            runner = try Runner(device: device)
+            cache[key] = runner
         }
-        let pipeline = try build()
-        cache[key] = pipeline
-        return pipeline
+        try runner.run(content())
     }
 }
 

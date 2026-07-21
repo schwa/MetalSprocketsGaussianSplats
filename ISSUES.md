@@ -1929,11 +1929,13 @@ Two stages: (1) convert encodePhase to element-built ComputePipelines (ComputeKe
 ## 91: SOGReaderGPU: decode dispatch uses raw encoder instead of MetalSprockets elements
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: splats, code-style, effort:s
 created: 2026-07-21T23:43:53Z
+updated: 2026-07-21T23:46:28Z
+closed: 2026-07-21T23:46:28Z
 +++
 
 SOGReaderGPU.load builds a raw command queue/encoder and binds 6 buffers and 7 textures by index for the one-shot SOG decode compute dispatch. The Splats target already depends on MetalSprockets, so this could run a ComputePipeline/ComputeDispatch element tree through a Runner with .parameter name bindings, like PointSplatWorkloadDistributor.build().
