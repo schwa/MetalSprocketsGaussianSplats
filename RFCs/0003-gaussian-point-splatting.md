@@ -77,6 +77,11 @@ Per frame, per sample-per-pixel pass (SPP ≥ 1), one command buffer:
               (supersampled) pixel, then:
                 atomic_min(fb64[pixel], pack(depth, color))
               Opaque points → min over depth = correct front sample.
+              Contention mitigation (Schütz et al. 2021 Sec. 3): read the
+              framebuffer word first and skip the atomic if the point is
+              already occluded; optionally simdgroup-reduce points targeting
+              the same pixel so only the closest issues the atomic. Cheap and
+              worth doing in v1 — close-up views concentrate points.
 
 5. RESOLVE    average the S×S subpixels (box filter; the paper tried a
               Gaussian filter and rejected it as blurrier than 3DGS) into a
@@ -114,10 +119,47 @@ Existing pieces to reuse:
 - `SplatGPUSort` culling front-end for the visibility pass (sort stages
   skipped — culling only).
 
+## Reference implementation notes
+
+From `~/Projects/Vendor/gaussian-point-splatting` (`src/core/`):
+
+- **Li₂ / Li₂⁻¹ coefficients** are in `random/random.cuh` (`dilog`: degree-7
+  + `(1−α)ln(1−α)` term; `inv_dilog`: degree-10 over `x/LI2_MAX`) — straight
+  FMA chains, port verbatim to MSL. Answers open question 3: lift, don't
+  re-fit.
+- **Poisson sampling** (`random/poisson.cuh`) is ~20 lines: Giles Q̃_N3 =
+  normal approximation with two correction terms fed by one Box–Muller draw.
+  No lookup tables.
+- **RNG:** pcg2d + a hash32-based per-(index, frame) seed. Portable as-is.
+- **No splat-record buffer:** the splat kernel re-reads raw Gaussian
+  attributes and recomputes cov2d + Cholesky (c0/c1/c2) per thread rather
+  than caching projected params from preprocess. Simpler; bandwidth cost
+  amortized by K points per thread.
+- **Early depth test is already there:** `if (depthBuffer[index] <=
+  view_depth_bits) continue;` before the atomicMin (no simdgroup dedupe).
+- **Per-Gaussian clamp** in preprocess: `num_points = min(num_points,
+  W·H/(2K))` — half the supersampled pixel count, not one-per-pixel.
+  Plus a hard view-space near cull at `−z ≤ 0.2`.
+- **Covariance floor is supersampling-scaled:** `+0.3·s²·I` where s is the
+  supersampling factor (identity at s = 1, matching the paper's screen-pixel
+  units).
+- **SPP via buffer slices:** the 64-bit buffer has `numPasses` layers; each
+  thread's point p writes slice `p/K`; the resolve averages over subpixels ×
+  passes. Not one command buffer per SPP as the Method section sketches.
+- **Splat-side rejection:** besides truncation-range rejection, points with
+  `α·gaussian_weight < 1/255` are rejected (matches 3DGS's fragment
+  threshold), and points outside the Gaussian's 3DGS screen bounds are
+  skipped.
+- Depth packing: depth occupies bits [36, 64) (28 bits), color bits [0, 36)
+  as 3×12-bit `value/255` — confirms the RFC's packing table.
+
 ## What we do NOT adopt (v1)
 
 - Hierarchical / occlusion culling (`--disable-*` flags in the reference
   implementation) — our scenes don't need them yet; frustum cull only.
+  (If adopted later, note the paper's two-phase scheme: phase 2 re-renders
+  Gaussians falsely culled by the previous frame's depth, guaranteeing no
+  misses; subpixel resolve happens in phase 2 only.)
 - Morton-order preprocessing.
 - Supersampling factors > 1 (paper's default 2×2, with K = S²); start at
   native res, K = 1, and accept more noise — the paper's
@@ -136,9 +178,10 @@ curve vs the sorted pipelines on multi-million-splat clouds, where sort
 bandwidth currently dominates. Expect PointSplat noisy-but-flat frame times
 where the sorted paths degrade.
 
-Known cost: noise. 1 SPP without temporal accumulation is visibly stochastic
-(see supplemental videos); with the existing temporal accumulation it should
-converge in a handful of frames for static views.
+Known cost: noise. 1 SPP without temporal accumulation is severely stochastic
+— paper Table 1: PSNR 16.94 at 1 SPP vs 25.71 for the 3DGS reference; ~64 SPP
+to get within ~0.5 dB. Temporal accumulation is effectively mandatory, not a
+nice-to-have; with it, static views converge in tens of frames.
 
 ## Verification plan
 
@@ -162,11 +205,16 @@ converge in a handful of frames for static views.
    3×12-bit sRGB [0,16) as-is, or trade bits? 28-bit fixed-point depth needs
    sane near/far; our cameras currently use reversed-infinite-Z in some paths
    — reconcile.
-3. **Li₂ fits** — lift coefficients from the reference repo vs re-fit; verify
-   against the Shadertoy (which is a compact single-shader statement of the
-   sampling math).
+3. **Li₂ fits** — resolved: lift the FMA chains from
+   `src/core/random/random.cuh` verbatim (see Reference implementation
+   notes); sanity-check against the Shadertoy.
 4. **Point count clamp / budget** — expose `maxPointsPerFrame` in
    `RenderConfig` (paper default 250e6; ours should default far lower).
+   Also adopt the paper's *per-Gaussian* clamp (Sec. 4.3): cap a single
+   Gaussian's point count at one point per covered pixel, and keep the near
+   plane reasonably far out. This is what tames blowups when the camera flies
+   through a splat — arguably more important than the global budget for our
+   demo scenes.
 5. Reprojection-based temporal reuse (paper's second video) — follow-up RFC
    or an extension of `TemporalAccumulationShader`?
 
