@@ -6,9 +6,9 @@ import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsUI
-import Splats
 import Observation
 import simd
+import Splats
 import SwiftUI
 
 /// Owns the ARSession and republishes frames for SwiftUI (#43).
@@ -32,7 +32,7 @@ final class ARSplatSessionModel: NSObject, ARSessionDelegate {
         currentFrame = nil
     }
 
-    nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
+    nonisolated func session(_: ARSession, didUpdate frame: ARFrame) {
         Task { @MainActor in currentFrame = frame }
     }
 }
@@ -56,7 +56,7 @@ struct ARSplatView: View {
 
     init(splatCloud: GPUSplatCloud<SparkSplat>) {
         self.splatCloud = splatCloud
-        // swiftlint:disable:next MTLCreateSystemDefaultDevice
+        // swiftlint:disable:next force_unwrapping
         let device = MTLCreateSystemDefaultDevice()!
         _sortManager = State(initialValue: try! AsyncSortManager<SparkSplat>(
             device: device,

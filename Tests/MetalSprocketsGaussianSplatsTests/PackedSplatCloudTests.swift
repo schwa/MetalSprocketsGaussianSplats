@@ -84,7 +84,7 @@ struct PackedSplatCloudTests {
     func zeroScale() {
         let splats = [
             SparkSplat(position: simd_half3(0, 0, 0), scale: simd_half3(0, 0, 0), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(255, 0, 0, 255)),
-            SparkSplat(position: simd_half3(1, 0, 0), scale: simd_half3(repeating: 0.1), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 255, 0, 200)),
+            SparkSplat(position: simd_half3(1, 0, 0), scale: simd_half3(repeating: 0.1), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 255, 0, 200))
         ]
         let (elements, _) = PackedSplatCloud.pack(splats)
         #expect(elements[0].color.3 == 0)

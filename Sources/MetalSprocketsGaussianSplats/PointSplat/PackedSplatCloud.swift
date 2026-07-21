@@ -150,8 +150,8 @@ public struct PackedSplatCloud {
     }
 }
 
-extension Float {
-    fileprivate func clamped(to range: ClosedRange<Float>) -> Float {
+private extension Float {
+    func clamped(to range: ClosedRange<Float>) -> Float {
         Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }

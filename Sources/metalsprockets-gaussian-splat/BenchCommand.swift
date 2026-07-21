@@ -403,7 +403,10 @@ struct BenchRunner {
             commandBuffer.waitUntilCompleted()
         }
         rgba.withUnsafeMutableBytes { pointer in
-            texture.getBytes(pointer.baseAddress!, bytesPerRow: texture.width * 16, from: MTLRegionMake2D(0, 0, texture.width, texture.height), mipmapLevel: 0)
+            guard let baseAddress = pointer.baseAddress else {
+                return
+            }
+            texture.getBytes(baseAddress, bytesPerRow: texture.width * 16, from: MTLRegionMake2D(0, 0, texture.width, texture.height), mipmapLevel: 0)
         }
         var rgb = [Float](repeating: 0, count: pixelCount * 3)
         for pixel in 0..<pixelCount {
