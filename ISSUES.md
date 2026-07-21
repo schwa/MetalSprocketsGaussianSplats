@@ -1378,17 +1378,19 @@ Related: #58 (tile perf), #59 (tile blending), #61 (global tile|depth sort repla
 ## 63: PointSplat: splat stage dispatches over full point budget instead of actual count
 
 +++
-status: new
+status: closed
 priority: high
 kind: none
 labels: performance, pointsplat
 created: 2026-07-21T14:52:10Z
-updated: 2026-07-21T16:32:51Z
+updated: 2026-07-21T17:57:49Z
+closed: 2026-07-21T17:57:49Z
 +++
 
 The splat kernel is dispatched over maxPointsPerFrame (default 4M) threads every frame because the total point count only exists GPU-side; threads past totals[0] exit immediately. Wasteful for sparse frames. MetalSprockets doesn't expose dispatchThreadgroups(indirectBuffer:) (same gap noted in RFC 0002). Affects both PointSplatRenderer and PointSplatRenderPipeline.
 
 - `2026-07-21T16:32:51Z`: Now that the point budget auto-scales with drawable size (32/supersampled pixel, ~500M on large drawables), the capacity-sized splat dispatch is the dominant fixed cost. Either expose indirect dispatch in MetalSprockets or clamp thread count another way.
+- `2026-07-21T17:57:49Z`: All post-prefix-sum stages (index clear, max-scan, carry apply, splat) now dispatch indirectly from the GPU-side total via dispatchThreadgroups(indirectBuffer:), encoded raw inside the compute pass. Per-frame cost scales with actual point demand instead of the budget ceiling.
 
 ---
 

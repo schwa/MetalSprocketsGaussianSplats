@@ -69,10 +69,32 @@ namespace PointSplatWorkload {
         totals[0] = running;
     }
 
+    // Number of active threads: the workload total clamped to capacity.
+    static inline uint active_count(device const uint *totals, uint capacity) {
+        return min(totals[0], capacity);
+    }
+
+    // Phase 2.1 (single thread): convert the GPU-side total into indirect
+    // dispatch arguments so later stages launch ceil(total/256) threadgroups
+    // instead of capacity-sized grids (RFC 0002's indirect-dispatch gap,
+    // resolved here with raw encoding).
+    kernel void workloadWriteDispatchArgs(device const uint *totals   [[buffer(0)]],
+                                          constant uint     &capacity [[buffer(1)]],
+                                          device uint3      *args     [[buffer(2)]],
+                                          uint gid [[thread_position_in_grid]]) {
+        if (gid != 0) {
+            return;
+        }
+        uint total = active_count(totals, capacity);
+        args[0] = uint3((total + WORKLOAD_BLOCK - 1) / WORKLOAD_BLOCK, 1, 1);
+    }
+
     // Phase 2.5: zero the indices array ahead of the scatter, so the whole
     // pipeline can run in one compute encoder without a blit fill.
-    kernel void workloadClearIndices(device uint   *indices  [[buffer(0)]],
-                                     constant uint &capacity [[buffer(1)]],
+    // Dispatched indirectly; the last threadgroup may run slightly past the
+    // total, which is harmless (entries past the total are never read).
+    kernel void workloadClearIndices(device uint       *indices  [[buffer(0)]],
+                                     constant uint     &capacity [[buffer(1)]],
                                      uint gid [[thread_position_in_grid]]) {
         if (gid < capacity) {
             indices[gid] = 0;
@@ -101,14 +123,16 @@ namespace PointSplatWorkload {
 
     // Phase 4: per-block inclusive max-scan of the scattered indices, in
     // place. Writes each block's maximum for the carry pass.
-    kernel void workloadMaxScanBlock(device uint   *indices     [[buffer(0)]],
-                                     device uint   *blockMaxes  [[buffer(1)]],
-                                     constant uint &numElements [[buffer(2)]],
+    kernel void workloadMaxScanBlock(device uint       *indices    [[buffer(0)]],
+                                     device uint       *blockMaxes [[buffer(1)]],
+                                     device const uint *totals     [[buffer(2)]],
+                                     constant uint     &capacity   [[buffer(3)]],
                                      uint gid     [[thread_position_in_grid]],
                                      uint lid     [[thread_position_in_threadgroup]],
                                      uint groupId [[threadgroup_position_in_grid]],
                                      uint tsize   [[threads_per_threadgroup]]) {
         threadgroup uint s[WORKLOAD_BLOCK];
+        uint numElements = active_count(totals, capacity);
         uint value = (gid < numElements) ? indices[gid] : 0u;
 
         s[lid] = value;
@@ -131,11 +155,13 @@ namespace PointSplatWorkload {
     // Phase 5 (single thread): exclusive running max over block maxima.
     kernel void workloadScanBlockMaxes(device const uint *blockMaxes [[buffer(0)]],
                                        device uint       *blockCarry [[buffer(1)]],
-                                       constant uint     &numBlocks  [[buffer(2)]],
+                                       device const uint *totals     [[buffer(2)]],
+                                       constant uint     &capacity   [[buffer(3)]],
                                        uint gid [[thread_position_in_grid]]) {
         if (gid != 0) {
             return;
         }
+        uint numBlocks = (active_count(totals, capacity) + WORKLOAD_BLOCK - 1) / WORKLOAD_BLOCK;
         uint carry = 0;
         for (uint b = 0; b < numBlocks; b++) {
             blockCarry[b] = carry;
@@ -144,12 +170,13 @@ namespace PointSplatWorkload {
     }
 
     // Phase 6: fold the carry from preceding blocks into each element.
-    kernel void workloadApplyBlockMax(device uint       *indices     [[buffer(0)]],
-                                      device const uint *blockCarry  [[buffer(1)]],
-                                      constant uint     &numElements [[buffer(2)]],
+    kernel void workloadApplyBlockMax(device uint       *indices    [[buffer(0)]],
+                                      device const uint *blockCarry [[buffer(1)]],
+                                      device const uint *totals     [[buffer(2)]],
+                                      constant uint     &capacity   [[buffer(3)]],
                                       uint gid     [[thread_position_in_grid]],
                                       uint groupId [[threadgroup_position_in_grid]]) {
-        if (gid >= numElements) {
+        if (gid >= active_count(totals, capacity)) {
             return;
         }
         indices[gid] = max(indices[gid], blockCarry[groupId]);

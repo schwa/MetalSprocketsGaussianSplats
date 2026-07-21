@@ -249,7 +249,7 @@ public struct SplatView: View {
             let megapixels = Double(pixels) / 1_000_000
             VStack(alignment: .leading, spacing: 4) {
                 LabeledContent("Splats", value: splatCloud.count.formatted())
-                LabeledContent("Size", value: "\(pixelWidth)\u{00D7}\(pixelHeight) (\(megapixels.formatted(.number.precision(.fractionLength(1)))) MP)")
+                LabeledContent("Size", value: "\(Int(proxy.size.width))\u{00D7}\(Int(proxy.size.height))\u{00D7}\(Double(displayScale).formatted(.number.precision(.fractionLength(0...1)))) (\(megapixels.formatted(.number.precision(.fractionLength(1)))) MP)")
                 LabeledContent("Supersampling", value: "\(supersampling)\u{00D7}\(supersampling)")
                 LabeledContent("Points/thread (K)", value: Self.pointSplatPointsPerThread.formatted())
                 LabeledContent("Point budget", value: budget.formatted(.number.notation(.compactName)))

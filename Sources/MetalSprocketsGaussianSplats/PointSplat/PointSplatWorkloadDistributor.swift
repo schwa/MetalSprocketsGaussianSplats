@@ -54,8 +54,13 @@ public final class PointSplatWorkloadDistributor {
     public let indicesBuffer: MTLBuffer
     /// One uint32: the total point count, written on the GPU timeline.
     public let totalsBuffer: MTLBuffer
+    /// `MTLDispatchThreadgroupsIndirectArguments` for ceil(total/256)
+    /// threadgroups, written on the GPU timeline. Use for any dispatch that
+    /// should cover exactly the active threads (e.g. the splat stage).
+    public let dispatchArgsBuffer: MTLBuffer
 
     private let scanCountsBlock: MTLComputePipelineState
+    private let writeDispatchArgs: MTLComputePipelineState
     private let scanBlockSums: MTLComputePipelineState
     private let clearIndices: MTLComputePipelineState
     private let scatterIndices: MTLComputePipelineState
@@ -83,6 +88,7 @@ public final class PointSplatWorkloadDistributor {
         }
         scanCountsBlock = try pipeline("workloadScanCountsBlock")
         scanBlockSums = try pipeline("workloadScanBlockSums")
+        writeDispatchArgs = try pipeline("workloadWriteDispatchArgs")
         clearIndices = try pipeline("workloadClearIndices")
         scatterIndices = try pipeline("workloadScatterIndices")
         maxScanBlock = try pipeline("workloadMaxScanBlock")
@@ -94,6 +100,7 @@ public final class PointSplatWorkloadDistributor {
         let uintStride = MemoryLayout<UInt32>.stride
         guard let indices = device.makeBuffer(length: uintStride * max(capacity, 1), options: .storageModePrivate),
               let totals = device.makeBuffer(length: uintStride, options: .storageModeShared),
+              let dispatchArgs = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 4, options: .storageModePrivate),
               let localPrefix = device.makeBuffer(length: uintStride * max(maxSplats, 1), options: .storageModePrivate),
               let countBlockSums = device.makeBuffer(length: uintStride * max(countBlocks, 1), options: .storageModePrivate),
               let countBlockBase = device.makeBuffer(length: uintStride * max(countBlocks, 1), options: .storageModePrivate),
@@ -103,8 +110,10 @@ public final class PointSplatWorkloadDistributor {
         }
         indices.label = "PointSplat indices"
         totals.label = "PointSplat totals"
+        dispatchArgs.label = "PointSplat dispatch args"
         indicesBuffer = indices
         totalsBuffer = totals
+        dispatchArgsBuffer = dispatchArgs
         self.localPrefix = localPrefix
         self.countBlockSums = countBlockSums
         self.countBlockBase = countBlockBase
@@ -113,24 +122,23 @@ public final class PointSplatWorkloadDistributor {
     }
 
     /// Encodes the full distribution pipeline into an open compute encoder.
-    /// The max-scan is sized to `capacity` so no CPU readback is required;
-    /// entries past the total are garbage and must not be consumed.
+    /// Every stage after the prefix sum dispatches indirectly from the
+    /// GPU-side total, so cost scales with actual demand rather than
+    /// capacity; entries past the total are garbage and must not be
+    /// consumed.
     public func encode(encoder: MTLComputeCommandEncoder, counts: MTLBuffer, count: Int) throws {
         guard count <= maxSplats else {
             throw DistributorError.splatCountExceedsMaximum(count: count, maximum: maxSplats)
         }
         let blockSize = Self.blockSize
         let countBlocks = (count + blockSize - 1) / blockSize
-        let capacityBlocks = (capacity + blockSize - 1) / blockSize
         var numElements = UInt32(count)
         var numCountBlocks = UInt32(countBlocks)
         var capacityValue = UInt32(capacity)
-        var numCapacityBlocks = UInt32(capacityBlocks)
 
         let blockThreads = MTLSize(width: blockSize, height: 1, depth: 1)
         let single = MTLSize(width: 1, height: 1, depth: 1)
         let countGroups = MTLSize(width: countBlocks, height: 1, depth: 1)
-        let capacityGroups = MTLSize(width: capacityBlocks, height: 1, depth: 1)
         let uintStride = MemoryLayout<UInt32>.stride
 
         encoder.setComputePipelineState(scanCountsBlock)
@@ -147,10 +155,16 @@ public final class PointSplatWorkloadDistributor {
         encoder.setBytes(&numCountBlocks, length: uintStride, index: 3)
         encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
 
+        encoder.setComputePipelineState(writeDispatchArgs)
+        encoder.setBuffer(totalsBuffer, offset: 0, index: 0)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 1)
+        encoder.setBuffer(dispatchArgsBuffer, offset: 0, index: 2)
+        encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
+
         encoder.setComputePipelineState(clearIndices)
         encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
         encoder.setBytes(&capacityValue, length: uintStride, index: 1)
-        encoder.dispatchThreadgroups(capacityGroups, threadsPerThreadgroup: blockThreads)
+        encoder.dispatchThreadgroups(indirectBuffer: dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
 
         encoder.setComputePipelineState(scatterIndices)
         encoder.setBuffer(counts, offset: 0, index: 0)
@@ -164,20 +178,23 @@ public final class PointSplatWorkloadDistributor {
         encoder.setComputePipelineState(maxScanBlock)
         encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
         encoder.setBuffer(maxBlockMaxes, offset: 0, index: 1)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 2)
-        encoder.dispatchThreadgroups(capacityGroups, threadsPerThreadgroup: blockThreads)
+        encoder.setBuffer(totalsBuffer, offset: 0, index: 2)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 3)
+        encoder.dispatchThreadgroups(indirectBuffer: dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
 
         encoder.setComputePipelineState(scanBlockMaxes)
         encoder.setBuffer(maxBlockMaxes, offset: 0, index: 0)
         encoder.setBuffer(maxBlockCarry, offset: 0, index: 1)
-        encoder.setBytes(&numCapacityBlocks, length: uintStride, index: 2)
+        encoder.setBuffer(totalsBuffer, offset: 0, index: 2)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 3)
         encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
 
         encoder.setComputePipelineState(applyBlockMax)
         encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
         encoder.setBuffer(maxBlockCarry, offset: 0, index: 1)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 2)
-        encoder.dispatchThreadgroups(capacityGroups, threadsPerThreadgroup: blockThreads)
+        encoder.setBuffer(totalsBuffer, offset: 0, index: 2)
+        encoder.setBytes(&capacityValue, length: uintStride, index: 3)
+        encoder.dispatchThreadgroups(indirectBuffer: dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
     }
 
     /// Builds the thread-to-Gaussian map, blocking until the GPU work

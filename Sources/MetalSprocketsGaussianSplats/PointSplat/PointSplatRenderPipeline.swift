@@ -28,7 +28,6 @@ public struct PointSplatRenderPipeline: Element {
 
     private let clearKernel: ComputeKernel
     private let preprocessKernel: ComputeKernel
-    private let splatKernel: ComputeKernel
     private let resolveKernel: ComputeKernel
     private let blendKernel: ComputeKernel
     private let blitVertexShader: VertexShader
@@ -51,7 +50,6 @@ public struct PointSplatRenderPipeline: Element {
         let renderLibrary = shaderLibrary.namespaced("PointSplatRender")
         clearKernel = try renderLibrary.function(named: "pointSplatClear", type: ComputeKernel.self)
         preprocessKernel = try renderLibrary.function(named: "pointSplatPreprocess", type: ComputeKernel.self)
-        splatKernel = try renderLibrary.function(named: "pointSplatSplat", type: ComputeKernel.self)
         resolveKernel = try renderLibrary.function(named: "pointSplatResolve", type: ComputeKernel.self)
         blendKernel = try shaderLibrary.namespaced("TemporalAccumulationShader").function(named: "blend", type: ComputeKernel.self)
         let blitLibrary = shaderLibrary.namespaced("BlitShader")
@@ -123,29 +121,31 @@ public struct PointSplatRenderPipeline: Element {
                         .parameter("shCoefficients", buffer: shBuffer)
                         .parameter("colors", buffer: resources.colors)
                 }
-                try ComputePipeline(computeKernel: splatKernel) {
-                    try ComputeDispatch(threadsPerGrid: MTLSize(width: resources.distributor.capacity, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
-                        .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
-                        .parameter("indices", buffer: resources.distributor.indicesBuffer)
-                        .parameter("framebuffer", buffer: resources.framebuffer)
-                        .parameter("uniforms", value: uniforms)
-                        .parameter("totals", buffer: resources.distributor.totalsBuffer)
-                        .parameter("framebufferRead", buffer: resources.framebuffer)
-                        .parameter("colors", buffer: resources.colors)
-                }
-                // Encode the workload distribution (prefix sum, scatter,
-                // max-scan) into the encoder just before the splat dispatch.
-                .onWorkloadEnter { [splatCloud] environmentValues in
-                    guard let encoder = environmentValues.computeCommandEncoder else {
-                        preconditionFailure("No compute command encoder found.")
-                    }
-                    try resources.distributor.encode(encoder: encoder, counts: resources.counts, count: splatCloud.count)
-                }
                 try ComputePipeline(computeKernel: resolveKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
                         .parameter("framebuffer", buffer: resources.framebuffer)
                         .parameter("uniforms", value: uniforms)
                         .parameter("outTexture", texture: resources.resolveTexture)
+                }
+                // Workload distribution + splat run before the resolve via
+                // raw encoding: the splat dispatch is indirect (sized by the
+                // GPU-side total), which MetalSprockets' ComputeDispatch
+                // doesn't support.
+                .onWorkloadEnter { [splatCloud] environmentValues in
+                    guard let encoder = environmentValues.computeCommandEncoder else {
+                        preconditionFailure("No compute command encoder found.")
+                    }
+                    try resources.distributor.encode(encoder: encoder, counts: resources.counts, count: splatCloud.count)
+                    var uniformsCopy = uniforms
+                    encoder.setComputePipelineState(resources.splatPipelineState)
+                    encoder.setBuffer(splatCloud.splats.unsafeMTLBuffer, offset: 0, index: 0)
+                    encoder.setBuffer(resources.distributor.indicesBuffer, offset: 0, index: 1)
+                    encoder.setBuffer(resources.framebuffer, offset: 0, index: 2)
+                    encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
+                    encoder.setBuffer(resources.distributor.totalsBuffer, offset: 0, index: 4)
+                    encoder.setBuffer(resources.framebuffer, offset: 0, index: 5)
+                    encoder.setBuffer(resources.colors, offset: 0, index: 6)
+                    encoder.dispatchThreadgroups(indirectBuffer: resources.distributor.dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
                 }
                 try ComputePipeline(computeKernel: blendKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
@@ -178,6 +178,9 @@ final class PointSplatResources {
     let dummySHBuffer: MTLBuffer
     let splatCount: Int
     let distributor: PointSplatWorkloadDistributor
+    /// Raw pipeline state for the splat stage; dispatched indirectly from
+    /// the distributor's GPU-side total.
+    let splatPipelineState: MTLComputePipelineState
     let resolveTexture: MTLTexture
     private let accumulationTextures: [MTLTexture]
     private(set) var accumulatedFrames: Int = 0
@@ -213,6 +216,12 @@ final class PointSplatResources {
         self.splatCount = splatCount
         // Point budget scales with the supersampled framebuffer size.
         distributor = try PointSplatWorkloadDistributor(device: device, capacity: PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixelCount, pointsPerThread: pointsPerThread), maxSplats: splatCount)
+
+        let library = try device.makeDefaultLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
+        guard let splatFunction = library.makeFunction(name: "PointSplatRender::pointSplatSplat") else {
+            throw PointSplatRenderer.RendererError.functionNotFound("pointSplatSplat")
+        }
+        splatPipelineState = try device.makeComputePipelineState(function: splatFunction)
 
         let textureWidth = width
         let textureHeight = height
