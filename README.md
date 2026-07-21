@@ -159,6 +159,41 @@ try PointSplatRenderPipeline(
 )
 ```
 
+## Benchmarks
+
+Measured with the CLI's `bench` subcommand: synthetic seeded clouds,
+1024×1024, median of 20 frames, Release build, Apple Silicon. Spark
+re-sorts every frame (representing interactive camera motion); PointSplat
+runs 2×2 supersampling with K=4.
+
+![Renderer scaling: PointSplat stays nearly flat while Spark and GPU-sort grow with splat count](Documentation/benchmark-scaling.png)
+
+| splats | point | spark | gpu |
+|-------:|------:|------:|----:|
+| 100k | 1.4 ms | 2.9 ms | 2.9 ms |
+| 1M | 10.7 ms | 14.2 ms | 6.7 ms |
+| 4M | 14.7 ms | 53.0 ms | 20.5 ms |
+| 8M | 18.2 ms | 115.7 ms | 39.8 ms |
+
+Takeaways:
+
+- **PointSplat flattens**: cost is bounded by points per pixel, not splat
+  count — 8M splats costs only ~1.2× the 4M time. It wins decisively at
+  4M+ and is competitive even at 100k.
+- **Spark is CPU-sort-bound** and scales linearly; fine for the hundreds-of-k
+  scenes it targets, painful past a few million.
+- **GPU-sort wins the middle** (~1M), where the radix sort is cheap and
+  PointSplat's fixed per-pixel cost dominates.
+
+Reproduce with:
+
+```sh
+xcb run --target metalsprockets-gaussian-splat -c Release -- \
+    bench --counts 100000,1000000,4000000,8000000 --frames 20 --size 1024
+```
+
+Or benchmark a real file: `bench --splat path/to/scene.sog`.
+
 ## Usage
 
 Rendering Gaussian splats requires two steps: sorting and rendering. The sort manager runs on a background thread and produces sorted indices that you pass to a render pipeline.
