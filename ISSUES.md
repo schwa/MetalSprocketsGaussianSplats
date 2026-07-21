@@ -1182,12 +1182,13 @@ SplatImmersiveElement currently only uses SparkSplatRenderPipeline. Add support 
 ## 51: Investigate stochastic seed behavior when camera is stationary
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: effort:s, stochastic
 created: 2026-04-09T20:13:57Z
-updated: 2026-07-21T20:43:22Z
+updated: 2026-07-21T22:35:29Z
+closed: 2026-07-21T22:35:29Z
 +++
 
 Currently frameTime (frame counter) is passed as the stochastic seed every frame, so the noise pattern changes even when the camera isn't moving. This causes constant visual shimmer. When the camera is stationary, we could either freeze the seed (stable but noisy image) or accumulate/average multiple frames for temporal convergence. Need to investigate what looks best.

@@ -65,6 +65,10 @@ public struct SplatView: View {
     @State private var pointSplatPointsPerThreadSetting = 4
     /// Scratch + output buffers for the GPU sorter (``SplatRenderer/gpu``).
     @State private var sortResources: GPUSortResources
+    /// Seed for the stochastic renderer's noise pattern. Advances once per
+    /// camera/model change, so the pattern varies while moving but freezes
+    /// when the view is stationary, avoiding constant shimmer (#51).
+    @State private var stochasticSeed: UInt32 = 0
 
     private static let pendingReleaseDepth = 3
 
@@ -145,7 +149,7 @@ public struct SplatView: View {
                         modelMatrix: modelMatrix,
                         cameraMatrix: cameraMatrix,
                         drawableSize: size,
-                        frameTime: context.frameUniforms.index
+                        frameTime: stochasticSeed
                     )
                     .depthCompare(function: .less, enabled: true)
                 }
@@ -241,11 +245,13 @@ public struct SplatView: View {
             }
         }
         .onChange(of: cameraMatrix) {
+            stochasticSeed &+= 1
             if renderer == .spark {
                 sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             }
         }
         .onChange(of: modelMatrix) {
+            stochasticSeed &+= 1
             if renderer == .spark {
                 sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             }
