@@ -292,21 +292,11 @@ public struct SparkSplatRenderPipeline: Element {
         }
 
         return try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-            Draw { [maxSHDegree, boundingBox] commandEncoder in
+            Draw { commandEncoder in
                 let vertices: [SIMD2<Float>] = [
                     [-1, -1], [-1, 1], [1, -1], [1, 1]
                 ]
                 commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                // Set SH degree for multi-cloud (shader will look up per-cloud
-                // SH buffers). Always bind: the cached pipeline state can have
-                // use_sh baked in from a previous cloud, and an unbound buffer
-                // 11 then trips Metal validation. Degree 0 short-circuits SH.
-                var shDegreeValue = UInt32(useSphericalHarmonics ? maxSHDegree : 0)
-                commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
-                // Set bounding box for vertex culling
-                if var bbox = boundingBox {
-                    commandEncoder.setVertexBytes(&bbox, length: MemoryLayout<BoundingBox3D>.size, index: 12)
-                }
                 if var viewMappings = amplificationViewMappings {
                     commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: &viewMappings)
                 } else {
@@ -327,6 +317,15 @@ public struct SparkSplatRenderPipeline: Element {
             .parameter("scale", value: Float(2.0))
             .parameter("cameraPositions", values: cameraPositions)
             .parameter("clouds", value: argumentBuffer)
+            // SH degree for multi-cloud (shader looks up per-cloud SH buffers).
+            // Reflection comes from the pipeline state, so this binds whenever
+            // the PSO has use_sh baked in (even from a previous cloud) and is
+            // skipped otherwise. Degree 0 short-circuits SH.
+            .parameter("shDegree", functionType: .vertex, value: UInt32(useSphericalHarmonics ? maxSHDegree : 0))
+            // Bounding box for vertex culling. When boundingBox is nil the
+            // use_bounding_box function constant is false, the binding is absent
+            // from reflection, and the placeholder value is silently skipped.
+            .parameter("boundingBox", functionType: .vertex, value: boundingBox ?? BoundingBox3D())
         }
         .vertexDescriptor(vertexDescriptor)
         .renderPassDescriptorModifier { [amplificationCount] descriptor in

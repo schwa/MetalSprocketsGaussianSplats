@@ -1819,12 +1819,13 @@ A shader-compilation failure at runtime (e.g. bad function constant) takes down 
 ## 86: SparkSplatRenderPipeline: boundingBox and shDegree bound via raw setVertexBytes instead of .parameter
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: spark, code-style, effort:s
 created: 2026-07-21T20:28:32Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T22:40:04Z
+closed: 2026-07-21T22:40:04Z
 +++
 
 In SparkSplatRenderPipeline's Draw closure, `shDegreeValue` (index 11) and `boundingBox` (index 12) are bound with raw `commandEncoder.setVertexBytes` instead of MetalSprockets' reflection-based `.parameter(...)`. The shDegree binding has a comment explaining why it must always be bound, but the boundingBox binding has no justification. Raw index-based binding loses bind-by-name reflection and diverges from the framework convention used for the other uniforms in the same pipeline. Also uses `MemoryLayout<...>.size` rather than `.stride`.
