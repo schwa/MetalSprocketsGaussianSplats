@@ -2,3 +2,4 @@
 #import "SparkSplatSupport.h"
 #import "TileSplatSupport.h"
 #import "SplatGPUSort.h"
+#import "PointSplatMath.h"
