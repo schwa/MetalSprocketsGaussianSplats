@@ -1728,12 +1728,13 @@ closed: 2026-07-21T21:12:15Z
 ## 81: StochasticSplatRenderPipeline: uniforms and textures bound via raw encoder calls instead of .parameter
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: stochastic, code-style, effort:s
 created: 2026-07-21T20:28:39Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T22:34:34Z
+closed: 2026-07-21T22:34:34Z
 +++
 
 The Draw closure in StochasticSplatRenderPipeline binds `time`, `alphaThreshold`, the blue-noise texture, the SH degree, and the SH buffer with raw `setFragmentBytes`/`setFragmentTexture`/`setVertexBytes`/`setVertexBuffer` at hard-coded indices, while the rest of the pipeline uses reflection-based `.parameter(...)`. These are all small uniforms/textures that `.parameter` handles; no justification is given for bypassing it. Also uses `MemoryLayout<...>.size` rather than `.stride`.

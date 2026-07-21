@@ -152,32 +152,21 @@ public struct StochasticSplatRenderPipeline: Element {
         get throws {
             let shBuffer = useSphericalHarmonics ? splatCloud.shCoefficients : nil
             let degree = useSphericalHarmonics ? splatCloud.shDegree : 0
-            var time = frameTime
-            var threshold = alphaThreshold
             let viewMatrices = cameraMatrices.map(\.inverse)
             let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
             let amplificationCount = cameraMatrices.count
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-                Draw { commandEncoder in
+                let draw = Draw { commandEncoder in
                     let vertices: [SIMD2<Float>] = [
                         [-1, -1], [-1, 1], [1, -1], [1, 1]
                     ]
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
                     commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
-                    // Set time uniform for fragment shader hash
-                    commandEncoder.setFragmentBytes(&time, length: MemoryLayout<UInt32>.size, index: 0)
-                    // Set alpha threshold for fragment shader
-                    commandEncoder.setFragmentBytes(&threshold, length: MemoryLayout<Float>.size, index: 1)
-                    // Set blue noise texture
-                    commandEncoder.setFragmentTexture(blueNoiseTexture, index: 0)
-                    // Set SH buffer and degree if available
-                    if let buffer = shBuffer {
-                        var shDegreeValue = UInt32(degree)
-                        commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
-                        commandEncoder.setVertexBuffer(buffer.unsafeMTLBuffer, offset: 0, index: 12)
-                    }
                     commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
                 }
+                .parameter("uTime", value: frameTime)
+                .parameter("alphaThreshold", value: alphaThreshold)
+                .parameter("blueNoiseTexture", texture: blueNoiseTexture)
                 .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
                 .parameter("modelMatrix", value: modelMatrix)
                 .parameter("viewMatrices", values: viewMatrices)
@@ -185,6 +174,13 @@ public struct StochasticSplatRenderPipeline: Element {
                 .parameter("drawableSize", value: drawableSize)
                 .parameter("scale", value: Float(2.0))
                 .parameter("cameraPositions", values: cameraPositions)
+                if let shBuffer {
+                    draw
+                        .parameter("shDegree", value: UInt32(degree))
+                        .parameter("shCoefficients", buffer: shBuffer.unsafeMTLBuffer)
+                } else {
+                    draw
+                }
             }
             .vertexDescriptor(vertexDescriptor)
             .renderPipelineDescriptorModifier { [amplificationCount] descriptor in
