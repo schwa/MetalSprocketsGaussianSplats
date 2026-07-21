@@ -1911,12 +1911,13 @@ Group-level hierarchical culling (#75) uses groups of 256 consecutive Gaussians 
 ## 90: PointSplat: rewrite raw-encoded frame flow as MetalSprockets elements
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: pointsplat, effort:l
 created: 2026-07-21T23:28:02Z
-updated: 2026-07-21T23:28:19Z
+updated: 2026-07-21T23:36:31Z
+closed: 2026-07-21T23:36:31Z
 +++
 
 PointSplatResources.encodeFrame/encodePhase sequences ~10 pipeline states on one raw compute encoder (clear, group bounds/cull, indirect preprocess, distributor, indirect splat, pyramid build), re-running the distributor mid-frame for the two-phase occlusion pass. PointSplatRenderer drives the same code offscreen with no element System. Because of this, the indirect dispatches cannot use ComputeDispatch(indirectBuffer:) (formerly #78).

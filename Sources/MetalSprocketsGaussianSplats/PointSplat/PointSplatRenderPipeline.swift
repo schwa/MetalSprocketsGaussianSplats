@@ -139,30 +139,23 @@ public struct PointSplatRenderPipeline: Element {
             // motion reprojects history (#73) or, with reprojection disabled
             // (#74), hard-resets so motion shows raw 1-SPP noise.
             let accumulation = resources.nextAccumulationStep(frameIndex: frameIndex, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix, allowReprojection: reprojection)
+            let plan = resources.framePlan(planKey: UInt64(frameIndex), splats: splatCloud.splats.unsafeMTLBuffer)
             try ComputePass(label: "PointSplat") {
+                try resources.frameElements(uniforms: uniforms, splats: splatCloud.splats.unsafeMTLBuffer, shBuffer: shBuffer, seed: frameIndex, packedBounds: GPSPackedSplatBounds(), plan: plan)
                 try ComputePipeline(computeKernel: resolveKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
                         .parameter("framebuffer", buffer: resources.framebuffer)
                         .parameter("uniforms", value: uniforms)
                         .parameter("outTexture", texture: resources.resolveTexture)
                 }
-                // The whole frame up to the resolve is raw-encoded: the splat
-                // dispatches are indirect (GPU-side totals) and the two-phase
-                // occlusion flow re-runs the workload distribution mid-frame,
-                // neither of which MetalSprockets elements support.
-                .onWorkloadEnter { [splatCloud, statistics, pointsPerThread, frameIndex] environmentValues in
-                    guard let encoder = environmentValues.computeCommandEncoder else {
-                        preconditionFailure("No compute command encoder found.")
-                    }
-                    // Publish the previous frame's per-phase totals before
-                    // encoding overwrites them.
+                // Publish the previous completed frame's per-phase totals.
+                .onWorkloadEnter { [statistics, pointsPerThread] _ in
                     if let statistics {
                         let stats = resources.lastFrameStats
                         statistics.pointCount = (stats.phase1Used + stats.phase2Used) * pointsPerThread
                         statistics.pointDemand = (stats.phase1Demand + stats.phase2Demand) * pointsPerThread
                         statistics.pointBudget = resources.distributor.capacity * pointsPerThread
                     }
-                    try resources.encodeFrame(encoder: encoder, uniforms: uniforms, splats: splatCloud.splats.unsafeMTLBuffer, shBuffer: shBuffer, seed: frameIndex)
                 }
                 if let previousViewProjection = accumulation.reprojectFrom {
                     // Camera moved: warp + clamp history instead of resetting
@@ -254,17 +247,17 @@ final class PointSplatResources {
     private let pyramidLevelViews: [MTLTexture]
     private var hasDepthHistory = false
 
-    private let clearPipelineState: MTLComputePipelineState
-    private let groupBoundsPipelineState: MTLComputePipelineState
-    private let clearCountsPipelineState: MTLComputePipelineState
-    private let groupCullPipelineState: MTLComputePipelineState
-    private let groupDispatchArgsPipelineState: MTLComputePipelineState
-    private let preprocessPipelineState: MTLComputePipelineState
-    private let splatPipelineState: MTLComputePipelineState
-    private let resolvePipelineState: MTLComputePipelineState
-    private let depthExtractPipelineState: MTLComputePipelineState
-    private let depthDownsamplePipelineState: MTLComputePipelineState
-    private let copyTotalsPipelineState: MTLComputePipelineState
+    private let clearKernel: ComputeKernel
+    private let groupBoundsKernel: ComputeKernel
+    private let clearCountsKernel: ComputeKernel
+    private let groupCullKernel: ComputeKernel
+    private let groupDispatchArgsKernel: ComputeKernel
+    private let preprocessKernel: ComputeKernel
+    private let splatKernel: ComputeKernel
+    private let resolveKernel: ComputeKernel
+    private let depthExtractKernel: ComputeKernel
+    private let depthDownsampleKernel: ComputeKernel
+    private let copyTotalsKernel: ComputeKernel
 
     private let accumulationTextures: [MTLTexture]
     private(set) var accumulatedFrames: Int = 0
@@ -274,6 +267,8 @@ final class PointSplatResources {
     private var lastProjectionMatrix: simd_float4x4?
     private var lastAccumulationFrameIndex: UInt32?
     private var lastAccumulationStep: AccumulationStep?
+    private var lastPlanKey: UInt64?
+    private var lastPlan: FramePlan?
 
     /// Far depth + packed background color: any splatted point wins the min.
     var clearValue: UInt64 {
@@ -348,24 +343,19 @@ final class PointSplatResources {
         // Point budget scales with the supersampled framebuffer size.
         distributor = try PointSplatWorkloadDistributor(device: device, capacity: PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixelCount, pointsPerThread: pointsPerThread), maxSplats: splatCount)
 
-        let library = try device.makeDefaultLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
-        func pipeline(_ name: String) throws -> MTLComputePipelineState {
-            guard let function = library.makeFunction(name: name) else {
-                throw PointSplatRenderer.RendererError.functionNotFound(name)
-            }
-            return try device.makeComputePipelineState(function: function)
-        }
-        clearPipelineState = try pipeline("PointSplatRender::pointSplatClear")
-        groupBoundsPipelineState = try pipeline("PointSplatRender::pointSplatGroupBounds")
-        clearCountsPipelineState = try pipeline("PointSplatRender::pointSplatClearCounts")
-        groupCullPipelineState = try pipeline("PointSplatRender::pointSplatGroupCull")
-        groupDispatchArgsPipelineState = try pipeline("PointSplatRender::pointSplatGroupDispatchArgs")
-        preprocessPipelineState = try pipeline("PointSplatRender::pointSplatPreprocess")
-        splatPipelineState = try pipeline("PointSplatRender::pointSplatSplat")
-        resolvePipelineState = try pipeline("PointSplatRender::pointSplatResolve")
-        depthExtractPipelineState = try pipeline("PointSplatRender::pointSplatDepthExtract")
-        depthDownsamplePipelineState = try pipeline("PointSplatRender::pointSplatDepthDownsample")
-        copyTotalsPipelineState = try pipeline("PointSplatWorkload::workloadCopyTotals")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
+        let renderLibrary = shaderLibrary.namespaced("PointSplatRender")
+        clearKernel = try renderLibrary.function(named: "pointSplatClear", type: ComputeKernel.self)
+        groupBoundsKernel = try renderLibrary.function(named: "pointSplatGroupBounds", type: ComputeKernel.self)
+        clearCountsKernel = try renderLibrary.function(named: "pointSplatClearCounts", type: ComputeKernel.self)
+        groupCullKernel = try renderLibrary.function(named: "pointSplatGroupCull", type: ComputeKernel.self)
+        groupDispatchArgsKernel = try renderLibrary.function(named: "pointSplatGroupDispatchArgs", type: ComputeKernel.self)
+        preprocessKernel = try renderLibrary.function(named: "pointSplatPreprocess", type: ComputeKernel.self)
+        splatKernel = try renderLibrary.function(named: "pointSplatSplat", type: ComputeKernel.self)
+        resolveKernel = try renderLibrary.function(named: "pointSplatResolve", type: ComputeKernel.self)
+        depthExtractKernel = try renderLibrary.function(named: "pointSplatDepthExtract", type: ComputeKernel.self)
+        depthDownsampleKernel = try renderLibrary.function(named: "pointSplatDepthDownsample", type: ComputeKernel.self)
+        copyTotalsKernel = try shaderLibrary.namespaced("PointSplatWorkload").function(named: "workloadCopyTotals", type: ComputeKernel.self)
 
         // Depth pyramid at native resolution with a full max-depth mip chain.
         let levels = Int(floor(log2(Double(max(width, height))))) + 1
@@ -402,152 +392,172 @@ final class PointSplatResources {
         accumulationTextures = [try makeTexture(label: "PointSplat accumulation A"), try makeTexture(label: "PointSplat accumulation B")]
     }
 
-    /// Encodes one full PointSplat frame up to (not including) the resolve:
-    /// clear, phase-1 preprocess/distribute/splat, depth pyramid build, and
-    /// — when a pyramid from a previous frame exists — the paper's phase 2
+    /// Per-frame element-tree decisions that also advance resources state
+    /// (group-bounds cache, depth history). Idempotent per `planKey`: `body`
+    /// can be evaluated multiple times per frame, so repeat calls for the
+    /// same key return the cached plan instead of advancing state again.
+    struct FramePlan {
+        /// Recompute group AABBs: the splat buffer changed since the last
+        /// frame (#75).
+        var recomputeBounds: Bool
+        /// Run the paper's two-phase occlusion flow: a depth pyramid from a
+        /// previous frame exists.
+        var occlusionPhase2: Bool
+    }
+
+    func framePlan(planKey: UInt64, splats: MTLBuffer) -> FramePlan {
+        if planKey == lastPlanKey, let lastPlan {
+            return lastPlan
+        }
+        let plan = FramePlan(recomputeBounds: boundsSourceBuffer != ObjectIdentifier(splats), occlusionPhase2: hasDepthHistory)
+        boundsSourceBuffer = ObjectIdentifier(splats)
+        hasDepthHistory = true
+        lastPlanKey = planKey
+        lastPlan = plan
+        return plan
+    }
+
+    /// One full PointSplat frame up to (not including) the resolve, as
+    /// compute elements for an enclosing ``ComputePass``: clear, phase-1
+    /// preprocess/distribute/splat, depth pyramid build, and — when a
+    /// pyramid from a previous frame exists — the paper's phase 2
     /// (re-testing phase-1-culled Gaussians against the fresh pyramid so
     /// stale-depth culling can never lose geometry).
-    func encodeFrame(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, packedBounds: GPSPackedSplatBounds = GPSPackedSplatBounds()) throws {
+    func frameElements(uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, packedBounds: GPSPackedSplatBounds = GPSPackedSplatBounds(), plan: FramePlan) throws -> some Element {
+        try distributor.validate(count: splatCount)
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
         let pixelCount = width * height * supersampling * supersampling
-        var clearValueCopy = clearValue
-        var pixelCountValue = UInt32(pixelCount)
-
-        encoder.setComputePipelineState(clearPipelineState)
-        encoder.setBuffer(framebuffer, offset: 0, index: 0)
-        encoder.setBytes(&clearValueCopy, length: MemoryLayout<UInt64>.stride, index: 1)
-        encoder.setBytes(&pixelCountValue, length: MemoryLayout<UInt32>.stride, index: 2)
-        encoder.dispatchThreads(MTLSize(width: pixelCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
-
-        // Group AABBs are a pure function of the splat buffer; recompute
-        // only when it changes (#75).
-        if boundsSourceBuffer != ObjectIdentifier(splats) {
-            var splatCountValue = UInt32(splatCount)
-            var packedFlag = uniforms.packedSplats
-            var packedBoundsCopy = packedBounds
-            encoder.setComputePipelineState(groupBoundsPipelineState)
-            encoder.setBuffer(splats, offset: 0, index: 0)
-            encoder.setBuffer(groupBounds, offset: 0, index: 1)
-            encoder.setBytes(&splatCountValue, length: MemoryLayout<UInt32>.stride, index: 2)
-            encoder.setBytes(&packedFlag, length: MemoryLayout<UInt32>.stride, index: 3)
-            encoder.setBytes(&packedBoundsCopy, length: MemoryLayout<GPSPackedSplatBounds>.stride, index: 4)
-            encoder.dispatchThreads(MTLSize(width: groupCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
-            boundsSourceBuffer = ObjectIdentifier(splats)
-        }
-
         var phase1 = uniforms
-        phase1.occlusionPhase = hasDepthHistory ? 1 : 0
-        try encodePhase(encoder: encoder, uniforms: phase1, splats: splats, shBuffer: shBuffer, seed: seed, statsOffset: 0, packedBounds: packedBounds)
-        encodePyramidBuild(encoder: encoder, uniforms: uniforms)
+        phase1.occlusionPhase = plan.occlusionPhase2 ? 1 : 0
+        var phase2 = uniforms
+        phase2.occlusionPhase = 2
 
-        if phase1.occlusionPhase == 1 {
-            var phase2 = uniforms
-            phase2.occlusionPhase = 2
-            try encodePhase(encoder: encoder, uniforms: phase2, splats: splats, shBuffer: shBuffer, seed: seed &+ 0x9E37_79B9, statsOffset: 2, packedBounds: packedBounds)
-            // Refresh the pyramid with phase-2 contributions for next frame.
-            encodePyramidBuild(encoder: encoder, uniforms: uniforms)
-        } else {
-            // No phase 2 this frame: zero its stats slots.
-            var statsOffset = UInt32(2)
-            encoder.setComputePipelineState(copyTotalsPipelineState)
-            encoder.setBuffer(zeroTotals, offset: 0, index: 0)
-            encoder.setBuffer(statsBuffer, offset: 0, index: 1)
-            encoder.setBytes(&statsOffset, length: MemoryLayout<UInt32>.stride, index: 2)
-            encoder.dispatchThreads(MTLSize(width: 2, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 2, height: 1, depth: 1))
+        return try Group {
+            try ComputePipeline(computeKernel: clearKernel) {
+                try ComputeDispatch(threadsPerGrid: MTLSize(width: pixelCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+                    .parameter("framebuffer", buffer: framebuffer)
+                    .parameter("clearValue", value: clearValue)
+                    .parameter("pixelCount", value: UInt32(pixelCount))
+            }
+            if plan.recomputeBounds {
+                try ComputePipeline(computeKernel: groupBoundsKernel) {
+                    try ComputeDispatch(threadsPerGrid: MTLSize(width: groupCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+                        .parameter("splats", buffer: splats)
+                        .parameter("bounds", buffer: groupBounds)
+                        .parameter("splatCount", value: UInt32(splatCount))
+                        .parameter("packedFlag", value: uniforms.packedSplats)
+                        .parameter("packedBounds", value: packedBounds)
+                }
+            }
+            try phaseElements(uniforms: phase1, splats: splats, shBuffer: shBuffer, seed: seed, statsOffset: 0, packedBounds: packedBounds)
+            try pyramidElements(uniforms: uniforms)
+            if plan.occlusionPhase2 {
+                try phaseElements(uniforms: phase2, splats: splats, shBuffer: shBuffer, seed: seed &+ 0x9E37_79B9, statsOffset: 2, packedBounds: packedBounds)
+                // Refresh the pyramid with phase-2 contributions for next frame.
+                try pyramidElements(uniforms: uniforms)
+            } else {
+                // No phase 2 this frame: zero its stats slots.
+                try ComputePipeline(computeKernel: copyTotalsKernel) {
+                    try ComputeDispatch(threadsPerGrid: MTLSize(width: 2, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 2, height: 1, depth: 1))
+                        .parameter("totals", buffer: zeroTotals)
+                        .parameter("dst", buffer: statsBuffer)
+                        .parameter("offset", value: UInt32(2))
+                }
+            }
         }
-        hasDepthHistory = true
     }
 
     /// Box-filters the supersampled framebuffer into `outTexture`.
-    func encodeResolve(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, outTexture: MTLTexture) {
-        var uniformsCopy = uniforms
-        encoder.setComputePipelineState(resolvePipelineState)
-        encoder.setBuffer(framebuffer, offset: 0, index: 0)
-        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 1)
-        encoder.setTexture(outTexture, index: 0)
-        encoder.dispatchThreads(MTLSize(width: outTexture.width, height: outTexture.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+    func resolveElements(uniforms: PointSplatUniforms, outTexture: MTLTexture) throws -> some Element {
+        try ComputePipeline(computeKernel: resolveKernel) {
+            try ComputeDispatch(threadsPerGrid: MTLSize(width: outTexture.width, height: outTexture.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+                .parameter("framebuffer", buffer: framebuffer)
+                .parameter("uniforms", value: uniforms)
+                .parameter("outTexture", texture: outTexture)
+        }
     }
 
     /// One preprocess -> distribute -> splat round for the given phase.
-    private func encodePhase(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, statsOffset: Int, packedBounds: GPSPackedSplatBounds) throws {
+    private func phaseElements(uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, statsOffset: Int, packedBounds: GPSPackedSplatBounds) throws -> some Element {
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
-        var uniformsCopy = uniforms
-        var groupCountValue = UInt32(groupCount)
-        var packedBoundsCopy = packedBounds
+        let single = MTLSize(width: 1, height: 1, depth: 1)
 
         // Reset counts/mask/visible-group counter, cull whole groups against
         // the frustum and depth pyramid, then run the per-Gaussian
         // preprocess only for surviving groups (#75).
-        encoder.setComputePipelineState(clearCountsPipelineState)
-        encoder.setBuffer(counts, offset: 0, index: 0)
-        encoder.setBuffer(renderedMask, offset: 0, index: 1)
-        encoder.setBuffer(visibleGroupCount, offset: 0, index: 2)
-        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
-        encoder.dispatchThreads(MTLSize(width: max(splatCount, 1), height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
-
-        encoder.setComputePipelineState(groupCullPipelineState)
-        encoder.setBuffer(groupBounds, offset: 0, index: 0)
-        encoder.setBuffer(visibleGroups, offset: 0, index: 1)
-        encoder.setBuffer(visibleGroupCount, offset: 0, index: 2)
-        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
-        encoder.setBytes(&groupCountValue, length: MemoryLayout<UInt32>.stride, index: 4)
-        encoder.setTexture(depthPyramid, index: 0)
-        encoder.dispatchThreads(MTLSize(width: groupCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
-
-        encoder.setComputePipelineState(groupDispatchArgsPipelineState)
-        encoder.setBuffer(visibleGroupCount, offset: 0, index: 0)
-        encoder.setBuffer(groupDispatchArgs, offset: 0, index: 1)
-        encoder.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
-
-        encoder.setComputePipelineState(preprocessPipelineState)
-        encoder.setBuffer(splats, offset: 0, index: 0)
-        encoder.setBuffer(counts, offset: 0, index: 1)
-        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 2)
-        encoder.setBuffer(shBuffer, offset: 0, index: 3)
-        encoder.setBuffer(colors, offset: 0, index: 4)
-        encoder.setBuffer(renderedMask, offset: 0, index: 5)
-        encoder.setBuffer(visibleGroups, offset: 0, index: 6)
-        encoder.setBytes(&packedBoundsCopy, length: MemoryLayout<GPSPackedSplatBounds>.stride, index: 7)
-        encoder.setTexture(depthPyramid, index: 0)
-        encoder.dispatchThreadgroups(indirectBuffer: groupDispatchArgs, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
-
-        try distributor.encode(encoder: encoder, counts: counts, count: splatCount, seed: seed)
-
-        var statsOffsetValue = UInt32(statsOffset)
-        encoder.setComputePipelineState(copyTotalsPipelineState)
-        encoder.setBuffer(distributor.totalsBuffer, offset: 0, index: 0)
-        encoder.setBuffer(statsBuffer, offset: 0, index: 1)
-        encoder.setBytes(&statsOffsetValue, length: MemoryLayout<UInt32>.stride, index: 2)
-        encoder.dispatchThreads(MTLSize(width: 2, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 2, height: 1, depth: 1))
-
-        encoder.setComputePipelineState(splatPipelineState)
-        encoder.setBuffer(splats, offset: 0, index: 0)
-        encoder.setBuffer(distributor.indicesBuffer, offset: 0, index: 1)
-        encoder.setBuffer(framebuffer, offset: 0, index: 2)
-        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
-        encoder.setBuffer(distributor.totalsBuffer, offset: 0, index: 4)
-        encoder.setBuffer(framebuffer, offset: 0, index: 5)
-        encoder.setBuffer(colors, offset: 0, index: 6)
-        encoder.setBytes(&packedBoundsCopy, length: MemoryLayout<GPSPackedSplatBounds>.stride, index: 7)
-        encoder.dispatchThreadgroups(indirectBuffer: distributor.dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
+        return try Group {
+            try ComputePipeline(computeKernel: clearCountsKernel) {
+                try ComputeDispatch(threadsPerGrid: MTLSize(width: max(splatCount, 1), height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+                    .parameter("counts", buffer: counts)
+                    .parameter("renderedMask", buffer: renderedMask)
+                    .parameter("visibleGroupCount", buffer: visibleGroupCount)
+                    .parameter("uniforms", value: uniforms)
+            }
+            try ComputePipeline(computeKernel: groupCullKernel) {
+                try ComputeDispatch(threadsPerGrid: MTLSize(width: groupCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+                    .parameter("bounds", buffer: groupBounds)
+                    .parameter("visibleGroups", buffer: visibleGroups)
+                    .parameter("visibleGroupCount", buffer: visibleGroupCount)
+                    .parameter("uniforms", value: uniforms)
+                    .parameter("groupCount", value: UInt32(groupCount))
+                    .parameter("depthPyramid", texture: depthPyramid)
+            }
+            try ComputePipeline(computeKernel: groupDispatchArgsKernel) {
+                try ComputeDispatch(threadsPerGrid: single, threadsPerThreadgroup: single)
+                    .parameter("visibleGroupCount", buffer: visibleGroupCount)
+                    .parameter("args", buffer: groupDispatchArgs)
+            }
+            try ComputePipeline(computeKernel: preprocessKernel) {
+                try ComputeDispatch(indirectBuffer: groupDispatchArgs, threadsPerThreadgroup: blockThreads)
+                    .parameter("splats", buffer: splats)
+                    .parameter("counts", buffer: counts)
+                    .parameter("uniforms", value: uniforms)
+                    .parameter("shCoefficients", buffer: shBuffer)
+                    .parameter("colors", buffer: colors)
+                    .parameter("renderedMask", buffer: renderedMask)
+                    .parameter("visibleGroups", buffer: visibleGroups)
+                    .parameter("packedBounds", value: packedBounds)
+                    .parameter("depthPyramid", texture: depthPyramid)
+            }
+            try distributor.elements(counts: counts, count: splatCount, seed: seed)
+            try ComputePipeline(computeKernel: copyTotalsKernel) {
+                try ComputeDispatch(threadsPerGrid: MTLSize(width: 2, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 2, height: 1, depth: 1))
+                    .parameter("totals", buffer: distributor.totalsBuffer)
+                    .parameter("dst", buffer: statsBuffer)
+                    .parameter("offset", value: UInt32(statsOffset))
+            }
+            try ComputePipeline(computeKernel: splatKernel) {
+                try ComputeDispatch(indirectBuffer: distributor.dispatchArgsBuffer, threadsPerThreadgroup: blockThreads)
+                    .parameter("splats", buffer: splats)
+                    .parameter("indices", buffer: distributor.indicesBuffer)
+                    .parameter("framebuffer", buffer: framebuffer)
+                    .parameter("uniforms", value: uniforms)
+                    .parameter("totals", buffer: distributor.totalsBuffer)
+                    .parameter("framebufferRead", buffer: framebuffer)
+                    .parameter("colors", buffer: colors)
+                    .parameter("packedBounds", value: packedBounds)
+            }
+        }
     }
 
     /// Extracts native-resolution max depth from the framebuffer and builds
     /// the max-depth mip chain.
-    private func encodePyramidBuild(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms) {
-        var uniformsCopy = uniforms
-        encoder.setComputePipelineState(depthExtractPipelineState)
-        encoder.setBuffer(framebuffer, offset: 0, index: 0)
-        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 1)
-        encoder.setTexture(pyramidLevelViews[0], index: 0)
-        encoder.dispatchThreads(MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
-
-        encoder.setComputePipelineState(depthDownsamplePipelineState)
-        for level in 1..<pyramidLevels {
-            let destination = pyramidLevelViews[level]
-            encoder.setTexture(pyramidLevelViews[level - 1], index: 0)
-            encoder.setTexture(destination, index: 1)
-            encoder.dispatchThreads(MTLSize(width: destination.width, height: destination.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+    private func pyramidElements(uniforms: PointSplatUniforms) throws -> some Element {
+        try Group {
+            try ComputePipeline(computeKernel: depthExtractKernel) {
+                try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+                    .parameter("framebuffer", buffer: framebuffer)
+                    .parameter("uniforms", value: uniforms)
+                    .parameter("outDepth", texture: pyramidLevelViews[0])
+            }
+            try ComputePipeline(computeKernel: depthDownsampleKernel) {
+                ForEach(Array(1..<pyramidLevels), id: \.self) { [pyramidLevelViews] level in
+                    let destination = pyramidLevelViews[level]
+                    try ComputeDispatch(threadsPerGrid: MTLSize(width: destination.width, height: destination.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+                        .parameter("src", texture: pyramidLevelViews[level - 1])
+                        .parameter("dst", texture: destination)
+                }
+            }
         }
     }
 

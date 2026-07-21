@@ -1,6 +1,7 @@
 #if !arch(x86_64)
 
 import Metal
+import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 
 /// GPU work distribution for the PointSplat renderer (RFC 0003, Sec. 3.2).
@@ -47,7 +48,7 @@ public final class PointSplatWorkloadDistributor {
     public let device: MTLDevice
     /// Maximum number of points per frame (T in the paper).
     public let capacity: Int
-    /// Maximum number of Gaussians per `encode` call.
+    /// Maximum number of Gaussians per `elements` call.
     public let maxSplats: Int
 
     /// Thread-to-Gaussian map, valid after the encoded work completes.
@@ -72,15 +73,15 @@ public final class PointSplatWorkloadDistributor {
     /// should cover exactly the active threads (e.g. the splat stage).
     public let dispatchArgsBuffer: MTLBuffer
 
-    private let scanCountsBlock: MTLComputePipelineState
-    private let scaleCounts: MTLComputePipelineState
-    private let writeDispatchArgs: MTLComputePipelineState
-    private let scanBlockSums: MTLComputePipelineState
-    private let clearIndices: MTLComputePipelineState
-    private let scatterIndices: MTLComputePipelineState
-    private let maxScanBlock: MTLComputePipelineState
-    private let scanBlockMaxes: MTLComputePipelineState
-    private let applyBlockMax: MTLComputePipelineState
+    private let scanCountsBlock: ComputeKernel
+    private let scaleCounts: ComputeKernel
+    private let writeDispatchArgs: ComputeKernel
+    private let scanBlockSums: ComputeKernel
+    private let clearIndices: ComputeKernel
+    private let scatterIndices: ComputeKernel
+    private let maxScanBlock: ComputeKernel
+    private let scanBlockMaxes: ComputeKernel
+    private let applyBlockMax: ComputeKernel
 
     private let localPrefix: MTLBuffer
     private let countBlockSums: MTLBuffer
@@ -88,27 +89,23 @@ public final class PointSplatWorkloadDistributor {
     private let maxBlockMaxes: MTLBuffer
     private let maxBlockCarry: MTLBuffer
 
+    private var runner: Runner?
+
     public init(device: MTLDevice, capacity: Int, maxSplats: Int) throws {
         self.device = device
         self.capacity = capacity
         self.maxSplats = maxSplats
 
-        let library = try device.makeDefaultLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
-        func pipeline(_ name: String) throws -> MTLComputePipelineState {
-            guard let function = library.makeFunction(name: "PointSplatWorkload::\(name)") else {
-                throw DistributorError.functionNotFound(name)
-            }
-            return try device.makeComputePipelineState(function: function)
-        }
-        scanCountsBlock = try pipeline("workloadScanCountsBlock")
-        scaleCounts = try pipeline("workloadScaleCounts")
-        scanBlockSums = try pipeline("workloadScanBlockSums")
-        writeDispatchArgs = try pipeline("workloadWriteDispatchArgs")
-        clearIndices = try pipeline("workloadClearIndices")
-        scatterIndices = try pipeline("workloadScatterIndices")
-        maxScanBlock = try pipeline("workloadMaxScanBlock")
-        scanBlockMaxes = try pipeline("workloadScanBlockMaxes")
-        applyBlockMax = try pipeline("workloadApplyBlockMax")
+        let library = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("PointSplatWorkload")
+        scanCountsBlock = try library.function(named: "workloadScanCountsBlock", type: ComputeKernel.self)
+        scaleCounts = try library.function(named: "workloadScaleCounts", type: ComputeKernel.self)
+        scanBlockSums = try library.function(named: "workloadScanBlockSums", type: ComputeKernel.self)
+        writeDispatchArgs = try library.function(named: "workloadWriteDispatchArgs", type: ComputeKernel.self)
+        clearIndices = try library.function(named: "workloadClearIndices", type: ComputeKernel.self)
+        scatterIndices = try library.function(named: "workloadScatterIndices", type: ComputeKernel.self)
+        maxScanBlock = try library.function(named: "workloadMaxScanBlock", type: ComputeKernel.self)
+        scanBlockMaxes = try library.function(named: "workloadScanBlockMaxes", type: ComputeKernel.self)
+        applyBlockMax = try library.function(named: "workloadApplyBlockMax", type: ComputeKernel.self)
 
         let countBlocks = (maxSplats + Self.blockSize - 1) / Self.blockSize
         let capacityBlocks = (capacity + Self.blockSize - 1) / Self.blockSize
@@ -141,121 +138,135 @@ public final class PointSplatWorkloadDistributor {
         self.maxBlockCarry = maxBlockCarry
     }
 
-    /// Encodes the full distribution pipeline into an open compute encoder.
-    /// Every stage after the prefix sum dispatches indirectly from the
-    /// GPU-side total, so cost scales with actual demand rather than
-    /// capacity; entries past the total are garbage and must not be
-    /// consumed.
-    public func encode(encoder: MTLComputeCommandEncoder, counts: MTLBuffer, count: Int, seed: UInt32 = 0) throws {
-        guard count <= maxSplats else {
-            throw DistributorError.splatCountExceedsMaximum(count: count, maximum: maxSplats)
-        }
+    /// The full distribution pipeline as compute elements for an enclosing
+    /// ``ComputePass``. Every stage after the prefix sum dispatches
+    /// indirectly from the GPU-side total, so cost scales with actual demand
+    /// rather than capacity; entries past the total are garbage and must not
+    /// be consumed.
+    @ElementBuilder
+    func elements(counts: MTLBuffer, count: Int, seed: UInt32 = 0) throws -> some Element {
         let blockSize = Self.blockSize
-        let countBlocks = (count + blockSize - 1) / blockSize
-        var numElements = UInt32(count)
-        var numCountBlocks = UInt32(countBlocks)
-        var capacityValue = UInt32(capacity)
+        let countBlocks = (max(count, 1) + blockSize - 1) / blockSize
+        let numElements = UInt32(count)
+        let numCountBlocks = UInt32(countBlocks)
+        let capacityValue = UInt32(capacity)
+        let uintStride = MemoryLayout<UInt32>.stride
 
         let blockThreads = MTLSize(width: blockSize, height: 1, depth: 1)
         let single = MTLSize(width: 1, height: 1, depth: 1)
         let countGroups = MTLSize(width: countBlocks, height: 1, depth: 1)
-        let uintStride = MemoryLayout<UInt32>.stride
 
-        var seedValue = seed
+        try Group {
+            // Pass A: raw demand into totals[1].
+            try ComputePipeline(computeKernel: scanCountsBlock) {
+                try ComputeDispatch(threadgroups: countGroups, threadsPerThreadgroup: blockThreads)
+                    .parameter("counts", buffer: counts)
+                    .parameter("localPrefix", buffer: localPrefix)
+                    .parameter("blockSums", buffer: countBlockSums)
+                    .parameter("numElements", value: numElements)
+            }
+            try ComputePipeline(computeKernel: scanBlockSums) {
+                try ComputeDispatch(threadgroups: single, threadsPerThreadgroup: single)
+                    .parameter("blockSums", buffer: countBlockSums)
+                    .parameter("blockBase", buffer: countBlockBase)
+                    .parameter("totals", buffer: totalsBuffer, offset: uintStride)
+                    .parameter("numBlocks", value: numCountBlocks)
+            }
+            // Over-budget? Scale all counts down proportionally (stochastic
+            // rounding keeps the expectation right), then re-scan. Turns budget
+            // overflow into uniform noise instead of truncating whole regions.
+            try ComputePipeline(computeKernel: scaleCounts) {
+                try ComputeDispatch(threadgroups: countGroups, threadsPerThreadgroup: blockThreads)
+                    .parameter("counts", buffer: counts)
+                    .parameter("totals", buffer: totalsBuffer)
+                    .parameter("capacity", value: capacityValue)
+                    .parameter("numElements", value: numElements)
+                    .parameter("seed", value: seed)
+            }
+            // Pass B: scan the (possibly scaled) counts into totals[0].
+            try ComputePipeline(computeKernel: scanCountsBlock) {
+                try ComputeDispatch(threadgroups: countGroups, threadsPerThreadgroup: blockThreads)
+                    .parameter("counts", buffer: counts)
+                    .parameter("localPrefix", buffer: localPrefix)
+                    .parameter("blockSums", buffer: countBlockSums)
+                    .parameter("numElements", value: numElements)
+            }
+            try ComputePipeline(computeKernel: scanBlockSums) {
+                try ComputeDispatch(threadgroups: single, threadsPerThreadgroup: single)
+                    .parameter("blockSums", buffer: countBlockSums)
+                    .parameter("blockBase", buffer: countBlockBase)
+                    .parameter("totals", buffer: totalsBuffer)
+                    .parameter("numBlocks", value: numCountBlocks)
+            }
+            try ComputePipeline(computeKernel: writeDispatchArgs) {
+                try ComputeDispatch(threadgroups: single, threadsPerThreadgroup: single)
+                    .parameter("totals", buffer: totalsBuffer)
+                    .parameter("capacity", value: capacityValue)
+                    .parameter("args", buffer: dispatchArgsBuffer)
+            }
+        }
+        try Group {
+            try ComputePipeline(computeKernel: clearIndices) {
+                try ComputeDispatch(indirectBuffer: dispatchArgsBuffer, threadsPerThreadgroup: blockThreads)
+                    .parameter("indices", buffer: indicesBuffer)
+                    .parameter("capacity", value: capacityValue)
+            }
+            try ComputePipeline(computeKernel: scatterIndices) {
+                try ComputeDispatch(threadgroups: countGroups, threadsPerThreadgroup: blockThreads)
+                    .parameter("counts", buffer: counts)
+                    .parameter("localPrefix", buffer: localPrefix)
+                    .parameter("blockBase", buffer: countBlockBase)
+                    .parameter("indices", buffer: indicesBuffer)
+                    .parameter("numElements", value: numElements)
+                    .parameter("capacity", value: capacityValue)
+            }
+            try ComputePipeline(computeKernel: maxScanBlock) {
+                try ComputeDispatch(indirectBuffer: dispatchArgsBuffer, threadsPerThreadgroup: blockThreads)
+                    .parameter("indices", buffer: indicesBuffer)
+                    .parameter("blockMaxes", buffer: maxBlockMaxes)
+                    .parameter("totals", buffer: totalsBuffer)
+                    .parameter("capacity", value: capacityValue)
+            }
+            try ComputePipeline(computeKernel: scanBlockMaxes) {
+                try ComputeDispatch(threadgroups: single, threadsPerThreadgroup: single)
+                    .parameter("blockMaxes", buffer: maxBlockMaxes)
+                    .parameter("blockCarry", buffer: maxBlockCarry)
+                    .parameter("totals", buffer: totalsBuffer)
+                    .parameter("capacity", value: capacityValue)
+            }
+            try ComputePipeline(computeKernel: applyBlockMax) {
+                try ComputeDispatch(indirectBuffer: dispatchArgsBuffer, threadsPerThreadgroup: blockThreads)
+                    .parameter("indices", buffer: indicesBuffer)
+                    .parameter("blockCarry", buffer: maxBlockCarry)
+                    .parameter("totals", buffer: totalsBuffer)
+                    .parameter("capacity", value: capacityValue)
+            }
+        }
+    }
 
-        // Pass A: raw demand into totals[1].
-        encoder.setComputePipelineState(scanCountsBlock)
-        encoder.setBuffer(counts, offset: 0, index: 0)
-        encoder.setBuffer(localPrefix, offset: 0, index: 1)
-        encoder.setBuffer(countBlockSums, offset: 0, index: 2)
-        encoder.setBytes(&numElements, length: uintStride, index: 3)
-        encoder.dispatchThreadgroups(countGroups, threadsPerThreadgroup: blockThreads)
-
-        encoder.setComputePipelineState(scanBlockSums)
-        encoder.setBuffer(countBlockSums, offset: 0, index: 0)
-        encoder.setBuffer(countBlockBase, offset: 0, index: 1)
-        encoder.setBuffer(totalsBuffer, offset: uintStride, index: 2)
-        encoder.setBytes(&numCountBlocks, length: uintStride, index: 3)
-        encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
-
-        // Over-budget? Scale all counts down proportionally (stochastic
-        // rounding keeps the expectation right), then re-scan. Turns budget
-        // overflow into uniform noise instead of truncating whole regions.
-        encoder.setComputePipelineState(scaleCounts)
-        encoder.setBuffer(counts, offset: 0, index: 0)
-        encoder.setBuffer(totalsBuffer, offset: 0, index: 1)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 2)
-        encoder.setBytes(&numElements, length: uintStride, index: 3)
-        encoder.setBytes(&seedValue, length: uintStride, index: 4)
-        encoder.dispatchThreadgroups(countGroups, threadsPerThreadgroup: blockThreads)
-
-        // Pass B: scan the (possibly scaled) counts into totals[0].
-        encoder.setComputePipelineState(scanCountsBlock)
-        encoder.setBuffer(counts, offset: 0, index: 0)
-        encoder.setBuffer(localPrefix, offset: 0, index: 1)
-        encoder.setBuffer(countBlockSums, offset: 0, index: 2)
-        encoder.setBytes(&numElements, length: uintStride, index: 3)
-        encoder.dispatchThreadgroups(countGroups, threadsPerThreadgroup: blockThreads)
-
-        encoder.setComputePipelineState(scanBlockSums)
-        encoder.setBuffer(countBlockSums, offset: 0, index: 0)
-        encoder.setBuffer(countBlockBase, offset: 0, index: 1)
-        encoder.setBuffer(totalsBuffer, offset: 0, index: 2)
-        encoder.setBytes(&numCountBlocks, length: uintStride, index: 3)
-        encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
-
-        encoder.setComputePipelineState(writeDispatchArgs)
-        encoder.setBuffer(totalsBuffer, offset: 0, index: 0)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 1)
-        encoder.setBuffer(dispatchArgsBuffer, offset: 0, index: 2)
-        encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
-
-        encoder.setComputePipelineState(clearIndices)
-        encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 1)
-        encoder.dispatchThreadgroups(indirectBuffer: dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
-
-        encoder.setComputePipelineState(scatterIndices)
-        encoder.setBuffer(counts, offset: 0, index: 0)
-        encoder.setBuffer(localPrefix, offset: 0, index: 1)
-        encoder.setBuffer(countBlockBase, offset: 0, index: 2)
-        encoder.setBuffer(indicesBuffer, offset: 0, index: 3)
-        encoder.setBytes(&numElements, length: uintStride, index: 4)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 5)
-        encoder.dispatchThreadgroups(countGroups, threadsPerThreadgroup: blockThreads)
-
-        encoder.setComputePipelineState(maxScanBlock)
-        encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
-        encoder.setBuffer(maxBlockMaxes, offset: 0, index: 1)
-        encoder.setBuffer(totalsBuffer, offset: 0, index: 2)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 3)
-        encoder.dispatchThreadgroups(indirectBuffer: dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
-
-        encoder.setComputePipelineState(scanBlockMaxes)
-        encoder.setBuffer(maxBlockMaxes, offset: 0, index: 0)
-        encoder.setBuffer(maxBlockCarry, offset: 0, index: 1)
-        encoder.setBuffer(totalsBuffer, offset: 0, index: 2)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 3)
-        encoder.dispatchThreadgroups(single, threadsPerThreadgroup: single)
-
-        encoder.setComputePipelineState(applyBlockMax)
-        encoder.setBuffer(indicesBuffer, offset: 0, index: 0)
-        encoder.setBuffer(maxBlockCarry, offset: 0, index: 1)
-        encoder.setBuffer(totalsBuffer, offset: 0, index: 2)
-        encoder.setBytes(&capacityValue, length: uintStride, index: 3)
-        encoder.dispatchThreadgroups(indirectBuffer: dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
+    /// Validates `count` before building the element tree.
+    func validate(count: Int) throws {
+        guard count <= maxSplats else {
+            throw DistributorError.splatCountExceedsMaximum(count: count, maximum: maxSplats)
+        }
     }
 
     /// Builds the thread-to-Gaussian map, blocking until the GPU work
     /// completes, and reads back the total. Convenience for offline/test use.
     public func build(counts: MTLBuffer, count: Int, commandQueue: MTLCommandQueue) throws -> Result {
-        guard let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw DistributorError.commandEncodingFailed
+        try validate(count: count)
+        let runner: Runner
+        if let existing = self.runner {
+            runner = existing
+        } else {
+            runner = try Runner(device: device, commandQueue: commandQueue)
+            self.runner = runner
         }
-        try encode(encoder: encoder, counts: counts, count: count)
-        encoder.endEncoding()
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
+        try runner.run(
+            ComputePass(label: "PointSplat workload") {
+                try elements(counts: counts, count: count)
+            }
+        )
 
         let rawTotal = Int(totalsBuffer.contents().load(as: UInt32.self))
         // Stochastic rounding in the over-budget scaling pass can land a

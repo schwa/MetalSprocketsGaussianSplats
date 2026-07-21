@@ -1,6 +1,7 @@
 #if !arch(x86_64)
 
 import Metal
+import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import simd
 import Splats
@@ -60,9 +61,11 @@ public final class PointSplatRenderer {
     public let device: MTLDevice
     public let configuration: Configuration
 
-    private let commandQueue: MTLCommandQueue
+    private let runner: Runner
     private var resources: PointSplatResources?
     private let outTexture: MTLTexture
+    /// Monotonic per-render key for `framePlan` idempotency; frame seeds can repeat.
+    private var planCounter: UInt64 = 0
 
     public init(device: MTLDevice, configuration: Configuration) throws {
         guard device.supportsFamily(.apple9) || device.supportsFamily(.mac2) else {
@@ -71,11 +74,7 @@ public final class PointSplatRenderer {
         self.device = device
         self.configuration = configuration
 
-        guard let commandQueue = device.makeCommandQueue() else {
-            throw RendererError.commandEncodingFailed
-        }
-        commandQueue.label = "PointSplat offscreen queue"
-        self.commandQueue = commandQueue
+        self.runner = try Runner(device: device)
 
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: configuration.width, height: configuration.height, mipmapped: false)
         descriptor.usage = [.shaderWrite, .shaderRead]
@@ -130,16 +129,16 @@ public final class PointSplatRenderer {
             packedSplats: packedBounds == nil ? 0 : 1
         )
 
-        // Whole frame in one serial compute encoder; the splat dispatches are
-        // sized to capacity and exit threads past the GPU-side total.
-        guard let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw RendererError.commandEncodingFailed
-        }
-        try resources.encodeFrame(encoder: encoder, uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed, packedBounds: packedBounds ?? GPSPackedSplatBounds())
-        resources.encodeResolve(encoder: encoder, uniforms: uniforms, outTexture: outTexture)
-        encoder.endEncoding()
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
+        // Whole frame in one serial compute pass; the splat dispatches are
+        // indirect from the GPU-side totals.
+        planCounter += 1
+        let plan = resources.framePlan(planKey: planCounter, splats: splats)
+        try runner.run(
+            ComputePass(label: "PointSplat offscreen") {
+                try resources.frameElements(uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed, packedBounds: packedBounds ?? GPSPackedSplatBounds(), plan: plan)
+                try resources.resolveElements(uniforms: uniforms, outTexture: outTexture)
+            }
+        )
 
         return outTexture
     }
