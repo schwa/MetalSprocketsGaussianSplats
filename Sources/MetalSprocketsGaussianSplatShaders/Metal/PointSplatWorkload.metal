@@ -209,4 +209,15 @@ namespace PointSplatWorkload {
         indices[gid] = max(indices[gid], blockCarry[groupId]);
     }
 
+    // Copies the two totals words into a stats slot so multi-phase frames
+    // can report per-phase used/demand numbers to the CPU.
+    kernel void workloadCopyTotals(device const uint *totals [[buffer(0)]],
+                                   device uint       *dst    [[buffer(1)]],
+                                   constant uint     &offset [[buffer(2)]],
+                                   uint gid [[thread_position_in_grid]]) {
+        if (gid < 2) {
+            dst[offset + gid] = totals[gid];
+        }
+    }
+
 } // namespace PointSplatWorkload

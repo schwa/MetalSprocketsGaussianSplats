@@ -31,6 +31,8 @@ namespace PointSplatRender {
         float c2;
         float3 conic;         // inverse covariance (a, b, d)
         float opacity;
+        float radius;         // conservative screen radius (supersampled px)
+        float sigmaZ;         // view-space depth standard deviation
         bool valid;
     };
 
@@ -95,6 +97,13 @@ namespace PointSplatRender {
         float invDet = 1.0 / det;
         result.conic = float3(cov2D.d * invDet, -cov2D.b * invDet, cov2D.a * invDet);
 
+        // Conservative bounds for occlusion culling: 3 sigma of the major
+        // eigenvalue in screen space, 3 sigma of depth in view space.
+        float eigenAvg = 0.5 * (cov2D.a + cov2D.d);
+        float eigenDelta = sqrt(max(0.0, eigenAvg * eigenAvg - det));
+        result.radius = 3.0 * sqrt(max(eigenAvg + eigenDelta, 0.0));
+        result.sigmaZ = sqrt(max(cov3D[2][2], 0.0));
+
         // Metal texture convention: origin top-left, y down.
         result.pixelMean = float2((ndc.x * 0.5 + 0.5) * uniforms.drawableSize.x,
                                   (0.5 - ndc.y * 0.5) * uniforms.drawableSize.y);
@@ -113,22 +122,63 @@ namespace PointSplatRender {
         }
     }
 
+    // Hierarchical depth test (paper Sec. 3.5): a Gaussian is provably
+    // occluded when the four pyramid texels covering its screen AABB are
+    // all closer than its minimum possible depth. The pyramid stores the
+    // *maximum* (farthest) visible depth per region, so this never falsely
+    // culls: background texels hold the far plane.
+    static bool isOccluded(ProjectedGaussian projected, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
+        float s = float(max(uniforms.supersampling, 1u));
+        float2 minPx = (projected.pixelMean - projected.radius) / s;
+        float2 maxPx = (projected.pixelMean + projected.radius) / s;
+        float2 size = float2(depthPyramid.get_width(), depthPyramid.get_height());
+        minPx = clamp(minPx, float2(0.0), size - 1.0);
+        maxPx = clamp(maxPx, float2(0.0), size - 1.0);
+
+        float extent = max(maxPx.x - minPx.x, maxPx.y - minPx.y);
+        uint lod = uint(clamp(ceil(log2(max(extent, 1.0))), 0.0, float(uniforms.pyramidLevels - 1)));
+        uint2 base = uint2(minPx) >> lod;
+        uint2 levelSize = max(uint2(size) >> lod, uint2(1));
+        uint2 upper = min(base + 1, levelSize - 1);
+
+        float minDepth = projected.viewDepth - 3.0 * projected.sigmaZ;
+        float d0 = depthPyramid.read(uint2(base.x, base.y), lod).r;
+        float d1 = depthPyramid.read(uint2(upper.x, base.y), lod).r;
+        float d2 = depthPyramid.read(uint2(base.x, upper.y), lod).r;
+        float d3 = depthPyramid.read(uint2(upper.x, upper.y), lod).r;
+        return max(max(d0, d1), max(d2, d3)) < minDepth;
+    }
+
     // Per Gaussian: cull, project, Poisson-sample the opacity-corrected
     // point count (paper Secs. 3.3-3.4), write counts for the distributor,
     // and cache the packed (SH-evaluated) color for the splat stage.
+    // renderedMask records phase-1 participation so phase 2 only considers
+    // Gaussians the stale pyramid culled.
     kernel void pointSplatPreprocess(device const SparkSplat *splats [[buffer(0)]],
                                      device uint *counts [[buffer(1)]],
                                      constant PointSplatUniforms &uniforms [[buffer(2)]],
                                      device const float *shCoefficients [[buffer(3)]],
                                      device ulong *colors [[buffer(4)]],
+                                     device uint *renderedMask [[buffer(5)]],
+                                     texture2d<float, access::read> depthPyramid [[texture(0)]],
                                      uint gid [[thread_position_in_grid]]) {
         if (gid >= uniforms.splatCount) {
             return;
         }
         counts[gid] = 0;
+        if (uniforms.occlusionPhase <= 1) {
+            renderedMask[gid] = 0;
+        } else if (renderedMask[gid] != 0) {
+            // Already rendered in phase 1.
+            return;
+        }
 
         ProjectedGaussian projected = project(splats[gid], uniforms);
         if (!projected.valid) {
+            return;
+        }
+
+        if (uniforms.occlusionPhase != 0 && isOccluded(projected, uniforms, depthPyramid)) {
             return;
         }
 
@@ -160,6 +210,48 @@ namespace PointSplatRender {
         // Per-Gaussian clamp (paper Sec. 4.3): at most half the framebuffer.
         uint pixelCount = uint(uniforms.drawableSize.x) * uint(uniforms.drawableSize.y);
         counts[gid] = min(numThreads, pixelCount / (2 * k));
+        if (uniforms.occlusionPhase == 1 && counts[gid] > 0) {
+            renderedMask[gid] = 1;
+        }
+    }
+
+    // Extracts a native-resolution view-space depth image from the 64-bit
+    // framebuffer, taking the farthest subpixel per pixel (conservative for
+    // the occlusion test; background subpixels hold the far plane).
+    kernel void pointSplatDepthExtract(device const ulong *framebuffer [[buffer(0)]],
+                                       constant PointSplatUniforms &uniforms [[buffer(1)]],
+                                       texture2d<float, access::write> outDepth [[texture(0)]],
+                                       uint2 gid [[thread_position_in_grid]]) {
+        if (gid.x >= outDepth.get_width() || gid.y >= outDepth.get_height()) {
+            return;
+        }
+        uint s = max(uniforms.supersampling, 1u);
+        uint stride = uint(uniforms.drawableSize.x);
+        float depth = 0.0;
+        for (uint dy = 0; dy < s; dy++) {
+            for (uint dx = 0; dx < s; dx++) {
+                ulong value = framebuffer[(gid.y * s + dy) * stride + (gid.x * s + dx)];
+                depth = max(depth, gps_unpack_depth(value >> GPS_DEPTH_SHIFT, uniforms.nearPlane, uniforms.farPlane));
+            }
+        }
+        outDepth.write(float4(depth, 0.0, 0.0, 0.0), gid);
+    }
+
+    // One 2x2 max-downsample step of the depth pyramid; src and dst are
+    // single-mip texture views of adjacent levels.
+    kernel void pointSplatDepthDownsample(texture2d<float, access::read> src [[texture(0)]],
+                                          texture2d<float, access::write> dst [[texture(1)]],
+                                          uint2 gid [[thread_position_in_grid]]) {
+        if (gid.x >= dst.get_width() || gid.y >= dst.get_height()) {
+            return;
+        }
+        uint2 base = gid * 2;
+        uint2 limit = uint2(src.get_width() - 1, src.get_height() - 1);
+        float d0 = src.read(min(base, limit)).r;
+        float d1 = src.read(min(base + uint2(1, 0), limit)).r;
+        float d2 = src.read(min(base + uint2(0, 1), limit)).r;
+        float d3 = src.read(min(base + uint2(1, 1), limit)).r;
+        dst.write(float4(max(max(d0, d1), max(d2, d3)), 0.0, 0.0, 0.0), gid);
     }
 
     // Per splat-thread: sample K points from the assigned Gaussian and

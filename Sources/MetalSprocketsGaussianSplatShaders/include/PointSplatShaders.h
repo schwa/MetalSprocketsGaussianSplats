@@ -37,6 +37,11 @@ struct PointSplatUniforms {
     unsigned int pointsPerThread;   // K; counts are in threads, each splats K points
     GPSFloat3 cameraPosition;       // world-space, for SH view direction
     unsigned int shDegree;          // 0 disables spherical harmonics
+    // Occlusion culling (paper Sec. 3.5, two-phase):
+    // 0 = off, 1 = phase 1 (cull vs previous depth pyramid),
+    // 2 = phase 2 (only Gaussians culled in phase 1, vs fresh pyramid).
+    unsigned int occlusionPhase;
+    unsigned int pyramidLevels;     // mip levels in the depth pyramid
 };
 
 // Quantizes positive view-space depth to 28-bit fixed point between near/far.
