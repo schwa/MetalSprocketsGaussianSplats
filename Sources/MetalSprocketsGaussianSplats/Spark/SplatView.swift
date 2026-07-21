@@ -242,10 +242,14 @@ public struct SplatView: View {
     private var pointSplatStats: some View {
         GeometryReader { proxy in
             let supersampling = Self.pointSplatSupersampling
-            let pixels = Int(proxy.size.width * displayScale) * Int(proxy.size.height * displayScale)
+            let pixelWidth = Int(proxy.size.width * displayScale)
+            let pixelHeight = Int(proxy.size.height * displayScale)
+            let pixels = pixelWidth * pixelHeight
             let budget = PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixels * supersampling * supersampling)
+            let megapixels = Double(pixels) / 1_000_000
             VStack(alignment: .leading, spacing: 4) {
                 LabeledContent("Splats", value: splatCloud.count.formatted())
+                LabeledContent("Size", value: "\(pixelWidth)\u{00D7}\(pixelHeight) (\(megapixels.formatted(.number.precision(.fractionLength(1)))) MP)")
                 LabeledContent("Supersampling", value: "\(supersampling)\u{00D7}\(supersampling)")
                 LabeledContent("Points/thread (K)", value: Self.pointSplatPointsPerThread.formatted())
                 LabeledContent("Point budget", value: budget.formatted(.number.notation(.compactName)))
