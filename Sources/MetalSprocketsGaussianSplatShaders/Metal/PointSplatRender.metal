@@ -23,6 +23,13 @@ namespace PointSplatRender {
     constant float MIN_ALPHA = 1.0 / 255.0;
     constant float COVARIANCE_FLOOR = 0.3;
 
+    // Gaussians per culling group (issue #75, paper Sec. 3.5). Matches the
+    // preprocess threadgroup size so one surviving group maps to one
+    // threadgroup. Must match PointSplatResources.groupSize.
+    constant uint GROUP_SIZE = 256;
+    // NDC margin shared with the per-Gaussian cull in project().
+    constant float NDC_CULL_MARGIN = 1.4;
+
     struct ProjectedGaussian {
         float2 pixelMean;
         float viewDepth;      // positive distance in front of the camera
@@ -122,15 +129,13 @@ namespace PointSplatRender {
         }
     }
 
-    // Hierarchical depth test (paper Sec. 3.5): a Gaussian is provably
+    // Hierarchical depth test (paper Sec. 3.5): a region is provably
     // occluded when the four pyramid texels covering its screen AABB are
     // all closer than its minimum possible depth. The pyramid stores the
     // *maximum* (farthest) visible depth per region, so this never falsely
-    // culls: background texels hold the far plane.
-    static bool isOccluded(ProjectedGaussian projected, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
-        float s = float(max(uniforms.supersampling, 1u));
-        float2 minPx = (projected.pixelMean - projected.radius) / s;
-        float2 maxPx = (projected.pixelMean + projected.radius) / s;
+    // culls: background texels hold the far plane. minPx/maxPx are in
+    // native-resolution pixels.
+    static bool depthAABBOccluded(float2 minPx, float2 maxPx, float minDepth, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
         float2 size = float2(depthPyramid.get_width(), depthPyramid.get_height());
         minPx = clamp(minPx, float2(0.0), size - 1.0);
         maxPx = clamp(maxPx, float2(0.0), size - 1.0);
@@ -141,7 +146,6 @@ namespace PointSplatRender {
         uint2 levelSize = max(uint2(size) >> lod, uint2(1));
         uint2 upper = min(base + 1, levelSize - 1);
 
-        float minDepth = projected.viewDepth - 3.0 * projected.sigmaZ;
         float d0 = depthPyramid.read(uint2(base.x, base.y), lod).r;
         float d1 = depthPyramid.read(uint2(upper.x, base.y), lod).r;
         float d2 = depthPyramid.read(uint2(base.x, upper.y), lod).r;
@@ -149,26 +153,168 @@ namespace PointSplatRender {
         return max(max(d0, d1), max(d2, d3)) < minDepth;
     }
 
-    // Per Gaussian: cull, project, Poisson-sample the opacity-corrected
-    // point count (paper Secs. 3.3-3.4), write counts for the distributor,
-    // and cache the packed (SH-evaluated) color for the splat stage.
-    // renderedMask records phase-1 participation so phase 2 only considers
-    // Gaussians the stale pyramid culled.
-    kernel void pointSplatPreprocess(device const SparkSplat *splats [[buffer(0)]],
-                                     device uint *counts [[buffer(1)]],
-                                     constant PointSplatUniforms &uniforms [[buffer(2)]],
-                                     device const float *shCoefficients [[buffer(3)]],
-                                     device ulong *colors [[buffer(4)]],
-                                     device uint *renderedMask [[buffer(5)]],
-                                     texture2d<float, access::read> depthPyramid [[texture(0)]],
-                                     uint gid [[thread_position_in_grid]]) {
+    static bool isOccluded(ProjectedGaussian projected, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
+        float s = float(max(uniforms.supersampling, 1u));
+        float2 minPx = (projected.pixelMean - projected.radius) / s;
+        float2 maxPx = (projected.pixelMean + projected.radius) / s;
+        float minDepth = projected.viewDepth - 3.0 * projected.sigmaZ;
+        return depthAABBOccluded(minPx, maxPx, minDepth, uniforms, depthPyramid);
+    }
+
+    // Group-level hierarchical culling (issue #75, paper Sec. 3.5).
+    //
+    // One-time per splat buffer: model-space AABB per group of GROUP_SIZE
+    // consecutive Gaussians, expanded by 3 sigma of each Gaussian's largest
+    // scale so the box conservatively contains the splatted points.
+    kernel void pointSplatGroupBounds(device const SparkSplat *splats [[buffer(0)]],
+                                      device float4 *bounds [[buffer(1)]],
+                                      constant uint &splatCount [[buffer(2)]],
+                                      uint gid [[thread_position_in_grid]]) {
+        uint groupCount = (splatCount + GROUP_SIZE - 1) / GROUP_SIZE;
+        if (gid >= groupCount) {
+            return;
+        }
+        uint start = gid * GROUP_SIZE;
+        uint end = min(start + GROUP_SIZE, splatCount);
+        float3 lo = float3(INFINITY);
+        float3 hi = float3(-INFINITY);
+        for (uint i = start; i < end; i++) {
+            SparkSplat splat = splats[i];
+            float3 position = float3(splat.position);
+            float3 scales = float3(splat.scale);
+            float pad = 3.0 * max(scales.x, max(scales.y, scales.z));
+            lo = min(lo, position - pad);
+            hi = max(hi, position + pad);
+        }
+        bounds[2 * gid + 0] = float4(lo, 0.0);
+        bounds[2 * gid + 1] = float4(hi, 0.0);
+    }
+
+    // Per frame, before the preprocess: zero the per-Gaussian counts (the
+    // group-culled preprocess no longer touches every Gaussian), reset the
+    // rendered mask on phase 1, and reset the visible-group counter.
+    kernel void pointSplatClearCounts(device uint *counts [[buffer(0)]],
+                                      device uint *renderedMask [[buffer(1)]],
+                                      device uint *visibleGroupCount [[buffer(2)]],
+                                      constant PointSplatUniforms &uniforms [[buffer(3)]],
+                                      uint gid [[thread_position_in_grid]]) {
+        if (gid == 0) {
+            visibleGroupCount[0] = 0;
+        }
         if (gid >= uniforms.splatCount) {
             return;
         }
         counts[gid] = 0;
         if (uniforms.occlusionPhase <= 1) {
             renderedMask[gid] = 0;
-        } else if (renderedMask[gid] != 0) {
+        }
+    }
+
+    // One thread per group: transform the AABB's 8 corners and cull the
+    // whole group when it is provably behind the near plane, outside the
+    // frustum (same 1.4 NDC margin as the per-Gaussian cull), or occluded
+    // by the depth pyramid. Survivors are compacted into visibleGroups.
+    // All tests are conservative: any doubt (e.g. a corner behind the
+    // camera making the projected AABB unbounded) keeps the group.
+    kernel void pointSplatGroupCull(device const float4 *bounds [[buffer(0)]],
+                                    device uint *visibleGroups [[buffer(1)]],
+                                    device atomic_uint *visibleGroupCount [[buffer(2)]],
+                                    constant PointSplatUniforms &uniforms [[buffer(3)]],
+                                    constant uint &groupCount [[buffer(4)]],
+                                    texture2d<float, access::read> depthPyramid [[texture(0)]],
+                                    uint gid [[thread_position_in_grid]]) {
+        if (gid >= groupCount) {
+            return;
+        }
+        float3 lo = bounds[2 * gid + 0].xyz;
+        float3 hi = bounds[2 * gid + 1].xyz;
+
+        bool anyInFront = false;
+        bool allOutLeft = true;
+        bool allOutRight = true;
+        bool allOutTop = true;
+        bool allOutBottom = true;
+        bool projectionBounded = true;
+        float2 minNDC = float2(INFINITY);
+        float2 maxNDC = float2(-INFINITY);
+        float minDepth = INFINITY;
+
+        for (uint c = 0; c < 8; c++) {
+            float3 corner = float3((c & 1) ? hi.x : lo.x, (c & 2) ? hi.y : lo.y, (c & 4) ? hi.z : lo.z);
+            float4 world = uniforms.modelMatrix * float4(corner, 1.0);
+            float3 view = (uniforms.viewMatrix * world).xyz;
+            minDepth = min(minDepth, -view.z);
+            if (-view.z > uniforms.nearPlane) {
+                anyInFront = true;
+            }
+            float4 clip = uniforms.projectionMatrix * float4(view, 1.0);
+            if (clip.w <= 0.0) {
+                // Corner behind the camera: the projected footprint is not
+                // bounded by the corner projections. Disable the NDC tests.
+                projectionBounded = false;
+                continue;
+            }
+            float2 ndc = clip.xy / clip.w;
+            allOutLeft = allOutLeft && (ndc.x < -NDC_CULL_MARGIN);
+            allOutRight = allOutRight && (ndc.x > NDC_CULL_MARGIN);
+            allOutBottom = allOutBottom && (ndc.y < -NDC_CULL_MARGIN);
+            allOutTop = allOutTop && (ndc.y > NDC_CULL_MARGIN);
+            minNDC = min(minNDC, ndc);
+            maxNDC = max(maxNDC, ndc);
+        }
+
+        if (!anyInFront) {
+            return;
+        }
+        if (projectionBounded && (allOutLeft || allOutRight || allOutTop || allOutBottom)) {
+            return;
+        }
+        if (uniforms.occlusionPhase != 0 && projectionBounded) {
+            // NDC (y up) -> native-resolution pixels (y down).
+            float2 size = float2(depthPyramid.get_width(), depthPyramid.get_height());
+            float2 minPx = float2((minNDC.x * 0.5 + 0.5) * size.x, (0.5 - maxNDC.y * 0.5) * size.y);
+            float2 maxPx = float2((maxNDC.x * 0.5 + 0.5) * size.x, (0.5 - minNDC.y * 0.5) * size.y);
+            if (depthAABBOccluded(minPx, maxPx, max(minDepth, uniforms.nearPlane), uniforms, depthPyramid)) {
+                return;
+            }
+        }
+        uint slot = atomic_fetch_add_explicit(visibleGroupCount, 1u, memory_order_relaxed);
+        visibleGroups[slot] = gid;
+    }
+
+    // Single thread: indirect dispatch arguments for the preprocess — one
+    // threadgroup per surviving group.
+    kernel void pointSplatGroupDispatchArgs(device const uint *visibleGroupCount [[buffer(0)]],
+                                            device uint3 *args [[buffer(1)]],
+                                            uint gid [[thread_position_in_grid]]) {
+        if (gid != 0) {
+            return;
+        }
+        args[0] = uint3(visibleGroupCount[0], 1, 1);
+    }
+
+    // Per Gaussian, dispatched indirectly with one threadgroup per
+    // *surviving* culling group (issue #75): cull, project, Poisson-sample
+    // the opacity-corrected point count (paper Secs. 3.3-3.4), write counts
+    // for the distributor, and cache the packed (SH-evaluated) color for
+    // the splat stage. Counts and renderedMask are pre-cleared by
+    // pointSplatClearCounts; renderedMask records phase-1 participation so
+    // phase 2 only considers Gaussians the stale pyramid culled.
+    kernel void pointSplatPreprocess(device const SparkSplat *splats [[buffer(0)]],
+                                     device uint *counts [[buffer(1)]],
+                                     constant PointSplatUniforms &uniforms [[buffer(2)]],
+                                     device const float *shCoefficients [[buffer(3)]],
+                                     device ulong *colors [[buffer(4)]],
+                                     device uint *renderedMask [[buffer(5)]],
+                                     device const uint *visibleGroups [[buffer(6)]],
+                                     texture2d<float, access::read> depthPyramid [[texture(0)]],
+                                     uint groupId [[threadgroup_position_in_grid]],
+                                     uint lid [[thread_position_in_threadgroup]]) {
+        uint gid = visibleGroups[groupId] * GROUP_SIZE + lid;
+        if (gid >= uniforms.splatCount) {
+            return;
+        }
+        if (uniforms.occlusionPhase > 1 && renderedMask[gid] != 0) {
             // Already rendered in phase 1.
             return;
         }

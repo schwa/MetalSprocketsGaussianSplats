@@ -1628,12 +1628,13 @@ There is no way to view raw single-frame PointSplat output. Temporal accumulatio
 ## 75: PointSplat: group-level hierarchical culling
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: pointsplat, performance, effort:l
 created: 2026-07-21T20:18:36Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T21:57:34Z
+closed: 2026-07-21T21:57:34Z
 +++
 
 Per-Gaussian preprocess is O(total splats) every frame even when most of the cloud is frustum- or occlusion-culled: 8M threads run projection just to write count 0. The paper (Sec 3.5) adds a coarse tier: ~1M groups of consecutive Gaussians (Morton or BVH order) with precomputed 3D AABBs, culled first so per-Gaussian work only runs for surviving groups. Prerequisite for 100M-class scenes; needs splat reordering at load time to make groups spatially coherent.
@@ -1848,5 +1849,20 @@ created: 2026-07-21T21:54:29Z
 +++
 
 Source comments across the project have not been audited against the house writing-comments skill rules. Review comments in Sources/, Examples/, and Tests/ for violations (redundant narration, stale/incorrect comments, commented-out code, etc.) and clean them up.
+
+---
+
+## 89: PointSplat: Morton-reorder splats at load time for group culling coherence
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: pointsplat, performance
+created: 2026-07-21T21:57:34Z
+updated: 2026-07-21T22:01:42Z
++++
+
+Group-level hierarchical culling (#75) uses groups of 256 consecutive Gaussians with precomputed AABBs. Culling effectiveness depends on groups being spatially coherent; PLY/SOG files are often only loosely ordered. Add an optional Morton (or BVH) reorder of the splat array at load time so group AABBs are tight and whole groups cull cleanly. Remember to reorder SH coefficient storage alongside positions.
 
 ---

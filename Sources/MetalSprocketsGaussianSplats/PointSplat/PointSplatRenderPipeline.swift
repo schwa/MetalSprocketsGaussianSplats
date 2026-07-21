@@ -220,6 +220,19 @@ final class PointSplatResources {
     let statsBuffer: MTLBuffer
     private let zeroTotals: MTLBuffer
     let splatCount: Int
+    /// Gaussians per hierarchical-culling group (#75); must match
+    /// GROUP_SIZE in PointSplatRender.metal.
+    static let groupSize = 256
+    let groupCount: Int
+    /// Two float4s (min, max) per group: model-space AABB expanded by 3
+    /// sigma of each Gaussian's largest scale. Computed once per splat
+    /// buffer on the GPU.
+    private let groupBounds: MTLBuffer
+    private let visibleGroups: MTLBuffer
+    private let visibleGroupCount: MTLBuffer
+    private let groupDispatchArgs: MTLBuffer
+    /// Splat buffer the group AABBs were computed from; recompute on change.
+    private var boundsSourceBuffer: ObjectIdentifier?
     let distributor: PointSplatWorkloadDistributor
     let resolveTexture: MTLTexture
     /// Hierarchical depth pyramid (max-depth mips) for occlusion culling.
@@ -229,6 +242,10 @@ final class PointSplatResources {
     private var hasDepthHistory = false
 
     private let clearPipelineState: MTLComputePipelineState
+    private let groupBoundsPipelineState: MTLComputePipelineState
+    private let clearCountsPipelineState: MTLComputePipelineState
+    private let groupCullPipelineState: MTLComputePipelineState
+    private let groupDispatchArgsPipelineState: MTLComputePipelineState
     private let preprocessPipelineState: MTLComputePipelineState
     private let splatPipelineState: MTLComputePipelineState
     private let resolvePipelineState: MTLComputePipelineState
@@ -287,6 +304,22 @@ final class PointSplatResources {
               let zeroTotals = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 2, options: .storageModeShared) else {
             throw PointSplatRenderer.RendererError.bufferAllocationFailed
         }
+        let groupCount = (max(splatCount, 1) + Self.groupSize - 1) / Self.groupSize
+        self.groupCount = groupCount
+        guard let groupBounds = device.makeBuffer(length: MemoryLayout<SIMD4<Float>>.stride * 2 * groupCount, options: .storageModePrivate),
+              let visibleGroups = device.makeBuffer(length: MemoryLayout<UInt32>.stride * groupCount, options: .storageModePrivate),
+              let visibleGroupCount = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModePrivate),
+              let groupDispatchArgs = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 4, options: .storageModePrivate) else {
+            throw PointSplatRenderer.RendererError.bufferAllocationFailed
+        }
+        groupBounds.label = "PointSplat group bounds"
+        visibleGroups.label = "PointSplat visible groups"
+        visibleGroupCount.label = "PointSplat visible group count"
+        groupDispatchArgs.label = "PointSplat group dispatch args"
+        self.groupBounds = groupBounds
+        self.visibleGroups = visibleGroups
+        self.visibleGroupCount = visibleGroupCount
+        self.groupDispatchArgs = groupDispatchArgs
         framebuffer.label = "PointSplat framebuffer64"
         counts.label = "PointSplat per-splat counts"
         colors.label = "PointSplat colors"
@@ -313,6 +346,10 @@ final class PointSplatResources {
             return try device.makeComputePipelineState(function: function)
         }
         clearPipelineState = try pipeline("PointSplatRender::pointSplatClear")
+        groupBoundsPipelineState = try pipeline("PointSplatRender::pointSplatGroupBounds")
+        clearCountsPipelineState = try pipeline("PointSplatRender::pointSplatClearCounts")
+        groupCullPipelineState = try pipeline("PointSplatRender::pointSplatGroupCull")
+        groupDispatchArgsPipelineState = try pipeline("PointSplatRender::pointSplatGroupDispatchArgs")
         preprocessPipelineState = try pipeline("PointSplatRender::pointSplatPreprocess")
         splatPipelineState = try pipeline("PointSplatRender::pointSplatSplat")
         resolvePipelineState = try pipeline("PointSplatRender::pointSplatResolve")
@@ -372,6 +409,18 @@ final class PointSplatResources {
         encoder.setBytes(&pixelCountValue, length: MemoryLayout<UInt32>.stride, index: 2)
         encoder.dispatchThreads(MTLSize(width: pixelCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
 
+        // Group AABBs are a pure function of the splat buffer; recompute
+        // only when it changes (#75).
+        if boundsSourceBuffer != ObjectIdentifier(splats) {
+            var splatCountValue = UInt32(splatCount)
+            encoder.setComputePipelineState(groupBoundsPipelineState)
+            encoder.setBuffer(splats, offset: 0, index: 0)
+            encoder.setBuffer(groupBounds, offset: 0, index: 1)
+            encoder.setBytes(&splatCountValue, length: MemoryLayout<UInt32>.stride, index: 2)
+            encoder.dispatchThreads(MTLSize(width: groupCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+            boundsSourceBuffer = ObjectIdentifier(splats)
+        }
+
         var phase1 = uniforms
         phase1.occlusionPhase = hasDepthHistory ? 1 : 0
         try encodePhase(encoder: encoder, uniforms: phase1, splats: splats, shBuffer: shBuffer, seed: seed, statsOffset: 0)
@@ -409,6 +458,31 @@ final class PointSplatResources {
     private func encodePhase(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, statsOffset: Int) throws {
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
         var uniformsCopy = uniforms
+        var groupCountValue = UInt32(groupCount)
+
+        // Reset counts/mask/visible-group counter, cull whole groups against
+        // the frustum and depth pyramid, then run the per-Gaussian
+        // preprocess only for surviving groups (#75).
+        encoder.setComputePipelineState(clearCountsPipelineState)
+        encoder.setBuffer(counts, offset: 0, index: 0)
+        encoder.setBuffer(renderedMask, offset: 0, index: 1)
+        encoder.setBuffer(visibleGroupCount, offset: 0, index: 2)
+        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
+        encoder.dispatchThreads(MTLSize(width: max(splatCount, 1), height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+
+        encoder.setComputePipelineState(groupCullPipelineState)
+        encoder.setBuffer(groupBounds, offset: 0, index: 0)
+        encoder.setBuffer(visibleGroups, offset: 0, index: 1)
+        encoder.setBuffer(visibleGroupCount, offset: 0, index: 2)
+        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
+        encoder.setBytes(&groupCountValue, length: MemoryLayout<UInt32>.stride, index: 4)
+        encoder.setTexture(depthPyramid, index: 0)
+        encoder.dispatchThreads(MTLSize(width: groupCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+
+        encoder.setComputePipelineState(groupDispatchArgsPipelineState)
+        encoder.setBuffer(visibleGroupCount, offset: 0, index: 0)
+        encoder.setBuffer(groupDispatchArgs, offset: 0, index: 1)
+        encoder.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
 
         encoder.setComputePipelineState(preprocessPipelineState)
         encoder.setBuffer(splats, offset: 0, index: 0)
@@ -417,8 +491,9 @@ final class PointSplatResources {
         encoder.setBuffer(shBuffer, offset: 0, index: 3)
         encoder.setBuffer(colors, offset: 0, index: 4)
         encoder.setBuffer(renderedMask, offset: 0, index: 5)
+        encoder.setBuffer(visibleGroups, offset: 0, index: 6)
         encoder.setTexture(depthPyramid, index: 0)
-        encoder.dispatchThreads(MTLSize(width: splatCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+        encoder.dispatchThreadgroups(indirectBuffer: groupDispatchArgs, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
 
         try distributor.encode(encoder: encoder, counts: counts, count: splatCount, seed: seed)
 

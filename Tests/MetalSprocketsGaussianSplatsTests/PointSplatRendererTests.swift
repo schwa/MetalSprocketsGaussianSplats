@@ -128,6 +128,44 @@ struct PointSplatRendererTests {
         #expect(firstPixels == secondPixels)
     }
 
+    @Test("group culling keeps visible splats across many culled groups")
+    func groupCullingPreservesVisibleSplats() throws {
+        // Regression for #75: >4 groups of 256 splats where every group but
+        // one is entirely behind the camera or far outside the frustum. The
+        // group-level cull must drop those wholesale without ever losing
+        // the one visible red splat.
+        let size = 64
+        var splats = [SparkSplat]()
+        for i in 0..<1200 {
+            // Behind the camera (camera at z=5 looking at origin).
+            let offset = Float(i % 7)
+            splats.append(SparkSplat(position: simd_half3(Float16(offset), Float16(offset), 50), scale: simd_half3(repeating: 0.2), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 255, 0, 255)))
+        }
+        // Far outside the frustum, in front of the camera.
+        for i in 0..<300 {
+            splats.append(SparkSplat(position: simd_half3(Float16(200 + Float(i % 5)), 0, 0), scale: simd_half3(repeating: 0.2), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 0, 255, 255)))
+        }
+        // Single visible splat, in the last (partial) group.
+        splats.append(SparkSplat(position: simd_half3(0, 0, 0), scale: simd_half3(repeating: 0.5), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(255, 0, 0, 255)))
+
+        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size))
+        let buffer = try makeSplatBuffer(splats)
+        let (view, projection) = makeMatrices(size: size)
+
+        var accumulated = [SIMD4<Float>](repeating: .zero, count: size * size)
+        let frames = 64
+        for frame in 0..<frames {
+            let texture = try renderer.render(splats: buffer, splatCount: splats.count, modelMatrix: .identity, viewMatrix: view, projectionMatrix: projection, frameSeed: UInt32(frame))
+            for (i, pixel) in readPixels(texture).enumerated() {
+                accumulated[i] += pixel
+            }
+        }
+        let center = accumulated[(size / 2) * size + size / 2] / Float(frames)
+        #expect(center.x > 0.9, "center red channel: \(center.x)")
+        #expect(center.y < 0.05, "culled green splats leaked: \(center.y)")
+        #expect(center.z < 0.05, "culled blue splats leaked: \(center.z)")
+    }
+
     @Test("empty scene renders background")
     func emptyScene() throws {
         let size = 16
