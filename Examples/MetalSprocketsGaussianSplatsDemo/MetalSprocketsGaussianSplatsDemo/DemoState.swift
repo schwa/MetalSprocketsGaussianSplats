@@ -85,13 +85,7 @@ class DemoState {
             }
         }
         do {
-            let reader = try SplatReader(url: url)
-            var splats: [SparkSplat] = []
-            splats.reserveCapacity(reader.splatCount)
-            try reader.read { _, extendedSplat in
-                splats.append(SparkSplat(extendedSplat.genericSplat))
-            }
-            let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
+            let cloud = try Self.readSplatCloud(device: device, url: url)
             splatCloud = cloud
             customModelName = url.lastPathComponent
             #if os(visionOS)
@@ -104,13 +98,31 @@ class DemoState {
 
     private static func loadSplatCloud(device: MTLDevice, model: SplatModel) -> GPUSplatCloud<SparkSplat> {
         let url = Bundle.main.url(forResource: model.resourceName, withExtension: model.resourceExtension)!
-        let reader = try! SplatReader(url: url)
+        return try! readSplatCloud(device: device, url: url)
+    }
+
+    /// Reads a splat file into a GPU cloud, including spherical harmonics
+    /// when present (flattened to the coefficient-major layout the shaders
+    /// expect).
+    private static func readSplatCloud(device: MTLDevice, url: URL) throws -> GPUSplatCloud<SparkSplat> {
+        let reader = try SplatReader(url: url)
+        let shDegree = reader.shDegree
         var splats: [SparkSplat] = []
         splats.reserveCapacity(reader.splatCount)
-        try! reader.read { _, extendedSplat in
+        var shCoefficients: [Float] = []
+        try reader.read { _, extendedSplat in
             splats.append(SparkSplat(extendedSplat.genericSplat))
+            if shDegree > 0, let sh = extendedSplat.sphericalHarmonics {
+                for coefficient in sh {
+                    shCoefficients.append(contentsOf: coefficient)
+                }
+            }
         }
-        return try! GPUSplatCloud<SparkSplat>(device: device, splats: splats)
+        let floatsPerSplat = [0, 9, 24, 45][min(Int(shDegree), 3)]
+        if floatsPerSplat > 0, shCoefficients.count == splats.count * floatsPerSplat {
+            return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, shCoefficients: shCoefficients, shDegree: shDegree)
+        }
+        return try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
     }
 }
 #endif

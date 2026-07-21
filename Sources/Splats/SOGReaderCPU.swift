@@ -13,7 +13,7 @@ public struct SOGReaderCPU: SplatReaderProtocol {
     private let sphericalHarmonics: [[[Float]]]? // Per-splat SH coefficients, or nil if no SH data. Each splat has [[r,g,b], [r,g,b], ...]
 
     /// The degree of spherical harmonics (0 = none, 1-3 = higher-order SH)
-    public let shDegree: Int
+    public let shDegree: UInt8
 
     public var splatCount: Int {
         splats.count
@@ -33,7 +33,7 @@ public struct SOGReaderCPU: SplatReaderProtocol {
         let result = try Self.loadSplats(from: tempURL)
         self.splats = result.splats
         self.sphericalHarmonics = result.sphericalHarmonics
-        self.shDegree = result.shDegree
+        self.shDegree = UInt8(result.shDegree)
     }
 
     /// Load SOG file from URL
@@ -41,7 +41,7 @@ public struct SOGReaderCPU: SplatReaderProtocol {
         let result = try Self.loadSplats(from: url)
         self.splats = result.splats
         self.sphericalHarmonics = result.sphericalHarmonics
-        self.shDegree = result.shDegree
+        self.shDegree = UInt8(result.shDegree)
     }
 
     public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {

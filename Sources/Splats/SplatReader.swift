@@ -8,6 +8,10 @@ public struct SplatReader: SplatReaderProtocol {
         inner.splatCount
     }
 
+    public var shDegree: UInt8 {
+        inner.shDegree
+    }
+
     public init(url: URL) throws {
         switch url.pathExtension.lowercased() {
         case "ply":
