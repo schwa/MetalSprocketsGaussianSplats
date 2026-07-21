@@ -202,28 +202,32 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// - Returns: An async stream of the latest ``SplatIndices``.
     nonisolated public func managedSortedIndicesStream(pendingReleaseDepth: Int = 3) -> AsyncStream<SplatIndices> {
         let source = _sortedIndicesStream
-        return AsyncStream { continuation in
-            let task = Task {
-                var pendingRelease: [SplatIndices] = []
-                for await indices in source {
-                    continuation.yield(indices)
-                    pendingRelease.append(indices)
-                    // Keep the newest `pendingReleaseDepth` results (plus the current one) alive.
-                    while pendingRelease.count > pendingReleaseDepth + 1 {
-                        pendingRelease.removeFirst().release()
-                    }
-                }
-                // Release everything except the current (last yielded) value, which the
-                // consumer may still be using for rendering.
-                while pendingRelease.count > 1 {
+        // Buffer only the newest value: with unbounded buffering a lagging consumer
+        // could dequeue indices whose buffers were already released back to the
+        // pool once they fell out of the pendingRelease window (#94). The newest
+        // value is always within the window, so it is guaranteed alive.
+        let (stream, continuation) = AsyncStream.makeStream(of: SplatIndices.self, bufferingPolicy: .bufferingNewest(1))
+        let task = Task {
+            var pendingRelease: [SplatIndices] = []
+            for await indices in source {
+                continuation.yield(indices)
+                pendingRelease.append(indices)
+                // Keep the newest `pendingReleaseDepth` results (plus the current one) alive.
+                while pendingRelease.count > pendingReleaseDepth + 1 {
                     pendingRelease.removeFirst().release()
                 }
-                continuation.finish()
             }
-            continuation.onTermination = { _ in
-                task.cancel()
+            // Release everything except the current (last yielded) value, which the
+            // consumer may still be using for rendering.
+            while pendingRelease.count > 1 {
+                pendingRelease.removeFirst().release()
             }
+            continuation.finish()
         }
+        continuation.onTermination = { _ in
+            task.cancel()
+        }
+        return stream
     }
 
     /// Stream of sort timing events, updated after each completed sort.

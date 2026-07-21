@@ -1977,12 +1977,13 @@ GPUSplatCloud is @unchecked Sendable but modelTransform and opacity are plain va
 ## 94: managedSortedIndicesStream: unbounded buffering can yield already-released buffers
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: concurrency, sorting, effort:s
 created: 2026-07-21T23:48:54Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:55:48Z
+closed: 2026-07-21T23:55:48Z
 +++
 
 AsyncSortManager.managedSortedIndicesStream uses the closure AsyncStream initializer with the default .unbounded buffering policy. The producer task releases superseded indices once they fall out of the pendingReleaseDepth window, but yielded values sit in the stream buffer until consumed - a consumer lagging more than depth values can dequeue SplatIndices whose buffers were already returned to the pool. Also uses the closure initializer instead of AsyncStream.makeStream(of:).
