@@ -71,6 +71,12 @@ kernel void splatCullMark(device const SparkSplat  *splats      [[buffer(0)]],
         float3 position = float3(splats[gid].position);
         float4 viewPos = p.modelView * float4(position, 1.0);
         bool alive = (p.cullEnabled == 0) || splatPassesCull(p.projection * viewPos, p.guardBand);
+        if (!alive && p.viewCount > 1) {
+            // Stereo: keep splats visible to either eye so per-eye visibility
+            // never causes incorrect culling.
+            float4 viewPos1 = p.modelView1 * float4(position, 1.0);
+            alive = splatPassesCull(p.projection1 * viewPos1, p.guardBand);
+        }
         float distance = viewPos.z * (p.reversed ? -1.0 : 1.0);
         ushort key = alive ? min(floatFlip16(as_type<ushort>(half(distance))), kMaxSurvivorKey)
                            : kCulledKey;

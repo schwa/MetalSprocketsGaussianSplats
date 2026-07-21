@@ -15,12 +15,21 @@ struct SplatImmersiveScene: Scene {
             ImmersiveRenderContent { [demoState] context in
                 let splatCloud = demoState.splatCloud
                 let renderState = demoState.renderState
+                let modelMatrix = simd_float4x4(translation: SIMD3<Float>(0, 1.5, -2))
+                    * simd_float4x4(xRotation: .radians(.pi))
+                if demoState.renderer == .gpu {
+                    try SplatImmersiveGPUSortElement(
+                        context: context,
+                        splatCloud: splatCloud,
+                        modelMatrix: modelMatrix,
+                        renderState: renderState
+                    )
+                }
                 try ImmersiveRenderPass(context: context, label: "Splat") {
                     try SplatImmersiveElement(
                         context: context,
                         splatCloud: splatCloud,
-                        modelMatrix: simd_float4x4(translation: SIMD3<Float>(0, 1.5, -2))
-                            * simd_float4x4(xRotation: .radians(.pi)),
+                        modelMatrix: modelMatrix,
                         renderer: demoState.renderer,
                         renderState: renderState
                     )

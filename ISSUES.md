@@ -1267,12 +1267,13 @@ The demo currently has separate AppIcon.icon (macOS/iOS) and AppIcon.solidimages
 ## 56: GPU-sorted pipeline does not support stereo/visionOS rendering
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: visionOS, effort:l, not-testable
 created: 2026-07-20T18:42:44Z
-updated: 2026-07-21T20:45:37Z
+updated: 2026-07-21T21:59:56Z
+closed: 2026-07-21T21:59:56Z
 +++
 
 GPUSortedSplatRenderPipeline and GPUSplatSortComputePass take a single projection/camera matrix and render mono only. SparkSplatRenderPipeline supports vertex amplification with per-view matrices, but the GPU sort path has no way to express stereo: the cull uses one projection matrix, so splats visible to only one eye could be culled incorrectly, and the pipeline exposes no multi-matrix initializer. visionOS immersive rendering therefore cannot use the GPU sort path.

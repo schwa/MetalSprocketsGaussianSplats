@@ -35,9 +35,9 @@ import Splats
 ///   ``GPUSortResources/slotCount`` (default 3), or slots will race.
 public struct GPUSortedSplatRenderPipeline: Element {
     var splatCloud: GPUSplatCloud<SparkSplat>
-    var projectionMatrix: simd_float4x4
+    var projectionMatrices: [simd_float4x4]
     var modelMatrix: simd_float4x4
-    var cameraMatrix: simd_float4x4
+    var cameraMatrices: [simd_float4x4]
     var drawableSize: SIMD2<Float>
     var convertSRGBToLinear: Bool
     var useSphericalHarmonics: Bool?
@@ -45,6 +45,7 @@ public struct GPUSortedSplatRenderPipeline: Element {
     var guardBand: Float
     var resources: GPUSortResources
 
+    /// Convenience initializer for mono (single-view) rendering.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
@@ -57,10 +58,41 @@ public struct GPUSortedSplatRenderPipeline: Element {
         guardBand: Float = 0.2,
         resources: GPUSortResources
     ) throws {
+        try self.init(
+            splatCloud: splatCloud,
+            projectionMatrices: [projectionMatrix],
+            modelMatrix: modelMatrix,
+            cameraMatrices: [cameraMatrix],
+            drawableSize: drawableSize,
+            convertSRGBToLinear: convertSRGBToLinear,
+            useSphericalHarmonics: useSphericalHarmonics,
+            cullEnabled: cullEnabled,
+            guardBand: guardBand,
+            resources: resources
+        )
+    }
+
+    /// Full initializer supporting stereo/amplification rendering. With two
+    /// views the GPU cull keeps splats visible to either eye, and the render
+    /// uses vertex amplification into a layered render target.
+    public init(
+        splatCloud: GPUSplatCloud<SparkSplat>,
+        projectionMatrices: [simd_float4x4],
+        modelMatrix: simd_float4x4,
+        cameraMatrices: [simd_float4x4],
+        drawableSize: SIMD2<Float>,
+        convertSRGBToLinear: Bool = true,
+        useSphericalHarmonics: Bool? = nil,
+        cullEnabled: Bool = true,
+        guardBand: Float = 0.2,
+        resources: GPUSortResources
+    ) throws {
+        precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
+        precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         self.splatCloud = splatCloud
-        self.projectionMatrix = projectionMatrix
+        self.projectionMatrices = projectionMatrices
         self.modelMatrix = modelMatrix
-        self.cameraMatrix = cameraMatrix
+        self.cameraMatrices = cameraMatrices
         self.drawableSize = drawableSize
         self.convertSRGBToLinear = convertSRGBToLinear
         self.useSphericalHarmonics = useSphericalHarmonics
@@ -76,7 +108,7 @@ public struct GPUSortedSplatRenderPipeline: Element {
         sortedIndices = resources.makeIndices(
             slot: slotIndex,
             count: splatCloud.count,
-            parameters: SortParameters(camera: cameraMatrix, model: modelMatrix)
+            parameters: SortParameters(camera: cameraMatrices[0], model: modelMatrix)
         )
     }
 
@@ -85,11 +117,12 @@ public struct GPUSortedSplatRenderPipeline: Element {
 
     public var body: some Element {
         get throws {
+            let viewCount = cameraMatrices.count
             try GPUSplatSortComputePass(
                 splatCloud: splatCloud,
-                projectionMatrix: projectionMatrix,
+                projectionMatrices: projectionMatrices,
                 modelMatrix: modelMatrix,
-                cameraMatrix: cameraMatrix,
+                cameraMatrices: cameraMatrices,
                 cullEnabled: cullEnabled,
                 guardBand: guardBand,
                 resources: resources,
@@ -99,9 +132,9 @@ public struct GPUSortedSplatRenderPipeline: Element {
             try RenderPass {
                 try SparkSplatRenderPipeline(
                     splatCloud: splatCloud,
-                    projectionMatrix: projectionMatrix,
+                    projectionMatrices: projectionMatrices,
                     modelMatrix: modelMatrix,
-                    cameraMatrix: cameraMatrix,
+                    cameraMatrices: cameraMatrices,
                     drawableSize: drawableSize,
                     convertSRGBToLinear: convertSRGBToLinear,
                     useSphericalHarmonics: useSphericalHarmonics,
@@ -109,7 +142,7 @@ public struct GPUSortedSplatRenderPipeline: Element {
                 )
             }
             .renderPassDescriptorModifier { descriptor in
-                descriptor.renderTargetArrayLength = 1
+                descriptor.renderTargetArrayLength = viewCount
             }
         }
     }

@@ -16,9 +16,9 @@ import Splats
 /// (`instanceCount`) for the render pass to draw with.
 public struct GPUSplatSortComputePass: Element {
     var splatCloud: GPUSplatCloud<SparkSplat>
-    var projectionMatrix: simd_float4x4
+    var projectionMatrices: [simd_float4x4]
     var modelMatrix: simd_float4x4
-    var cameraMatrix: simd_float4x4
+    var cameraMatrices: [simd_float4x4]
     var cullEnabled: Bool
     var guardBand: Float
     var reversed: Bool
@@ -34,6 +34,7 @@ public struct GPUSplatSortComputePass: Element {
     @MSState var scatter: ComputeKernel
     @MSState var decode: ComputeKernel
 
+    /// Convenience initializer for mono (single-view) sorting.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
@@ -45,10 +46,39 @@ public struct GPUSplatSortComputePass: Element {
         resources: GPUSortResources,
         slotIndex: Int
     ) throws {
+        try self.init(
+            splatCloud: splatCloud,
+            projectionMatrices: [projectionMatrix],
+            modelMatrix: modelMatrix,
+            cameraMatrices: [cameraMatrix],
+            cullEnabled: cullEnabled,
+            guardBand: guardBand,
+            reversed: reversed,
+            resources: resources,
+            slotIndex: slotIndex
+        )
+    }
+
+    /// Full initializer supporting stereo. With two views the cull keeps any
+    /// splat visible to either view; the sort key is the first view's depth.
+    public init(
+        splatCloud: GPUSplatCloud<SparkSplat>,
+        projectionMatrices: [simd_float4x4],
+        modelMatrix: simd_float4x4,
+        cameraMatrices: [simd_float4x4],
+        cullEnabled: Bool = true,
+        guardBand: Float = 0.2,
+        reversed: Bool = false,
+        resources: GPUSortResources,
+        slotIndex: Int
+    ) throws {
+        precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
+        precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
+        precondition(projectionMatrices.count <= 2, "GPU sort supports at most two views")
         self.splatCloud = splatCloud
-        self.projectionMatrix = projectionMatrix
+        self.projectionMatrices = projectionMatrices
         self.modelMatrix = modelMatrix
-        self.cameraMatrix = cameraMatrix
+        self.cameraMatrices = cameraMatrices
         self.cullEnabled = cullEnabled
         self.guardBand = guardBand
         self.reversed = reversed
@@ -70,7 +100,8 @@ public struct GPUSplatSortComputePass: Element {
         get throws {
             let count = splatCloud.count
             let slot = resources.slots[slotIndex]
-            let modelView = cameraMatrix.inverse * modelMatrix * splatCloud.modelTransform
+            let modelViews = cameraMatrices.map { $0.inverse * modelMatrix * splatCloud.modelTransform }
+            let viewCount = cameraMatrices.count
 
             let compactBlock = GPUSortResources.compactBlock
             let elementsPerTile = GPUSortResources.elementsPerTile
@@ -78,8 +109,11 @@ public struct GPUSplatSortComputePass: Element {
             let numTiles = (count + elementsPerTile - 1) / elementsPerTile
 
             let distanceParams = SplatDistanceParams(
-                modelView: modelView,
-                projection: projectionMatrix,
+                modelView: modelViews[0],
+                projection: projectionMatrices[0],
+                modelView1: viewCount > 1 ? modelViews[1] : modelViews[0],
+                projection1: viewCount > 1 ? projectionMatrices[1] : projectionMatrices[0],
+                viewCount: UInt32(viewCount),
                 numElements: UInt32(count),
                 cloudIndex: 0,
                 reversed: reversed ? 1 : 0,

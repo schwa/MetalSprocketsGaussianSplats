@@ -23,8 +23,11 @@ struct SplatSortParams {
 
 /// Parameters for the per-splat cull + distance kernel that builds the sort records.
 struct SplatDistanceParams {
-    float4x4 modelView;         // camera.inverse * model * cloudTransform
-    float4x4 projection;        // clip = projection * modelView * position
+    float4x4 modelView;         // camera.inverse * model * cloudTransform (view 0)
+    float4x4 projection;        // clip = projection * modelView * position (view 0)
+    float4x4 modelView1;        // second view (stereo); valid when viewCount > 1
+    float4x4 projection1;       // second projection (stereo); valid when viewCount > 1
+    unsigned int viewCount;     // 1 = mono, 2 = stereo (cull keeps splats visible to either view)
     unsigned int numElements;   // total input splats (dispatch grid)
     unsigned int cloudIndex;    // carried into each record's high 16 bits
     unsigned int reversed;      // 1 = reverse sort order (flip distance sign)
