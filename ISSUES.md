@@ -1370,3 +1370,103 @@ Related: #58 (tile perf), #59 (tile blending), #61 (global tile|depth sort repla
 - `2026-07-20T19:45:10Z`: RFC 0002 (RFCs/0002-tilealt-cull-globalsort-bin-render.md) proposes TileAlt: cull -> global depth sort -> ordered (atomics-free) bin -> stable tileID partition -> tile render, as a sibling of the existing tile renderer. Depends on MetalSprockets#351 (indirect compute dispatch).
 
 ---
+
+## 63: PointSplat: splat stage dispatches over full point budget instead of actual count
+
++++
+status: new
+priority: medium
+kind: none
+labels: performance, pointsplat
+created: 2026-07-21T14:52:10Z
++++
+
+The splat kernel is dispatched over maxPointsPerFrame (default 4M) threads every frame because the total point count only exists GPU-side; threads past totals[0] exit immediately. Wasteful for sparse frames. MetalSprockets doesn't expose dispatchThreadgroups(indirectBuffer:) (same gap noted in RFC 0002). Affects both PointSplatRenderer and PointSplatRenderPipeline.
+
+---
+
+## 64: PointSplat: no spherical harmonics support
+
++++
+status: new
+priority: medium
+kind: none
+labels: pointsplat
+created: 2026-07-21T14:52:10Z
++++
+
+PointSplat renders base splat color only; view-dependent SH color (used by Spark and Stochastic renderers) is ignored. Scenes with SH will look flat compared to other renderers in the demo picker.
+
+---
+
+## 65: PointSplat: measure simdgroup dedupe before atomic_min
+
++++
+status: new
+priority: low
+kind: none
+labels: performance, pointsplat
+created: 2026-07-21T14:52:10Z
++++
+
+The splat kernel has an early depth test (plain aliased read) before atomic_min, but no simdgroup-level dedupe of points targeting the same pixel (Schuetz 2021 reports large wins from warp dedupe under contention). Unknown whether it pays off on Apple GPUs; needs measurement with GPU capture on close-up views.
+
+---
+
+## 66: PointSplat: profile occupancy, atomic throughput, and scaling vs sorted pipelines
+
++++
+status: new
+priority: medium
+kind: none
+labels: performance, pointsplat
+created: 2026-07-21T14:52:10Z
++++
+
+RFC 0003 verification plan items not yet done: GPU capture to confirm even occupancy across the splat dispatch (the paper's central claim) and atomic throughput; record the frame-time scaling curve vs Spark/GPU/Stochastic on small and multi-million-splat scenes.
+
+---
+
+## 67: PointSplat: near/far planes hardcoded in interactive pipeline
+
++++
+status: new
+priority: medium
+kind: none
+labels: pointsplat
+created: 2026-07-21T14:52:10Z
++++
+
+PointSplatRenderPipeline hardcodes nearPlane 0.2 / farPlane 200 for the 28-bit fixed-point depth quantization, ignoring the projection's zClip range. Scenes larger than 200 units or with tighter near planes will quantize depth badly. RFC 0003 open question 2 (reversed-infinite-Z reconciliation) is also unresolved.
+
+---
+
+## 68: PointSplat: color space of blit presentation unverified
+
++++
+status: new
+priority: high
+kind: none
+labels: bug, pointsplat
+created: 2026-07-21T14:52:11Z
++++
+
+The resolve/accumulation textures hold raw (sRGB-encoded) splat color values in rgba16Float; the fullscreen BlitShader samples them and writes into a bgra8Unorm_srgb drawable, which will re-encode. PointSplat output may look washed out or double-encoded next to the other renderers in the demo picker. Needs a visual A/B check.
+
+- `2026-07-21T14:58:20Z`: Visual A/B done: PointSplat is washed out in the same way as the tile renderer (#59), so this is the shared color-pipeline issue rather than a PointSplat-specific double-encode. Keeping open until #59 is understood.
+
+---
+
+## 69: PointSplat: occlusion culling and temporal reprojection deferred
+
++++
+status: new
+priority: low
+kind: none
+labels: pointsplat
+created: 2026-07-21T14:52:11Z
++++
+
+RFC 0003 defers hierarchical/occlusion culling (two-phase scheme, depth mip chain) and reprojection-based temporal reuse. Without them, large occluded scenes waste splat work, and any camera motion resets accumulation to 1 SPP noise. Tracking issue for the follow-up.
+
+---
