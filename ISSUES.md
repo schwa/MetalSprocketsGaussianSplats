@@ -1519,13 +1519,17 @@ Loading sphere-32M.sog fails with failedToDecodeImage(quats.webp). The file is a
 ## 72: Port GPU SOG reader from gaussiansplats-ios
 
 +++
-status: new
+status: closed
 priority: high
 kind: enhancement
-labels: splats,performance
+labels: splats, performance
 created: 2026-07-21T18:35:05Z
+updated: 2026-07-21T18:40:09Z
+closed: 2026-07-21T18:40:09Z
 +++
 
 Loading large SOG files (e.g. sphere-48M.sog) through SOGReaderCPU takes minutes: per-splat Swift closure over 48M splats plus huge intermediate GenericSplat/ExtendedSplat arrays before the GPU buffer is built. ~/Shared/Projects/Work/gaussiansplats-ios has a GPU path to port: Sources/GaussianSplatMetal/IO/SOGReaderGPU.swift (unzips, decodes the WebP planes concurrently into rgba8Uint textures) + Sources/GaussianSplatShaders/SOGDecodeShader.metal (compute kernel dequantizes per splat straight into a SparkSplat buffer and flattened SH buffer) + SplatCloudBuilder + its MiniZip dependency. Produces the same SparkSplat layout we use. Note: it still decodes WebP via ImageIO, so it does not address #71 (palette+alpha decode failure); large generated files may need both fixes. The demo already parses off-main with a loading indicator, so this slots in behind the existing loadCustomSplat path.
+
+- `2026-07-21T18:40:09Z`: Ported SOGReaderGPU + SOGDecodeShader from gaussiansplats-ios (adapted to ZIPFoundation and this repo's shader bundle lookup). Parity test vs SOGReaderCPU on test-ring.sog passes. Demo loads all .sog files (bundled helmet + custom loads) through the GPU path.
 
 ---

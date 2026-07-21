@@ -4,3 +4,4 @@
 #import "SplatGPUSort.h"
 #import "PointSplatMath.h"
 #import "PointSplatShaders.h"
+#import "SOGDecodeShader.h"

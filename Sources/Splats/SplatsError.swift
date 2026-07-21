@@ -17,6 +17,7 @@ internal enum SplatsError: Error, Equatable {
     case failedToExtractZIP
     case missingTexture(String)
     case failedToDecodeImage(String)
+    case resourceCreationFailure(String)
 
     // SPZ errors
     case decompressionFailed
@@ -51,6 +52,8 @@ extension SplatsError: LocalizedError {
             "SOG archive is missing '\(filename)'."
         case .failedToDecodeImage(let filename):
             "Could not decode '\(filename)' from the SOG archive. The image may use a WebP feature this platform's decoder does not support."
+        case .resourceCreationFailure(let what):
+            "Failed to create GPU resource: \(what)."
         case .decompressionFailed:
             "SPZ payload failed to decompress."
         case .invalidMagic:
