@@ -2022,12 +2022,13 @@ PointSplatStatistics is @unchecked Sendable but its three fields have no synchro
 ## 97: DemoState.loadCustomSplat: replace Task.detached with @concurrent function
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: concurrency, demo, effort:xs
 created: 2026-07-21T23:49:08Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:56:49Z
+closed: 2026-07-21T23:56:49Z
 +++
 
 loadCustomSplat offloads parsing via Task.detached(priority: .userInitiated), which sheds priority escalation and task-local context. Swift 6.2 preference is a nonisolated @concurrent async function so the call stays structured. Also add a doc-comment constraint to AsyncSortManager.sortNowSync noting it must not be called from an async context (spin-wait would burn a cooperative-pool thread).

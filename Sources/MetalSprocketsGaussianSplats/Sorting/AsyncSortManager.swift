@@ -309,6 +309,10 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
 
     /// Perform a synchronous sort immediately and return the result (nonisolated wrapper).
     /// Blocks the calling thread until the sort completes.
+    ///
+    /// - Important: Must not be called from an async context: the spin-wait
+    ///   would occupy a cooperative-pool thread until the sort finishes. Use
+    ///   ``sortNowAsync(_:)`` from async code.
     nonisolated
     public func sortNowSync(_ parameters: SortParameters) -> SplatIndices {
         let done = Atomic<Bool>(false)

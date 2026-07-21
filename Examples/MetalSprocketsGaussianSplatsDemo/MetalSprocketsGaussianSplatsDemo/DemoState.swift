@@ -98,10 +98,7 @@ class DemoState {
         Self.logger.info("Loading \(url.lastPathComponent, privacy: .public)…")
         let start = ContinuousClock.now
         do {
-            let device = self.device
-            let cloud = try await Task.detached(priority: .userInitiated) {
-                try Self.readSplatCloud(device: device, url: url)
-            }.value
+            let cloud = try await Self.readSplatCloudOffMain(device: device, url: url)
             Self.logger.info("Loaded \(cloud.count) splats in \((ContinuousClock.now - start).description, privacy: .public)")
             splatCloud = cloud
             customModelName = url.lastPathComponent
@@ -118,6 +115,14 @@ class DemoState {
     private static func loadSplatCloud(device: MTLDevice, model: SplatModel) -> GPUSplatCloud<SparkSplat> {
         let url = Bundle.main.url(forResource: model.resourceName, withExtension: model.resourceExtension)!
         return try! readSplatCloud(device: device, url: url)
+    }
+
+    /// Off-main wrapper for ``readSplatCloud(device:url:)`` so large files
+    /// don't block the main actor. `@concurrent` keeps the call structured
+    /// (priority escalation and task-locals propagate), unlike Task.detached.
+    @concurrent
+    nonisolated private static func readSplatCloudOffMain(device: MTLDevice, url: URL) async throws -> GPUSplatCloud<SparkSplat> {
+        try readSplatCloud(device: device, url: url)
     }
 
     /// Reads a splat file into a GPU cloud, including spherical harmonics
