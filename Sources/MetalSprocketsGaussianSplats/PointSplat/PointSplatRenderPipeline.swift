@@ -35,10 +35,12 @@ public struct PointSplatRenderPipeline: Element {
     private var supersampling: Int
     private var pointsPerThread: Int
     private var statistics: PointSplatStatistics?
+    private var reprojection: Bool
 
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, supersampling: Int = 2, pointsPerThread: Int = 4, statistics: PointSplatStatistics? = nil) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, supersampling: Int = 2, pointsPerThread: Int = 4, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) throws {
         self.supersampling = max(supersampling, 1)
         self.pointsPerThread = max(pointsPerThread, 1)
+        self.reprojection = reprojection
         self.statistics = statistics
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
@@ -102,8 +104,9 @@ public struct PointSplatRenderPipeline: Element {
             )
             let shBuffer = splatCloud.shCoefficients?.unsafeMTLBuffer ?? resources.dummySHBuffer
             // Running mean: weight the new frame by 1/(n+1); camera or model
-            // motion resets n so stale accumulation never ghosts.
-            let accumulation = resources.nextAccumulationStep(cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix)
+            // motion reprojects history (#73) or, with reprojection disabled
+            // (#74), hard-resets so motion shows raw 1-SPP noise.
+            let accumulation = resources.nextAccumulationStep(cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix, allowReprojection: reprojection)
             try ComputePass(label: "PointSplat") {
                 try ComputePipeline(computeKernel: resolveKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
@@ -426,7 +429,7 @@ final class PointSplatResources {
     /// projection motion switches to reprojection against the previous
     /// view-projection (model changes still hard-reset — reprojection can't
     /// warp content change).
-    func nextAccumulationStep(cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4, projectionMatrix: simd_float4x4) -> AccumulationStep {
+    func nextAccumulationStep(cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4, projectionMatrix: simd_float4x4, allowReprojection: Bool = true) -> AccumulationStep {
         let viewMoved = lastCameraMatrix != cameraMatrix || lastProjectionMatrix != projectionMatrix
         let modelChanged = lastModelMatrix != modelMatrix
         let previousViewProjection: simd_float4x4? = if let lastCameraMatrix, let lastProjectionMatrix {
@@ -439,7 +442,7 @@ final class PointSplatResources {
         if modelChanged {
             accumulatedFrames = 0
         } else if viewMoved {
-            if let previousViewProjection, accumulatedFrames > 0 {
+            if allowReprojection, let previousViewProjection, accumulatedFrames > 0 {
                 reprojectFrom = previousViewProjection
                 // Resume post-motion convergence from a moderate weight
                 // rather than trusting warped history as a long average.

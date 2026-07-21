@@ -52,6 +52,7 @@ public struct SplatView: View {
     @State private var pendingRelease: [SplatIndices] = []
     @State private var sortManager: AsyncSortManager<SparkSplat>
     @State private var pointSplatStatistics = PointSplatStatistics()
+    @State private var pointSplatReprojection = true
     /// Scratch + output buffers for the GPU sorter (``SplatRenderer/gpu``).
     @State private var sortResources: GPUSortResources
 
@@ -155,6 +156,7 @@ public struct SplatView: View {
                     frameIndex: UInt32(truncatingIfNeeded: context.frameUniforms.index),
                     supersampling: Self.pointSplatSupersampling,
                     pointsPerThread: Self.pointSplatPointsPerThread,
+                    reprojection: pointSplatReprojection,
                     statistics: pointSplatStatistics
                 )
             }
@@ -262,6 +264,9 @@ public struct SplatView: View {
                         .foregroundStyle(demand > budget ? .orange : .white)
                 }
                 LabeledContent("SH degree", value: splatCloud.shCoefficients != nil ? splatCloud.shDegree.formatted() : "off")
+                Toggle("Reproject", isOn: $pointSplatReprojection)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
             }
             .fixedSize()
             .monospacedDigit()

@@ -1562,13 +1562,17 @@ Accumulation resets to 1 SPP noise the moment the camera moves. The paper's repr
 ## 74: PointSplat: toggle to disable temporal accumulation/reprojection
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
 labels: pointsplat
 created: 2026-07-21T19:45:06Z
+updated: 2026-07-21T20:14:13Z
+closed: 2026-07-21T20:14:13Z
 +++
 
 There is no way to view raw single-frame PointSplat output. Temporal accumulation (static views) and reprojection (camera motion) are always on, which hides per-frame noise characteristics -- useful for debugging (e.g. the current occlusion-culling render issues), for judging SPP quality honestly, and for A/B against StochasticSplats-style output. Wants a runtime toggle (demo UI + PointSplatRenderPipeline parameter) that bypasses the blend/reproject stage and presents the resolve texture directly.
+
+- `2026-07-21T20:14:13Z`: Reproject toggle added: PointSplatRenderPipeline gains reprojection: Bool (default true) and the demo overlay a switch. Off restores pre-#73 behavior (camera motion hard-resets accumulation, showing raw noise during motion); static accumulation always runs.
 
 ---
