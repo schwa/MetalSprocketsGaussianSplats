@@ -148,8 +148,7 @@ struct GoldenImageRenderingTests {
                 modelMatrix: .identity,
                 cameraMatrix: cameraMatrix,
                 drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                convertSRGBToLinear: false,
-                useSphericalHarmonics: useSphericalHarmonics,
+                configuration: .init(convertSRGBToLinear: false, useSphericalHarmonics: useSphericalHarmonics),
                 sortedIndices: sortedIndices
             )
         }

@@ -170,11 +170,13 @@ public struct SplatView: View {
                     cameraMatrix: cameraMatrix,
                     drawableSize: size,
                     frameIndex: UInt32(truncatingIfNeeded: context.frameUniforms.index),
-                    depthRange: depthRange,
-                    supersampling: pointSplatSupersamplingSetting,
-                    pointsPerThread: pointSplatPointsPerThreadSetting,
-                    reprojection: pointSplatReprojection,
-                    statistics: pointSplatStatistics
+                    configuration: .init(
+                        depthRange: depthRange,
+                        supersampling: pointSplatSupersamplingSetting,
+                        pointsPerThread: pointSplatPointsPerThreadSetting,
+                        reprojection: pointSplatReprojection,
+                        statistics: pointSplatStatistics
+                    )
                 )
             }
         }

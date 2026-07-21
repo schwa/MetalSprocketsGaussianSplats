@@ -206,7 +206,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                         modelMatrix: modelMatrix,
                         cameraMatrices: cameraMatrices,
                         drawableSize: drawableSize,
-                        convertSRGBToLinear: true,
+                        configuration: .init(convertSRGBToLinear: true),
                         sortedIndices: gpuSortedIndices
                     )
                     .viewMappings((0 ..< context.viewCount).map {
@@ -241,7 +241,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrices[eye],
                     drawableSize: drawableSize,
-                    convertSRGBToLinear: true,
+                    configuration: .init(convertSRGBToLinear: true),
                     sortedIndices: sortedIndices
                 )
                 .viewMappings([

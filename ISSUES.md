@@ -2088,12 +2088,13 @@ PointSplat has three public error enums: PointSplatRenderer.RendererError, Point
 ## 101: API: configuration structs for SparkSplatRenderPipeline and PointSplatRenderPipeline inits
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: api, effort:m
 created: 2026-07-21T23:52:19Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:58:39Z
+closed: 2026-07-21T23:58:39Z
 +++
 
 SparkSplatRenderPipeline has three public init overloads with 9 parameters each (single/multi cloud x mono/stereo, plus convertSRGBToLinear/useSphericalHarmonics/boundingBox). PointSplatRenderPipeline.init takes 11 parameters while the offscreen PointSplatRenderer already has a Configuration struct the live pipeline does not share. Introduce configuration types with defaults to collapse the overload matrix.

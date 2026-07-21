@@ -42,6 +42,35 @@ public struct PointSplatRenderPipeline: Element {
     private var reprojection: Bool
     private var depthRange: ClosedRange<Float>
 
+    /// Rendering options for ``PointSplatRenderPipeline`` (#101).
+    public struct Configuration {
+        /// View-space range for the framebuffer's 28-bit fixed-point depth
+        /// quantization and the near cull. Should match the projection's clip
+        /// range; reversed-infinite-Z callers must supply a finite far for
+        /// quantization purposes.
+        public var depthRange: ClosedRange<Float>
+        /// Framebuffer supersampling factor. Clamped to at least 1.
+        public var supersampling: Int
+        /// Number of points each compute thread splats. Clamped to at least 1.
+        /// Default is 16: on Apple GPUs the bench sweep measured no PSNR cost
+        /// for K up to 16 at fixed S, and K = 16 is ~2x faster than the
+        /// paper's K = 4 (issue #76).
+        public var pointsPerThread: Int
+        /// Whether the previous frame's accumulation is reprojected when the
+        /// camera moves, reducing convergence noise.
+        public var reprojection: Bool
+        /// Optional collector for per-frame render statistics.
+        public var statistics: PointSplatStatistics?
+
+        public init(depthRange: ClosedRange<Float> = 0.2...200.0, supersampling: Int = 2, pointsPerThread: Int = 16, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) {
+            self.depthRange = depthRange
+            self.supersampling = supersampling
+            self.pointsPerThread = pointsPerThread
+            self.reprojection = reprojection
+            self.statistics = statistics
+        }
+    }
+
     /// - Parameters:
     ///   - splatCloud: The splat cloud to render.
     ///   - projectionMatrix: The camera projection matrix.
@@ -50,23 +79,14 @@ public struct PointSplatRenderPipeline: Element {
     ///   - drawableSize: The render target size in pixels.
     ///   - frameIndex: A monotonically increasing frame counter, used to vary the
     ///     stochastic sampling pattern each frame.
-    ///   - depthRange: view-space range for the framebuffer's 28-bit
-    ///     fixed-point depth quantization and the near cull. Should match the
-    ///     projection's clip range; reversed-infinite-Z callers must supply a
-    ///     finite far for quantization purposes.
-    ///   - supersampling: Framebuffer supersampling factor. Clamped to at least 1.
-    ///   - pointsPerThread: Number of points each compute thread splats. Clamped to at least 1.
-    ///     Default is 16: on Apple GPUs the bench sweep measured no PSNR cost for K up to 16 at
-    ///     fixed S, and K = 16 is ~2x faster than the paper's K = 4 (issue #76).
-    ///   - reprojection: Whether the previous frame's accumulation is reprojected
-    ///     when the camera moves, reducing convergence noise.
-    ///   - statistics: Optional collector for per-frame render statistics.
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, depthRange: ClosedRange<Float> = 0.2...200.0, supersampling: Int = 2, pointsPerThread: Int = 16, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) throws {
-        self.depthRange = depthRange
-        self.supersampling = max(supersampling, 1)
-        self.pointsPerThread = max(pointsPerThread, 1)
-        self.reprojection = reprojection
-        self.statistics = statistics
+    ///   - configuration: Rendering options (depth range, supersampling,
+    ///     points per thread, reprojection, statistics).
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, configuration: Configuration = Configuration()) throws {
+        self.depthRange = configuration.depthRange
+        self.supersampling = max(configuration.supersampling, 1)
+        self.pointsPerThread = max(configuration.pointsPerThread, 1)
+        self.reprojection = configuration.reprojection
+        self.statistics = configuration.statistics
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix

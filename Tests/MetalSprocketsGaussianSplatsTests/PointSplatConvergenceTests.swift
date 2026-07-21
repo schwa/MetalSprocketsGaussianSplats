@@ -59,7 +59,7 @@ struct PointSplatConvergenceTests {
                 modelMatrix: .identity,
                 cameraMatrix: cameraMatrix,
                 drawableSize: SIMD2<Float>(Float(size), Float(size)),
-                convertSRGBToLinear: false,
+                configuration: .init(convertSRGBToLinear: false),
                 sortedIndices: sortedIndices
             )
         }

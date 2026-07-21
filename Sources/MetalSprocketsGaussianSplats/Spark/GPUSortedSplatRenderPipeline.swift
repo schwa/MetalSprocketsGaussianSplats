@@ -136,8 +136,7 @@ public struct GPUSortedSplatRenderPipeline: Element {
                     modelMatrix: modelMatrix,
                     cameraMatrices: cameraMatrices,
                     drawableSize: drawableSize,
-                    convertSRGBToLinear: convertSRGBToLinear,
-                    useSphericalHarmonics: useSphericalHarmonics,
+                    configuration: .init(convertSRGBToLinear: convertSRGBToLinear, useSphericalHarmonics: useSphericalHarmonics),
                     sortedIndices: sortedIndices
                 )
             }

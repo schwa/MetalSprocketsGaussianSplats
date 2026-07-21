@@ -125,34 +125,46 @@ public struct SparkSplatRenderPipeline: Element {
         splatClouds.reduce(0) { $0 + $1.count }
     }
 
+    /// Rendering options shared by all ``SparkSplatRenderPipeline`` initializers (#101).
+    public struct Configuration: Sendable {
+        /// Whether splat colors are converted from sRGB to linear in the shader.
+        public var convertSRGBToLinear: Bool
+        /// Override SH usage. If nil, automatically enables SH when any cloud has SH data.
+        public var useSphericalHarmonics: Bool?
+        /// Optional world-space bounding box. Splats outside this box are culled.
+        public var boundingBox: BoundingBox3D?
+
+        public init(convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil) {
+            self.convertSRGBToLinear = convertSRGBToLinear
+            self.useSphericalHarmonics = useSphericalHarmonics
+            self.boundingBox = boundingBox
+        }
+    }
+
     // MARK: - Single Cloud Convenience Initializers
 
     /// Convenience initializer for single cloud, single-view rendering (non-stereo)
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, configuration: Configuration = Configuration(), sortedIndices: SplatIndices) throws {
         try self.init(
             splatClouds: [splatCloud],
             projectionMatrices: [projectionMatrix],
             modelMatrix: modelMatrix,
             cameraMatrices: [cameraMatrix],
             drawableSize: drawableSize,
-            convertSRGBToLinear: convertSRGBToLinear,
-            useSphericalHarmonics: useSphericalHarmonics,
-            boundingBox: boundingBox,
+            configuration: configuration,
             sortedIndices: sortedIndices
         )
     }
 
     /// Convenience initializer for single cloud, stereo/amplification rendering
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, configuration: Configuration = Configuration(), sortedIndices: SplatIndices) throws {
         try self.init(
             splatClouds: [splatCloud],
             projectionMatrices: projectionMatrices,
             modelMatrix: modelMatrix,
             cameraMatrices: cameraMatrices,
             drawableSize: drawableSize,
-            convertSRGBToLinear: convertSRGBToLinear,
-            useSphericalHarmonics: useSphericalHarmonics,
-            boundingBox: boundingBox,
+            configuration: configuration,
             sortedIndices: sortedIndices
         )
     }
@@ -167,11 +179,12 @@ public struct SparkSplatRenderPipeline: Element {
     ///   - modelMatrix: The scene-level model transform, combined with each cloud's own transform.
     ///   - cameraMatrices: One camera (view-to-world) matrix per view, matching `projectionMatrices`.
     ///   - drawableSize: The render target size in pixels.
-    ///   - convertSRGBToLinear: Whether splat colors are converted from sRGB to linear in the shader.
-    ///   - useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when any cloud has SH data.
-    ///   - boundingBox: Optional world-space bounding box. Splats outside this box are culled.
+    ///   - configuration: Rendering options (sRGB conversion, SH override, bounding-box culling).
     ///   - sortedIndices: Pre-sorted splat indices from an ``AsyncSortManager``.
-    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices) throws {
+    public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, configuration: Configuration = Configuration(), sortedIndices: SplatIndices) throws {
+        let convertSRGBToLinear = configuration.convertSRGBToLinear
+        let useSphericalHarmonics = configuration.useSphericalHarmonics
+        let boundingBox = configuration.boundingBox
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
         precondition(!splatClouds.isEmpty, "Must have at least one splat cloud")

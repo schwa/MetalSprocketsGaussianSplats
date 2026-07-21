@@ -407,7 +407,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 modelMatrix: modelMatrix,
                 cameraMatrix: cameraMatrix,
                 drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                convertSRGBToLinear: useSrgbToLinear,
+                configuration: .init(convertSRGBToLinear: useSrgbToLinear),
                 sortedIndices: sortedIndices
             )
         }
