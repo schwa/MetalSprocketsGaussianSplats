@@ -7,10 +7,14 @@ import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsUI
 import Splats
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var cameraMatrix = simd_float4x4(translation: SIMD3<Float>(0, 0, 3))
     @State private var frameTimingStatistics: FrameTimingStatistics?
+    @State private var isImporting = false
+
+    private static let splatContentTypes: [UTType] = [.ply, .spz, .sog]
 
     let splatCloud: GPUSplatCloud<SparkSplat>
     @Bindable var demoState: DemoState
@@ -49,6 +53,7 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 200)
+                loadButton
                 ImmersiveToggle(demoState: demoState)
                 if demoState.isImmersive, let timing = demoState.immersiveFrameTiming {
                     FrameTimingView(statistics: timing)
@@ -81,6 +86,12 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                loadButton
+                if let name = demoState.customModelName {
+                    Text(name)
+                        .font(.caption)
+                        .lineLimit(1)
+                }
             }
             .padding(8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -94,6 +105,22 @@ struct ContentView: View {
         }
 
         #endif
+    }
+
+    private var loadButton: some View {
+        Button("Load\u{2026}") {
+            isImporting = true
+        }
+        .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.splatContentTypes) { result in
+            if case .success(let url) = result {
+                demoState.loadCustomSplat(url: url)
+            }
+        }
+        .alert("Load Failed", isPresented: Binding(get: { demoState.loadError != nil }, set: { if !$0 { demoState.loadError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(demoState.loadError ?? "")
+        }
     }
 }
 

@@ -39,10 +39,14 @@ class DemoState {
     var selectedModel: SplatModel = .butterfly {
         didSet {
             if selectedModel != oldValue {
+                customModelName = nil
                 reloadSplatCloud()
             }
         }
     }
+    /// Display name of a user-loaded splat file; nil when a bundled model is shown.
+    private(set) var customModelName: String?
+    var loadError: String?
 
     private(set) var splatCloud: GPUSplatCloud<SparkSplat>
     private let device: MTLDevice
@@ -69,6 +73,33 @@ class DemoState {
         #if os(visionOS)
         renderState = SplatImmersiveRenderState(splatCloud: cloud)
         #endif
+    }
+
+    /// Loads a user-picked splat file (e.g. from a file importer). The URL
+    /// may be security-scoped.
+    func loadCustomSplat(url: URL) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if scoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        do {
+            let reader = try SplatReader(url: url)
+            var splats: [SparkSplat] = []
+            splats.reserveCapacity(reader.splatCount)
+            try reader.read { _, extendedSplat in
+                splats.append(SparkSplat(extendedSplat.genericSplat))
+            }
+            let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
+            splatCloud = cloud
+            customModelName = url.lastPathComponent
+            #if os(visionOS)
+            renderState = SplatImmersiveRenderState(splatCloud: cloud)
+            #endif
+        } catch {
+            loadError = "Could not load \(url.lastPathComponent): \(error.localizedDescription)"
+        }
     }
 
     private static func loadSplatCloud(device: MTLDevice, model: SplatModel) -> GPUSplatCloud<SparkSplat> {
