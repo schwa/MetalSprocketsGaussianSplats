@@ -3,3 +3,4 @@
 #import "TileSplatSupport.h"
 #import "SplatGPUSort.h"
 #import "PointSplatMath.h"
+#import "PointSplatShaders.h"
