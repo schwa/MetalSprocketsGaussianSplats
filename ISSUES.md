@@ -116,9 +116,9 @@ Architecture refactor: Move sort management from SparkSplatRenderPipeline to the
 status: open
 priority: high
 kind: bug
-labels: effort:xl
+labels: effort:xl, not-testable
 created: 2026-02-20T00:00:00Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-07-21T20:45:36Z
 +++
 
 ## Problem
@@ -299,9 +299,9 @@ Same issue likely applies to Antimatter15SplatRenderPipeline and SparkSplatDebug
 status: open
 priority: medium
 kind: task
-labels: effort:s
+labels: effort:s, not-testable
 created: 2026-03-19T00:00:00Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-07-21T20:45:36Z
 +++
 
 ---
@@ -882,12 +882,12 @@ Provide a public RealityKit Scene (or ImmersiveSpace content) in the library tha
 ## 35: Support per-eye sorting for visionOS stereo rendering
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
-labels: visionOS, sorting, effort:l
+labels: visionOS, sorting, effort:l, not-testable
 created: 2026-04-09T17:40:46Z
-updated: 2026-04-09T18:02:11Z
+updated: 2026-07-21T20:45:36Z
 +++
 
 Currently SplatImmersiveElement sorts once using the left eye's camera matrix and shares the sorted index buffer for both eyes. For distant splats the depth order can differ between eyes, causing flicker. Since CPU sort is cheap (~2ms for 150k splats), we could sort twice — once per eye — using separate buffers. This would eliminate any depth-order disagreement between eyes.
@@ -899,12 +899,12 @@ Currently SplatImmersiveElement sorts once using the left eye's camera matrix an
 ## 36: Investigate constant minor flicker in visionOS immersive rendering
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
-labels: effort:s, visionOS, sorting
+labels: effort:s, visionOS, sorting, not-testable
 created: 2026-04-09T17:40:54Z
-updated: 2026-04-09T17:57:55Z
+updated: 2026-07-21T20:45:36Z
 +++
 
 Distant splats flicker during immersive rendering. Likely cause: the pending release depth (3 buffers) is too shallow for visionOS stereo rendering, which has more in-flight GPU work. A pool buffer may be returned and overwritten by a new sort while the GPU is still reading it. To diagnose: disable pool release entirely (just allocate fresh buffers) and see if flicker disappears. If confirmed, either increase the pending release depth for visionOS or make it configurable.
@@ -923,11 +923,12 @@ The flicker is constant and minor, present even when head is relatively stationa
 ## 37: Add turnkey SplatImmersiveContent convenience wrapper
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
-labels: effort:s, visionOS, api
+labels: effort:s, visionOS, api, not-testable
 created: 2026-04-09T17:41:13Z
+updated: 2026-07-21T20:45:36Z
 +++
 
 SplatImmersiveElement works but requires the consumer to set up ImmersiveRenderContent → ImmersiveRenderPass → SplatImmersiveElement + SplatImmersiveRenderState. SplatView is a single-line drop-in for windowed rendering — we should have the equivalent for immersive. A SplatImmersiveContent: ImmersiveSpaceContent that hides the boilerplate, so usage is just:
@@ -999,11 +1000,12 @@ The demo has an AppIcon.icon file (Icon Composer format) but no icon appears. Ic
 ## 41: Splat rendering fails silently in visionOS and iPad simulators
 
 +++
-status: new
+status: open
 priority: low
 kind: bug
 labels: effort:m, simulator
 created: 2026-04-09T19:09:47Z
+updated: 2026-07-21T20:43:22Z
 +++
 
 SplatView renders nothing in visionOS and iPad simulators — sorting runs but no pixels appear. No errors logged. Works fine on device and on macOS native. The MetalSprockets cube demo renders fine on simulator, so it's specific to the splat pipeline. Likely cause: GPU buffer addresses (gpuAddressAsUnsafeMutablePointer), argument buffers, or other advanced Metal features used by SparkSplatRenderPipeline that aren't supported by simulator Metal.
@@ -1031,11 +1033,12 @@ The MetalSprockets FrameTimingView provides an FPS overlay. Add it to the demo a
 ## 43: Add ARKit camera passthrough mode to iOS demo
 
 +++
-status: new
+status: open
 priority: low
 kind: feature
-labels: effort:m, demo, iOS
+labels: effort:m, demo, iOS, not-testable
 created: 2026-04-09T19:19:51Z
+updated: 2026-07-21T20:45:36Z
 +++
 
 The MetalSprockets demo has an ARKit mode that renders the camera feed (YCbCr billboard) with 3D content overlaid using ARKit world tracking. Add similar support to the splat demo on iOS — render splats on top of the AR camera feed with proper AR projection/view matrices from ARKit. See MetalSprockets Example MobileDemoView for the pattern: ARSessionDelegate + .arkit() modifier + YCbCrBillboardRenderPass.
@@ -1065,11 +1068,12 @@ Switching to stochastic mode in SplatView crashes with 'MTLDepthStencilDescripto
 ## 45: SplatView renders blank when used with .toolbar or NavigationStack on macOS
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
-labels: effort:xs, macOS, demo
+labels: effort:xs, macOS, demo, not-testable
 created: 2026-04-09T20:07:10Z
+updated: 2026-07-21T20:45:37Z
 +++
 
 SplatView (via RenderView/MTKView) renders nothing when .toolbar is applied or when wrapped in NavigationStack on macOS. Resizing the window triggers rendering. Root cause is in MetalSprockets (filed as MetalSprockets#311) — MTKView gets zero initial size and never redraws. Workaround: use .overlay for UI controls instead of .toolbar.
@@ -1079,14 +1083,18 @@ SplatView (via RenderView/MTKView) renders nothing when .toolbar is applied or w
 ## 46: Add tile-based renderer to SplatRenderer enum
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: effort:m, tile-based
 created: 2026-04-09T20:08:11Z
+updated: 2026-07-21T20:43:22Z
+closed: 2026-07-21T20:43:22Z
 +++
 
 SplatRenderer currently has .spark and .stochastic but not .tileBased. TileBasedSplatPipeline requires TileSplatResources to be created and managed, so it's not a trivial drop-in. SplatView would need to lazily create and hold TileSplatResources when tile-based mode is selected.
+
+- `2026-07-21T20:43:22Z`: Already implemented: SplatRenderer has .tileBased and SplatView renders it via TileBasedSplatPass (which manages TileSplatResources internally). Obsolete.
 
 ---
 
@@ -1129,11 +1137,12 @@ The demo only supports turntable drag rotation via .interactiveCamera(). Add pin
 ## 49: Metal GPU performance HUD disappears during drag/pan gestures
 
 +++
-status: new
+status: open
 priority: low
 kind: bug
 labels: effort:xs, macOS
 created: 2026-04-09T20:13:18Z
+updated: 2026-07-21T20:43:22Z
 +++
 
 The Metal GPU performance overlay disappears while dragging/panning the camera. Reappears when gesture ends. Same issue as MetalSprockets#34/#312. Flickering is reduced when shader validation is enabled (slower frame rate). Likely a SwiftUI overlay/z-ordering issue during gesture handling in RenderView.
@@ -1162,11 +1171,12 @@ SplatImmersiveElement currently only uses SparkSplatRenderPipeline. Add support 
 ## 51: Investigate stochastic seed behavior when camera is stationary
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
 labels: effort:s, stochastic
 created: 2026-04-09T20:13:57Z
+updated: 2026-07-21T20:43:22Z
 +++
 
 Currently frameTime (frame counter) is passed as the stochastic seed every frame, so the noise pattern changes even when the camera isn't moving. This causes constant visual shimmer. When the camera is stationary, we could either freeze the seed (stable but noisy image) or accumulate/average multiple frames for temporal convergence. Need to investigate what looks best.
@@ -1213,11 +1223,12 @@ FrameTimingView is available for windowed SplatView via .onFrameTimingChange but
 ## 54: Support gestures in visionOS immersive mode
 
 +++
-status: new
+status: open
 priority: medium
 kind: feature
-labels: effort:m, visionOS, demo
+labels: effort:m, visionOS, demo, not-testable
 created: 2026-04-09T21:57:38Z
+updated: 2026-07-21T20:45:37Z
 +++
 
 The immersive splat currently has no gesture interaction — the splat is static in space. Add gesture support for manipulating the splat in immersive mode.
@@ -1245,11 +1256,12 @@ The demo currently has separate AppIcon.icon (macOS/iOS) and AppIcon.solidimages
 ## 56: GPU-sorted pipeline does not support stereo/visionOS rendering
 
 +++
-status: new
+status: open
 priority: medium
 kind: feature
-labels: visionOS
+labels: visionOS, effort:l, not-testable
 created: 2026-07-20T18:42:44Z
+updated: 2026-07-21T20:45:37Z
 +++
 
 GPUSortedSplatRenderPipeline and GPUSplatSortComputePass take a single projection/camera matrix and render mono only. SparkSplatRenderPipeline supports vertex amplification with per-view matrices, but the GPU sort path has no way to express stereo: the cull uses one projection matrix, so splats visible to only one eye could be culled incorrectly, and the pipeline exposes no multi-matrix initializer. visionOS immersive rendering therefore cannot use the GPU sort path.
@@ -1259,11 +1271,13 @@ GPUSortedSplatRenderPipeline and GPUSplatSortComputePass take a single projectio
 ## 57: SplatImmersiveContent should be able to use the GPU sort pipeline
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: visionOS
+labels: visionOS, effort:m, not-testable
+depends: 56
 created: 2026-07-20T18:42:44Z
+updated: 2026-07-21T20:45:37Z
 +++
 
 SplatImmersiveContent drives immersive visionOS rendering via the CPU AsyncSortManager path. Once stereo support exists in the GPU-sorted pipeline, immersive content should be able to opt into GPU sorting/culling, removing CPU sort latency in head-tracked rendering where stale sort order is most visible.
@@ -1273,11 +1287,12 @@ SplatImmersiveContent drives immersive visionOS rendering via the CPU AsyncSortM
 ## 58: Tile-based renderer performance is poor
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
-labels: tile-based
+labels: tile-based, effort:l
 created: 2026-07-20T18:53:32Z
+updated: 2026-07-21T20:43:22Z
 +++
 
 The tile-based renderer runs significantly slower than the Spark and GPU-sorted renderers on the same scenes (observed in the demo app on macOS). Frame times are noticeably worse when switching the Renderer picker to Tile.
@@ -1330,11 +1345,12 @@ The GPU-sorted pipeline (SplatGPUSort) culls splats against the frustum before s
 ## 61: Investigate using SplatGPUSort radix sort for tile-based per-tile ordering
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: tile-based
+labels: tile-based, effort:m
 created: 2026-07-20T18:53:32Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 The GPU-sorted pipeline has a proper stable two-pass 8-bit radix sort over the half depth key (SplatGPUSort). The tile-based renderer uses its own per-tile sort (TileSplatSort). Investigate whether the per-tile depth ordering is currently incorrect or unstable (a possible contributor to the washed-out blending) and whether the SplatGPUSort radix approach could replace or feed the per-tile sort.
@@ -1356,11 +1372,12 @@ Related: #58, #59.
 ## 62: Unified splat pipeline: shared cull + global sort front-end feeding tile-based rendering
 
 +++
-status: new
+status: open
 priority: medium
 kind: feature
-labels: tile-based
+labels: tile-based, effort:xl
 created: 2026-07-20T19:01:34Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 The GPU-sorted pipeline (SplatGPUSort) and the tile-based renderer are converging on the same front-end tools: frustum cull, depth keys, radix sort. They differ only in back-end — sorted instanced quads with hardware blending (Spark/GPU) vs per-pixel front-to-back imageblock accumulation with early termination (tile).
@@ -1433,11 +1450,12 @@ The splat kernel has an early depth test (plain aliased read) before atomic_min,
 ## 66: PointSplat: profile occupancy, atomic throughput, and scaling vs sorted pipelines
 
 +++
-status: new
+status: open
 priority: medium
-kind: none
-labels: performance, pointsplat
+kind: task
+labels: performance, pointsplat, effort:m
 created: 2026-07-21T14:52:10Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 RFC 0003 verification plan items not yet done: GPU capture to confirm even occupancy across the splat dispatch (the paper's central claim) and atomic throughput; record the frame-time scaling curve vs Spark/GPU/Stochastic on small and multi-million-splat scenes.
@@ -1506,10 +1524,12 @@ RFC 0003 defers hierarchical/occlusion culling (two-phase scheme, depth mip chai
 ## 70: Parallel code paths for offscreen vs live rendering
 
 +++
-status: new
+status: open
 priority: medium
-kind: none
+kind: task
+labels: pointsplat, code-style, effort:m
 created: 2026-07-21T17:47:37Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 Offscreen and live rendering have largely parallel/duplicated code paths. Needs a dramatic cleanup to consolidate the shared logic.
@@ -1519,11 +1539,12 @@ Offscreen and live rendering have largely parallel/duplicated code paths. Needs 
 ## 71: SOGReaderCPU: ImageIO rejects some lossless WebP textures
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
-labels: splats
+labels: splats, effort:m
 created: 2026-07-21T18:07:20Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 Loading sphere-32M.sog fails with failedToDecodeImage(quats.webp). The file is a valid 5660x5656 VP8L (lossless) WebP, 1.3 KB (constant-color, likely all-identity quaternions); CGImageSource creates a source but CGImageSourceCreateImageAtIndex returns nil, while the sibling scales.webp (same dims, also from the same encoder) decodes fine. sips can't read its dimensions either, so this is an ImageIO WebP decoder limitation, not a parsing bug in the reader. Affects SOG files from encoders that emit highly-compressed lossless textures. Possible fix: bundle a small VP8L decoder or special-case via libwebp.
@@ -1589,11 +1610,12 @@ There is no way to view raw single-frame PointSplat output. Temporal accumulatio
 ## 75: PointSplat: group-level hierarchical culling
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
-labels: pointsplat, performance
+labels: pointsplat, performance, effort:l
 created: 2026-07-21T20:18:36Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 Per-Gaussian preprocess is O(total splats) every frame even when most of the cloud is frustum- or occlusion-culled: 8M threads run projection just to write count 0. The paper (Sec 3.5) adds a coarse tier: ~1M groups of consecutive Gaussians (Morton or BVH order) with precomputed 3D AABBs, culled first so per-Gaussian work only runs for surviving groups. Prerequisite for 100M-class scenes; needs splat reordering at load time to make groups spatially coherent.
@@ -1603,11 +1625,12 @@ Per-Gaussian preprocess is O(total splats) every frame even when most of the clo
 ## 76: PointSplat: sweep K and supersampling settings on Apple GPUs
 
 +++
-status: new
+status: open
 priority: low
 kind: task
-labels: pointsplat, performance
+labels: pointsplat, performance, effort:s
 created: 2026-07-21T20:18:36Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 We use the paper's defaults (2x2 supersampling, K=4) untested on our hardware. The paper measured K=1 vs K=4 as +37% frame time on NVIDIA; K=8/16, 1x1+accumulation, and 4x4 are unswept here. The bench subcommand makes this a quick experiment: quality (PSNR vs converged) and frame time per configuration, pick per-platform defaults.
@@ -1619,11 +1642,12 @@ We use the paper's defaults (2x2 supersampling, K=4) untested on our hardware. T
 ## 77: PointSplat: quantized splat storage
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, splats
+labels: pointsplat, splats, memory, effort:l
 created: 2026-07-21T20:18:36Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 SparkSplat is 32 bytes plus float32 SH coefficients; the paper packs a Gaussian into 21 bytes (fixed-point means, 10-bit log scales, 30-bit quaternion, 8-bit opacity) with 8-bit palette-quantized SH, roughly 4x smaller. Splat-stage read bandwidth and total memory scale accordingly; matters for multi-10M clouds (48M splats = 1.5 GB today before SH). Touches every renderer that consumes SparkSplat, so likely a parallel packed format consumed by PointSplat first.
@@ -1633,11 +1657,12 @@ SparkSplat is 32 bytes plus float32 SH coefficients; the paper packs a Gaussian 
 ## 78: PointSplat indirect dispatches bypass the new ComputeDispatch(indirectBuffer:) element
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
 labels: pointsplat, effort:m
 created: 2026-07-21T20:37:59Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 MetalSprockets 92dbfa0 added declarative indirect dispatch (ComputeDispatch(indirectBuffer:threadsPerThreadgroup:), MetalSprockets#351), but all three indirect dispatch sites here still call encoder.dispatchThreadgroups(indirectBuffer:) on raw encoders: PointSplatWorkloadDistributor.encode, PointSplatResources.encodePhase, and PointSplatRenderer. The surrounding PointSplat frame is raw-encoded for more than just the old dispatch gap (mid-frame distributor re-runs, two-phase occlusion), so adopting the element means refactoring that flow back into declarative elements, not a drop-in swap. Related: #62 (TileAlt, was blocked on MetalSprockets#351), #63 (where the raw workaround landed).
@@ -1647,11 +1672,12 @@ MetalSprockets 92dbfa0 added declarative indirect dispatch (ComputeDispatch(indi
 ## 79: SparkSplatRenderPipeline: cloudDataBuffer allocated on every body evaluation
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
 labels: spark, performance, code-style, effort:s
 created: 2026-07-21T20:28:32Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 `renderPipeline(sortedIndices:)` (called from `body`) allocates a fresh `cloudDataBuffer` via `device.makeTypedBuffer(values:...)` each time it runs. MetalSprockets element `body` must stay pure and can be evaluated multiple times per frame, so this is an allocation side effect in body: a new MTLBuffer per evaluation, per frame. Expected: buffer allocated once (or on cloud change) and reused; actual: per-evaluation allocation churn.
@@ -1661,11 +1687,12 @@ created: 2026-07-21T20:28:32Z
 ## 80: GPUSortedSplatRenderPipeline: slot advance is a side effect in body
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
 labels: spark, gpu-sort, code-style, effort:s
 created: 2026-07-21T20:28:39Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 `GPUSortedSplatRenderPipeline.body` calls `resources.advance()` and `resources.makeIndices(...)`, which mutate the shared `GPUSortResources` slot state. MetalSprockets `body` can be evaluated multiple times per frame (diffing, re-expansion), so the slot index can advance more than once per rendered frame, breaking the frames-in-flight slot rotation the type documents (slotCount default 3). Side effects belong in lifecycle hooks, not body.
@@ -1675,11 +1702,12 @@ created: 2026-07-21T20:28:39Z
 ## 81: StochasticSplatRenderPipeline: uniforms and textures bound via raw encoder calls instead of .parameter
 
 +++
-status: new
+status: open
 priority: low
 kind: task
 labels: stochastic, code-style, effort:s
 created: 2026-07-21T20:28:39Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 The Draw closure in StochasticSplatRenderPipeline binds `time`, `alphaThreshold`, the blue-noise texture, the SH degree, and the SH buffer with raw `setFragmentBytes`/`setFragmentTexture`/`setVertexBytes`/`setVertexBuffer` at hard-coded indices, while the rest of the pipeline uses reflection-based `.parameter(...)`. These are all small uniforms/textures that `.parameter` handles; no justification is given for bypassing it. Also uses `MemoryLayout<...>.size` rather than `.stride`.
@@ -1689,11 +1717,12 @@ The Draw closure in StochasticSplatRenderPipeline binds `time`, `alphaThreshold`
 ## 82: PointSplatRenderPipeline: accumulation step advances ping-pong state inside body
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
 labels: pointsplat, code-style, effort:s
 created: 2026-07-21T20:28:46Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 `PointSplatRenderPipeline.body` calls `resources.nextAccumulationStep(...)`, which mutates `frameParity`, `accumulatedFrames`, and the last-matrix tracking. `body` can be evaluated multiple times per frame, so the ping-pong parity and accumulation count can advance more than once per rendered frame, corrupting the running mean. Unlike `validatedResources()` (which has a comment explaining its eager mutation), this side effect is unacknowledged.
@@ -1703,11 +1732,12 @@ created: 2026-07-21T20:28:46Z
 ## 83: PointSplatResources creates its own MTLDevice instead of using the environment device
 
 +++
-status: new
+status: open
 priority: low
 kind: task
 labels: pointsplat, code-style, effort:s
 created: 2026-07-21T20:28:46Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 `PointSplatResources.init` calls `MTLCreateSystemDefaultDevice()` directly rather than using the device MetalSprockets publishes via `@MSEnvironment(\.device)` (e.g. allocation in `.onSetupEnter`). This diverges from framework convention, and on multi-GPU systems the resources could be allocated on a different device than the one the render view uses.
@@ -1717,11 +1747,12 @@ created: 2026-07-21T20:28:46Z
 ## 84: TileSplatRenderPass and SparkSplatDebugRenderPipeline bind buffers/uniforms via raw encoder calls instead of .parameter
 
 +++
-status: new
+status: open
 priority: low
 kind: task
 labels: tile-based, spark, code-style, effort:s
 created: 2026-07-21T20:28:54Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 TileSplatRenderPass's first Draw closure binds the splat buffer, tile indices, tile offsets, and uniforms with raw `setFragmentBuffer`/`setFragmentBytes` at hard-coded indices instead of reflection-based `.parameter(...)`. SparkSplatDebugRenderPipeline similarly binds its per-mode debug params and boundingBox with raw `setFragmentBytes`/`setVertexBytes`. No justification is given for bypassing bind-by-name in either. Both also use `MemoryLayout<...>.size` rather than `.stride`.
@@ -1731,11 +1762,12 @@ TileSplatRenderPass's first Draw closure binds the splat buffer, tile indices, t
 ## 85: Shader recreation in .onChange hooks uses try!/fatalError on failure
 
 +++
-status: new
+status: open
 priority: low
 kind: task
 labels: spark, tile-based, code-style, effort:s
 created: 2026-07-21T20:28:54Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 Three renderers recreate function-constant-specialized shaders inside `.onChange` hooks and crash on failure instead of surfacing the error:
@@ -1751,12 +1783,12 @@ A shader-compilation failure at runtime (e.g. bad function constant) takes down 
 ## 86: SparkSplatRenderPipeline: boundingBox and shDegree bound via raw setVertexBytes instead of .parameter
 
 +++
-status: new
+status: open
 priority: low
 kind: task
 labels: spark, code-style, effort:s
 created: 2026-07-21T20:28:32Z
-updated: 2026-07-21T20:39:48Z
+updated: 2026-07-21T20:43:23Z
 +++
 
 In SparkSplatRenderPipeline's Draw closure, `shDegreeValue` (index 11) and `boundingBox` (index 12) are bound with raw `commandEncoder.setVertexBytes` instead of MetalSprockets' reflection-based `.parameter(...)`. The shDegree binding has a comment explaining why it must always be bound, but the boundingBox binding has no justification. Raw index-based binding loses bind-by-name reflection and diverges from the framework convention used for the other uniforms in the same pipeline. Also uses `MemoryLayout<...>.size` rather than `.stride`.
