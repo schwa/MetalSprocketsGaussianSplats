@@ -30,7 +30,9 @@ struct PointSplatUniforms {
     float farPlane;
     unsigned int splatCount;
     unsigned int frameSeed;
-    unsigned int capacity;          // max points per frame (T)
+    unsigned int capacity;          // max threads per frame (T / K)
+    unsigned int supersampling;     // linear supersampling factor S (1 or 2)
+    unsigned int pointsPerThread;   // K; counts are in threads, each splats K points
 };
 
 // Quantizes positive view-space depth to 28-bit fixed point between near/far.

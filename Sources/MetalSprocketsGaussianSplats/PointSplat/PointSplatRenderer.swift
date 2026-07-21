@@ -33,14 +33,21 @@ public final class PointSplatRenderer {
         /// Point budget per frame (T in the paper).
         public var maxPointsPerFrame: Int
         public var backgroundColor: SIMD3<Float>
+        /// Linear supersampling factor S; the framebuffer is S x S larger
+        /// and resolved with a box filter. Paper default is 2.
+        public var supersampling: Int
+        /// Points splatted per thread (K). Paper pairs K = S^2.
+        public var pointsPerThread: Int
 
-        public init(width: Int, height: Int, nearPlane: Float = 0.2, farPlane: Float = 100.0, maxPointsPerFrame: Int = 4_000_000, backgroundColor: SIMD3<Float> = .zero) {
+        public init(width: Int, height: Int, nearPlane: Float = 0.2, farPlane: Float = 100.0, maxPointsPerFrame: Int = 4_000_000, backgroundColor: SIMD3<Float> = .zero, supersampling: Int = 1, pointsPerThread: Int = 1) {
             self.width = width
             self.height = height
             self.nearPlane = nearPlane
             self.farPlane = farPlane
             self.maxPointsPerFrame = maxPointsPerFrame
             self.backgroundColor = backgroundColor
+            self.supersampling = supersampling
+            self.pointsPerThread = pointsPerThread
         }
     }
 
@@ -80,7 +87,7 @@ public final class PointSplatRenderer {
         splat = try pipeline("pointSplatSplat")
         resolve = try pipeline("pointSplatResolve")
 
-        let pixelCount = configuration.width * configuration.height
+        let pixelCount = configuration.width * configuration.height * configuration.supersampling * configuration.supersampling
         guard let framebuffer = device.makeBuffer(length: MemoryLayout<UInt64>.stride * pixelCount, options: .storageModePrivate) else {
             throw RendererError.bufferAllocationFailed
         }
@@ -98,18 +105,21 @@ public final class PointSplatRenderer {
 
     /// Renders one stochastic frame. Blocks until complete.
     public func render(splats: MTLBuffer, splatCount: Int, modelMatrix: simd_float4x4, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4, frameSeed: UInt32) throws -> MTLTexture {
+        let supersampling = max(configuration.supersampling, 1)
         var uniforms = PointSplatUniforms(
             modelMatrix: modelMatrix,
             viewMatrix: viewMatrix,
             projectionMatrix: projectionMatrix,
-            drawableSize: SIMD2<Float>(Float(configuration.width), Float(configuration.height)),
+            drawableSize: SIMD2<Float>(Float(configuration.width * supersampling), Float(configuration.height * supersampling)),
             nearPlane: configuration.nearPlane,
             farPlane: configuration.farPlane,
             splatCount: UInt32(splatCount),
             frameSeed: frameSeed,
-            capacity: UInt32(configuration.maxPointsPerFrame)
+            capacity: UInt32(configuration.maxPointsPerFrame),
+            supersampling: UInt32(supersampling),
+            pointsPerThread: UInt32(max(configuration.pointsPerThread, 1))
         )
-        let pixelCount = configuration.width * configuration.height
+        let pixelCount = configuration.width * configuration.height * supersampling * supersampling
         var pixelCountValue = UInt32(pixelCount)
         // Far depth + background color: any splatted point wins the min.
         let background = configuration.backgroundColor

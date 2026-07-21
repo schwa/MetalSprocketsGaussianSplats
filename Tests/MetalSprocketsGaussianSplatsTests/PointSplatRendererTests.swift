@@ -76,6 +76,36 @@ struct PointSplatRendererTests {
         #expect(corner.x < 0.05, "corner should be background, got \(corner)")
     }
 
+    @Test("2x2 supersampling with K=4 converges on splat color")
+    func supersampledConvergence() throws {
+        let size = 64
+        let splat = SparkSplat(
+            position: simd_half3(0, 0, 0),
+            scale: simd_half3(repeating: 0.5),
+            rotation: simd_half4(0, 0, 0, 1),
+            color: simd_uchar4(255, 0, 0, 255)
+        )
+        let configuration = PointSplatRenderer.Configuration(width: size, height: size, maxPointsPerFrame: 200_000, supersampling: 2, pointsPerThread: 4)
+        let renderer = try PointSplatRenderer(device: device, configuration: configuration)
+        let buffer = try makeSplatBuffer([splat])
+        let (view, projection) = makeMatrices(size: size)
+
+        var accumulated = [SIMD4<Float>](repeating: .zero, count: size * size)
+        let frames = 64
+        for frame in 0..<frames {
+            let texture = try renderer.render(splats: buffer, splatCount: 1, modelMatrix: .identity, viewMatrix: view, projectionMatrix: projection, frameSeed: UInt32(frame))
+            #expect(texture.width == size && texture.height == size)
+            for (i, pixel) in readPixels(texture).enumerated() {
+                accumulated[i] += pixel
+            }
+        }
+        let center = accumulated[(size / 2) * size + size / 2] / Float(frames)
+        #expect(center.x > 0.9, "center red channel: \(center.x)")
+        #expect(center.y < 0.05)
+        let corner = accumulated[0] / Float(frames)
+        #expect(corner.x < 0.05, "corner should be background, got \(corner)")
+    }
+
     @Test("fixed seed produces identical images")
     func deterministicWithFixedSeed() throws {
         let size = 32

@@ -14,7 +14,9 @@ using namespace SparkSplatSupport;
 // the splat kernel scatters pixel-sized opaque points into a 64-bit
 // depth+color buffer with atomic_min; resolve unpacks to a color texture.
 //
-// v1 scope: 1x1 supersampling, K = 1 point per thread, frustum cull only.
+// Supports SxS supersampling with K points per thread (paper Sec. 3.4:
+// point counts are stochastically rounded to multiples of K, amortizing
+// the per-Gaussian projection across K samples). Frustum cull only.
 
 namespace PointSplatRender {
 
@@ -71,8 +73,11 @@ namespace PointSplatRender {
         float3x3 J = computeProjectionJacobian(viewCenter, focal);
         Covariance2D cov2D = projectCovarianceTo2D(cov3D, J);
 
-        cov2D.a += COVARIANCE_FLOOR;
-        cov2D.d += COVARIANCE_FLOOR;
+        // The +0.3 floor is in *output pixel* units; the supersampled
+        // framebuffer scales areas by S^2 (paper renders at S x S).
+        float floorScale = COVARIANCE_FLOOR * float(uniforms.supersampling * uniforms.supersampling);
+        cov2D.a += floorScale;
+        cov2D.d += floorScale;
         float det = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
         if (det <= 0.0) {
             return result;
@@ -127,13 +132,21 @@ namespace PointSplatRender {
         GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed);
         uint numPoints = gps_poisson(&seed, lambda);
 
+        // Stochastically round to a multiple of K and emit *thread* counts;
+        // each splat thread draws K points.
+        uint k = max(uniforms.pointsPerThread, 1u);
+        uint numThreads = numPoints;
+        if (k > 1) {
+            numThreads = uint(gps_stochastic_round(float(numPoints) / float(k), gps_pcg2d(&seed).x));
+        }
+
         // Per-Gaussian clamp (paper Sec. 4.3): at most half the framebuffer.
         uint pixelCount = uint(uniforms.drawableSize.x) * uint(uniforms.drawableSize.y);
-        counts[gid] = min(numPoints, pixelCount / 2);
+        counts[gid] = min(numThreads, pixelCount / (2 * k));
     }
 
-    // Per point-thread: sample one point from the assigned Gaussian and
-    // splat it with atomic_min. Requires MSL 3.1 + Apple9/Mac2.
+    // Per splat-thread: sample K points from the assigned Gaussian and
+    // splat each with atomic_min. Requires MSL 3.1 + Apple9/Mac2.
     kernel void pointSplatSplat(device const SparkSplat *splats [[buffer(0)]],
                                 device const uint *indices [[buffer(1)]],
                                 device atomic_ulong *framebuffer [[buffer(2)]],
@@ -141,7 +154,7 @@ namespace PointSplatRender {
                                 device const uint *totals [[buffer(4)]],
                                 device const ulong *framebufferRead [[buffer(5)]],
                                 uint gid [[thread_position_in_grid]]) {
-        // Dispatched over the full capacity; totals[0] is the actual point
+        // Dispatched over the full capacity; totals[0] is the actual thread
         // count written by the workload distributor on the GPU timeline.
         if (gid >= min(totals[0], uniforms.capacity)) {
             return;
@@ -152,53 +165,63 @@ namespace PointSplatRender {
             return;
         }
 
-        GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed * 2654435761u + 1u);
-        GPSFloat2 u = gps_pcg2d(&seed);
-        GPSFloat2 sample = gps_corrected_box_muller(u.x, u.y, projected.opacity);
-
-        float2 pixel = floor(float2(projected.pixelMean.x + projected.c0 * sample.x,
-                                    projected.pixelMean.y + projected.c1 * sample.x + projected.c2 * sample.y));
-        int x = int(pixel.x);
-        int y = int(pixel.y);
-        if (x < 0 || x >= int(uniforms.drawableSize.x) || y < 0 || y >= int(uniforms.drawableSize.y)) {
-            return;
-        }
-
-        // Rejection at the 3DGS truncation threshold: opacity * gaussian
-        // weight below 1/255 never contributes in the reference rasterizer.
-        float2 delta = projected.pixelMean - pixel;
-        float gaussianWeight = exp(-0.5 * (projected.conic.x * delta.x * delta.x + 2.0 * projected.conic.y * delta.x * delta.y + projected.conic.z * delta.y * delta.y));
-        if (projected.opacity * gaussianWeight < MIN_ALPHA) {
-            return;
-        }
-
         float4 rgba = float4(splats[gaussianIndex].color) / 255.0;
         ulong packed = (gps_pack_depth(projected.viewDepth, uniforms.nearPlane, uniforms.farPlane) << GPS_DEPTH_SHIFT)
             | gps_pack_color(rgba.r, rgba.g, rgba.b);
 
-        uint index = uint(y) * uint(uniforms.drawableSize.x) + uint(x);
-        // Early depth test avoids atomic contention for occluded points.
-        // Metal's 64-bit atomics only support min/max (no load), so read
-        // through a plain aliased view; a stale value only costs a
-        // superfluous atomic_min, never correctness.
-        if (framebufferRead[index] <= packed) {
-            return;
+        GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed * 2654435761u + 1u);
+        uint k = max(uniforms.pointsPerThread, 1u);
+        for (uint p = 0; p < k; p++) {
+            GPSFloat2 u = gps_pcg2d(&seed);
+            GPSFloat2 sample = gps_corrected_box_muller(u.x, u.y, projected.opacity);
+
+            float2 pixel = floor(float2(projected.pixelMean.x + projected.c0 * sample.x,
+                                        projected.pixelMean.y + projected.c1 * sample.x + projected.c2 * sample.y));
+            int x = int(pixel.x);
+            int y = int(pixel.y);
+            if (x < 0 || x >= int(uniforms.drawableSize.x) || y < 0 || y >= int(uniforms.drawableSize.y)) {
+                continue;
+            }
+
+            // Rejection at the 3DGS truncation threshold: opacity * gaussian
+            // weight below 1/255 never contributes in the reference rasterizer.
+            float2 delta = projected.pixelMean - pixel;
+            float gaussianWeight = exp(-0.5 * (projected.conic.x * delta.x * delta.x + 2.0 * projected.conic.y * delta.x * delta.y + projected.conic.z * delta.y * delta.y));
+            if (projected.opacity * gaussianWeight < MIN_ALPHA) {
+                continue;
+            }
+
+            uint index = uint(y) * uint(uniforms.drawableSize.x) + uint(x);
+            // Early depth test avoids atomic contention for occluded points.
+            // Metal's 64-bit atomics only support min/max (no load), so read
+            // through a plain aliased view; a stale value only costs a
+            // superfluous atomic_min, never correctness.
+            if (framebufferRead[index] <= packed) {
+                continue;
+            }
+            atomic_min_explicit(&framebuffer[index], packed, memory_order_relaxed);
         }
-        atomic_min_explicit(&framebuffer[index], packed, memory_order_relaxed);
     }
 
-    // Unpacks the 64-bit framebuffer into a color texture (1x1: no subpixel
-    // averaging yet).
+    // Unpacks the supersampled 64-bit framebuffer into a native-resolution
+    // color texture with an S x S box filter (paper Sec. 3.1).
     kernel void pointSplatResolve(device const ulong *framebuffer [[buffer(0)]],
                                   constant PointSplatUniforms &uniforms [[buffer(1)]],
                                   texture2d<float, access::write> outTexture [[texture(0)]],
                                   uint2 gid [[thread_position_in_grid]]) {
-        if (gid.x >= uint(uniforms.drawableSize.x) || gid.y >= uint(uniforms.drawableSize.y)) {
+        if (gid.x >= outTexture.get_width() || gid.y >= outTexture.get_height()) {
             return;
         }
-        ulong value = framebuffer[gid.y * uint(uniforms.drawableSize.x) + gid.x];
-        float3 color = float3(gps_unpack_channel(value, 24), gps_unpack_channel(value, 12), gps_unpack_channel(value, 0));
-        outTexture.write(float4(color, 1.0), gid);
+        uint s = max(uniforms.supersampling, 1u);
+        uint stride = uint(uniforms.drawableSize.x);
+        float3 color = float3(0.0);
+        for (uint dy = 0; dy < s; dy++) {
+            for (uint dx = 0; dx < s; dx++) {
+                ulong value = framebuffer[(gid.y * s + dy) * stride + (gid.x * s + dx)];
+                color += float3(gps_unpack_channel(value, 24), gps_unpack_channel(value, 12), gps_unpack_channel(value, 0));
+            }
+        }
+        outTexture.write(float4(color / float(s * s), 1.0), gid);
     }
 
 } // namespace PointSplatRender

@@ -34,7 +34,12 @@ public struct PointSplatRenderPipeline: Element {
     private let blitVertexShader: VertexShader
     private let blitFragmentShader: FragmentShader
 
-    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, maxPointsPerFrame: Int = 4_000_000) throws {
+    private var supersampling: Int
+    private var pointsPerThread: Int
+
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, maxPointsPerFrame: Int = 4_000_000, supersampling: Int = 2, pointsPerThread: Int = 4) throws {
+        self.supersampling = max(supersampling, 1)
+        self.pointsPerThread = max(pointsPerThread, 1)
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
@@ -53,24 +58,28 @@ public struct PointSplatRenderPipeline: Element {
         blitVertexShader = try blitLibrary.function(named: "vertex_main", type: VertexShader.self)
         blitFragmentShader = try blitLibrary.function(named: "fragment_main", type: FragmentShader.self)
 
-        resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, maxPointsPerFrame: maxPointsPerFrame)
+        resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, maxPointsPerFrame: maxPointsPerFrame, supersampling: max(supersampling, 1))
     }
 
     public var body: some Element {
         get throws {
             let width = resources.width
             let height = resources.height
-            let pixelCount = width * height
+            let bufferWidth = width * supersampling
+            let bufferHeight = height * supersampling
+            let pixelCount = bufferWidth * bufferHeight
             let uniforms = PointSplatUniforms(
                 modelMatrix: modelMatrix,
                 viewMatrix: cameraMatrix.inverse,
                 projectionMatrix: projectionMatrix,
-                drawableSize: SIMD2<Float>(Float(width), Float(height)),
+                drawableSize: SIMD2<Float>(Float(bufferWidth), Float(bufferHeight)),
                 nearPlane: 0.2,
                 farPlane: 200.0,
                 splatCount: UInt32(splatCloud.count),
                 frameSeed: frameIndex,
-                capacity: UInt32(resources.distributor.capacity)
+                capacity: UInt32(resources.distributor.capacity),
+                supersampling: UInt32(supersampling),
+                pointsPerThread: UInt32(pointsPerThread)
             )
             // Running mean: weight the new frame by 1/(n+1); camera or model
             // motion resets n so stale accumulation never ghosts.
@@ -130,11 +139,11 @@ public struct PointSplatRenderPipeline: Element {
                     .parameter("texture", texture: accumulation.output)
                 }
             }
-            .onChange(of: drawableSize) { _, newSize in
-                resources = try! PointSplatResources(drawableSize: newSize, splatCount: splatCloud.count, maxPointsPerFrame: resources.distributor.capacity)
+            .onChange(of: drawableSize) { [supersampling] _, newSize in
+                resources = try! PointSplatResources(drawableSize: newSize, splatCount: splatCloud.count, maxPointsPerFrame: resources.distributor.capacity, supersampling: supersampling)
             }
-            .onChange(of: splatCloud) { _, newCloud in
-                resources = try! PointSplatResources(drawableSize: drawableSize, splatCount: newCloud.count, maxPointsPerFrame: resources.distributor.capacity)
+            .onChange(of: splatCloud) { [supersampling] _, newCloud in
+                resources = try! PointSplatResources(drawableSize: drawableSize, splatCount: newCloud.count, maxPointsPerFrame: resources.distributor.capacity, supersampling: supersampling)
             }
         }
     }
@@ -159,7 +168,7 @@ final class PointSplatResources {
         UInt64(GPS_DEPTH_MAX) << UInt64(GPS_DEPTH_SHIFT)
     }
 
-    init(drawableSize: SIMD2<Float>, splatCount: Int, maxPointsPerFrame: Int) throws {
+    init(drawableSize: SIMD2<Float>, splatCount: Int, maxPointsPerFrame: Int, supersampling: Int) throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw PointSplatRenderer.RendererError.unsupportedDevice
         }
@@ -168,7 +177,7 @@ final class PointSplatResources {
         }
         width = max(Int(drawableSize.x), 1)
         height = max(Int(drawableSize.y), 1)
-        let pixelCount = width * height
+        let pixelCount = width * height * supersampling * supersampling
 
         guard let framebuffer = device.makeBuffer(length: MemoryLayout<UInt64>.stride * pixelCount, options: .storageModePrivate), let counts = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate) else {
             throw PointSplatRenderer.RendererError.bufferAllocationFailed
