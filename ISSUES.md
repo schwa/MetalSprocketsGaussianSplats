@@ -1515,3 +1515,17 @@ Loading sphere-32M.sog fails with failedToDecodeImage(quats.webp). The file is a
 - `2026-07-21T18:12:42Z`: Characterized: ImageIO fails on lossless WebP using the VP8L color-indexing (palette) transform when the palette contains alpha and the image is large (fails at >=4095x4095, works at <=2048x2048; opaque palettes work at all sizes; libwebp decodes everything fine). Reproduced with synthetic cwebp -lossless encodes, so it's not specific to the SOG encoder. Tested on macOS 27 beta - possibly a beta ImageIO regression; worth a feedback report. Workaround options: decode via libwebp for VP8L+palette+alpha, or pre-process textures.
 
 ---
+
+## 72: Port GPU SOG reader from gaussiansplats-ios
+
++++
+status: new
+priority: high
+kind: enhancement
+labels: splats,performance
+created: 2026-07-21T18:35:05Z
++++
+
+Loading large SOG files (e.g. sphere-48M.sog) through SOGReaderCPU takes minutes: per-splat Swift closure over 48M splats plus huge intermediate GenericSplat/ExtendedSplat arrays before the GPU buffer is built. ~/Shared/Projects/Work/gaussiansplats-ios has a GPU path to port: Sources/GaussianSplatMetal/IO/SOGReaderGPU.swift (unzips, decodes the WebP planes concurrently into rgba8Uint textures) + Sources/GaussianSplatShaders/SOGDecodeShader.metal (compute kernel dequantizes per splat straight into a SparkSplat buffer and flattened SH buffer) + SplatCloudBuilder + its MiniZip dependency. Produces the same SparkSplat layout we use. Note: it still decodes WebP via ImageIO, so it does not address #71 (palette+alpha decode failure); large generated files may need both fixes. The demo already parses off-main with a loading indicator, so this slots in behind the existing loadCustomSplat path.
+
+---
