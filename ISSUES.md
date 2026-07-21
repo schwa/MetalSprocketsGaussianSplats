@@ -1675,15 +1675,18 @@ MetalSprockets 92dbfa0 added declarative indirect dispatch (ComputeDispatch(indi
 ## 79: SparkSplatRenderPipeline: cloudDataBuffer allocated on every body evaluation
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: spark, performance, code-style, effort:s
 created: 2026-07-21T20:28:32Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T21:09:07Z
+closed: 2026-07-21T21:09:07Z
 +++
 
 `renderPipeline(sortedIndices:)` (called from `body`) allocates a fresh `cloudDataBuffer` via `device.makeTypedBuffer(values:...)` each time it runs. MetalSprockets element `body` must stay pure and can be evaluated multiple times per frame, so this is an allocation side effect in body: a new MTLBuffer per evaluation, per frame. Expected: buffer allocated once (or on cloud change) and reused; actual: per-evaluation allocation churn.
+
+- `2026-07-21T21:09:07Z`: cloudDataBuffer now cached in @MSState keyed on (modelMatrix, clouds) - reference equality on clouds, so the check is cheap. A changed key allocates a new buffer rather than mutating the old, so in-flight frames keep valid data. Also synced the demo's Package.resolved to the same MetalSprockets revision as the package build (mixed pins made _MTLCreateSystemDefaultDevice ambiguous).
 
 ---
 

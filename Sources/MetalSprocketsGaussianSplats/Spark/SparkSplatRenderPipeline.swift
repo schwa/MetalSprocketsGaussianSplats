@@ -95,6 +95,19 @@ public struct SparkSplatRenderPipeline: Element {
     var fragmentShader: FragmentShader
     @MSState
     private var lastUseBoundingBox: Bool = false
+    /// Cached per-cloud argument data, rebuilt only when the clouds or model
+    /// matrix change. Body can be evaluated many times per frame, so
+    /// allocating here per evaluation was churning a fresh MTLBuffer each
+    /// time. A changed key allocates a *new* buffer (never mutates the old
+    /// one) so in-flight frames keep reading valid data.
+    @MSState
+    private var cloudDataCache: CloudDataCache?
+
+    struct CloudDataCache {
+        var modelMatrix: simd_float4x4
+        var clouds: [GPUSplatCloud<SparkSplat>]
+        var buffer: TypedMTLBuffer<SplatCloudData>
+    }
     var vertexDescriptor: MTLVertexDescriptor
     var convertSRGBToLinear: Bool
 
@@ -219,21 +232,25 @@ public struct SparkSplatRenderPipeline: Element {
         let amplificationCount = cameraMatrices.count
         let device = _MTLCreateSystemDefaultDevice()
 
-        // Build per-cloud data array
-        var cloudDataArray: [SplatCloudData] = []
-        for cloud in splatClouds {
-            let combinedModel = modelMatrix * cloud.modelTransform
-            let cloudData = SplatCloudData(
-                splats: cloud.splats.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SparkSplat.self),
-                modelMatrix: combinedModel,
-                shCoefficients: cloud.shCoefficients?.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: Float.self),
-                opacity: cloud.opacity
-            )
-            cloudDataArray.append(cloudData)
+        // Build (or reuse) the per-cloud data buffer.
+        let cloudDataBuffer: TypedMTLBuffer<SplatCloudData>
+        if let cache = cloudDataCache, cache.modelMatrix == modelMatrix, cache.clouds == splatClouds {
+            cloudDataBuffer = cache.buffer
+        } else {
+            var cloudDataArray: [SplatCloudData] = []
+            for cloud in splatClouds {
+                let combinedModel = modelMatrix * cloud.modelTransform
+                let cloudData = SplatCloudData(
+                    splats: cloud.splats.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SparkSplat.self),
+                    modelMatrix: combinedModel,
+                    shCoefficients: cloud.shCoefficients?.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: Float.self),
+                    opacity: cloud.opacity
+                )
+                cloudDataArray.append(cloudData)
+            }
+            cloudDataBuffer = try device.makeTypedBuffer(values: cloudDataArray, options: []).labeled("CloudData")
+            cloudDataCache = CloudDataCache(modelMatrix: modelMatrix, clouds: splatClouds, buffer: cloudDataBuffer)
         }
-
-        // Create buffer for cloud data array
-        let cloudDataBuffer = try device.makeTypedBuffer(values: cloudDataArray, options: []).labeled("CloudData")
 
         // Create the argument buffer struct
         let argumentBuffer = MultiCloudArgumentBuffer(
