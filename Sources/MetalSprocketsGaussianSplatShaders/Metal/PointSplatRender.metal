@@ -72,6 +72,10 @@ namespace PointSplatRender {
         float2 focal = computeFocalLength(uniforms.projectionMatrix, uniforms.drawableSize);
         float3x3 J = computeProjectionJacobian(viewCenter, focal);
         Covariance2D cov2D = projectCovarianceTo2D(cov3D, J);
+        // The pixel-space y axis is flipped relative to NDC (texture origin
+        // top-left). Reflecting y negates the covariance cross term:
+        // Sigma' = S Sigma S with S = diag(1, -1).
+        cov2D.b = -cov2D.b;
 
         // The +0.3 floor is in *output pixel* units; the supersampled
         // framebuffer scales areas by S^2 (paper renders at S x S).
