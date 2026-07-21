@@ -91,6 +91,8 @@ Possible fixes:
 2. Use isPaused=false with preferredFramesPerSecond to match gesture rate
 3. Handle at MetalSprockets level - RenderView should observe state changes
 
+- `2026-07-21T21:32:44Z`: Investigated in current codebase: the SwiftUI bounding-box overlay described here no longer exists (only SparkSplatDebugRenderPipeline remains, which draws bounds inside the same Metal pass, so it cannot lag relative to the splats). The underlying mechanism (RenderView content closure sampling cameraMatrix at render time, potentially behind gesture-rate SwiftUI updates) still exists but has no visible artifact without the overlay, and all three proposed fixes live in MetalSprockets' RenderView (setNeedsDisplay on state change / observing state). Unblocker: either close as obsolete, or re-file against MetalSprockets so RenderView redraws (or re-samples state) when observed content state changes.
+
 ---
 
 ## 5: Refactor sorting out of pipeline element
@@ -1808,5 +1810,20 @@ updated: 2026-07-21T20:43:23Z
 +++
 
 In SparkSplatRenderPipeline's Draw closure, `shDegreeValue` (index 11) and `boundingBox` (index 12) are bound with raw `commandEncoder.setVertexBytes` instead of MetalSprockets' reflection-based `.parameter(...)`. The shDegree binding has a comment explaining why it must always be bound, but the boundingBox binding has no justification. Raw index-based binding loses bind-by-name reflection and diverges from the framework convention used for the other uniforms in the same pipeline. Also uses `MemoryLayout<...>.size` rather than `.stride`.
+
+---
+
+## 87: Support .lcc2 splat format
+
++++
+status: new
+priority: medium
+kind: none
+created: 2026-07-21T21:44:25Z
++++
+
+The LCC2 format (from XGRIDS) is a Gaussian splat container format that is not currently supported for loading/rendering.
+
+Whitepaper/spec: https://github.com/xgrids/LCC2Whitepaper
 
 ---
