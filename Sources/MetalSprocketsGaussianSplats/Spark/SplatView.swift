@@ -35,6 +35,14 @@ import SwiftUI
 ///     }
 /// }
 /// ```
+///
+/// ## Known Issues
+///
+/// On macOS, applying `.toolbar` or wrapping the view in a `NavigationStack`
+/// can leave the underlying `MTKView` with a zero initial size, so nothing
+/// renders until the window is resized. This is a MetalSprockets `RenderView`
+/// bug (MetalSprockets#311). Until it is fixed upstream, place UI controls in
+/// an `.overlay` instead of a toolbar, as the demo app does.
 public struct SplatView: View {
     private let splatCloud: GPUSplatCloud<SparkSplat>
     private let cameraMatrix: simd_float4x4

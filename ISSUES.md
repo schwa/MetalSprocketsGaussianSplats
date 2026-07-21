@@ -1071,12 +1071,13 @@ Switching to stochastic mode in SplatView crashes with 'MTLDepthStencilDescripto
 ## 45: SplatView renders blank when used with .toolbar or NavigationStack on macOS
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: effort:xs, macOS, demo, not-testable
 created: 2026-04-09T20:07:10Z
-updated: 2026-07-21T20:45:37Z
+updated: 2026-07-21T21:27:48Z
+closed: 2026-07-21T21:27:48Z
 +++
 
 SplatView (via RenderView/MTKView) renders nothing when .toolbar is applied or when wrapped in NavigationStack on macOS. Resizing the window triggers rendering. Root cause is in MetalSprockets (filed as MetalSprockets#311) — MTKView gets zero initial size and never redraws. Workaround: use .overlay for UI controls instead of .toolbar.
