@@ -2037,12 +2037,13 @@ loadCustomSplat offloads parsing via Task.detached(priority: .userInitiated), wh
 ## 98: ARSplatView: heavy work and try!/force-unwrap in view init
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: demo, iOS, code-style, effort:xs
 created: 2026-07-21T23:50:42Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:55:36Z
+closed: 2026-07-21T23:55:36Z
 +++
 
 ARSplatView.init calls MTLCreateSystemDefaultDevice()! and try! AsyncSortManager(...) to seed @State. View inits can run on every parent body evaluation, and sample code gets copied - crashes on failure instead of degrading, and allocates a sort manager eagerly. Move creation into a model object or .task, and handle failure without force-unwrap/try!.

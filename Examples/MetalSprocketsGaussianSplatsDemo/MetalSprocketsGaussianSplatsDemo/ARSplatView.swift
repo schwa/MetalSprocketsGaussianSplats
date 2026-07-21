@@ -71,22 +71,11 @@ struct ARSplatView: View {
 
     @State private var sessionModel = ARSplatSessionModel()
     @State private var frameData = ARFrameData()
-    @State private var sortManager: AsyncSortManager<SparkSplat>
+    @State private var sortManager: AsyncSortManager<SparkSplat>?
+    @State private var sortManagerError: Error?
     @State private var sortedIndices: SplatIndices?
 
     private static let pendingReleaseDepth = 3
-
-    init(splatCloud: GPUSplatCloud<SparkSplat>) {
-        self.splatCloud = splatCloud
-        // swiftlint:disable:next force_unwrapping
-        let device = MTLCreateSystemDefaultDevice()!
-        _sortManager = State(initialValue: try! AsyncSortManager<SparkSplat>(
-            device: device,
-            splatCloud: splatCloud,
-            capacity: splatCloud.count,
-            preallocatedBufferCount: Self.pendingReleaseDepth + 3
-        ))
-    }
 
     var body: some View {
         content
@@ -94,12 +83,31 @@ struct ARSplatView: View {
             .onDisappear { sessionModel.stop() }
             .arkit(frame: sessionModel.currentFrame, frameData: $frameData)
             .task {
-                for await indices in sortManager.managedSortedIndicesStream(pendingReleaseDepth: Self.pendingReleaseDepth) {
+                // Created here rather than in init so a failure degrades to an
+                // error message instead of crashing, and so no work happens on
+                // every parent body evaluation (#98).
+                let manager: AsyncSortManager<SparkSplat>
+                do {
+                    guard let device = MTLCreateSystemDefaultDevice() else {
+                        throw ARSplatViewError.noMetalDevice
+                    }
+                    manager = try AsyncSortManager<SparkSplat>(
+                        device: device,
+                        splatCloud: splatCloud,
+                        capacity: splatCloud.count,
+                        preallocatedBufferCount: Self.pendingReleaseDepth + 3
+                    )
+                } catch {
+                    sortManagerError = error
+                    return
+                }
+                sortManager = manager
+                for await indices in manager.managedSortedIndicesStream(pendingReleaseDepth: Self.pendingReleaseDepth) {
                     sortedIndices = indices
                 }
             }
             .onChange(of: frameData.viewMatrix) {
-                sortManager.requestSort(SortParameters(camera: frameData.viewMatrix.inverse, model: Self.modelMatrix))
+                sortManager?.requestSort(SortParameters(camera: frameData.viewMatrix.inverse, model: Self.modelMatrix))
             }
     }
 
@@ -133,9 +141,19 @@ struct ARSplatView: View {
             }
             .metalDepthStencilPixelFormat(.depth32Float)
             .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 0))
+        } else if let sortManagerError {
+            ContentUnavailableView(
+                "AR unavailable",
+                systemImage: "exclamationmark.triangle",
+                description: Text(sortManagerError.localizedDescription)
+            )
         } else {
             ProgressView("Starting AR\u{2026}")
         }
     }
+}
+
+private enum ARSplatViewError: Error {
+    case noMetalDevice
 }
 #endif
