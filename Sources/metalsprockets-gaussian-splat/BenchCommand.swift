@@ -25,13 +25,15 @@ struct BenchCommand: AsyncParsableCommand {
         case point
         case spark
         case gpu
+        case tile
+        case stochastic
     }
 
     @Option(help: "Comma-separated splat counts for synthetic clouds")
     var counts: String = "100000,500000,1000000,4000000,8000000"
 
-    @Option(help: "Renderers to benchmark (point, spark, gpu)")
-    var renderers: [BenchRenderer] = BenchRenderer.allCases
+    @Option(help: "Renderers to benchmark (point, spark, gpu, tile, stochastic)")
+    var renderers: [BenchRenderer] = [.point, .spark, .gpu]
 
     @Option(help: "Frames per measurement (median reported)")
     var frames: Int = 50
@@ -164,15 +166,26 @@ struct BenchRunner {
         var rows: [Row] = []
         for renderer in renderers {
             let times: [Double]
-            switch renderer {
-            case .point:
-                times = try benchmarkPointSplat(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
+            do {
+                switch renderer {
+                case .point:
+                    times = try benchmarkPointSplat(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
 
-            case .spark:
-                times = try benchmarkSpark(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
+                case .spark:
+                    times = try benchmarkSpark(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
 
-            case .gpu:
-                times = try benchmarkGPUSort(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
+                case .gpu:
+                    times = try benchmarkGPUSort(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
+
+                case .tile:
+                    times = try benchmarkTile(splats: splats, cameraMatrix: cameraMatrix, projection: projection)
+
+                case .stochastic:
+                    times = try benchmarkStochastic(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
+                }
+            } catch {
+                print("\(label) \(renderer.rawValue): failed (\(error))")
+                continue
             }
             let sorted = times.sorted()
             let row = Row(
@@ -225,6 +238,34 @@ struct BenchRunner {
         return try measure { _ in
             let pipeline = try GPUSortedSplatRenderPipeline(splatCloud: cloud, projectionMatrix: projectionMatrix, modelMatrix: .identity, cameraMatrix: cameraMatrix, drawableSize: drawableSize, resources: resources)
             _ = try offscreen.render(pipeline)
+        }
+    }
+
+    private func benchmarkTile(splats: [SparkSplat], cameraMatrix: simd_float4x4, projection: PerspectiveProjection) throws -> [Double] {
+        let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
+        let offscreen = try OffscreenRenderer(size: CGSize(width: size, height: size))
+        let drawableSize = SIMD2<Float>(Float(size), Float(size))
+        return try measure { _ in
+            let pass = try TileBasedSplatPass(splatCloud: cloud, projection: projection, drawableSize: drawableSize, cameraMatrix: cameraMatrix, modelMatrix: .identity)
+            _ = try offscreen.render(pass)
+        }
+    }
+
+    private func benchmarkStochastic(splats: [SparkSplat], cameraMatrix: simd_float4x4, projectionMatrix: simd_float4x4) throws -> [Double] {
+        let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
+        let offscreen = try OffscreenRenderer(size: CGSize(width: size, height: size))
+        let drawableSize = SIMD2<Float>(Float(size), Float(size))
+        // Single stochastic frame per measurement, no temporal accumulation:
+        // this is the per-frame cost an interactive session pays.
+        return try measure { frame in
+            let renderPass = try RenderPass {
+                try StochasticSplatRenderPipeline(splatCloud: cloud, projectionMatrix: projectionMatrix, modelMatrix: .identity, cameraMatrix: cameraMatrix, drawableSize: drawableSize, frameTime: UInt32(frame))
+                    .depthCompare(function: .less, enabled: true)
+            }
+            .renderPassDescriptorModifier { descriptor in
+                descriptor.renderTargetArrayLength = 1
+            }
+            _ = try offscreen.render(renderPass)
         }
     }
 

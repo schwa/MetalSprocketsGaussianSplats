@@ -185,6 +185,13 @@ Takeaways:
 - **GPU-sort wins the middle** (~1M), where the radix sort is cheap and
   PointSplat's fixed per-pixel cost dominates.
 
+**What's measured:** per-frame GPU cost at interactive settings, not
+equal quality. Spark/GPU/Tile frames are converged and deterministic;
+Point/Stochastic frames are single 1-SPP stochastic samples that rely on
+temporal accumulation for a finished image (fine interactively, flattering
+for offline single-shot renders). The `point` numbers also exclude the
+interactive pipeline's occlusion-culling and accumulation stages.
+
 Reproduce with:
 
 ```sh
@@ -192,7 +199,8 @@ xcb run --target metalsprockets-gaussian-splat -c Release -- \
     bench --counts 100000,1000000,4000000,8000000 --frames 20 --size 1024
 ```
 
-Or benchmark a real file: `bench --splat path/to/scene.sog`.
+Add `--renderers point,spark,gpu,tile,stochastic` for all five, or
+benchmark a real file with `bench --splat path/to/scene.sog`.
 
 ## Usage
 
