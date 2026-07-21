@@ -83,18 +83,12 @@ public struct TileSplatRenderPass: Element {
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-
-                    // Fragment shader buffers
-                    commandEncoder.setFragmentBuffer(tileSplatResources.projectedSplats.unsafeMTLBuffer, offset: 0, index: 0)
-                    commandEncoder.setFragmentBuffer(tileSplatResources.tileSplatIndicesA.unsafeMTLBuffer, offset: 0, index: 1)
-                    commandEncoder.setFragmentBuffer(tileSplatResources.tileOffsets.unsafeMTLBuffer, offset: 0, index: 2)
-
-                    // Uniforms
-                    var uniformsCopy = uniforms
-                    commandEncoder.setFragmentBytes(&uniformsCopy, length: MemoryLayout<TileRenderUniforms>.size, index: 3)
-
                     commandEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
                 }
+                .parameter("projectedSplats", buffer: tileSplatResources.projectedSplats.unsafeMTLBuffer)
+                .parameter("tileSplatIndices", buffer: tileSplatResources.tileSplatIndicesA.unsafeMTLBuffer)
+                .parameter("tileOffsets", buffer: tileSplatResources.tileOffsets.unsafeMTLBuffer)
+                .parameter("uniforms", value: uniforms)
             }
             .onChange(of: debugTileBorders, initial: true) { _, _ in
                 fragmentShader = try! Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileBorders: debugTileBorders)

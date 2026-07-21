@@ -1781,12 +1781,13 @@ updated: 2026-07-21T20:43:23Z
 ## 84: TileSplatRenderPass and SparkSplatDebugRenderPipeline bind buffers/uniforms via raw encoder calls instead of .parameter
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: tile-based, spark, code-style, effort:s
 created: 2026-07-21T20:28:54Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T22:36:48Z
+closed: 2026-07-21T22:36:48Z
 +++
 
 TileSplatRenderPass's first Draw closure binds the splat buffer, tile indices, tile offsets, and uniforms with raw `setFragmentBuffer`/`setFragmentBytes` at hard-coded indices instead of reflection-based `.parameter(...)`. SparkSplatDebugRenderPipeline similarly binds its per-mode debug params and boundingBox with raw `setFragmentBytes`/`setVertexBytes`. No justification is given for bypassing bind-by-name in either. Both also use `MemoryLayout<...>.size` rather than `.stride`.

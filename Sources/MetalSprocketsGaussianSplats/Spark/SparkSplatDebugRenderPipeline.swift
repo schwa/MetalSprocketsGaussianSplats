@@ -273,34 +273,11 @@ public struct SparkSplatDebugRenderPipeline: Element {
         }
 
         return try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-            Draw { [boundingBox, debugParams] commandEncoder in
+            let draw = Draw { commandEncoder in
                 let vertices: [SIMD2<Float>] = [
                     [-1, -1], [-1, 1], [1, -1], [1, 1]
                 ]
                 commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-
-                // Set bounding box for vertex culling
-                if var bbox = boundingBox {
-                    commandEncoder.setVertexBytes(&bbox, length: MemoryLayout<BoundingBox3D>.size, index: 12)
-                }
-
-                // Set fragment shader parameters based on debug mode
-                switch debugParams {
-                case .distance(var params):
-                    commandEncoder.setFragmentBytes(&params, length: MemoryLayout<DebugDistanceParams>.size, index: 0)
-                case .size(var params):
-                    commandEncoder.setFragmentBytes(&params, length: MemoryLayout<DebugSizeParams>.size, index: 0)
-                case .depth(var params):
-                    commandEncoder.setFragmentBytes(&params, length: MemoryLayout<DebugDepthParams>.size, index: 0)
-                case .opacity, .normal:
-                    // No parameters needed
-                    break
-                case .aspectRatio(var params):
-                    commandEncoder.setFragmentBytes(&params, length: MemoryLayout<DebugAspectRatioParams>.size, index: 0)
-                case .cloudIndex(var params):
-                    commandEncoder.setFragmentBytes(&params, length: MemoryLayout<DebugCloudIndexParams>.size, index: 0)
-                }
-
                 commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
                 commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)
             }
@@ -311,6 +288,27 @@ public struct SparkSplatDebugRenderPipeline: Element {
             .parameter("scale", value: Float(2.0))
             .parameter("cameraPositions", values: cameraPositions)
             .parameter("clouds", value: argumentBuffer)
+            // Bounding box for vertex culling. When boundingBox is nil the
+            // use_bounding_box function constant is false, the binding is absent
+            // from reflection, and the placeholder value is silently skipped.
+            .parameter("boundingBox", functionType: .vertex, value: boundingBox ?? BoundingBox3D())
+
+            // Fragment shader parameters based on debug mode. The opacity and
+            // normal shaders take no parameters.
+            switch debugParams {
+            case .distance(let params):
+                draw.parameter("params", functionType: .fragment, value: params)
+            case .size(let params):
+                draw.parameter("params", functionType: .fragment, value: params)
+            case .depth(let params):
+                draw.parameter("params", functionType: .fragment, value: params)
+            case .opacity, .normal:
+                draw
+            case .aspectRatio(let params):
+                draw.parameter("params", functionType: .fragment, value: params)
+            case .cloudIndex(let params):
+                draw.parameter("params", functionType: .fragment, value: params)
+            }
         }
         .vertexDescriptor(vertexDescriptor)
         .renderPassDescriptorModifier { descriptor in
