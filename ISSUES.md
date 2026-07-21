@@ -1957,3 +1957,168 @@ closed: 2026-07-21T23:46:34Z
 BenchCommand creates its own command queue and a raw MTLBlitCommandEncoder to synchronize a texture for CPU readback. Could use a BlitPass element (or a Runner-driven tree) instead of raw encoding.
 
 ---
+
+## 93: GPUSplatCloud: unsynchronized mutable state under @unchecked Sendable
+
++++
+status: open
+priority: medium
+kind: bug
+labels: concurrency, splats, effort:s
+created: 2026-07-21T23:48:54Z
+updated: 2026-07-21T23:53:12Z
++++
+
+GPUSplatCloud is @unchecked Sendable but modelTransform and opacity are plain vars with no synchronization. The cloud is shared between the main thread (UI mutates transform/opacity) and the AsyncSortManager actor (reads during sorts); simd_float4x4 is 64 bytes so a torn read mid-sort is possible.
+
+---
+
+## 94: managedSortedIndicesStream: unbounded buffering can yield already-released buffers
+
++++
+status: open
+priority: medium
+kind: bug
+labels: concurrency, sorting, effort:s
+created: 2026-07-21T23:48:54Z
+updated: 2026-07-21T23:53:12Z
++++
+
+AsyncSortManager.managedSortedIndicesStream uses the closure AsyncStream initializer with the default .unbounded buffering policy. The producer task releases superseded indices once they fall out of the pendingReleaseDepth window, but yielded values sit in the stream buffer until consumed - a consumer lagging more than depth values can dequeue SplatIndices whose buffers were already returned to the pool. Also uses the closure initializer instead of AsyncStream.makeStream(of:).
+
+---
+
+## 95: ARSplatView: per-frame unstructured tasks can deliver ARKit frames out of order
+
++++
+status: open
+priority: low
+kind: bug
+labels: concurrency, demo, iOS, effort:xs
+created: 2026-07-21T23:49:07Z
+updated: 2026-07-21T23:53:12Z
++++
+
+ARSplatSessionModel.session(_:didUpdate:) spawns an unstructured Task { @MainActor in currentFrame = frame } per ARKit frame (60 Hz). Task start order is not FIFO, so currentFrame can go backwards under load, and task creation is unbounded. A latest-value AsyncStream (bufferingNewest(1)) with a single consumer preserves order.
+
+---
+
+## 96: PointSplatStatistics: @unchecked Sendable without synchronization
+
++++
+status: open
+priority: low
+kind: task
+labels: concurrency, pointsplat, code-style, effort:xs
+created: 2026-07-21T23:49:07Z
+updated: 2026-07-21T23:53:12Z
++++
+
+PointSplatStatistics is @unchecked Sendable but its three fields have no synchronization. Both writer (element workload phase) and reader (SwiftUI polling) are currently the main thread, so it works, but the conformance advertises cross-thread safety it does not have. Either drop the conformance and mark it @MainActor, or guard the fields with OSAllocatedUnfairLock.
+
+---
+
+## 97: DemoState.loadCustomSplat: replace Task.detached with @concurrent function
+
++++
+status: open
+priority: low
+kind: enhancement
+labels: concurrency, demo, effort:xs
+created: 2026-07-21T23:49:08Z
+updated: 2026-07-21T23:53:12Z
++++
+
+loadCustomSplat offloads parsing via Task.detached(priority: .userInitiated), which sheds priority escalation and task-local context. Swift 6.2 preference is a nonisolated @concurrent async function so the call stays structured. Also add a doc-comment constraint to AsyncSortManager.sortNowSync noting it must not be called from an async context (spin-wait would burn a cooperative-pool thread).
+
+---
+
+## 98: ARSplatView: heavy work and try!/force-unwrap in view init
+
++++
+status: open
+priority: low
+kind: bug
+labels: demo, iOS, code-style, effort:xs
+created: 2026-07-21T23:50:42Z
+updated: 2026-07-21T23:53:12Z
++++
+
+ARSplatView.init calls MTLCreateSystemDefaultDevice()! and try! AsyncSortManager(...) to seed @State. View inits can run on every parent body evaluation, and sample code gets copied - crashes on failure instead of degrading, and allocates a sort manager eagerly. Move creation into a model object or .task, and handle failure without force-unwrap/try!.
+
+---
+
+## 99: API: demote unused-externally public types to internal
+
++++
+status: open
+priority: medium
+kind: task
+labels: api, effort:s
+created: 2026-07-21T23:52:19Z
+updated: 2026-07-21T23:53:12Z
++++
+
+These public types have no users outside the library (not demo, CLI, or tests): TileSplatResources, TileBinningCountPass, TileBinningWritePass, TilePrefixSumComputePass, TileSortingComputePass, TileHeatMapRenderPass (tile internals; TileBasedSplatPipeline is the public entry), and AnyGPUSplatCloud (unused everywhere). Pool, SingleValueStream, and PointSplatWorkloadDistributor are used only by tests - internal + @testable candidates. Un-publishing after a version tag is breaking, so demote before the next release.
+
+---
+
+## 100: API: consolidate PointSplat error enums
+
++++
+status: open
+priority: low
+kind: enhancement
+labels: api, pointsplat, effort:s
+created: 2026-07-21T23:52:19Z
+updated: 2026-07-21T23:53:12Z
++++
+
+PointSplat has three public error enums: PointSplatRenderer.RendererError, PointSplatWorkloadDistributor.DistributorError, and PackedSplatCloud.PackError. Callers cannot handle them uniformly, and PointSplatResources throwing PointSplatRenderer.RendererError shows the boundary is wrong. A single PointSplatError enum would cover the cases.
+
+---
+
+## 101: API: configuration structs for SparkSplatRenderPipeline and PointSplatRenderPipeline inits
+
++++
+status: open
+priority: low
+kind: enhancement
+labels: api, effort:m
+created: 2026-07-21T23:52:19Z
+updated: 2026-07-21T23:53:12Z
++++
+
+SparkSplatRenderPipeline has three public init overloads with 9 parameters each (single/multi cloud x mono/stereo, plus convertSRGBToLinear/useSphericalHarmonics/boundingBox). PointSplatRenderPipeline.init takes 11 parameters while the offscreen PointSplatRenderer already has a Configuration struct the live pipeline does not share. Introduce configuration types with defaults to collapse the overload matrix.
+
+---
+
+## 102: API: reader naming is inconsistent (read vs load) and SOGReaderGPU skips SplatReaderProtocol
+
++++
+status: open
+priority: low
+kind: task
+labels: api, splats, effort:s
+created: 2026-07-21T23:52:19Z
+updated: 2026-07-21T23:53:12Z
++++
+
+All splat readers stream via read(_ handler:) and conform to SplatReaderProtocol except SOGReaderGPU, which exposes load(url:) -> Result and does not conform. Three patterns exist for getting splats from a file: init(url:) + read, init(data:), and load(url:). Pick one naming convention; document why the GPU reader's shape differs if it must.
+
+---
+
+## 103: SplatImmersiveRenderState.init uses try! on a public API path
+
++++
+status: open
+priority: low
+kind: bug
+labels: api, visionOS, effort:xs
+created: 2026-07-21T23:52:20Z
+updated: 2026-07-21T23:53:12Z
++++
+
+SplatImmersiveRenderState.init constructs its per-eye AsyncSortManagers with try!, crashing instead of throwing on failure. Public API should not force-unwrap; make the init throwing (same class of issue as #98).
+
+---
