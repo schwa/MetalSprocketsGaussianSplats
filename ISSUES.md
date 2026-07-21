@@ -1415,14 +1415,18 @@ PointSplat renders base splat color only; view-dependent SH color (used by Spark
 ## 65: PointSplat: measure simdgroup dedupe before atomic_min
 
 +++
-status: new
+status: closed
 priority: low
 kind: none
 labels: performance, pointsplat
 created: 2026-07-21T14:52:10Z
+updated: 2026-07-21T20:23:36Z
+closed: 2026-07-21T20:23:36Z
 +++
 
 The splat kernel has an early depth test (plain aliased read) before atomic_min, but no simdgroup-level dedupe of points targeting the same pixel (Schuetz 2021 reports large wins from warp dedupe under contention). Unknown whether it pays off on Apple GPUs; needs measurement with GPU capture on close-up views.
+
+- `2026-07-21T20:23:36Z`: Measured: replacing atomic_min with a racy plain store (same workload, wrong image) changes nothing - 4M: 15.12 vs 14.97 ms, 8M: 19.40 vs 19.50 ms (within run noise). The splat stage is not atomic-bound on Apple GPUs; the early depth test already absorbs contention. Simdgroup dedupe would add ALU cost for zero atomic savings. Not worth implementing.
 
 ---
 
@@ -1439,6 +1443,7 @@ created: 2026-07-21T14:52:10Z
 RFC 0003 verification plan items not yet done: GPU capture to confirm even occupancy across the splat dispatch (the paper's central claim) and atomic throughput; record the frame-time scaling curve vs Spark/GPU/Stochastic on small and multi-million-splat scenes.
 
 - `2026-07-21T19:49:48Z`: Scaling curve done via new 'bench' CLI subcommand (synthetic seeded clouds, no fixtures; Release, 1024x1024, 20 frames, median ms): 100k: point 1.4 / spark 2.9 / gpu 2.9. 1M: 10.7 / 14.2 / 6.7. 4M: 14.7 / 53.0 / 20.5. 8M: 18.2 / 115.7 / 39.8. PointSplat flattens as predicted (bounded by points/pixel); spark is CPU-sort-bound (linear); gpu-sort wins the ~1M middle. Remaining: GPU capture for splat-dispatch occupancy and atomic throughput.
+- `2026-07-21T20:23:36Z`: Atomic-throughput half answered via the #65 measurement: atomics cost ~nothing (see #65). The flat scaling curve plus this strongly supports the paper's even-workload claim; a formal occupancy capture remains optional.
 
 ---
 
@@ -1574,5 +1579,180 @@ closed: 2026-07-21T20:14:13Z
 There is no way to view raw single-frame PointSplat output. Temporal accumulation (static views) and reprojection (camera motion) are always on, which hides per-frame noise characteristics -- useful for debugging (e.g. the current occlusion-culling render issues), for judging SPP quality honestly, and for A/B against StochasticSplats-style output. Wants a runtime toggle (demo UI + PointSplatRenderPipeline parameter) that bypasses the blend/reproject stage and presents the resolve texture directly.
 
 - `2026-07-21T20:14:13Z`: Reproject toggle added: PointSplatRenderPipeline gains reprojection: Bool (default true) and the demo overlay a switch. Off restores pre-#73 behavior (camera motion hard-resets accumulation, showing raw noise during motion); static accumulation always runs.
+
+---
+
+## 75: PointSplat: group-level hierarchical culling
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: pointsplat, performance
+created: 2026-07-21T20:18:36Z
++++
+
+Per-Gaussian preprocess is O(total splats) every frame even when most of the cloud is frustum- or occlusion-culled: 8M threads run projection just to write count 0. The paper (Sec 3.5) adds a coarse tier: ~1M groups of consecutive Gaussians (Morton or BVH order) with precomputed 3D AABBs, culled first so per-Gaussian work only runs for surviving groups. Prerequisite for 100M-class scenes; needs splat reordering at load time to make groups spatially coherent.
+
+---
+
+## 76: PointSplat: sweep K and supersampling settings on Apple GPUs
+
++++
+status: new
+priority: low
+kind: task
+labels: pointsplat, performance
+created: 2026-07-21T20:18:36Z
++++
+
+We use the paper's defaults (2x2 supersampling, K=4) untested on our hardware. The paper measured K=1 vs K=4 as +37% frame time on NVIDIA; K=8/16, 1x1+accumulation, and 4x4 are unswept here. The bench subcommand makes this a quick experiment: quality (PSNR vs converged) and frame time per configuration, pick per-platform defaults.
+
+---
+
+## 77: PointSplat: quantized splat storage
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: pointsplat, performance, splats
+created: 2026-07-21T20:18:36Z
++++
+
+SparkSplat is 32 bytes plus float32 SH coefficients; the paper packs a Gaussian into 21 bytes (fixed-point means, 10-bit log scales, 30-bit quaternion, 8-bit opacity) with 8-bit palette-quantized SH, roughly 4x smaller. Splat-stage read bandwidth and total memory scale accordingly; matters for multi-10M clouds (48M splats = 1.5 GB today before SH). Touches every renderer that consumes SparkSplat, so likely a parallel packed format consumed by PointSplat first.
+
+---
+
+## 78: PointSplat indirect dispatches bypass the new ComputeDispatch(indirectBuffer:) element
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: pointsplat, effort:m
+created: 2026-07-21T20:37:59Z
++++
+
+MetalSprockets 92dbfa0 added declarative indirect dispatch (ComputeDispatch(indirectBuffer:threadsPerThreadgroup:), MetalSprockets#351), but all three indirect dispatch sites here still call encoder.dispatchThreadgroups(indirectBuffer:) on raw encoders: PointSplatWorkloadDistributor.encode, PointSplatResources.encodePhase, and PointSplatRenderer. The surrounding PointSplat frame is raw-encoded for more than just the old dispatch gap (mid-frame distributor re-runs, two-phase occlusion), so adopting the element means refactoring that flow back into declarative elements, not a drop-in swap. Related: #62 (TileAlt, was blocked on MetalSprockets#351), #63 (where the raw workaround landed).
+
+---
+
+## 79: SparkSplatRenderPipeline: cloudDataBuffer allocated on every body evaluation
+
++++
+status: new
+priority: medium
+kind: bug
+labels: spark, performance, code-style, effort:s
+created: 2026-07-21T20:28:32Z
++++
+
+`renderPipeline(sortedIndices:)` (called from `body`) allocates a fresh `cloudDataBuffer` via `device.makeTypedBuffer(values:...)` each time it runs. MetalSprockets element `body` must stay pure and can be evaluated multiple times per frame, so this is an allocation side effect in body: a new MTLBuffer per evaluation, per frame. Expected: buffer allocated once (or on cloud change) and reused; actual: per-evaluation allocation churn.
+
+---
+
+## 80: GPUSortedSplatRenderPipeline: slot advance is a side effect in body
+
++++
+status: new
+priority: medium
+kind: bug
+labels: spark, gpu-sort, code-style, effort:s
+created: 2026-07-21T20:28:39Z
++++
+
+`GPUSortedSplatRenderPipeline.body` calls `resources.advance()` and `resources.makeIndices(...)`, which mutate the shared `GPUSortResources` slot state. MetalSprockets `body` can be evaluated multiple times per frame (diffing, re-expansion), so the slot index can advance more than once per rendered frame, breaking the frames-in-flight slot rotation the type documents (slotCount default 3). Side effects belong in lifecycle hooks, not body.
+
+---
+
+## 81: StochasticSplatRenderPipeline: uniforms and textures bound via raw encoder calls instead of .parameter
+
++++
+status: new
+priority: low
+kind: task
+labels: stochastic, code-style, effort:s
+created: 2026-07-21T20:28:39Z
++++
+
+The Draw closure in StochasticSplatRenderPipeline binds `time`, `alphaThreshold`, the blue-noise texture, the SH degree, and the SH buffer with raw `setFragmentBytes`/`setFragmentTexture`/`setVertexBytes`/`setVertexBuffer` at hard-coded indices, while the rest of the pipeline uses reflection-based `.parameter(...)`. These are all small uniforms/textures that `.parameter` handles; no justification is given for bypassing it. Also uses `MemoryLayout<...>.size` rather than `.stride`.
+
+---
+
+## 82: PointSplatRenderPipeline: accumulation step advances ping-pong state inside body
+
++++
+status: new
+priority: medium
+kind: bug
+labels: pointsplat, code-style, effort:s
+created: 2026-07-21T20:28:46Z
++++
+
+`PointSplatRenderPipeline.body` calls `resources.nextAccumulationStep(...)`, which mutates `frameParity`, `accumulatedFrames`, and the last-matrix tracking. `body` can be evaluated multiple times per frame, so the ping-pong parity and accumulation count can advance more than once per rendered frame, corrupting the running mean. Unlike `validatedResources()` (which has a comment explaining its eager mutation), this side effect is unacknowledged.
+
+---
+
+## 83: PointSplatResources creates its own MTLDevice instead of using the environment device
+
++++
+status: new
+priority: low
+kind: task
+labels: pointsplat, code-style, effort:s
+created: 2026-07-21T20:28:46Z
++++
+
+`PointSplatResources.init` calls `MTLCreateSystemDefaultDevice()` directly rather than using the device MetalSprockets publishes via `@MSEnvironment(\.device)` (e.g. allocation in `.onSetupEnter`). This diverges from framework convention, and on multi-GPU systems the resources could be allocated on a different device than the one the render view uses.
+
+---
+
+## 84: TileSplatRenderPass and SparkSplatDebugRenderPipeline bind buffers/uniforms via raw encoder calls instead of .parameter
+
++++
+status: new
+priority: low
+kind: task
+labels: tile-based, spark, code-style, effort:s
+created: 2026-07-21T20:28:54Z
++++
+
+TileSplatRenderPass's first Draw closure binds the splat buffer, tile indices, tile offsets, and uniforms with raw `setFragmentBuffer`/`setFragmentBytes` at hard-coded indices instead of reflection-based `.parameter(...)`. SparkSplatDebugRenderPipeline similarly binds its per-mode debug params and boundingBox with raw `setFragmentBytes`/`setVertexBytes`. No justification is given for bypassing bind-by-name in either. Both also use `MemoryLayout<...>.size` rather than `.stride`.
+
+---
+
+## 85: Shader recreation in .onChange hooks uses try!/fatalError on failure
+
++++
+status: new
+priority: low
+kind: task
+labels: spark, tile-based, code-style, effort:s
+created: 2026-07-21T20:28:54Z
++++
+
+Three renderers recreate function-constant-specialized shaders inside `.onChange` hooks and crash on failure instead of surfacing the error:
+
+- SparkSplatRenderPipeline: `do/catch` with `fatalError("Failed to recreate shaders: ...")`
+- TileSplatRenderPass: `try! Self.makeFragmentShader(...)`
+- TileHeatMapRenderPass: `try! Self.makeFragmentShader(...)`
+
+A shader-compilation failure at runtime (e.g. bad function constant) takes down the process rather than failing the frame or propagating through MetalSprockets' throwing element machinery.
+
+---
+
+## 86: SparkSplatRenderPipeline: boundingBox and shDegree bound via raw setVertexBytes instead of .parameter
+
++++
+status: new
+priority: low
+kind: task
+labels: spark, code-style, effort:s
+created: 2026-07-21T20:28:32Z
+updated: 2026-07-21T20:39:48Z
++++
+
+In SparkSplatRenderPipeline's Draw closure, `shDegreeValue` (index 11) and `boundingBox` (index 12) are bound with raw `commandEncoder.setVertexBytes` instead of MetalSprockets' reflection-based `.parameter(...)`. The shDegree binding has a comment explaining why it must always be bound, but the boundingBox binding has no justification. Raw index-based binding loses bind-by-name reflection and diverges from the framework convention used for the other uniforms in the same pipeline. Also uses `MemoryLayout<...>.size` rather than `.stride`.
 
 ---
