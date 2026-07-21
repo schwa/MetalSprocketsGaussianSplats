@@ -1485,6 +1485,8 @@ created: 2026-07-21T14:52:11Z
 
 RFC 0003 defers hierarchical/occlusion culling (two-phase scheme, depth mip chain) and reprojection-based temporal reuse. Without them, large occluded scenes waste splat work, and any camera motion resets accumulation to 1 SPP noise. Tracking issue for the follow-up.
 
+- `2026-07-21T19:06:12Z`: Occlusion culling half implemented (WIP commit d9fde5d7): hierarchical max-depth pyramid, two-phase cull per the paper. Known render issues being debugged. Temporal reprojection not started.
+
 ---
 
 ## 70: Parallel code paths for offscreen vs live rendering
