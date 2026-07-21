@@ -1287,11 +1287,13 @@ The tile-based renderer runs significantly slower than the Spark and GPU-sorted 
 ## 59: Tile-based renderer blending is broken - output is washed out
 
 +++
-status: new
+status: closed
 priority: medium
 kind: bug
 labels: tile-based
 created: 2026-07-20T18:53:32Z
+updated: 2026-07-21T15:08:16Z
+closed: 2026-07-21T15:08:16Z
 +++
 
 With the tile-based renderer selected, the butterfly model renders washed out compared to the Spark renderer on the same scene: colors are pale and low-contrast, as if alpha accumulation or the sRGB/linear conversion in the tile shader's front-to-back blend is wrong.
@@ -1302,6 +1304,8 @@ Repro:
 3. Switch Renderer between Spark and Tile
 
 Expected: matching color/contrast. Actual: Tile output is visibly washed out.
+
+- `2026-07-21T15:08:17Z`: Tile fragment re-encoded linear back to sRGB before writing to the sRGB render target, double-encoding on store. Now writes linear and lets the target encode.
 
 ---
 
@@ -1444,16 +1448,19 @@ PointSplatRenderPipeline hardcodes nearPlane 0.2 / farPlane 200 for the 28-bit f
 ## 68: PointSplat: color space of blit presentation unverified
 
 +++
-status: new
+status: closed
 priority: high
 kind: none
 labels: bug, pointsplat
 created: 2026-07-21T14:52:11Z
+updated: 2026-07-21T15:08:17Z
+closed: 2026-07-21T15:08:17Z
 +++
 
 The resolve/accumulation textures hold raw (sRGB-encoded) splat color values in rgba16Float; the fullscreen BlitShader samples them and writes into a bgra8Unorm_srgb drawable, which will re-encode. PointSplat output may look washed out or double-encoded next to the other renderers in the demo picker. Needs a visual A/B check.
 
 - `2026-07-21T14:58:20Z`: Visual A/B done: PointSplat is washed out in the same way as the tile renderer (#59), so this is the shared color-pipeline issue rather than a PointSplat-specific double-encode. Keeping open until #59 is understood.
+- `2026-07-21T15:08:17Z`: Same double-encode class as #59: PointSplat blit sampled sRGB-encoded accumulation values into an sRGB drawable. Blit fragment now linearizes (function constant on BlitShader). Visually verified against Spark.
 
 ---
 

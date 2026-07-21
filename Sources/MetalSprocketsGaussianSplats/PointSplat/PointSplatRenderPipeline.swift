@@ -56,7 +56,12 @@ public struct PointSplatRenderPipeline: Element {
         blendKernel = try shaderLibrary.namespaced("TemporalAccumulationShader").function(named: "blend", type: ComputeKernel.self)
         let blitLibrary = shaderLibrary.namespaced("BlitShader")
         blitVertexShader = try blitLibrary.function(named: "vertex_main", type: VertexShader.self)
-        blitFragmentShader = try blitLibrary.function(named: "fragment_main", type: FragmentShader.self)
+        // The accumulation texture holds sRGB-encoded splat values (the paper
+        // averages in sRGB); linearize so the sRGB drawable's store encode
+        // round-trips instead of double-encoding (#68).
+        var blitConstants = FunctionConstants()
+        blitConstants["convert_srgb_to_linear"] = .bool(true)
+        blitFragmentShader = try blitLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: blitConstants)
 
         resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, maxPointsPerFrame: maxPointsPerFrame, supersampling: max(supersampling, 1))
     }

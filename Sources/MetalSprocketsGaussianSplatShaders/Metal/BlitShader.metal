@@ -3,6 +3,10 @@ using namespace metal;
 
 namespace BlitShader {
 
+    // Enable when the sampled texture holds sRGB-encoded values and the
+    // render target is an sRGB format (which encodes again on store).
+    constant bool convert_srgb_to_linear [[function_constant(0)]];
+
     struct VertexOut {
         float4 position [[position]];
         float2 texCoord;
@@ -33,7 +37,11 @@ namespace BlitShader {
         texture2d<float> texture [[texture(0)]]
     ) {
         constexpr sampler s(filter::linear);
-        return texture.sample(s, in.texCoord);
+        float4 color = texture.sample(s, in.texCoord);
+        if (convert_srgb_to_linear) {
+            color.rgb = pow(color.rgb, float3(2.2));
+        }
+        return color;
     }
 
 }

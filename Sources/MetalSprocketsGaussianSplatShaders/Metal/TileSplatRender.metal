@@ -207,11 +207,9 @@ namespace TileSplatRender {
             }
         }
 
-        // Convert back from linear to sRGB for output
-        float3 srgbColor = pow(accumulatedColor.rgb, float3(1.0 / 2.2));
-
-        // Output to imageblock with premultiplied alpha
-        out.imageblock.color = half4(half3(srgbColor), half(accumulatedAlpha));
+        // Output linear color; the sRGB render target encodes on store.
+        // (Re-encoding here double-encoded and washed the image out, #59.)
+        out.imageblock.color = half4(half3(accumulatedColor.rgb), half(accumulatedAlpha));
         return out;
     }
 
