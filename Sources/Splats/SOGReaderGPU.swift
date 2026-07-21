@@ -21,6 +21,12 @@ import ZIPFoundation
 /// on the GPU, producing the same `SparkSplat` buffer (and flattened
 /// higher-order SH float buffer) that `SOGReaderCPU` produces — orders of
 /// magnitude faster for multi-million-splat files.
+///
+/// Unlike the other readers, `SOGReaderGPU` does not conform to
+/// ``SplatReaderProtocol``: that protocol streams CPU-side `ExtendedSplat`
+/// values one at a time, while this reader needs a `MTLDevice` and produces
+/// GPU-resident buffers wholesale. It follows the same `read` naming, but
+/// takes the URL per call (the device, not the file, is the reader's state).
 public struct SOGReaderGPU {
     /// Decoded result, GPU-resident.
     public struct Result {
@@ -38,8 +44,8 @@ public struct SOGReaderGPU {
     }
 
     // Cache a Runner (and its element System) per device. Reusing the Runner
-    // keeps the compiled decode pipeline state cached across `load` calls,
-    // which would otherwise recompile the compute function every load.
+    // keeps the compiled decode pipeline state cached across `read` calls,
+    // which would otherwise recompile the compute function every read.
     private static let runnerCache = RunnerCache()
 
     private func decodeKernel() throws -> ComputeKernel {
@@ -49,12 +55,12 @@ public struct SOGReaderGPU {
         return try ShaderLibrary(bundle: bundle).namespaced("SOGDecodeShader").function(named: "decode", type: ComputeKernel.self)
     }
 
-    /// Loads a SOG archive and decodes its splat textures on the GPU.
+    /// Reads a SOG archive and decodes its splat textures on the GPU.
     ///
     /// - Parameters:
-    ///   - url: The `.sog` archive to load.
+    ///   - url: The `.sog` archive to read.
     ///   - name: Overrides the buffer label; defaults to the file's name.
-    public func load(url: URL, name: String? = nil) throws -> Result {
+    public func read(url: URL, name: String? = nil) throws -> Result {
         let archive: Archive
         do {
             archive = try Archive(url: url, accessMode: .read)

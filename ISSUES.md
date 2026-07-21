@@ -2104,12 +2104,13 @@ SparkSplatRenderPipeline has three public init overloads with 9 parameters each 
 ## 102: API: reader naming is inconsistent (read vs load) and SOGReaderGPU skips SplatReaderProtocol
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: api, splats, effort:s
 created: 2026-07-21T23:52:19Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:57:47Z
+closed: 2026-07-21T23:57:47Z
 +++
 
 All splat readers stream via read(_ handler:) and conform to SplatReaderProtocol except SOGReaderGPU, which exposes load(url:) -> Result and does not conform. Three patterns exist for getting splats from a file: init(url:) + read, init(data:), and load(url:). Pick one naming convention; document why the GPU reader's shape differs if it must.

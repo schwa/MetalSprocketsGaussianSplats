@@ -133,7 +133,7 @@ class DemoState {
         // de-quantize straight into the SparkSplat buffer). Orders of
         // magnitude faster than the per-splat CPU reader for large files.
         if url.pathExtension.lowercased() == "sog" {
-            let result = try SOGReaderGPU(device: device).load(url: url)
+            let result = try SOGReaderGPU(device: device).read(url: url)
             let shCoefficients = result.shDegree > 0 ? result.shCoefficients : nil
             return GPUSplatCloud<SparkSplat>(splats: result.splats, shCoefficients: shCoefficients, shDegree: result.shDegree)
         }

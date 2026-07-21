@@ -30,7 +30,7 @@ struct SOGReaderGPUTests {
         }
 
         // GPU path.
-        let gpuResult = try SOGReaderGPU(device: device).load(url: url)
+        let gpuResult = try SOGReaderGPU(device: device).read(url: url)
         #expect(gpuResult.count == cpuSplats.count)
         #expect(gpuResult.shDegree == cpuReader.shDegree)
 

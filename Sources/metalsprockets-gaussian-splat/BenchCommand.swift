@@ -183,7 +183,7 @@ struct BenchRunner {
             throw BenchCommand.BenchError(message: "No Metal device")
         }
         if url.pathExtension.lowercased() == "sog" {
-            return Array(try SOGReaderGPU(device: device).load(url: url).splats)
+            return Array(try SOGReaderGPU(device: device).read(url: url).splats)
         }
         let reader = try SplatReader(url: url)
         var splats: [SparkSplat] = []
