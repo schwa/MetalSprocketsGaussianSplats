@@ -14,13 +14,6 @@ import MetalSprocketsGaussianSplatShaders
 /// `capacity` and exiting threads past the total (RFC 0002's
 /// indirect-dispatch gap).
 public final class PointSplatWorkloadDistributor {
-    public enum DistributorError: Error {
-        case bufferAllocationFailed
-        case commandEncodingFailed
-        case functionNotFound(String)
-        case splatCountExceedsMaximum(count: Int, maximum: Int)
-    }
-
     /// Elements per scan block. Must match WORKLOAD_BLOCK in PointSplatWorkload.metal.
     static let blockSize = 256
 
@@ -118,7 +111,7 @@ public final class PointSplatWorkloadDistributor {
               let countBlockBase = device.makeBuffer(length: uintStride * max(countBlocks, 1), options: .storageModePrivate),
               let maxBlockMaxes = device.makeBuffer(length: uintStride * max(capacityBlocks, 1), options: .storageModePrivate),
               let maxBlockCarry = device.makeBuffer(length: uintStride * max(capacityBlocks, 1), options: .storageModePrivate) else {
-            throw DistributorError.bufferAllocationFailed
+            throw PointSplatError.bufferAllocationFailed
         }
         indices.label = "PointSplat indices"
         totals.label = "PointSplat totals"
@@ -247,7 +240,7 @@ public final class PointSplatWorkloadDistributor {
     /// Validates `count` before building the element tree.
     func validate(count: Int) throws {
         guard count <= maxSplats else {
-            throw DistributorError.splatCountExceedsMaximum(count: count, maximum: maxSplats)
+            throw PointSplatError.splatCountExceedsMaximum(count: count, maximum: maxSplats)
         }
     }
 

@@ -14,22 +14,17 @@ import Splats
 /// limited to quantization error while splat-stage read bandwidth drops
 /// by ~44%.
 public struct PackedSplatCloud {
-    public enum PackError: Error {
-        case bufferAllocationFailed
-        case emptyCloud
-    }
-
     public let buffer: MTLBuffer
     public let bounds: GPSPackedSplatBounds
     public let count: Int
 
     public init(device: MTLDevice, splats: [SparkSplat]) throws {
         guard !splats.isEmpty else {
-            throw PackError.emptyCloud
+            throw PointSplatError.emptyCloud
         }
         let (elements, bounds) = Self.pack(splats)
         guard let buffer = device.makeBuffer(bytes: elements, length: MemoryLayout<GPSPackedSplat>.stride * elements.count) else {
-            throw PackError.bufferAllocationFailed
+            throw PointSplatError.bufferAllocationFailed
         }
         buffer.label = "Packed splats"
         self.buffer = buffer

@@ -308,7 +308,7 @@ final class PointSplatResources {
 
     init(device: MTLDevice, drawableSize: SIMD2<Float>, splatCount: Int, supersampling: Int, pointsPerThread: Int, backgroundColor: SIMD3<Float> = .zero) throws {
         guard device.supportsFamily(.apple9) || device.supportsFamily(.mac2) else {
-            throw PointSplatRenderer.RendererError.unsupportedDevice
+            throw PointSplatError.unsupportedDevice
         }
         self.device = device
         self.backgroundColor = backgroundColor
@@ -325,7 +325,7 @@ final class PointSplatResources {
               let renderedMask = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate),
               let statsBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 4, options: .storageModeShared),
               let zeroTotals = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 2, options: .storageModeShared) else {
-            throw PointSplatRenderer.RendererError.bufferAllocationFailed
+            throw PointSplatError.bufferAllocationFailed
         }
         let groupCount = (max(splatCount, 1) + Self.groupSize - 1) / Self.groupSize
         self.groupCount = groupCount
@@ -333,7 +333,7 @@ final class PointSplatResources {
               let visibleGroups = device.makeBuffer(length: MemoryLayout<UInt32>.stride * groupCount, options: .storageModePrivate),
               let visibleGroupCount = device.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModePrivate),
               let groupDispatchArgs = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 4, options: .storageModePrivate) else {
-            throw PointSplatRenderer.RendererError.bufferAllocationFailed
+            throw PointSplatError.bufferAllocationFailed
         }
         groupBounds.label = "PointSplat group bounds"
         visibleGroups.label = "PointSplat visible groups"
@@ -383,13 +383,13 @@ final class PointSplatResources {
         pyramidDescriptor.usage = [.shaderRead, .shaderWrite]
         pyramidDescriptor.storageMode = .private
         guard let depthPyramid = device.makeTexture(descriptor: pyramidDescriptor) else {
-            throw PointSplatRenderer.RendererError.textureAllocationFailed
+            throw PointSplatError.textureAllocationFailed
         }
         depthPyramid.label = "PointSplat depth pyramid"
         self.depthPyramid = depthPyramid
         pyramidLevelViews = try (0..<levels).map { level in
             guard let view = depthPyramid.makeTextureView(pixelFormat: .r32Float, textureType: .type2D, levels: level..<(level + 1), slices: 0..<1) else {
-                throw PointSplatRenderer.RendererError.textureAllocationFailed
+                throw PointSplatError.textureAllocationFailed
             }
             return view
         }
@@ -401,7 +401,7 @@ final class PointSplatResources {
             descriptor.usage = [.shaderWrite, .shaderRead]
             descriptor.storageMode = .private
             guard let texture = device.makeTexture(descriptor: descriptor) else {
-                throw PointSplatRenderer.RendererError.textureAllocationFailed
+                throw PointSplatError.textureAllocationFailed
             }
             texture.label = label
             return texture

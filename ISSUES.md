@@ -2072,12 +2072,13 @@ These public types have no users outside the library (not demo, CLI, or tests): 
 ## 100: API: consolidate PointSplat error enums
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: api, pointsplat, effort:s
 created: 2026-07-21T23:52:19Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:56:49Z
+closed: 2026-07-21T23:56:49Z
 +++
 
 PointSplat has three public error enums: PointSplatRenderer.RendererError, PointSplatWorkloadDistributor.DistributorError, and PackedSplatCloud.PackError. Callers cannot handle them uniformly, and PointSplatResources throwing PointSplatRenderer.RendererError shows the boundary is wrong. A single PointSplatError enum would cover the cases.

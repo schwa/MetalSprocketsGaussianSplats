@@ -20,14 +20,6 @@ import Splats
 ///
 /// Requires 64-bit atomics: Apple9 (A17/M3+) or Mac2 GPU family.
 public final class PointSplatRenderer {
-    public enum RendererError: Error {
-        case unsupportedDevice
-        case bufferAllocationFailed
-        case commandEncodingFailed
-        case functionNotFound(String)
-        case textureAllocationFailed
-    }
-
     public struct Configuration {
         public var width: Int
         public var height: Int
@@ -69,7 +61,7 @@ public final class PointSplatRenderer {
 
     public init(device: MTLDevice, configuration: Configuration) throws {
         guard device.supportsFamily(.apple9) || device.supportsFamily(.mac2) else {
-            throw RendererError.unsupportedDevice
+            throw PointSplatError.unsupportedDevice
         }
         self.device = device
         self.configuration = configuration
@@ -79,7 +71,7 @@ public final class PointSplatRenderer {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: configuration.width, height: configuration.height, mipmapped: false)
         descriptor.usage = [.shaderWrite, .shaderRead]
         guard let outTexture = device.makeTexture(descriptor: descriptor) else {
-            throw RendererError.textureAllocationFailed
+            throw PointSplatError.textureAllocationFailed
         }
         outTexture.label = "PointSplat resolve"
         self.outTexture = outTexture
@@ -108,7 +100,7 @@ public final class PointSplatRenderer {
             )
         }
         guard let resources else {
-            throw RendererError.bufferAllocationFailed
+            throw PointSplatError.bufferAllocationFailed
         }
         let uniforms = PointSplatUniforms(
             modelMatrix: modelMatrix,
