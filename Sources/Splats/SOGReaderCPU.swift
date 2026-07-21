@@ -251,45 +251,8 @@ public struct SOGReaderCPU: SplatReaderProtocol {
 
     private static func loadImageDataWithSize(from archive: Archive, filename: String) throws -> (data: [UInt8], width: Int, height: Int, bytesPerPixel: Int) {
         let imageData = try extractData(from: archive, filename: filename)
-
-        guard let imageSource = CGImageSourceCreateWithData(imageData as CFData, nil), let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
-            throw SplatsError.failedToDecodeImage(filename)
-        }
-
-        let width = cgImage.width
-        let height = cgImage.height
-
-        // Always decode to RGBA for consistency
-        var pixelData = [UInt8](repeating: 0, count: width * height * 4)
-
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        // CGContext requires premultiplied alpha
-        guard let context = CGContext(
-            data: &pixelData,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: width * 4,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            throw SplatsError.failedToDecodeImage(filename)
-        }
-
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-
-        // Un-premultiply alpha to recover original RGB values
-        for i in stride(from: 0, to: pixelData.count, by: 4) {
-            let a = pixelData[i + 3]
-            if a > 0, a < 255 {
-                let alphaF = Float(a) / 255.0
-                pixelData[i + 0] = UInt8(min(255, Float(pixelData[i + 0]) / alphaF))
-                pixelData[i + 1] = UInt8(min(255, Float(pixelData[i + 1]) / alphaF))
-                pixelData[i + 2] = UInt8(min(255, Float(pixelData[i + 2]) / alphaF))
-            }
-        }
-
-        return (pixelData, width, height, 4)
+        let decoded = try SOGImageDecode.decodeRGBA(imageData, filename: filename)
+        return (decoded.pixels, decoded.width, decoded.height, 4)
     }
 }
 
