@@ -2,6 +2,10 @@ import Metal
 import MetalSprocketsSupport
 
 // TODO: #128 Unit tests.
+/// A type-safe wrapper around an `MTLBuffer` holding elements of a fixed type.
+///
+/// Tracks a logical `count` separate from the buffer's capacity and provides
+/// typed accessors so callers don't deal in raw bytes.
 public struct TypedMTLBuffer<Element> {
     private var base: MTLBuffer
     public var count: Int {

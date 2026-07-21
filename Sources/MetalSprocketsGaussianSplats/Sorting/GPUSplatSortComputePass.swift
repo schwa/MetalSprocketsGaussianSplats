@@ -9,7 +9,7 @@ import Splats
 /// Compute pass encoding the full GPU splat sort for one cloud into one slot of
 /// a ``GPUSortResources``: frustum cull + stable compaction, then a two-pass
 /// 8-bit LSD radix over the 16-bit half depth key, then decode into
-/// ``IndexedDistance`` records the render vertex shader reads.
+/// `IndexedDistance` records the render vertex shader reads.
 ///
 /// Culled splats are dropped before the radix so the sort processes only
 /// survivors; the survivor count lands in the slot's indirect draw args

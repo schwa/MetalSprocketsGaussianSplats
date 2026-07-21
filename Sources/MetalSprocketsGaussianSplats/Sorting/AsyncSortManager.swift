@@ -107,6 +107,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     ///   - preallocatedBufferCount: Number of index buffers to preallocate in the pool.
     ///     Typical value is 4 (in-flight MTKView buffers + 1 for sorting). Default is 0
     ///     which allocates buffers on demand.
+    ///   - poolReleaseDisabled: Disables returning index buffers to the pool, forcing
+    ///     fresh allocations. Useful for debugging buffer reuse issues.
     public init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int, preallocatedBufferCount: Int = 0, poolReleaseDisabled: Bool = false) throws {
         self.device = device
         self.capacity = capacity

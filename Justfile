@@ -1,6 +1,15 @@
 list:
     @just --list
 
+# Generate DocC documentation for the library targets into ./docs
+generate-docs:
+    swift package --allow-writing-to-directory ./docs generate-documentation --target Splats --output-path ./docs/Splats
+    swift package --allow-writing-to-directory ./docs generate-documentation --target MetalSprocketsGaussianSplats --output-path ./docs/MetalSprocketsGaussianSplats
+
+# Preview DocC documentation locally
+preview-docs target="MetalSprocketsGaussianSplats":
+    swift package --disable-sandbox preview-documentation --target {{target}}
+
 ack_dir := "Examples/MetalGaussianSplatsDemo/MetalGaussianSplatsDemo/Acknowledgements"
 
 # Gather all LICENSE files from dependencies and copy to Acknowledgements folder

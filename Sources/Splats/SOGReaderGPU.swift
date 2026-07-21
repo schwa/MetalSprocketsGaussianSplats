@@ -57,7 +57,11 @@ public struct SOGReaderGPU {
         }
     }
 
-    /// - Parameter name: Overrides the buffer label; defaults to the file's name.
+    /// Loads a SOG archive and decodes its splat textures on the GPU.
+    ///
+    /// - Parameters:
+    ///   - url: The `.sog` archive to load.
+    ///   - name: Overrides the buffer label; defaults to the file's name.
     public func load(url: URL, name: String? = nil) throws -> Result {
         let archive: Archive
         do {

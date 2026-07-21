@@ -31,7 +31,8 @@ let package = Package(
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
         .package(url: "https://github.com/schwa/GoldenImage", from: "0.1.2"),
-        .package(url: "https://github.com/schwa/MetalSupport", from: "1.0.0")
+        .package(url: "https://github.com/schwa/MetalSupport", from: "1.0.0"),
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.1.0")
     ],
     targets: [
         .target(

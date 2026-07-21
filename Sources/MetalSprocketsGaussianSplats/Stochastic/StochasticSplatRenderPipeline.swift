@@ -35,8 +35,19 @@ public struct StochasticSplatRenderPipeline: Element {
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
 
-    /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when data is available.
     /// Convenience initializer for single-view (mono) rendering.
+    ///
+    /// - Parameters:
+    ///   - splatCloud: The splat cloud to render.
+    ///   - projectionMatrix: The camera projection matrix.
+    ///   - modelMatrix: The scene-level model transform.
+    ///   - cameraMatrix: The camera (view-to-world) matrix.
+    ///   - drawableSize: The render target size in pixels.
+    ///   - frameTime: A per-frame counter used to vary the stochastic noise pattern.
+    ///   - alphaThreshold: Opacity above which a splat fragment is treated as fully opaque.
+    ///   - convertSRGBToLinear: Whether splat colors are converted from sRGB to linear in the shader.
+    ///   - useBlueNoise: Uses a blue-noise texture for sampling instead of white noise, reducing visible grain.
+    ///   - useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when data is available.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
@@ -64,6 +75,18 @@ public struct StochasticSplatRenderPipeline: Element {
     }
 
     /// Full initializer supporting stereo/amplification rendering.
+    ///
+    /// - Parameters:
+    ///   - splatCloud: The splat cloud to render.
+    ///   - projectionMatrices: One projection matrix per view (two for stereo).
+    ///   - modelMatrix: The scene-level model transform.
+    ///   - cameraMatrices: One camera (view-to-world) matrix per view, matching `projectionMatrices`.
+    ///   - drawableSize: The render target size in pixels.
+    ///   - frameTime: A per-frame counter used to vary the stochastic noise pattern.
+    ///   - alphaThreshold: Opacity above which a splat fragment is treated as fully opaque.
+    ///   - convertSRGBToLinear: Whether splat colors are converted from sRGB to linear in the shader.
+    ///   - useBlueNoise: Uses a blue-noise texture for sampling instead of white noise, reducing visible grain.
+    ///   - useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when data is available.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrices: [simd_float4x4],

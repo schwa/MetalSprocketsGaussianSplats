@@ -330,12 +330,13 @@ closed: 2026-03-25T00:00:00Z
 ## 15: Create docc docs for entire project.
 
 +++
-status: open
+status: closed
 priority: medium
 kind: documentation
 labels: effort:l
 created: 2026-03-25T00:00:00Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-07-21T21:58:57Z
+closed: 2026-07-21T21:58:57Z
 +++
 
 ---

@@ -34,3 +34,6 @@ playground.xcworkspace
 tmp
 
 .swiftpm
+
+# Generated DocC output
+docs/

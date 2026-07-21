@@ -7,6 +7,11 @@ internal import os
 import simd
 import Splats
 
+/// A splat cloud whose splat data lives in Metal buffers, ready for GPU rendering.
+///
+/// Holds the splat buffer, an optional spherical-harmonics coefficient buffer,
+/// a per-cloud model transform, and a cloud-level opacity. Equality is by
+/// reference; comparing buffer contents would be too expensive for large clouds.
 public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where Splat: SortableSplatProtocol {
     public let splats: TypedMTLBuffer<Splat>
 
@@ -58,6 +63,7 @@ public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where S
 
 // MARK: -
 
+/// Sorted splat indices produced by a CPU or GPU sort, ready for indexed drawing.
 public struct SplatIndices: Sendable, Equatable {
     var parameters: SortParameters
     var indices: TypedMTLBuffer<IndexedDistance>
@@ -88,6 +94,10 @@ public struct SplatIndices: Sendable, Equatable {
 
 // MARK: -
 
+/// The camera and model state a sort was (or should be) computed for.
+///
+/// Renderers compare the parameters of the most recent sort against the current
+/// frame to decide whether a re-sort is needed.
 public struct SortParameters: Sendable, Equatable {
     var time: TimeInterval
     var camera: simd_float4x4

@@ -155,9 +155,17 @@ public struct SparkSplatRenderPipeline: Element {
     // MARK: - Multi-Cloud Initializers
 
     /// Full initializer supporting multiple clouds and stereo/amplification rendering
-    /// - Parameter useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when any cloud has SH data.
-    /// - Parameter boundingBox: Optional world-space bounding box. Splats outside this box are culled.
-    /// - Parameter sortedIndices: Pre-sorted splat indices from an ``AsyncSortManager``.
+    ///
+    /// - Parameters:
+    ///   - splatClouds: The splat clouds to render, in draw order.
+    ///   - projectionMatrices: One projection matrix per view (two for stereo).
+    ///   - modelMatrix: The scene-level model transform, combined with each cloud's own transform.
+    ///   - cameraMatrices: One camera (view-to-world) matrix per view, matching `projectionMatrices`.
+    ///   - drawableSize: The render target size in pixels.
+    ///   - convertSRGBToLinear: Whether splat colors are converted from sRGB to linear in the shader.
+    ///   - useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when any cloud has SH data.
+    ///   - boundingBox: Optional world-space bounding box. Splats outside this box are culled.
+    ///   - sortedIndices: Pre-sorted splat indices from an ``AsyncSortManager``.
     public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, sortedIndices: SplatIndices) throws {
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")

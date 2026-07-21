@@ -83,6 +83,8 @@ public enum DebugParams: Sendable {
     case cloudIndex(DebugCloudIndexParams)
 }
 
+/// A variant of ``SparkSplatRenderPipeline`` that renders debug visualizations
+/// such as depth, opacity, normals, aspect ratio, and cloud index.
 public struct SparkSplatDebugRenderPipeline: Element {
     var splatClouds: [GPUSplatCloud<SparkSplat>]
     var projectionMatrices: [simd_float4x4]

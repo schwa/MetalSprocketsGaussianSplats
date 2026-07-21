@@ -1,7 +1,13 @@
 import Foundation
 import UniformTypeIdentifiers
 
+/// A general-purpose PLY file parser supporting ASCII and binary encodings.
+///
+/// Parses the PLY header and streams element records to a handler. Use
+/// ``PLYSplatReader`` for Gaussian-splat-specific decoding built on top of
+/// this reader.
 public struct PLYReader {
+    /// The encoding of a PLY file's body, as declared in its header.
     public enum Format {
         case ascii
         case binaryLittleEndian

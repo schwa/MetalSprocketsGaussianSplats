@@ -38,10 +38,23 @@ public struct PointSplatRenderPipeline: Element {
     private var reprojection: Bool
     private var depthRange: ClosedRange<Float>
 
-    /// - Parameter depthRange: view-space range for the framebuffer's 28-bit
-    ///   fixed-point depth quantization and the near cull. Should match the
-    ///   projection's clip range; reversed-infinite-Z callers must supply a
-    ///   finite far for quantization purposes.
+    /// - Parameters:
+    ///   - splatCloud: The splat cloud to render.
+    ///   - projectionMatrix: The camera projection matrix.
+    ///   - modelMatrix: The scene-level model transform.
+    ///   - cameraMatrix: The camera (view-to-world) matrix.
+    ///   - drawableSize: The render target size in pixels.
+    ///   - frameIndex: A monotonically increasing frame counter, used to vary the
+    ///     stochastic sampling pattern each frame.
+    ///   - depthRange: view-space range for the framebuffer's 28-bit
+    ///     fixed-point depth quantization and the near cull. Should match the
+    ///     projection's clip range; reversed-infinite-Z callers must supply a
+    ///     finite far for quantization purposes.
+    ///   - supersampling: Framebuffer supersampling factor. Clamped to at least 1.
+    ///   - pointsPerThread: Number of points each compute thread splats. Clamped to at least 1.
+    ///   - reprojection: Whether the previous frame's accumulation is reprojected
+    ///     when the camera moves, reducing convergence noise.
+    ///   - statistics: Optional collector for per-frame render statistics.
     public init(splatCloud: GPUSplatCloud<SparkSplat>, projectionMatrix: simd_float4x4, modelMatrix: simd_float4x4, cameraMatrix: simd_float4x4, drawableSize: SIMD2<Float>, frameIndex: UInt32, depthRange: ClosedRange<Float> = 0.2...200.0, supersampling: Int = 2, pointsPerThread: Int = 4, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) throws {
         self.depthRange = depthRange
         self.supersampling = max(supersampling, 1)
