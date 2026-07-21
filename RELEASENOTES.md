@@ -7,11 +7,55 @@
 - Added GPU-sorted splat pipeline with frustum culling (`GPUSortedSplatRenderPipeline`):
   cull + stable compaction + two-pass radix sort encoded in the same GPU workload as
   rendering, drawing survivors via indirect draw. New `gpu` renderer mode in `SplatView`
-  with a splat count / cull percentage stats overlay.
+  with a splat count / cull percentage stats overlay. Stereo/visionOS rendering supported.
+- New PointSplat renderer: sort-free stochastic Gaussian point splatting (RFC 0003),
+  with GPU work distribution, 2x2 supersampling and K points per thread, spherical
+  harmonics, occlusion culling, temporal reprojection during camera motion (with
+  toggle), proportional thinning under a framebuffer-derived point budget, and
+  GPU-side indirect dispatch
+- PointSplat: group-level hierarchical culling with optional Morton reorder of splats
+  at load time (`ilOrdered:` on `GPUSplatCloud`) for tight group bounds
+- Tile-based renderer exposed in `SplatView` and the demo
+- visionOS: per-eye sorting for stereo rendering and a turnkey `SplatImmersiveContent`
+  immersive space wrapper
+- Ported GPU SOG reader from gaussiansplats-ios; added a pure-Swift VP8L fallback
+  decoder for lossless WebP textures ImageIO rejects
+- Added `managedSortedIndicesStream` to `AsyncSortManager` for simpler buffer-release
+  handling
+- CLI: `bench` subcommand producing renderer scaling curves (spark, gpu, tile,
+  stochastic); README benchmark results section with scaling graph
+- Added DocC documentation catalogs and doc comments across the package
+- Splats: human-readable error descriptions
+
+### Fixes
+
+- Fixed washed-out output in tile and PointSplat renderers
+- Fixed mirrored anisotropic splats in PointSplat
+- PointSplat resources are recreated when the splat cloud or drawable changes
+- PointSplat accumulation is idempotent per frame; GPU sort advances its frame slot
+  in init, not body
+- Spark: `cloudDataBuffer` cached across body evaluations
+- Stochastic renderer: noise seed freezes when the camera is stationary
+- Demo: fixed Load button only working once; added drag & drop and a loading indicator
+- Shader recreation on setting changes now propagates errors instead of `try!`/`fatalError`
+
+### Performance
+
+- Tile renderer precomputes per-splat conic data: ~3.5x faster
+- PointSplat occlusion culling and temporal reprojection (RFC 0005)
 
 ### Other
 
 - Demo project resolves Interaction3D from GitHub instead of a local package override
+- All Metal resources now carry debug labels
+- Stochastic, tile, and Spark pipelines bind uniforms/textures via `.parameter`
+  instead of raw encoder calls
+- Golden-image rendering test coverage
+- Consolidated offscreen and live PointSplat code paths
+- Documented macOS toolbar/NavigationStack blank-render limitation on `SplatView`
+- New RFCs: 0002 (TileAlt), 0003 (PointSplat), 0004 (point budget thinning),
+  0005 (PointSplat improvements beyond the paper)
+- README: per-renderer sections
 
 ## 0.1.7
 
