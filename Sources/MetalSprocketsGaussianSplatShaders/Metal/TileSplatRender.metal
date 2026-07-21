@@ -44,9 +44,13 @@ namespace TileSplatRender {
 
     /// Renders each pixel by iterating through the tile's sorted splat list
     /// Writes result to imageblock for later blit to color attachment
+    ///
+    /// Per-splat projection data (screen center, conic, color) is precomputed
+    /// once per frame by the binning write kernel (#58); the loop here is a
+    /// cheap conic evaluation.
     [[fragment]] FragmentOut tile_fragment(
         FragmentIn in [[stage_in]],
-        constant SparkSplat* splats [[buffer(0)]],
+        constant TileProjectedSplat* projectedSplats [[buffer(0)]],
         device TileSplatIndex* tileSplatIndices [[buffer(1)]],
         device const uint* tileOffsets [[buffer(2)]],
         constant TileRenderUniforms& uniforms [[buffer(3)]],
@@ -94,115 +98,31 @@ namespace TileSplatRender {
         // Pixel center in screen coordinates
         float2 pixelPos = float2(pixelCoord) + 0.5;
 
-        // Precompute focal length
-        float2 focal = computeFocalLength(uniforms.projectionMatrix, uniforms.drawableSize);
-
         // Process splats front-to-back (already sorted by depth)
         for (uint i = 0; i < count; i++) {
             TileSplatIndex idx = tileSplatIndices[startIndex + i];
-            SparkSplat splat = splats[idx.splatID];
+            TileProjectedSplat projected = projectedSplats[idx.splatID];
 
-            float3 center = float3(splat.position);
-            float3 scales = float3(splat.scale);
-            float4 quaternion = float4(splat.rotation);
-            float4 rgba = float4(splat.color) / 255.0;
+            float2 delta = pixelPos - projected.centerConicAB.xy;
 
-            // Skip if too transparent
-            if (rgba.a < MIN_ALPHA) {
-                continue;
-            }
-
-            // Transform to world then view space
-            float4 worldCenter = uniforms.modelMatrix * float4(center, 1.0);
-            float4 viewCenter4 = uniforms.viewMatrix * worldCenter;
-            float3 viewCenter = viewCenter4.xyz;
-
-            // Skip if behind camera (shouldn't happen after binning, but safety check)
-            if (viewCenter.z >= 0.0) {
-                continue;
-            }
-
-            // Compute clip space position
-            float4 clipCenter = uniforms.projectionMatrix * float4(viewCenter, 1.0);
-            float3 ndcCenter = clipCenter.xyz / clipCenter.w;
-
-            // Convert NDC to screen coordinates (flip Y: NDC Y=-1 is bottom, screen Y=0 is top)
-            float2 splatCenter2D = float2(
-                (ndcCenter.x + 1.0) * 0.5 * uniforms.drawableSize.x,
-                (1.0 - ndcCenter.y) * 0.5 * uniforms.drawableSize.y
-            );
-
-            // Build rotation-scale matrix and transform to view space
-            float3x3 localRS = scaleQuaternionToMatrix(scales, quaternion);
-            float3x3 viewRS = transformToViewSpace(uniforms.modelMatrix, uniforms.viewMatrix, localRS);
-
-            // Compute 3D covariance and project to 2D
-            float3x3 cov3D = compute3DCovariance(viewRS);
-            float3x3 J = computeProjectionJacobian(viewCenter, focal);
-            Covariance2D cov2D = projectCovarianceTo2D(cov3D, J);
-
-            // Add blur for anti-aliasing
-            float blurAmount = 0.3;
-            float detOrig = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
-            cov2D.a += blurAmount;
-            cov2D.d += blurAmount;
-            float det = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
-
-            // Compute anti-aliasing intensity scaling
-            float blurAdjust = sqrt(max(0.0, detOrig / det));
-            float baseAlpha = rgba.a * blurAdjust;
-
-            if (baseAlpha < MIN_ALPHA) {
-                continue;
-            }
-
-            // Eigendecomposition for Gaussian evaluation
-            Eigen2D eigen = eigendecompose2D(cov2D, MAX_PIXEL_RADIUS, MAX_STD_DEV);
-
-            // Flip Y component of eigen axes to match screen coordinates (Y flipped from NDC)
-            eigen.majorAxis.y = -eigen.majorAxis.y;
-            eigen.minorAxis.y = -eigen.minorAxis.y;
-
-            // Compute pixel's position relative to splat center
-            float2 delta = pixelPos - splatCenter2D;
-
-            // Transform delta to ellipse-aligned UV space
-            float2 eigenVec1 = normalize(eigen.majorAxis);
-            float2 eigenVec2 = float2(eigenVec1.y, -eigenVec1.x);
-
-            float majorScale = length(eigen.majorAxis);
-            float minorScale = length(eigen.minorAxis);
-
-            // Avoid division by zero
-            if (majorScale < 0.001 || minorScale < 0.001) {
-                continue;
-            }
-
-            // UV in ellipse space
-            float u = dot(delta, eigenVec1) / majorScale;
-            float v = dot(delta, eigenVec2) / minorScale;
-
-            // Squared distance in normalized ellipse space
-            float z = u * u + v * v;
+            // Squared Mahalanobis distance via the precomputed conic.
+            float mahalanobis2 = projected.centerConicAB.z * delta.x * delta.x
+                + 2.0 * projected.centerConicAB.w * delta.x * delta.y
+                + projected.conicD * delta.y * delta.y;
 
             // Skip if outside Gaussian cutoff
-            if (z > 1.0) {
+            if (mahalanobis2 > MAX_STD_DEV * MAX_STD_DEV) {
                 continue;
             }
 
-            // Evaluate Gaussian
-            float zScaled = z * (MAX_STD_DEV * MAX_STD_DEV);
-            float alpha = baseAlpha * exp(-0.5 * zScaled);
+            float alpha = projected.colorAlpha.w * exp(-0.5 * mahalanobis2);
 
             if (alpha < MIN_ALPHA) {
                 continue;
             }
 
-            // Convert sRGB to linear for correct blending
-            float3 linearRGB = pow(rgba.rgb, float3(2.2));
-
-            // Front-to-back alpha blending
-            if (accumulateFrontToBack(float4(linearRGB, 1.0), alpha, accumulatedColor, accumulatedAlpha)) {
+            // Front-to-back alpha blending (color is already linear)
+            if (accumulateFrontToBack(float4(projected.colorAlpha.rgb, 1.0), alpha, accumulatedColor, accumulatedAlpha)) {
                 break; // Early exit - pixel is opaque enough
             }
         }

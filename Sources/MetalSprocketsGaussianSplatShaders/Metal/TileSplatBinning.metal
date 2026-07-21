@@ -24,7 +24,8 @@ namespace TileSplatBinning {
         constant uint2& tileGridSize,
         thread uint2& minTile,
         thread uint2& maxTile,
-        thread float& depth
+        thread float& depth,
+        thread TileProjectedSplat& projected
     ) {
         SparkSplat splat = splats[splatID];
 
@@ -86,14 +87,36 @@ namespace TileSplatBinning {
 
         // Add small blur for anti-aliasing
         float blurAmount = 0.3;
+        float detOrig = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
         cov2D.a += blurAmount;
         cov2D.d += blurAmount;
+        float det = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
+
+        if (det <= 0.0) {
+            return false;
+        }
 
         // Eigendecomposition for ellipse axes
         Eigen2D eigen = eigendecompose2D(cov2D, MAX_PIXEL_RADIUS, MAX_STD_DEV);
 
         // Compute NDC center
         float3 ndcCenter = clipCenter.xyz / clipCenter.w;
+
+        // Precompute the per-pixel evaluation data: screen-space center,
+        // inverse covariance (conic), and anti-aliased base alpha. The
+        // render loop evaluates only this — never the projection math.
+        float2 screenCenter = float2(
+            (ndcCenter.x + 1.0) * 0.5 * drawableSize.x,
+            (1.0 - ndcCenter.y) * 0.5 * drawableSize.y
+        );
+        float invDet = 1.0 / det;
+        // Screen Y is flipped from NDC, which negates the off-diagonal term.
+        float3 conic = float3(cov2D.d * invDet, cov2D.b * invDet, cov2D.a * invDet);
+        float blurAdjust = sqrt(max(0.0, detOrig / det));
+        float baseAlpha = rgba.a * blurAdjust;
+        projected.centerConicAB = float4(screenCenter, conic.x, conic.y);
+        projected.colorAlpha = float4(pow(rgba.rgb, float3(2.2)), baseAlpha);
+        projected.conicD = conic.z;
 
         // Compute bounding box in NDC space
         float2 majorAxisNDC = (2.0 / drawableSize) * eigen.majorAxis;
@@ -142,10 +165,11 @@ namespace TileSplatBinning {
 
         uint2 minTile, maxTile;
         float depth;
+        TileProjectedSplat projected;
 
         if (!computeSplatTileBounds(splatID, splats, modelMatrix, viewMatrix,
                                      projectionMatrix, drawableSize, tileGridSize,
-                                     minTile, maxTile, depth)) {
+                                     minTile, maxTile, depth, projected)) {
             return;
         }
 
@@ -175,7 +199,8 @@ namespace TileSplatBinning {
         device atomic_uint* tileCounters [[buffer(8)]],
         device TileSplatIndex* tileSplatIndices [[buffer(9)]],
         device const uint* tileOffsets [[buffer(10)]],
-        constant uint& maxTotalIntersections [[buffer(11)]]
+        constant uint& maxTotalIntersections [[buffer(11)]],
+        device TileProjectedSplat* projectedSplats [[buffer(12)]]
     ) {
         if (splatID >= splatCount) {
             return;
@@ -183,12 +208,15 @@ namespace TileSplatBinning {
 
         uint2 minTile, maxTile;
         float depth;
+        TileProjectedSplat projected;
 
         if (!computeSplatTileBounds(splatID, splats, modelMatrix, viewMatrix,
                                      projectionMatrix, drawableSize, tileGridSize,
-                                     minTile, maxTile, depth)) {
+                                     minTile, maxTile, depth, projected)) {
             return;
         }
+
+        projectedSplats[splatID] = projected;
 
         // Write to all overlapping tiles
         for (uint ty = minTile.y; ty <= maxTile.y; ty++) {

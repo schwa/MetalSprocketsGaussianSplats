@@ -117,6 +117,7 @@ public struct TileBinningWritePass: Element {
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
             .namespaced("TileSplatBinning")
         self.computeKernel = try shaderLibrary.function(named: "tile_binning_write", type: ComputeKernel.self)
+        try tileSplatResources.ensureProjectedSplatCapacity(splatCloud.count)
     }
 
     // MARK: - Element Body
@@ -153,6 +154,7 @@ public struct TileBinningWritePass: Element {
                     .parameter("tileSplatIndices", buffer: tileSplatResources.tileSplatIndicesA.unsafeMTLBuffer)
                     .parameter("tileOffsets", buffer: tileSplatResources.tileOffsets.unsafeMTLBuffer)
                     .parameter("maxTotalIntersections", value: UInt32(TileSplatResources.maxTotalSplatTileIntersections))
+                    .parameter("projectedSplats", buffer: tileSplatResources.projectedSplats.unsafeMTLBuffer)
                 }
             }
         }

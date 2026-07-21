@@ -19,6 +19,16 @@ struct TileSplatIndex {
     float depth;         // Camera-space Z for sorting (negative = in front of camera)
 };
 
+/// Per-splat 2D projection data, precomputed once per frame by the binning
+/// write kernel so the per-pixel render loop only evaluates a conic instead
+/// of redoing the covariance projection and eigendecomposition per pixel.
+struct TileProjectedSplat {
+    simd_float4 centerConicAB;  // center.xy (screen pixels), conic a, conic b
+    simd_float4 colorAlpha;     // linear rgb, base alpha (after AA scaling)
+    float conicD;
+    float padding[3];
+};
+
 /// Uniforms for tile-based rendering
 struct TileRenderUniforms {
     simd_float4x4 modelMatrix;

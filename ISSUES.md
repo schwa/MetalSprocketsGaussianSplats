@@ -1290,15 +1290,18 @@ SplatImmersiveContent drives immersive visionOS rendering via the CPU AsyncSortM
 ## 58: Tile-based renderer performance is poor
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: tile-based, effort:l
 created: 2026-07-20T18:53:32Z
-updated: 2026-07-21T20:43:22Z
+updated: 2026-07-21T21:48:53Z
+closed: 2026-07-21T21:48:53Z
 +++
 
 The tile-based renderer runs significantly slower than the Spark and GPU-sorted renderers on the same scenes (observed in the demo app on macOS). Frame times are noticeably worse when switching the Renderer picker to Tile.
+
+- `2026-07-21T21:48:53Z`: Precomputed per-splat 2D projection data (screen center, conic/inverse covariance, linear color, AA'd base alpha) once per frame in the binning write kernel; the per-pixel render loop is now a cheap conic evaluation instead of redoing covariance projection + eigendecomposition per splat per pixel. Bench (synthetic, 1024px): 4M splats 436ms -> 125ms, 8M 890ms -> 260ms (~3.5x). Remaining known cost at smaller counts is the serial per-tile radix sort and single-threaded prefix sum. Smoke test added (TileRenderingTests).
 
 ---
 

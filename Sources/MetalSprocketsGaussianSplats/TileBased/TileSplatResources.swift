@@ -51,6 +51,11 @@ public final class TileSplatResources {
     /// Written by prefix sum kernel
     public private(set) var maxTileCount: TypedMTLBuffer<UInt32>
 
+    /// Per-splat 2D projection data (screen center, conic, linear color),
+    /// written by the binning write kernel and read by the render pass (#58).
+    /// Grown on demand via ``ensureProjectedSplatCapacity(_:)``.
+    public private(set) var projectedSplats: TypedMTLBuffer<TileProjectedSplat>
+
     /// Shared-mode buffer for reading back tile counts to CPU (for stats display)
     public private(set) var tileCountersReadback: TypedMTLBuffer<UInt32>
 
@@ -92,6 +97,19 @@ public final class TileSplatResources {
         // Allocate readback buffer for CPU access to tile counts
         self.tileCountersReadback = try device.makeTypedBuffer(element: UInt32.self, capacity: totalTiles, options: .storageModeShared).labeled("TileCountersReadback")
         self.tileCountersReadback.count = totalTiles
+
+        self.projectedSplats = try device.makeTypedBuffer(element: TileProjectedSplat.self, capacity: 1, options: .storageModePrivate).labeled("TileProjectedSplats")
+        self.projectedSplats.count = 1
+    }
+
+    /// Grow the projected-splat buffer to hold at least `splatCount` entries.
+    public func ensureProjectedSplatCapacity(_ splatCount: Int) throws {
+        let required = max(splatCount, 1)
+        guard projectedSplats.capacity < required else {
+            return
+        }
+        projectedSplats = try device.makeTypedBuffer(element: TileProjectedSplat.self, capacity: required, options: .storageModePrivate).labeled("TileProjectedSplats")
+        projectedSplats.count = required
     }
 
     // MARK: - Resize
@@ -161,7 +179,8 @@ public final class TileSplatResources {
         let offsetsBufferSize = tileOffsets.unsafeMTLBuffer.length
         let maxTileCountSize = maxTileCount.unsafeMTLBuffer.length
         let readbackBufferSize = tileCountersReadback.unsafeMTLBuffer.length
-        return indexBufferASize + indexBufferBSize + counterBufferSize + offsetsBufferSize + maxTileCountSize + readbackBufferSize
+        let projectedSplatsSize = projectedSplats.unsafeMTLBuffer.length
+        return indexBufferASize + indexBufferBSize + counterBufferSize + offsetsBufferSize + maxTileCountSize + readbackBufferSize + projectedSplatsSize
     }
 
     /// Human-readable memory usage string

@@ -85,7 +85,7 @@ public struct TileSplatRenderPass: Element {
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
 
                     // Fragment shader buffers
-                    commandEncoder.setFragmentBuffer(splatCloud.splats.unsafeMTLBuffer, offset: 0, index: 0)
+                    commandEncoder.setFragmentBuffer(tileSplatResources.projectedSplats.unsafeMTLBuffer, offset: 0, index: 0)
                     commandEncoder.setFragmentBuffer(tileSplatResources.tileSplatIndicesA.unsafeMTLBuffer, offset: 0, index: 1)
                     commandEncoder.setFragmentBuffer(tileSplatResources.tileOffsets.unsafeMTLBuffer, offset: 0, index: 2)
 
