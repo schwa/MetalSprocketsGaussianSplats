@@ -119,6 +119,45 @@ namespace PointSplatRender {
         return result;
     }
 
+    // Reconstructs a SparkSplat from its packed 18-byte form (issue #77).
+    static SparkSplat gps_unpack_splat(GPSPackedSplat packed, constant GPSPackedSplatBounds &bounds) {
+        SparkSplat splat;
+        float3 t = float3(packed.position[0], packed.position[1], packed.position[2]) / 65535.0;
+        splat.position = half3(bounds.positionMin + t * bounds.positionExtent);
+
+        uint scaleBits = uint(packed.scale[0]) | (uint(packed.scale[1]) << 16);
+        float3 logT = float3((scaleBits >> 20) & 0x3FFu, (scaleBits >> 10) & 0x3FFu, scaleBits & 0x3FFu) / 1023.0;
+        splat.scale = half3(exp(bounds.logScaleMin + logT * bounds.logScaleExtent));
+
+        // Smallest-three: the largest-magnitude component (made positive at
+        // pack time) is reconstructed from the other three.
+        uint rotationBits = uint(packed.rotation[0]) | (uint(packed.rotation[1]) << 16);
+        uint maxIndex = rotationBits >> 30;
+        const float limit = 0.7071067811865476;
+        float3 abc = (float3((rotationBits >> 20) & 0x3FFu, (rotationBits >> 10) & 0x3FFu, rotationBits & 0x3FFu) / 1023.0 * 2.0 - 1.0) * limit;
+        float w = sqrt(max(0.0, 1.0 - dot(abc, abc)));
+        float4 q;
+        switch (maxIndex) {
+        case 0: q = float4(w, abc.x, abc.y, abc.z); break;
+        case 1: q = float4(abc.x, w, abc.y, abc.z); break;
+        case 2: q = float4(abc.x, abc.y, w, abc.z); break;
+        default: q = float4(abc.x, abc.y, abc.z, w); break;
+        }
+        splat.rotation = half4(q);
+
+        splat.color = uchar4(packed.color[0], packed.color[1], packed.color[2], packed.color[3]);
+        return splat;
+    }
+
+    // Loads a splat from either storage format; `splats` aliases an array
+    // of SparkSplat or GPSPackedSplat depending on `packedFlag`.
+    static inline SparkSplat gps_load_splat(device const uchar *splats, uint index, uint packedFlag, constant GPSPackedSplatBounds &bounds) {
+        if (packedFlag != 0) {
+            return gps_unpack_splat(reinterpret_cast<device const GPSPackedSplat *>(splats)[index], bounds);
+        }
+        return reinterpret_cast<device const SparkSplat *>(splats)[index];
+    }
+
     // Clears the 64-bit framebuffer to (far depth | background color).
     kernel void pointSplatClear(device ulong  *framebuffer [[buffer(0)]],
                                 constant ulong &clearValue [[buffer(1)]],
@@ -166,9 +205,11 @@ namespace PointSplatRender {
     // One-time per splat buffer: model-space AABB per group of GROUP_SIZE
     // consecutive Gaussians, expanded by 3 sigma of each Gaussian's largest
     // scale so the box conservatively contains the splatted points.
-    kernel void pointSplatGroupBounds(device const SparkSplat *splats [[buffer(0)]],
+    kernel void pointSplatGroupBounds(device const uchar *splats [[buffer(0)]],
                                       device float4 *bounds [[buffer(1)]],
                                       constant uint &splatCount [[buffer(2)]],
+                                      constant uint &packedFlag [[buffer(3)]],
+                                      constant GPSPackedSplatBounds &packedBounds [[buffer(4)]],
                                       uint gid [[thread_position_in_grid]]) {
         uint groupCount = (splatCount + GROUP_SIZE - 1) / GROUP_SIZE;
         if (gid >= groupCount) {
@@ -179,7 +220,7 @@ namespace PointSplatRender {
         float3 lo = float3(INFINITY);
         float3 hi = float3(-INFINITY);
         for (uint i = start; i < end; i++) {
-            SparkSplat splat = splats[i];
+            SparkSplat splat = gps_load_splat(splats, i, packedFlag, packedBounds);
             float3 position = float3(splat.position);
             float3 scales = float3(splat.scale);
             float pad = 3.0 * max(scales.x, max(scales.y, scales.z));
@@ -300,13 +341,14 @@ namespace PointSplatRender {
     // the splat stage. Counts and renderedMask are pre-cleared by
     // pointSplatClearCounts; renderedMask records phase-1 participation so
     // phase 2 only considers Gaussians the stale pyramid culled.
-    kernel void pointSplatPreprocess(device const SparkSplat *splats [[buffer(0)]],
+    kernel void pointSplatPreprocess(device const uchar *splats [[buffer(0)]],
                                      device uint *counts [[buffer(1)]],
                                      constant PointSplatUniforms &uniforms [[buffer(2)]],
                                      device const float *shCoefficients [[buffer(3)]],
                                      device ulong *colors [[buffer(4)]],
                                      device uint *renderedMask [[buffer(5)]],
                                      device const uint *visibleGroups [[buffer(6)]],
+                                     constant GPSPackedSplatBounds &packedBounds [[buffer(7)]],
                                      texture2d<float, access::read> depthPyramid [[texture(0)]],
                                      uint groupId [[threadgroup_position_in_grid]],
                                      uint lid [[thread_position_in_threadgroup]]) {
@@ -319,7 +361,8 @@ namespace PointSplatRender {
             return;
         }
 
-        ProjectedGaussian projected = project(splats[gid], uniforms);
+        SparkSplat splat = gps_load_splat(splats, gid, uniforms.packedSplats, packedBounds);
+        ProjectedGaussian projected = project(splat, uniforms);
         if (!projected.valid) {
             return;
         }
@@ -330,9 +373,9 @@ namespace PointSplatRender {
 
         // SH color depends only on the view direction to the Gaussian's
         // mean, so evaluate once here rather than per point.
-        float3 rgb = float3(splats[gid].color.xyz) / 255.0;
+        float3 rgb = float3(splat.color.xyz) / 255.0;
         if (uniforms.shDegree > 0) {
-            float3 worldCenter = (uniforms.modelMatrix * float4(float3(splats[gid].position), 1.0)).xyz;
+            float3 worldCenter = (uniforms.modelMatrix * float4(float3(splat.position), 1.0)).xyz;
             float3 viewDir = normalize(worldCenter - uniforms.cameraPosition);
             rgb = max(rgb + evaluateSH(viewDir, shCoefficients, gid, uniforms.shDegree), 0.0);
         }
@@ -402,13 +445,14 @@ namespace PointSplatRender {
 
     // Per splat-thread: sample K points from the assigned Gaussian and
     // splat each with atomic_min. Requires MSL 3.1 + Apple9/Mac2.
-    kernel void pointSplatSplat(device const SparkSplat *splats [[buffer(0)]],
+    kernel void pointSplatSplat(device const uchar *splats [[buffer(0)]],
                                 device const uint *indices [[buffer(1)]],
                                 device atomic_ulong *framebuffer [[buffer(2)]],
                                 constant PointSplatUniforms &uniforms [[buffer(3)]],
                                 device const uint *totals [[buffer(4)]],
                                 device const ulong *framebufferRead [[buffer(5)]],
                                 device const ulong *colors [[buffer(6)]],
+                                constant GPSPackedSplatBounds &packedBounds [[buffer(7)]],
                                 uint gid [[thread_position_in_grid]]) {
         // Dispatched over the full capacity; totals[0] is the actual thread
         // count written by the workload distributor on the GPU timeline.
@@ -416,7 +460,7 @@ namespace PointSplatRender {
             return;
         }
         uint gaussianIndex = indices[gid];
-        ProjectedGaussian projected = project(splats[gaussianIndex], uniforms);
+        ProjectedGaussian projected = project(gps_load_splat(splats, gaussianIndex, uniforms.packedSplats, packedBounds), uniforms);
         if (!projected.valid) {
             return;
         }

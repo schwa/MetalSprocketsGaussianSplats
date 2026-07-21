@@ -53,6 +53,9 @@ struct BenchCommand: AsyncParsableCommand {
     @Option(help: "PointSplat points per thread K")
     var pointsPerThread: Int = 4
 
+    @Flag(help: "Use quantized 18-byte packed splat storage for the point renderer (issue #77)")
+    var packed = false
+
     @Flag(help: "Sweep PointSplat S/K configs for single-frame PSNR vs a converged reference (ignores --renderers)")
     var pointQuality = false
 
@@ -77,8 +80,9 @@ struct BenchCommand: AsyncParsableCommand {
         }
         let supersampling = self.supersampling
         let pointsPerThread = self.pointsPerThread
+        let packed = self.packed
         try await MainActor.run {
-            var runner = try BenchRunner(size: size, frames: frames, supersampling: supersampling, pointsPerThread: pointsPerThread)
+            var runner = try BenchRunner(size: size, frames: frames, supersampling: supersampling, pointsPerThread: pointsPerThread, packed: packed)
             var rows: [BenchRunner.Row] = []
             #if DEBUG
             print("warning: Debug build; numbers will not be representative")
@@ -129,8 +133,10 @@ struct BenchRunner {
     let pointsPerThread: Int
     let device: MTLDevice
     let commandQueue: MTLCommandQueue
+    let packed: Bool
 
-    init(size: Int, frames: Int, supersampling: Int = 2, pointsPerThread: Int = 4) throws {
+    init(size: Int, frames: Int, supersampling: Int = 2, pointsPerThread: Int = 4, packed: Bool = false) throws {
+        self.packed = packed
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw BenchCommand.BenchError(message: "No Metal device")
         }
@@ -239,6 +245,12 @@ struct BenchRunner {
 
     private func benchmarkPointSplat(splats: [SparkSplat], cameraMatrix: simd_float4x4, projectionMatrix: simd_float4x4) throws -> [Double] {
         let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, supersampling: supersampling, pointsPerThread: pointsPerThread))
+        if packed {
+            let cloud = try PackedSplatCloud(device: device, splats: splats)
+            return try measure { frame in
+                _ = try renderer.render(packed: cloud, modelMatrix: .identity, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: UInt32(frame))
+            }
+        }
         guard let buffer = device.makeBuffer(bytes: splats, length: MemoryLayout<SparkSplat>.stride * splats.count) else {
             throw BenchCommand.BenchError(message: "Buffer allocation failed")
         }

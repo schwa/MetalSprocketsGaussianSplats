@@ -42,7 +42,33 @@ struct PointSplatUniforms {
     // 2 = phase 2 (only Gaussians culled in phase 1, vs fresh pyramid).
     unsigned int occlusionPhase;
     unsigned int pyramidLevels;     // mip levels in the depth pyramid
+    unsigned int packedSplats;      // 1 = splat buffer holds GPSPackedSplat (issue #77)
 };
+
+// Quantized splat storage (issue #77, paper Sec. 4.1): 18 bytes per
+// Gaussian versus SparkSplat's 32. Fixed-point means inside the cloud
+// AABB, 10-bit log-space scales, smallest-three quaternion (2-bit max
+// component index + 3 x 10-bit components), 8-bit color + opacity.
+// All fields are 16-bit or smaller so the struct packs without padding.
+struct GPSPackedSplat {
+    unsigned short position[3];  // fixed-point in [positionMin, positionMin + positionExtent]
+    unsigned short scale[2];     // low 30 bits: 3 x 10-bit log scales
+    unsigned short rotation[2];  // 2-bit largest-component index + 3 x 10-bit smallest-three
+    unsigned char color[4];      // rgb + opacity
+};
+
+// Dequantization ranges for a packed cloud; positions and log scales are
+// stored normalized against these.
+struct GPSPackedSplatBounds {
+    GPSFloat3 positionMin;
+    GPSFloat3 positionExtent;
+    float logScaleMin;
+    float logScaleExtent;
+};
+
+#ifndef __METAL_VERSION__
+_Static_assert(sizeof(struct GPSPackedSplat) == 18, "GPSPackedSplat must be 18 bytes");
+#endif
 
 // Quantizes positive view-space depth to 28-bit fixed point between near/far.
 static inline GPSPacked gps_pack_depth(float viewDepth, float nearPlane, float farPlane) {

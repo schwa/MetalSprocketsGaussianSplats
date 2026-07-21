@@ -1677,15 +1677,18 @@ We use the paper's defaults (2x2 supersampling, K=4) untested on our hardware. T
 ## 77: PointSplat: quantized splat storage
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: pointsplat, splats, memory, effort:l
 created: 2026-07-21T20:18:36Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T23:12:18Z
+closed: 2026-07-21T23:12:18Z
 +++
 
 SparkSplat is 32 bytes plus float32 SH coefficients; the paper packs a Gaussian into 21 bytes (fixed-point means, 10-bit log scales, 30-bit quaternion, 8-bit opacity) with 8-bit palette-quantized SH, roughly 4x smaller. Splat-stage read bandwidth and total memory scale accordingly; matters for multi-10M clouds (48M splats = 1.5 GB today before SH). Touches every renderer that consumes SparkSplat, so likely a parallel packed format consumed by PointSplat first.
+
+- `2026-07-21T23:12:18Z`: Implemented the parallel packed format, PointSplat-first as suggested: GPSPackedSplat is 18 bytes vs SparkSplat's 32 (16-bit fixed-point means in the cloud AABB, 3x10-bit log scales, smallest-three 30-bit quaternion, 8-bit rgba). PackedSplatCloud packs on CPU and the PointSplat kernels decode on load behind a uniforms flag (unpacked path unchanged); PointSplatRenderer gained render(packed:), and bench gained --packed. Tests: CPU round-trip accuracy, zero-scale handling, and a GPU packed-vs-unpacked converged PSNR check (>30 dB). Timing at 8M synthetic is neutral-to-slightly-faster (17.6 -> 17.3 ms median); the win is the 44% storage cut. Not done: 8-bit palette-quantized SH (this offscreen path is color-only) and adoption by the other SparkSplat renderers.
 
 ---
 

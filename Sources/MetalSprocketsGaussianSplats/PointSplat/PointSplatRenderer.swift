@@ -88,6 +88,16 @@ public final class PointSplatRenderer {
 
     /// Renders one stochastic frame. Blocks until complete.
     public func render(splats: MTLBuffer, splatCount: Int, modelMatrix: simd_float4x4, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4, frameSeed: UInt32) throws -> MTLTexture {
+        try render(splats: splats, splatCount: splatCount, packedBounds: nil, modelMatrix: modelMatrix, viewMatrix: viewMatrix, projectionMatrix: projectionMatrix, frameSeed: frameSeed)
+    }
+
+    /// Renders one stochastic frame from quantized 18-byte splats
+    /// (issue #77). Blocks until complete.
+    public func render(packed cloud: PackedSplatCloud, modelMatrix: simd_float4x4, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4, frameSeed: UInt32) throws -> MTLTexture {
+        try render(splats: cloud.buffer, splatCount: cloud.count, packedBounds: cloud.bounds, modelMatrix: modelMatrix, viewMatrix: viewMatrix, projectionMatrix: projectionMatrix, frameSeed: frameSeed)
+    }
+
+    private func render(splats: MTLBuffer, splatCount: Int, packedBounds: GPSPackedSplatBounds?, modelMatrix: simd_float4x4, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4, frameSeed: UInt32) throws -> MTLTexture {
         if resources?.splatCount != splatCount {
             resources = try PointSplatResources(
                 device: device,
@@ -116,7 +126,8 @@ public final class PointSplatRenderer {
             cameraPosition: .zero,
             shDegree: 0,
             occlusionPhase: 0,
-            pyramidLevels: UInt32(resources.pyramidLevels)
+            pyramidLevels: UInt32(resources.pyramidLevels),
+            packedSplats: packedBounds == nil ? 0 : 1
         )
 
         // Whole frame in one serial compute encoder; the splat dispatches are
@@ -124,7 +135,7 @@ public final class PointSplatRenderer {
         guard let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw RendererError.commandEncodingFailed
         }
-        try resources.encodeFrame(encoder: encoder, uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed)
+        try resources.encodeFrame(encoder: encoder, uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed, packedBounds: packedBounds ?? GPSPackedSplatBounds())
         resources.encodeResolve(encoder: encoder, uniforms: uniforms, outTexture: outTexture)
         encoder.endEncoding()
         commandBuffer.commit()

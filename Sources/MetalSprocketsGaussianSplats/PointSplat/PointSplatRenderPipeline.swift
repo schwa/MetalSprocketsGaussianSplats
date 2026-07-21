@@ -131,7 +131,8 @@ public struct PointSplatRenderPipeline: Element {
                 cameraPosition: SIMD3<Float>(cameraMatrix.columns.3.x, cameraMatrix.columns.3.y, cameraMatrix.columns.3.z),
                 shDegree: UInt32(splatCloud.shCoefficients != nil ? splatCloud.shDegree : 0),
                 occlusionPhase: 0,
-                pyramidLevels: UInt32(resources.pyramidLevels)
+                pyramidLevels: UInt32(resources.pyramidLevels),
+                packedSplats: 0
             )
             let shBuffer = splatCloud.shCoefficients?.unsafeMTLBuffer ?? resources.dummySHBuffer
             // Running mean: weight the new frame by 1/(n+1); camera or model
@@ -406,7 +407,7 @@ final class PointSplatResources {
     /// — when a pyramid from a previous frame exists — the paper's phase 2
     /// (re-testing phase-1-culled Gaussians against the fresh pyramid so
     /// stale-depth culling can never lose geometry).
-    func encodeFrame(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32) throws {
+    func encodeFrame(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, packedBounds: GPSPackedSplatBounds = GPSPackedSplatBounds()) throws {
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
         let pixelCount = width * height * supersampling * supersampling
         var clearValueCopy = clearValue
@@ -422,23 +423,27 @@ final class PointSplatResources {
         // only when it changes (#75).
         if boundsSourceBuffer != ObjectIdentifier(splats) {
             var splatCountValue = UInt32(splatCount)
+            var packedFlag = uniforms.packedSplats
+            var packedBoundsCopy = packedBounds
             encoder.setComputePipelineState(groupBoundsPipelineState)
             encoder.setBuffer(splats, offset: 0, index: 0)
             encoder.setBuffer(groupBounds, offset: 0, index: 1)
             encoder.setBytes(&splatCountValue, length: MemoryLayout<UInt32>.stride, index: 2)
+            encoder.setBytes(&packedFlag, length: MemoryLayout<UInt32>.stride, index: 3)
+            encoder.setBytes(&packedBoundsCopy, length: MemoryLayout<GPSPackedSplatBounds>.stride, index: 4)
             encoder.dispatchThreads(MTLSize(width: groupCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
             boundsSourceBuffer = ObjectIdentifier(splats)
         }
 
         var phase1 = uniforms
         phase1.occlusionPhase = hasDepthHistory ? 1 : 0
-        try encodePhase(encoder: encoder, uniforms: phase1, splats: splats, shBuffer: shBuffer, seed: seed, statsOffset: 0)
+        try encodePhase(encoder: encoder, uniforms: phase1, splats: splats, shBuffer: shBuffer, seed: seed, statsOffset: 0, packedBounds: packedBounds)
         encodePyramidBuild(encoder: encoder, uniforms: uniforms)
 
         if phase1.occlusionPhase == 1 {
             var phase2 = uniforms
             phase2.occlusionPhase = 2
-            try encodePhase(encoder: encoder, uniforms: phase2, splats: splats, shBuffer: shBuffer, seed: seed &+ 0x9E37_79B9, statsOffset: 2)
+            try encodePhase(encoder: encoder, uniforms: phase2, splats: splats, shBuffer: shBuffer, seed: seed &+ 0x9E37_79B9, statsOffset: 2, packedBounds: packedBounds)
             // Refresh the pyramid with phase-2 contributions for next frame.
             encodePyramidBuild(encoder: encoder, uniforms: uniforms)
         } else {
@@ -464,10 +469,11 @@ final class PointSplatResources {
     }
 
     /// One preprocess -> distribute -> splat round for the given phase.
-    private func encodePhase(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, statsOffset: Int) throws {
+    private func encodePhase(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, statsOffset: Int, packedBounds: GPSPackedSplatBounds) throws {
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
         var uniformsCopy = uniforms
         var groupCountValue = UInt32(groupCount)
+        var packedBoundsCopy = packedBounds
 
         // Reset counts/mask/visible-group counter, cull whole groups against
         // the frustum and depth pyramid, then run the per-Gaussian
@@ -501,6 +507,7 @@ final class PointSplatResources {
         encoder.setBuffer(colors, offset: 0, index: 4)
         encoder.setBuffer(renderedMask, offset: 0, index: 5)
         encoder.setBuffer(visibleGroups, offset: 0, index: 6)
+        encoder.setBytes(&packedBoundsCopy, length: MemoryLayout<GPSPackedSplatBounds>.stride, index: 7)
         encoder.setTexture(depthPyramid, index: 0)
         encoder.dispatchThreadgroups(indirectBuffer: groupDispatchArgs, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
 
@@ -521,6 +528,7 @@ final class PointSplatResources {
         encoder.setBuffer(distributor.totalsBuffer, offset: 0, index: 4)
         encoder.setBuffer(framebuffer, offset: 0, index: 5)
         encoder.setBuffer(colors, offset: 0, index: 6)
+        encoder.setBytes(&packedBoundsCopy, length: MemoryLayout<GPSPackedSplatBounds>.stride, index: 7)
         encoder.dispatchThreadgroups(indirectBuffer: distributor.dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: blockThreads)
     }
 
