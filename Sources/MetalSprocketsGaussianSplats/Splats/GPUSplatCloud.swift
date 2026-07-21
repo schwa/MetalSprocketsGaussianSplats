@@ -37,12 +37,28 @@ public final class GPUSplatCloud <Splat>: Equatable, @unchecked Sendable where S
         self.opacity = opacity
     }
 
-    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, opacity: Float = 1.0) throws {
-        let splats = try device.makeTypedBuffer(values: splats, options: []).labeled("Splats")
-        self.init(splats: splats, modelTransform: modelTransform, opacity: opacity)
+    /// - Parameter mortonOrdered: When true, reorders the splats along a
+    ///   Morton curve before upload so consecutive splats are spatially
+    ///   coherent, tightening group-culling AABBs (#89).
+    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, opacity: Float = 1.0, mortonOrdered: Bool = false) throws {
+        var splats = splats
+        if mortonOrdered {
+            SplatMortonReorder.reorder(splats: &splats)
+        }
+        let splatsBuffer = try device.makeTypedBuffer(values: splats, options: []).labeled("Splats")
+        self.init(splats: splatsBuffer, modelTransform: modelTransform, opacity: opacity)
     }
 
-    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, shCoefficients: [Float], shDegree: UInt8, opacity: Float = 1.0) throws {
+    /// - Parameter mortonOrdered: When true, reorders the splats (and their
+    ///   SH coefficients, in lockstep) along a Morton curve before upload so
+    ///   consecutive splats are spatially coherent, tightening group-culling
+    ///   AABBs (#89).
+    public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, shCoefficients: [Float], shDegree: UInt8, opacity: Float = 1.0, mortonOrdered: Bool = false) throws {
+        var splats = splats
+        var shCoefficients = shCoefficients
+        if mortonOrdered {
+            SplatMortonReorder.reorder(splats: &splats, shCoefficients: &shCoefficients)
+        }
         let splatsBuffer = try device.makeTypedBuffer(values: splats, options: []).labeled("Splats")
         let shBuffer = try device.makeTypedBuffer(values: shCoefficients, options: []).labeled("SHCoefficients")
         self.init(splats: splatsBuffer, modelTransform: modelTransform, shCoefficients: shBuffer, shDegree: shDegree, opacity: opacity)

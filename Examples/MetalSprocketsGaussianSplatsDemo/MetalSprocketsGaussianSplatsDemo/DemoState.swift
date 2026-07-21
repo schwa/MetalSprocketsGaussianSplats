@@ -147,10 +147,13 @@ class DemoState {
             }
         }
         let floatsPerSplat = [0, 9, 24, 45][min(Int(shDegree), 3)]
+        // Morton-reorder for group-culling coherence (#89); the SOG GPU
+        // path above skips this since its splats decode straight into GPU
+        // buffers.
         if floatsPerSplat > 0, shCoefficients.count == splats.count * floatsPerSplat {
-            return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, shCoefficients: shCoefficients, shDegree: shDegree)
+            return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, shCoefficients: shCoefficients, shDegree: shDegree, mortonOrdered: true)
         }
-        return try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
+        return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, mortonOrdered: true)
     }
 }
 #endif

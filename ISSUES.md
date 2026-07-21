@@ -1868,12 +1868,13 @@ Source comments across the project have not been audited against the house writi
 ## 89: PointSplat: Morton-reorder splats at load time for group culling coherence
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: pointsplat, performance, effort:m
 created: 2026-07-21T21:57:34Z
-updated: 2026-07-21T22:30:09Z
+updated: 2026-07-21T22:41:13Z
+closed: 2026-07-21T22:41:13Z
 +++
 
 Group-level hierarchical culling (#75) uses groups of 256 consecutive Gaussians with precomputed AABBs. Culling effectiveness depends on groups being spatially coherent; PLY/SOG files are often only loosely ordered. Add an optional Morton (or BVH) reorder of the splat array at load time so group AABBs are tight and whole groups cull cleanly. Remember to reorder SH coefficient storage alongside positions.
