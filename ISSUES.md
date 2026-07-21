@@ -1700,17 +1700,19 @@ SparkSplat is 32 bytes plus float32 SH coefficients; the paper packs a Gaussian 
 ## 78: PointSplat indirect dispatches bypass the new ComputeDispatch(indirectBuffer:) element
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: pointsplat, effort:m, punted
 created: 2026-07-21T20:37:59Z
-updated: 2026-07-21T22:48:16Z
+updated: 2026-07-21T23:28:05Z
+closed: 2026-07-21T23:28:05Z
 +++
 
 MetalSprockets 92dbfa0 added declarative indirect dispatch (ComputeDispatch(indirectBuffer:threadsPerThreadgroup:), MetalSprockets#351), but all three indirect dispatch sites here still call encoder.dispatchThreadgroups(indirectBuffer:) on raw encoders: PointSplatWorkloadDistributor.encode, PointSplatResources.encodePhase, and PointSplatRenderer. The surrounding PointSplat frame is raw-encoded for more than just the old dispatch gap (mid-frame distributor re-runs, two-phase occlusion), so adopting the element means refactoring that flow back into declarative elements, not a drop-in swap. Related: #62 (TileAlt, was blocked on MetalSprockets#351), #63 (where the raw workaround landed).
 
 - `2026-07-21T22:41:36Z`: Looked at adopting ComputeDispatch(indirectBuffer:) here. Confirmed the element exists (MetalSprockets 92dbfa0) and works for standalone dispatches, but all three indirect sites live inside the raw-encoded frame flow: PointSplatResources.encodeFrame/encodePhase sequences ~10 pipeline states (clear, group bounds/cull, indirect preprocess, distributor, indirect splat, pyramid build) on one raw encoder, re-running the distributor mid-frame for the two-phase occlusion pass, and PointSplatRenderer drives the same code offscreen with no element System at all. Adopting the element means rewriting that entire flow as declarative ComputePipeline/ComputeDispatch elements (including converting the MTLComputePipelineState-based kernels to ComputeKernel + .parameter bindings) and giving the offscreen renderer an element host. That is a substantial refactor, not a batch-sized change. Unblocker: split this into (1) convert encodePhase to element-built ComputePipelines inside the live pipeline body, (2) port the offscreen PointSplatRenderer to run the same element tree, then the indirect dispatches fall out naturally.
+- `2026-07-21T23:28:05Z`: Superseded by #90: element adoption requires rewriting the raw-encoded frame flow first.
 
 ---
 
@@ -1903,5 +1905,22 @@ closed: 2026-07-21T22:41:13Z
 +++
 
 Group-level hierarchical culling (#75) uses groups of 256 consecutive Gaussians with precomputed AABBs. Culling effectiveness depends on groups being spatially coherent; PLY/SOG files are often only loosely ordered. Add an optional Morton (or BVH) reorder of the splat array at load time so group AABBs are tight and whole groups cull cleanly. Remember to reorder SH coefficient storage alongside positions.
+
+---
+
+## 90: PointSplat: rewrite raw-encoded frame flow as MetalSprockets elements
+
++++
+status: open
+priority: low
+kind: enhancement
+labels: pointsplat, effort:l
+created: 2026-07-21T23:28:02Z
+updated: 2026-07-21T23:28:19Z
++++
+
+PointSplatResources.encodeFrame/encodePhase sequences ~10 pipeline states on one raw compute encoder (clear, group bounds/cull, indirect preprocess, distributor, indirect splat, pyramid build), re-running the distributor mid-frame for the two-phase occlusion pass. PointSplatRenderer drives the same code offscreen with no element System. Because of this, the indirect dispatches cannot use ComputeDispatch(indirectBuffer:) (formerly #78).
+
+Two stages: (1) convert encodePhase to element-built ComputePipelines (ComputeKernel + .parameter bindings) inside the live pipeline body; (2) port the offscreen PointSplatRenderer to run the same element tree. The indirect-dispatch element adoption then falls out naturally.
 
 ---
