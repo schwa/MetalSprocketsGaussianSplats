@@ -301,12 +301,13 @@ Same issue likely applies to Antimatter15SplatRenderPipeline and SparkSplatDebug
 ## 13: Stop using placeholder Metal debug labels
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:s, not-testable
 created: 2026-03-19T00:00:00Z
-updated: 2026-07-21T20:45:36Z
+updated: 2026-07-21T21:33:47Z
+closed: 2026-07-21T21:33:47Z
 +++
 
 ---

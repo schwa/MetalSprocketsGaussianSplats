@@ -219,6 +219,7 @@ struct BenchRunner {
         guard let buffer = device.makeBuffer(bytes: splats, length: MemoryLayout<SparkSplat>.stride * splats.count) else {
             throw BenchCommand.BenchError(message: "Buffer allocation failed")
         }
+        buffer.label = "Bench splats"
         return try measure { frame in
             _ = try renderer.render(splats: buffer, splatCount: splats.count, modelMatrix: .identity, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: UInt32(frame))
         }

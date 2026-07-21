@@ -355,11 +355,11 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
 
         var shCoefficientsBuffer: TypedMTLBuffer<Float>?
         if !loadResult.shCoefficients.isEmpty, effectiveSHDegree > 0 {
-            shCoefficientsBuffer = try device.makeTypedBuffer(values: loadResult.shCoefficients, options: [])
+            shCoefficientsBuffer = try device.makeTypedBuffer(values: loadResult.shCoefficients, options: []).labeled("SHCoefficients")
         }
 
         let gpuSplats = loadResult.splats.map { SparkSplat($0) }
-        let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: [])
+        let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: []).labeled("Splats")
         let sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>
         if let shBuffer = shCoefficientsBuffer {
             sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(

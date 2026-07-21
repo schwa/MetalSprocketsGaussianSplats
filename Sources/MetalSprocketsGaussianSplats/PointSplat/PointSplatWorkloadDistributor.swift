@@ -126,6 +126,11 @@ public final class PointSplatWorkloadDistributor {
         indices.label = "PointSplat indices"
         totals.label = "PointSplat totals"
         dispatchArgs.label = "PointSplat dispatch args"
+        localPrefix.label = "PointSplat workload local prefix"
+        countBlockSums.label = "PointSplat workload count block sums"
+        countBlockBase.label = "PointSplat workload count block base"
+        maxBlockMaxes.label = "PointSplat workload max block maxes"
+        maxBlockCarry.label = "PointSplat workload max block carry"
         indicesBuffer = indices
         totalsBuffer = totals
         dispatchArgsBuffer = dispatchArgs

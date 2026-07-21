@@ -268,9 +268,12 @@ final class PointSplatResources {
             throw PointSplatRenderer.RendererError.bufferAllocationFailed
         }
         framebuffer.label = "PointSplat framebuffer64"
+        counts.label = "PointSplat per-splat counts"
         colors.label = "PointSplat colors"
+        dummySHBuffer.label = "PointSplat dummy SH"
         renderedMask.label = "PointSplat rendered mask"
         statsBuffer.label = "PointSplat stats"
+        zeroTotals.label = "PointSplat zero totals"
         self.framebuffer = framebuffer
         self.counts = counts
         self.colors = colors

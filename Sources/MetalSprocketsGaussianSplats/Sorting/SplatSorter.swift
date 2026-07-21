@@ -68,7 +68,7 @@ public enum SplatSorter {
     ) throws -> SplatIndices {
         let totalCount = splatClouds.reduce(0) { $0 + $1.count }
         guard totalCount > 0 else {
-            var emptyBuffer = try device.makeTypedBuffer(element: IndexedDistance.self, capacity: 1, options: [])
+            var emptyBuffer = try device.makeTypedBuffer(element: IndexedDistance.self, capacity: 1, options: []).labeled("IndexBuffer-empty")
             emptyBuffer.count = 0
             return SplatIndices(parameters: parameters, indices: emptyBuffer)
         }

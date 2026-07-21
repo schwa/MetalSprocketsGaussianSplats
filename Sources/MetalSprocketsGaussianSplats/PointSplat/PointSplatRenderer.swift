@@ -75,6 +75,7 @@ public final class PointSplatRenderer {
         guard let commandQueue = device.makeCommandQueue() else {
             throw RendererError.commandEncodingFailed
         }
+        commandQueue.label = "PointSplat offscreen queue"
         self.commandQueue = commandQueue
 
         let library = try device.makeDefaultLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
@@ -134,12 +135,17 @@ public final class PointSplatRenderer {
         guard let counts = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate), let colors = device.makeBuffer(length: MemoryLayout<UInt64>.stride * max(splatCount, 1), options: .storageModePrivate), let dummySH = device.makeBuffer(length: MemoryLayout<Float>.stride, options: .storageModePrivate), let mask = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate) else {
             throw RendererError.bufferAllocationFailed
         }
+        counts.label = "PointSplat per-splat counts"
+        colors.label = "PointSplat colors"
+        dummySH.label = "PointSplat dummy SH"
+        mask.label = "PointSplat rendered mask"
         let dummyPyramidDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r32Float, width: 1, height: 1, mipmapped: false)
         dummyPyramidDescriptor.usage = [.shaderRead]
         dummyPyramidDescriptor.storageMode = .private
         guard let dummyPyramid = device.makeTexture(descriptor: dummyPyramidDescriptor) else {
             throw RendererError.textureAllocationFailed
         }
+        dummyPyramid.label = "PointSplat dummy depth pyramid"
         if distributor == nil || distributor?.maxSplats ?? 0 < splatCount {
             distributor = try PointSplatWorkloadDistributor(device: device, capacity: configuration.pointBudget, maxSplats: splatCount)
         }
