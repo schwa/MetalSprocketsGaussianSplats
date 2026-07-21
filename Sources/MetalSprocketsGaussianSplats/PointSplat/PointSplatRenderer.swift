@@ -49,7 +49,7 @@ public final class PointSplatRenderer {
 
         /// Frame point budget (T), derived from the supersampled size.
         var pointBudget: Int {
-            PointSplatWorkloadDistributor.capacity(forSupersampledPixels: width * height * supersampling * supersampling)
+            PointSplatWorkloadDistributor.capacity(forSupersampledPixels: width * height * supersampling * supersampling, pointsPerThread: pointsPerThread)
         }
     }
 

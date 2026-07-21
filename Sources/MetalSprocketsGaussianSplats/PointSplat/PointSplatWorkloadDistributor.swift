@@ -29,9 +29,12 @@ public final class PointSplatWorkloadDistributor {
     /// index storage per point.
     static let pointsPerPixelBudget = 32
 
-    /// Frame point budget (T) derived from the supersampled framebuffer size.
-    public static func capacity(forSupersampledPixels pixels: Int) -> Int {
-        max(pixels, 1) * pointsPerPixelBudget
+    /// Frame budget in *threads* (T / K) derived from the supersampled
+    /// framebuffer size: 32 points per pixel, K points per thread. This is
+    /// the distributor's capacity and the index-buffer length (4 bytes per
+    /// thread).
+    public static func capacity(forSupersampledPixels pixels: Int, pointsPerThread: Int) -> Int {
+        max(pixels, 1) * pointsPerPixelBudget / max(pointsPerThread, 1)
     }
 
     public struct Result {

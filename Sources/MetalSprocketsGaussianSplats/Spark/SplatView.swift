@@ -245,7 +245,7 @@ public struct SplatView: View {
             let pixelWidth = Int(proxy.size.width * displayScale)
             let pixelHeight = Int(proxy.size.height * displayScale)
             let pixels = pixelWidth * pixelHeight
-            let budget = PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixels * supersampling * supersampling)
+            let budget = PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixels * supersampling * supersampling, pointsPerThread: Self.pointSplatPointsPerThread) * Self.pointSplatPointsPerThread
             let megapixels = Double(pixels) / 1_000_000
             VStack(alignment: .leading, spacing: 4) {
                 LabeledContent("Splats", value: splatCloud.count.formatted())
