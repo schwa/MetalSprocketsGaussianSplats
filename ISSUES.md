@@ -1158,6 +1158,8 @@ updated: 2026-07-21T20:43:22Z
 
 The Metal GPU performance overlay disappears while dragging/panning the camera. Reappears when gesture ends. Same issue as MetalSprockets#34/#312. Flickering is reduced when shader validation is enabled (slower frame rate). Likely a SwiftUI overlay/z-ordering issue during gesture handling in RenderView.
 
+- `2026-07-21T22:35:44Z`: Investigated: RenderView is defined in the upstream MetalSprockets package, not this repo, and this repo contains no HUD-related code to patch. The HUD flicker during drags is the same defect tracked upstream as MetalSprockets#34/#312 (RenderView overlay/z-ordering during gestures). Unblocker: fix in MetalSprockets' RenderView and bump the dependency here; nothing actionable in this repo until then.
+
 ---
 
 ## 50: Support stochastic renderer in visionOS immersive mode
