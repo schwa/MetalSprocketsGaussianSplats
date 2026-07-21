@@ -42,6 +42,7 @@ public struct SplatView: View {
     private let projection: PerspectiveProjection
 
     @Environment(\.splatRenderer) private var renderer
+    @Environment(\.displayScale) private var displayScale
 
     @State private var sortedIndices: SplatIndices?
     /// Queue of recently-superseded indices awaiting release. We hold the last
@@ -54,6 +55,11 @@ public struct SplatView: View {
     @State private var sortResources: GPUSortResources
 
     private static let pendingReleaseDepth = 3
+
+    /// PointSplat sampling settings (paper defaults); shown in the stats
+    /// overlay and passed to the pipeline.
+    private static let pointSplatSupersampling = 2
+    private static let pointSplatPointsPerThread = 4
 
     /// Creates a `SplatView` that renders the given splat cloud.
     ///
@@ -145,18 +151,23 @@ public struct SplatView: View {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: size,
-                    frameIndex: UInt32(truncatingIfNeeded: context.frameUniforms.index)
+                    frameIndex: UInt32(truncatingIfNeeded: context.frameUniforms.index),
+                    supersampling: Self.pointSplatSupersampling,
+                    pointsPerThread: Self.pointSplatPointsPerThread
                 )
             }
         }
         .overlay(alignment: .bottomLeading) {
-            if renderer == .tileBased || renderer == .pointSplat {
+            if renderer == .tileBased {
                 Text("Work in progress")
                     .font(.caption)
                     .padding(8)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
                     .foregroundStyle(.white)
                     .padding()
+            }
+            if renderer == .pointSplat {
+                pointSplatStats
             }
             if renderer == .gpu {
                 TimelineView(.periodic(from: .now, by: 0.25)) { _ in
@@ -223,6 +234,31 @@ public struct SplatView: View {
             if renderer == .spark {
                 sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             }
+        }
+    }
+
+    /// PointSplat constants overlay: splat count, sampling settings, and the
+    /// derived per-frame point budget for the current view size.
+    private var pointSplatStats: some View {
+        GeometryReader { proxy in
+            let supersampling = Self.pointSplatSupersampling
+            let pixels = Int(proxy.size.width * displayScale) * Int(proxy.size.height * displayScale)
+            let budget = PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixels * supersampling * supersampling)
+            VStack(alignment: .leading, spacing: 4) {
+                LabeledContent("Splats", value: splatCloud.count.formatted())
+                LabeledContent("Supersampling", value: "\(supersampling)\u{00D7}\(supersampling)")
+                LabeledContent("Points/thread (K)", value: Self.pointSplatPointsPerThread.formatted())
+                LabeledContent("Point budget", value: budget.formatted(.number.notation(.compactName)))
+                LabeledContent("SH degree", value: splatCloud.shCoefficients != nil ? splatCloud.shDegree.formatted() : "off")
+            }
+            .fixedSize()
+            .monospacedDigit()
+            .font(.caption)
+            .padding(8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .padding()
         }
     }
 }
