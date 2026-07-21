@@ -259,11 +259,12 @@ public struct SparkSplatRenderPipeline: Element {
                     [-1, -1], [-1, 1], [1, -1], [1, 1]
                 ]
                 commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                // Set SH degree for multi-cloud (shader will look up per-cloud SH buffers)
-                if useSphericalHarmonics {
-                    var shDegreeValue = UInt32(maxSHDegree)
-                    commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
-                }
+                // Set SH degree for multi-cloud (shader will look up per-cloud
+                // SH buffers). Always bind: the cached pipeline state can have
+                // use_sh baked in from a previous cloud, and an unbound buffer
+                // 11 then trips Metal validation. Degree 0 short-circuits SH.
+                var shDegreeValue = UInt32(useSphericalHarmonics ? maxSHDegree : 0)
+                commandEncoder.setVertexBytes(&shDegreeValue, length: MemoryLayout<UInt32>.size, index: 11)
                 // Set bounding box for vertex culling
                 if var bbox = boundingBox {
                     commandEncoder.setVertexBytes(&bbox, length: MemoryLayout<BoundingBox3D>.size, index: 12)
