@@ -1536,12 +1536,13 @@ RFC 0003 defers hierarchical/occlusion culling (two-phase scheme, depth mip chai
 ## 70: Parallel code paths for offscreen vs live rendering
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: pointsplat, code-style, effort:m
 created: 2026-07-21T17:47:37Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T21:40:10Z
+closed: 2026-07-21T21:40:10Z
 +++
 
 Offscreen and live rendering have largely parallel/duplicated code paths. Needs a dramatic cleanup to consolidate the shared logic.

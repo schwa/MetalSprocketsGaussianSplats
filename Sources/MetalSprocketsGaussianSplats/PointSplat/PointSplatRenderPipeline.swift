@@ -188,8 +188,11 @@ public final class PointSplatStatistics: @unchecked Sendable {
     }
 }
 
-/// Per-drawable-size GPU resources for ``PointSplatRenderPipeline``.
+/// Per-drawable-size GPU resources and frame encoding shared by
+/// ``PointSplatRenderPipeline`` (live) and ``PointSplatRenderer`` (offscreen).
 final class PointSplatResources {
+    let device: MTLDevice
+    let backgroundColor: SIMD3<Float>
     let width: Int
     let height: Int
     let supersampling: Int
@@ -215,6 +218,7 @@ final class PointSplatResources {
     private let clearPipelineState: MTLComputePipelineState
     private let preprocessPipelineState: MTLComputePipelineState
     private let splatPipelineState: MTLComputePipelineState
+    private let resolvePipelineState: MTLComputePipelineState
     private let depthExtractPipelineState: MTLComputePipelineState
     private let depthDownsamplePipelineState: MTLComputePipelineState
     private let copyTotalsPipelineState: MTLComputePipelineState
@@ -228,8 +232,9 @@ final class PointSplatResources {
     private var lastAccumulationFrameIndex: UInt32?
     private var lastAccumulationStep: AccumulationStep?
 
+    /// Far depth + packed background color: any splatted point wins the min.
     var clearValue: UInt64 {
-        UInt64(GPS_DEPTH_MAX) << UInt64(GPS_DEPTH_SHIFT)
+        (UInt64(GPS_DEPTH_MAX) << UInt64(GPS_DEPTH_SHIFT)) | gps_pack_color(backgroundColor.x, backgroundColor.y, backgroundColor.z)
     }
 
     struct FrameStats {
@@ -245,13 +250,15 @@ final class PointSplatResources {
         return FrameStats(phase1Used: Int(pointer[0]), phase1Demand: Int(pointer[1]), phase2Used: Int(pointer[2]), phase2Demand: Int(pointer[3]))
     }
 
-    init(drawableSize: SIMD2<Float>, splatCount: Int, supersampling: Int, pointsPerThread: Int) throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+    init(device explicitDevice: MTLDevice? = nil, drawableSize: SIMD2<Float>, splatCount: Int, supersampling: Int, pointsPerThread: Int, backgroundColor: SIMD3<Float> = .zero) throws {
+        guard let device = explicitDevice ?? MTLCreateSystemDefaultDevice() else {
             throw PointSplatRenderer.RendererError.unsupportedDevice
         }
         guard device.supportsFamily(.apple9) || device.supportsFamily(.mac2) else {
             throw PointSplatRenderer.RendererError.unsupportedDevice
         }
+        self.device = device
+        self.backgroundColor = backgroundColor
         width = max(Int(drawableSize.x), 1)
         height = max(Int(drawableSize.y), 1)
         self.supersampling = supersampling
@@ -295,6 +302,7 @@ final class PointSplatResources {
         clearPipelineState = try pipeline("PointSplatRender::pointSplatClear")
         preprocessPipelineState = try pipeline("PointSplatRender::pointSplatPreprocess")
         splatPipelineState = try pipeline("PointSplatRender::pointSplatSplat")
+        resolvePipelineState = try pipeline("PointSplatRender::pointSplatResolve")
         depthExtractPipelineState = try pipeline("PointSplatRender::pointSplatDepthExtract")
         depthDownsamplePipelineState = try pipeline("PointSplatRender::pointSplatDepthDownsample")
         copyTotalsPipelineState = try pipeline("PointSplatWorkload::workloadCopyTotals")
@@ -372,6 +380,16 @@ final class PointSplatResources {
             encoder.dispatchThreads(MTLSize(width: 2, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 2, height: 1, depth: 1))
         }
         hasDepthHistory = true
+    }
+
+    /// Box-filters the supersampled framebuffer into `outTexture`.
+    func encodeResolve(encoder: MTLComputeCommandEncoder, uniforms: PointSplatUniforms, outTexture: MTLTexture) {
+        var uniformsCopy = uniforms
+        encoder.setComputePipelineState(resolvePipelineState)
+        encoder.setBuffer(framebuffer, offset: 0, index: 0)
+        encoder.setBytes(&uniformsCopy, length: MemoryLayout<PointSplatUniforms>.stride, index: 1)
+        encoder.setTexture(outTexture, index: 0)
+        encoder.dispatchThreads(MTLSize(width: outTexture.width, height: outTexture.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
     }
 
     /// One preprocess -> distribute -> splat round for the given phase.

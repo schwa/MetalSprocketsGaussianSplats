@@ -13,6 +13,10 @@ import Splats
 /// per pixel is noisy by design — accumulate frames (varying `frameSeed`)
 /// for a converged image.
 ///
+/// Frame encoding and GPU resources are shared with the live
+/// ``PointSplatRenderPipeline`` via `PointSplatResources`; this class only
+/// adds a blocking command queue and a CPU-readable output texture.
+///
 /// Requires 64-bit atomics: Apple9 (A17/M3+) or Mac2 GPU family.
 public final class PointSplatRenderer {
     public enum RendererError: Error {
@@ -43,8 +47,8 @@ public final class PointSplatRenderer {
             self.nearPlane = nearPlane
             self.farPlane = farPlane
             self.backgroundColor = backgroundColor
-            self.supersampling = supersampling
-            self.pointsPerThread = pointsPerThread
+            self.supersampling = max(supersampling, 1)
+            self.pointsPerThread = max(pointsPerThread, 1)
         }
 
         /// Frame point budget (T), derived from the supersampled size.
@@ -57,12 +61,7 @@ public final class PointSplatRenderer {
     public let configuration: Configuration
 
     private let commandQueue: MTLCommandQueue
-    private let clear: MTLComputePipelineState
-    private let preprocess: MTLComputePipelineState
-    private let splat: MTLComputePipelineState
-    private let resolve: MTLComputePipelineState
-    private var distributor: PointSplatWorkloadDistributor?
-    private let framebuffer: MTLBuffer
+    private var resources: PointSplatResources?
     private let outTexture: MTLTexture
 
     public init(device: MTLDevice, configuration: Configuration) throws {
@@ -78,25 +77,6 @@ public final class PointSplatRenderer {
         commandQueue.label = "PointSplat offscreen queue"
         self.commandQueue = commandQueue
 
-        let library = try device.makeDefaultLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
-        func pipeline(_ name: String) throws -> MTLComputePipelineState {
-            guard let function = library.makeFunction(name: "PointSplatRender::\(name)") else {
-                throw RendererError.functionNotFound(name)
-            }
-            return try device.makeComputePipelineState(function: function)
-        }
-        clear = try pipeline("pointSplatClear")
-        preprocess = try pipeline("pointSplatPreprocess")
-        splat = try pipeline("pointSplatSplat")
-        resolve = try pipeline("pointSplatResolve")
-
-        let pixelCount = configuration.width * configuration.height * configuration.supersampling * configuration.supersampling
-        guard let framebuffer = device.makeBuffer(length: MemoryLayout<UInt64>.stride * pixelCount, options: .storageModePrivate) else {
-            throw RendererError.bufferAllocationFailed
-        }
-        framebuffer.label = "PointSplat framebuffer64"
-        self.framebuffer = framebuffer
-
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: configuration.width, height: configuration.height, mipmapped: false)
         descriptor.usage = [.shaderWrite, .shaderRead]
         guard let outTexture = device.makeTexture(descriptor: descriptor) else {
@@ -108,89 +88,44 @@ public final class PointSplatRenderer {
 
     /// Renders one stochastic frame. Blocks until complete.
     public func render(splats: MTLBuffer, splatCount: Int, modelMatrix: simd_float4x4, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4, frameSeed: UInt32) throws -> MTLTexture {
-        let supersampling = max(configuration.supersampling, 1)
-        var uniforms = PointSplatUniforms(
+        if resources?.splatCount != splatCount {
+            resources = try PointSplatResources(
+                device: device,
+                drawableSize: SIMD2<Float>(Float(configuration.width), Float(configuration.height)),
+                splatCount: splatCount,
+                supersampling: configuration.supersampling,
+                pointsPerThread: configuration.pointsPerThread,
+                backgroundColor: configuration.backgroundColor
+            )
+        }
+        guard let resources else {
+            throw RendererError.bufferAllocationFailed
+        }
+        let uniforms = PointSplatUniforms(
             modelMatrix: modelMatrix,
             viewMatrix: viewMatrix,
             projectionMatrix: projectionMatrix,
-            drawableSize: SIMD2<Float>(Float(configuration.width * supersampling), Float(configuration.height * supersampling)),
+            drawableSize: SIMD2<Float>(Float(configuration.width * configuration.supersampling), Float(configuration.height * configuration.supersampling)),
             nearPlane: configuration.nearPlane,
             farPlane: configuration.farPlane,
             splatCount: UInt32(splatCount),
             frameSeed: frameSeed,
-            capacity: UInt32(configuration.pointBudget),
-            supersampling: UInt32(supersampling),
-            pointsPerThread: UInt32(max(configuration.pointsPerThread, 1)),
+            capacity: UInt32(resources.distributor.capacity),
+            supersampling: UInt32(configuration.supersampling),
+            pointsPerThread: UInt32(configuration.pointsPerThread),
             cameraPosition: .zero,
             shDegree: 0,
             occlusionPhase: 0,
-            pyramidLevels: 1
+            pyramidLevels: UInt32(resources.pyramidLevels)
         )
-        let pixelCount = configuration.width * configuration.height * supersampling * supersampling
-        var pixelCountValue = UInt32(pixelCount)
-        // Far depth + background color: any splatted point wins the min.
-        let background = configuration.backgroundColor
-        var clearValue = (UInt64(GPS_DEPTH_MAX) << UInt64(GPS_DEPTH_SHIFT)) | gps_pack_color(background.x, background.y, background.z)
 
-        guard let counts = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate), let colors = device.makeBuffer(length: MemoryLayout<UInt64>.stride * max(splatCount, 1), options: .storageModePrivate), let dummySH = device.makeBuffer(length: MemoryLayout<Float>.stride, options: .storageModePrivate), let mask = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate) else {
-            throw RendererError.bufferAllocationFailed
-        }
-        counts.label = "PointSplat per-splat counts"
-        colors.label = "PointSplat colors"
-        dummySH.label = "PointSplat dummy SH"
-        mask.label = "PointSplat rendered mask"
-        let dummyPyramidDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r32Float, width: 1, height: 1, mipmapped: false)
-        dummyPyramidDescriptor.usage = [.shaderRead]
-        dummyPyramidDescriptor.storageMode = .private
-        guard let dummyPyramid = device.makeTexture(descriptor: dummyPyramidDescriptor) else {
-            throw RendererError.textureAllocationFailed
-        }
-        dummyPyramid.label = "PointSplat dummy depth pyramid"
-        if distributor == nil || distributor?.maxSplats ?? 0 < splatCount {
-            distributor = try PointSplatWorkloadDistributor(device: device, capacity: configuration.pointBudget, maxSplats: splatCount)
-        }
-        guard let distributor else {
-            throw RendererError.bufferAllocationFailed
-        }
-
-        // Whole frame in one serial compute encoder; the splat dispatch is
-        // sized to capacity and exits threads past the GPU-side total.
+        // Whole frame in one serial compute encoder; the splat dispatches are
+        // sized to capacity and exit threads past the GPU-side total.
         guard let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw RendererError.commandEncodingFailed
         }
-        encoder.setComputePipelineState(clear)
-        encoder.setBuffer(framebuffer, offset: 0, index: 0)
-        encoder.setBytes(&clearValue, length: MemoryLayout<UInt64>.stride, index: 1)
-        encoder.setBytes(&pixelCountValue, length: MemoryLayout<UInt32>.stride, index: 2)
-        encoder.dispatchThreads(MTLSize(width: pixelCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
-
-        encoder.setComputePipelineState(preprocess)
-        encoder.setBuffer(splats, offset: 0, index: 0)
-        encoder.setBuffer(counts, offset: 0, index: 1)
-        encoder.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 2)
-        encoder.setBuffer(dummySH, offset: 0, index: 3)
-        encoder.setBuffer(colors, offset: 0, index: 4)
-        encoder.setBuffer(mask, offset: 0, index: 5)
-        encoder.setTexture(dummyPyramid, index: 0)
-        encoder.dispatchThreads(MTLSize(width: splatCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
-
-        try distributor.encode(encoder: encoder, counts: counts, count: splatCount, seed: frameSeed)
-
-        encoder.setComputePipelineState(splat)
-        encoder.setBuffer(splats, offset: 0, index: 0)
-        encoder.setBuffer(distributor.indicesBuffer, offset: 0, index: 1)
-        encoder.setBuffer(framebuffer, offset: 0, index: 2)
-        encoder.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 3)
-        encoder.setBuffer(distributor.totalsBuffer, offset: 0, index: 4)
-        encoder.setBuffer(framebuffer, offset: 0, index: 5)
-        encoder.setBuffer(colors, offset: 0, index: 6)
-        encoder.dispatchThreadgroups(indirectBuffer: distributor.dispatchArgsBuffer, indirectBufferOffset: 0, threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
-
-        encoder.setComputePipelineState(resolve)
-        encoder.setBuffer(framebuffer, offset: 0, index: 0)
-        encoder.setBytes(&uniforms, length: MemoryLayout<PointSplatUniforms>.stride, index: 1)
-        encoder.setTexture(outTexture, index: 0)
-        encoder.dispatchThreads(MTLSize(width: configuration.width, height: configuration.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+        try resources.encodeFrame(encoder: encoder, uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed)
+        resources.encodeResolve(encoder: encoder, uniforms: uniforms, outTexture: outTexture)
         encoder.endEncoding()
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
