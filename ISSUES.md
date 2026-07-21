@@ -924,6 +924,7 @@ The flicker is constant and minor, present even when head is relatively stationa
 
 - `2026-04-09T17:52:31Z`: Pool reuse ruled out — disabling pool release did not fix the flicker. Remaining theories:
 - `2026-04-09T17:57:50Z`: Pool reuse confirmed not the cause. Re-enabled pool release. Also tried averaged eye position (#39) — no change. Flicker remains open for further investigation.
+- `2026-07-21T21:37:32Z`: Per-eye sorting is now implemented (#35): each eye gets its own sort order and draw call, removing theory 3 (eye-0-only sort / averaged-eye sort) as a variable. Cannot verify on-device from this environment — needs a Vision Pro test. If flicker persists after #35, remaining theories are (1) Float16 sort-key quantization: distanceToCamera is Float16, so head micro-movements push splats across quantization boundaries, reordering them within blend order (try widening the sort key to Float32/UInt32 in IndexedDistance), and (2) rgba16Float linear blending differences. Unblocker: on-device retest with per-eye sorting, then try a 32-bit sort key if still flickering.
 
 ---
 
@@ -1831,5 +1832,19 @@ created: 2026-07-21T21:44:25Z
 The LCC2 format (from XGRIDS) is a Gaussian splat container format that is not currently supported for loading/rendering.
 
 Whitepaper/spec: https://github.com/xgrids/LCC2Whitepaper
+
+---
+
+## 88: Audit code comments against writing-comments skill
+
++++
+status: new
+priority: medium
+kind: task
+labels: code-style, effort:m
+created: 2026-07-21T21:54:29Z
++++
+
+Source comments across the project have not been audited against the house writing-comments skill rules. Review comments in Sources/, Examples/, and Tests/ for violations (redundant narration, stale/incorrect comments, commented-out code, etc.) and clean them up.
 
 ---
