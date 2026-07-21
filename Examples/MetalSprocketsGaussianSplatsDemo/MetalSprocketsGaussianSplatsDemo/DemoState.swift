@@ -36,11 +36,12 @@ enum SplatModel: String, CaseIterable, Identifiable {
 @Observable
 class DemoState {
     var renderer: SplatRenderer = .spark
-    var selectedModel: SplatModel = .butterfly {
+    /// The selected bundled model; nil while a user-loaded file is shown.
+    var selectedModel: SplatModel? = .butterfly {
         didSet {
-            if selectedModel != oldValue {
+            if let selectedModel, selectedModel != oldValue {
                 customModelName = nil
-                reloadSplatCloud()
+                reloadSplatCloud(model: selectedModel)
             }
         }
     }
@@ -67,17 +68,18 @@ class DemoState {
         #endif
     }
 
-    private func reloadSplatCloud() {
-        let cloud = Self.loadSplatCloud(device: device, model: selectedModel)
+    private func reloadSplatCloud(model: SplatModel) {
+        let cloud = Self.loadSplatCloud(device: device, model: model)
         splatCloud = cloud
         #if os(visionOS)
         renderState = SplatImmersiveRenderState(splatCloud: cloud)
         #endif
     }
 
-    /// Loads a user-picked splat file (e.g. from a file importer). The URL
-    /// may be security-scoped.
-    func loadCustomSplat(url: URL) {
+    /// Loads a user-picked splat file (file importer or drag & drop). The
+    /// URL may be security-scoped. Parsing runs off the main actor so large
+    /// files neither freeze the UI nor wedge the file dialog's dismissal.
+    func loadCustomSplat(url: URL) async {
         let scoped = url.startAccessingSecurityScopedResource()
         defer {
             if scoped {
@@ -85,9 +87,13 @@ class DemoState {
             }
         }
         do {
-            let cloud = try Self.readSplatCloud(device: device, url: url)
+            let device = self.device
+            let cloud = try await Task.detached(priority: .userInitiated) {
+                try Self.readSplatCloud(device: device, url: url)
+            }.value
             splatCloud = cloud
             customModelName = url.lastPathComponent
+            selectedModel = nil
             #if os(visionOS)
             renderState = SplatImmersiveRenderState(splatCloud: cloud)
             #endif
@@ -104,7 +110,7 @@ class DemoState {
     /// Reads a splat file into a GPU cloud, including spherical harmonics
     /// when present (flattened to the coefficient-major layout the shaders
     /// expect).
-    private static func readSplatCloud(device: MTLDevice, url: URL) throws -> GPUSplatCloud<SparkSplat> {
+    nonisolated private static func readSplatCloud(device: MTLDevice, url: URL) throws -> GPUSplatCloud<SparkSplat> {
         let reader = try SplatReader(url: url)
         let shDegree = reader.shDegree
         var splats: [SparkSplat] = []

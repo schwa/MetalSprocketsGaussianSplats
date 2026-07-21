@@ -14,8 +14,6 @@ struct ContentView: View {
     @State private var frameTimingStatistics: FrameTimingStatistics?
     @State private var isImporting = false
 
-    private static let splatContentTypes: [UTType] = [.ply, .spz, .sog]
-
     let splatCloud: GPUSplatCloud<SparkSplat>
     @Bindable var demoState: DemoState
 
@@ -39,7 +37,7 @@ struct ContentView: View {
             HStack {
                 Picker("Model", selection: $demoState.selectedModel) {
                     ForEach(SplatModel.allCases) { model in
-                        Text(model.rawValue).tag(model)
+                        Text(model.rawValue).tag(model as SplatModel?)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -62,6 +60,7 @@ struct ContentView: View {
             .padding()
             .glassBackgroundEffect()
         }
+        .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
         #else
         SplatView(
             splatCloud: splatCloud,
@@ -70,11 +69,20 @@ struct ContentView: View {
         .splatRenderer(demoState.renderer)
         .onFrameTimingChange { frameTimingStatistics = $0 }
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first else {
+                return false
+            }
+            Task {
+                await demoState.loadCustomSplat(url: url)
+            }
+            return true
+        }
         .overlay(alignment: .top) {
             HStack {
                 Picker("Model", selection: $demoState.selectedModel) {
                     ForEach(SplatModel.allCases) { model in
-                        Text(model.rawValue).tag(model)
+                        Text(model.rawValue).tag(model as SplatModel?)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -103,29 +111,53 @@ struct ContentView: View {
                     .padding()
             }
         }
+        .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
 
         #endif
     }
 
     private var loadButton: some View {
         Button("Load\u{2026}") {
-            isImporting = true
-        }
-        .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.splatContentTypes) { result in
-            if case .success(let url) = result {
-                // Defer the load so the importer finishes dismissing before the
-                // splat-cloud change rebuilds this view; loading synchronously
-                // here leaves isImporting stuck and the picker won't reopen.
-                Task { @MainActor in
-                    demoState.loadCustomSplat(url: url)
-                }
+            // Cycle through false: macOS can leave the binding stuck true
+            // after dismissal, and true -> true never re-presents.
+            isImporting = false
+            Task { @MainActor in
+                isImporting = true
             }
         }
-        .alert("Load Failed", isPresented: Binding(get: { demoState.loadError != nil }, set: { if !$0 { demoState.loadError = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(demoState.loadError ?? "")
-        }
+    }
+}
+
+private struct SplatImporter: ViewModifier {
+    @Binding var isImporting: Bool
+    let demoState: DemoState
+
+    private static let splatContentTypes: [UTType] = [.ply, .spz, .sog]
+
+    func body(content: Content) -> some View {
+        content
+            .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.splatContentTypes) { result in
+                if case .success(let url) = result {
+                    // Parsing happens off the main actor, so the importer's
+                    // dismissal completes instead of wedging behind a
+                    // seconds-long synchronous load (which left it unable
+                    // to present a second time).
+                    Task {
+                        await demoState.loadCustomSplat(url: url)
+                    }
+                }
+            }
+            // The alert must sit on a different node than the fileImporter:
+            // two presentation modifiers on one node conflict, and the
+            // importer silently stops presenting after its first use.
+            .background {
+                Color.clear
+                    .alert("Load Failed", isPresented: Binding(get: { demoState.loadError != nil }, set: { if !$0 { demoState.loadError = nil } })) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text(demoState.loadError ?? "")
+                    }
+            }
     }
 }
 
