@@ -929,12 +929,13 @@ The flicker is constant and minor, present even when head is relatively stationa
 ## 37: Add turnkey SplatImmersiveContent convenience wrapper
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: effort:s, visionOS, api, not-testable
 created: 2026-04-09T17:41:13Z
-updated: 2026-07-21T20:45:36Z
+updated: 2026-07-21T21:34:32Z
+closed: 2026-07-21T21:34:32Z
 +++
 
 SplatImmersiveElement works but requires the consumer to set up ImmersiveRenderContent → ImmersiveRenderPass → SplatImmersiveElement + SplatImmersiveRenderState. SplatView is a single-line drop-in for windowed rendering — we should have the equivalent for immersive. A SplatImmersiveContent: ImmersiveSpaceContent that hides the boilerplate, so usage is just:

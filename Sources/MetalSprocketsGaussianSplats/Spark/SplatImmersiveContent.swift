@@ -10,6 +10,57 @@ import simd
 import Splats
 import SwiftUI
 
+/// Turnkey immersive space content that renders a Gaussian splat cloud.
+///
+/// Wraps `ImmersiveRenderContent`, `ImmersiveRenderPass`, ``SplatImmersiveElement``,
+/// and ``SplatImmersiveRenderState`` so usage is a single line:
+///
+/// ```swift
+/// ImmersiveSpace(id: "Splat") {
+///     SplatImmersiveContent(splatCloud: cloud)
+/// }
+/// ```
+///
+/// For more control (custom render pass composition, frame timing callbacks,
+/// mixing with other elements), drop down to ``SplatImmersiveElement`` directly.
+public struct SplatImmersiveContent: ImmersiveSpaceContent {
+    let splatCloud: GPUSplatCloud<SparkSplat>
+    let modelMatrix: simd_float4x4
+    let renderer: SplatRenderer
+    private let renderState: SplatImmersiveRenderState
+
+    /// Creates turnkey immersive splat content.
+    ///
+    /// - Parameters:
+    ///   - splatCloud: The GPU splat cloud to render.
+    ///   - modelMatrix: The model-to-world transform matrix.
+    ///   - renderer: The rendering algorithm to use.
+    public init(
+        splatCloud: GPUSplatCloud<SparkSplat>,
+        modelMatrix: simd_float4x4 = .identity,
+        renderer: SplatRenderer = .spark
+    ) {
+        self.splatCloud = splatCloud
+        self.modelMatrix = modelMatrix
+        self.renderer = renderer
+        self.renderState = SplatImmersiveRenderState(splatCloud: splatCloud)
+    }
+
+    public var body: some ImmersiveSpaceContent {
+        ImmersiveRenderContent { [splatCloud, modelMatrix, renderer, renderState] context in
+            try ImmersiveRenderPass(context: context, label: "Splat") {
+                try SplatImmersiveElement(
+                    context: context,
+                    splatCloud: splatCloud,
+                    modelMatrix: modelMatrix,
+                    renderer: renderer,
+                    renderState: renderState
+                )
+            }
+        }
+    }
+}
+
 /// A MetalSprockets `Element` that renders a Gaussian splat cloud in a visionOS immersive space.
 ///
 /// Use inside `ImmersiveRenderContent` and `ImmersiveRenderPass`, exactly like any other
@@ -131,6 +182,9 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                     descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
                     descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
                 }
+            case .gpu, .tileBased, .pointSplat:
+                // Not supported in immersive rendering.
+                EmptyElement()
             }
         }
     }
