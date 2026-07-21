@@ -47,6 +47,12 @@ struct BenchCommand: AsyncParsableCommand {
     @Option(help: "Write results as CSV to this path")
     var csv: String?
 
+    @Option(help: "PointSplat supersampling factor S")
+    var supersampling: Int = 2
+
+    @Option(help: "PointSplat points per thread K")
+    var pointsPerThread: Int = 4
+
     struct BenchError: Error {
         var message: String
     }
@@ -63,8 +69,10 @@ struct BenchCommand: AsyncParsableCommand {
             }
             return value
         }
+        let supersampling = self.supersampling
+        let pointsPerThread = self.pointsPerThread
         try await MainActor.run {
-            var runner = try BenchRunner(size: size, frames: frames)
+            var runner = try BenchRunner(size: size, frames: frames, supersampling: supersampling, pointsPerThread: pointsPerThread)
             var rows: [BenchRunner.Row] = []
             #if DEBUG
             print("warning: Debug build; numbers will not be representative")
@@ -99,15 +107,19 @@ struct BenchRunner {
 
     let size: Int
     let frames: Int
+    let supersampling: Int
+    let pointsPerThread: Int
     let device: MTLDevice
 
-    init(size: Int, frames: Int) throws {
+    init(size: Int, frames: Int, supersampling: Int = 2, pointsPerThread: Int = 4) throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw BenchCommand.BenchError(message: "No Metal device")
         }
         self.device = device
         self.size = size
         self.frames = frames
+        self.supersampling = supersampling
+        self.pointsPerThread = pointsPerThread
     }
 
     // MARK: - Cloud generation / loading
@@ -203,7 +215,7 @@ struct BenchRunner {
     }
 
     private func benchmarkPointSplat(splats: [SparkSplat], cameraMatrix: simd_float4x4, projectionMatrix: simd_float4x4) throws -> [Double] {
-        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, supersampling: 2, pointsPerThread: 4))
+        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, supersampling: supersampling, pointsPerThread: pointsPerThread))
         guard let buffer = device.makeBuffer(bytes: splats, length: MemoryLayout<SparkSplat>.stride * splats.count) else {
             throw BenchCommand.BenchError(message: "Buffer allocation failed")
         }

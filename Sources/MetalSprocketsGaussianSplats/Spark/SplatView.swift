@@ -53,15 +53,13 @@ public struct SplatView: View {
     @State private var sortManager: AsyncSortManager<SparkSplat>
     @State private var pointSplatStatistics = PointSplatStatistics()
     @State private var pointSplatReprojection = true
+    @State private var pointSplatSupersamplingSetting = 2
+    @State private var pointSplatPointsPerThreadSetting = 4
     /// Scratch + output buffers for the GPU sorter (``SplatRenderer/gpu``).
     @State private var sortResources: GPUSortResources
 
     private static let pendingReleaseDepth = 3
 
-    /// PointSplat sampling settings (paper defaults); shown in the stats
-    /// overlay and passed to the pipeline.
-    private static let pointSplatSupersampling = 2
-    private static let pointSplatPointsPerThread = 4
 
     /// Creates a `SplatView` that renders the given splat cloud.
     ///
@@ -164,8 +162,8 @@ public struct SplatView: View {
                     drawableSize: size,
                     frameIndex: UInt32(truncatingIfNeeded: context.frameUniforms.index),
                     depthRange: depthRange,
-                    supersampling: Self.pointSplatSupersampling,
-                    pointsPerThread: Self.pointSplatPointsPerThread,
+                    supersampling: pointSplatSupersamplingSetting,
+                    pointsPerThread: pointSplatPointsPerThreadSetting,
                     reprojection: pointSplatReprojection,
                     statistics: pointSplatStatistics
                 )
@@ -255,17 +253,38 @@ public struct SplatView: View {
     /// derived per-frame point budget for the current view size.
     private var pointSplatStats: some View {
         GeometryReader { proxy in
-            let supersampling = Self.pointSplatSupersampling
+            let supersampling = pointSplatSupersamplingSetting
+            let pointsPerThread = pointSplatPointsPerThreadSetting
             let pixelWidth = Int(proxy.size.width * displayScale)
             let pixelHeight = Int(proxy.size.height * displayScale)
             let pixels = pixelWidth * pixelHeight
-            let budget = PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixels * supersampling * supersampling, pointsPerThread: Self.pointSplatPointsPerThread) * Self.pointSplatPointsPerThread
+            let budget = PointSplatWorkloadDistributor.capacity(forSupersampledPixels: pixels * supersampling * supersampling, pointsPerThread: pointsPerThread) * pointsPerThread
             let megapixels = Double(pixels) / 1_000_000
             VStack(alignment: .leading, spacing: 4) {
                 LabeledContent("Splats", value: splatCloud.count.formatted())
                 LabeledContent("Size", value: "\(Int(proxy.size.width))\u{00D7}\(Int(proxy.size.height))\u{00D7}\(Double(displayScale).formatted(.number.precision(.fractionLength(0...1)))) (\(megapixels.formatted(.number.precision(.fractionLength(1)))) MP)")
-                LabeledContent("Supersampling", value: "\(supersampling)\u{00D7}\(supersampling)")
-                LabeledContent("Points/thread (K)", value: Self.pointSplatPointsPerThread.formatted())
+                LabeledContent("Supersampling") {
+                    Picker("Supersampling", selection: $pointSplatSupersamplingSetting) {
+                        Text("1\u{00D7}1").tag(1)
+                        Text("2\u{00D7}2").tag(2)
+                        Text("4\u{00D7}4").tag(4)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.mini)
+                    .fixedSize()
+                }
+                LabeledContent("Points/thread (K)") {
+                    Picker("Points/thread", selection: $pointSplatPointsPerThreadSetting) {
+                        ForEach([1, 4, 8, 16], id: \.self) { value in
+                            Text(value.formatted()).tag(value)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.mini)
+                    .fixedSize()
+                }
                 LabeledContent("Point budget", value: budget.formatted(.number.notation(.compactName)))
                 TimelineView(.periodic(from: .now, by: 0.25)) { _ in
                     let demand = pointSplatStatistics.pointDemand

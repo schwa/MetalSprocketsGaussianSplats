@@ -1612,6 +1612,8 @@ created: 2026-07-21T20:18:36Z
 
 We use the paper's defaults (2x2 supersampling, K=4) untested on our hardware. The paper measured K=1 vs K=4 as +37% frame time on NVIDIA; K=8/16, 1x1+accumulation, and 4x4 are unswept here. The bench subcommand makes this a quick experiment: quality (PSNR vs converged) and frame time per configuration, pick per-platform defaults.
 
+- `2026-07-21T20:33:04Z`: Timing sweep done via bench --supersampling/--points-per-thread (1M/8M synthetic, Release, median ms): S1K1 9.6/17.0, S1K4 3.5/10.4, S2K1 40.7/50.9, S2K4 (default) 10.7/19.4, S2K8 6.5/15.3, S2K16 4.6/12.9, S4K4 42.2/72.8, S4K16 20.3/51.3. K dominates: S2K16 is 2.3x faster than the default. Caveat: counts round stochastically to multiples of K, so large K adds per-frame variance on small splats. Demo overlay now has live S and K pickers for the visual half; defaults unchanged pending that judgment.
+
 ---
 
 ## 77: PointSplat: quantized splat storage

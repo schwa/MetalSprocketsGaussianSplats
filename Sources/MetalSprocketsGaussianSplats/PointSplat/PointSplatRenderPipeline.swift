@@ -78,7 +78,7 @@ public struct PointSplatRenderPipeline: Element {
     private func validatedResources() throws -> PointSplatResources {
         let width = max(Int(drawableSize.x), 1)
         let height = max(Int(drawableSize.y), 1)
-        if resources.splatCount != splatCloud.count || resources.width != width || resources.height != height {
+        if resources.splatCount != splatCloud.count || resources.width != width || resources.height != height || resources.supersampling != supersampling || resources.pointsPerThread != pointsPerThread {
             resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, supersampling: supersampling, pointsPerThread: pointsPerThread)
         }
         return resources
@@ -193,6 +193,7 @@ final class PointSplatResources {
     let width: Int
     let height: Int
     let supersampling: Int
+    let pointsPerThread: Int
     let framebuffer: MTLBuffer
     let counts: MTLBuffer
     let colors: MTLBuffer
@@ -252,6 +253,7 @@ final class PointSplatResources {
         width = max(Int(drawableSize.x), 1)
         height = max(Int(drawableSize.y), 1)
         self.supersampling = supersampling
+        self.pointsPerThread = pointsPerThread
         let pixelCount = width * height * supersampling * supersampling
 
         guard let framebuffer = device.makeBuffer(length: MemoryLayout<UInt64>.stride * pixelCount, options: .storageModePrivate),
