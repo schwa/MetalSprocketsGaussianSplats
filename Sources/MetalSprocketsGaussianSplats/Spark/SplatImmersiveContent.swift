@@ -87,7 +87,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
     let splatCloud: GPUSplatCloud<SparkSplat>
     let modelMatrix: simd_float4x4
     let renderer: SplatRenderer
-    let sortedIndices: SplatIndices?
+    let sortedIndicesPerEye: [SplatIndices?]
     let frameCount: UInt32
 
     /// Creates an immersive splat element.
@@ -112,16 +112,13 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
         self.frameCount = renderState.nextFrameCount()
 
         if renderer == .spark {
-            // Average both eyes' positions for sort — minimizes worst-case depth error for stereo
-            let cam0 = context.viewMatrix(eye: 0).inverse
-            let cam1 = context.viewCount > 1 ? context.viewMatrix(eye: 1).inverse : cam0
-            let avgPosition = (cam0.columns.3 + cam1.columns.3) * 0.5
-            var cameraMatrix = cam0
-            cameraMatrix.columns.3 = avgPosition
-            renderState.requestSort(cameraMatrix: cameraMatrix, modelMatrix: modelMatrix)
-            self.sortedIndices = renderState.currentSortedIndices
+            // Sort once per eye — CPU sorts are cheap and this eliminates any
+            // depth-order disagreement between eyes for distant splats.
+            let cameraMatrices = (0 ..< context.viewCount).map { context.viewMatrix(eye: $0).inverse }
+            renderState.requestSort(cameraMatrices: cameraMatrices, modelMatrix: modelMatrix)
+            self.sortedIndicesPerEye = (0 ..< context.viewCount).map { renderState.currentSortedIndices(eye: $0) }
         } else {
-            self.sortedIndices = nil
+            self.sortedIndicesPerEye = []
         }
     }
 
@@ -136,37 +133,25 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                 Float(context.drawable.colorTextures[0].height)
             )
 
-            Draw { encoder in
-                var viewMappings = (0 ..< context.viewCount).map {
-                    MTLVertexAmplificationViewMapping(
-                        viewportArrayIndexOffset: UInt32($0),
-                        renderTargetArrayIndexOffset: UInt32($0)
-                    )
-                }
-                encoder.setVertexAmplificationCount(context.viewCount, viewMappings: &viewMappings)
-                encoder.setViewports(context.viewports)
-            }
-
             switch renderer {
             case .spark:
-                if let sortedIndices {
-                    try SparkSplatRenderPipeline(
-                        splatCloud: splatCloud,
-                        projectionMatrices: projectionMatrices,
-                        modelMatrix: modelMatrix,
-                        cameraMatrices: cameraMatrices,
-                        drawableSize: drawableSize,
-                        convertSRGBToLinear: true,
-                        sortedIndices: sortedIndices
-                    )
-                    .depthCompare(function: .greater, enabled: true)
-                    .renderPipelineDescriptorModifier { descriptor in
-                        descriptor.maxVertexAmplificationCount = context.viewCount
-                        descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
-                        descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
-                    }
+                // Per-eye rendering: each eye gets its own draw with its own sort
+                // order, targeting its render target layer via a view mapping.
+                try eyeElement(eye: 0, projectionMatrices: projectionMatrices, cameraMatrices: cameraMatrices, drawableSize: drawableSize)
+                if context.viewCount > 1 {
+                    try eyeElement(eye: 1, projectionMatrices: projectionMatrices, cameraMatrices: cameraMatrices, drawableSize: drawableSize)
                 }
             case .stochastic:
+                Draw { encoder in
+                    var viewMappings = (0 ..< context.viewCount).map {
+                        MTLVertexAmplificationViewMapping(
+                            viewportArrayIndexOffset: UInt32($0),
+                            renderTargetArrayIndexOffset: UInt32($0)
+                        )
+                    }
+                    encoder.setVertexAmplificationCount(context.viewCount, viewMappings: &viewMappings)
+                    encoder.setViewports(context.viewports)
+                }
                 try StochasticSplatRenderPipeline(
                     splatCloud: splatCloud,
                     projectionMatrices: projectionMatrices,
@@ -185,6 +170,37 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
             case .gpu, .tileBased, .pointSplat:
                 // Not supported in immersive rendering.
                 EmptyElement()
+            }
+        }
+    }
+
+    private func eyeElement(eye: Int, projectionMatrices: [simd_float4x4], cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>) throws -> some Element {
+        try Group {
+            if let sortedIndices = eye < sortedIndicesPerEye.count ? sortedIndicesPerEye[eye] : nil {
+                Draw { [viewport = context.viewports[eye]] encoder in
+                    encoder.setViewport(viewport)
+                }
+                try SparkSplatRenderPipeline(
+                    splatCloud: splatCloud,
+                    projectionMatrix: projectionMatrices[eye],
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrices[eye],
+                    drawableSize: drawableSize,
+                    convertSRGBToLinear: true,
+                    sortedIndices: sortedIndices
+                )
+                .viewMappings([
+                    MTLVertexAmplificationViewMapping(
+                        viewportArrayIndexOffset: UInt32(eye),
+                        renderTargetArrayIndexOffset: UInt32(eye)
+                    )
+                ])
+                .depthCompare(function: .greater, enabled: true)
+                .renderPipelineDescriptorModifier { descriptor in
+                    descriptor.maxVertexAmplificationCount = context.viewCount
+                    descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
+                    descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
+                }
             }
         }
     }
@@ -215,57 +231,77 @@ public final class SplatImmersiveRenderState: Sendable {
         var pendingRelease: [SplatIndices] = []
     }
 
-    private let sortManager: AsyncSortManager<SparkSplat>
-    private let state: OSAllocatedUnfairLock<State>
+    // One sort manager and state slot per eye, so each eye has its own sort
+    // order and buffer lifecycle.
+    private let sortManagers: [AsyncSortManager<SparkSplat>]
+    private let states: [OSAllocatedUnfairLock<State>]
     private let frameCounter: OSAllocatedUnfairLock<UInt32>
-    private let listenerTask: Task<Void, Never>
+    private let listenerTasks: [Task<Void, Never>]
 
     private static let pendingReleaseDepth = 3
+    private static let eyeCount = 2
 
     public init(splatCloud: GPUSplatCloud<SparkSplat>) {
         let device = MTLCreateSystemDefaultDevice()!
-        let sortManager = try! AsyncSortManager<SparkSplat>(
-            device: device,
-            splatCloud: splatCloud,
-            capacity: splatCloud.count,
-            preallocatedBufferCount: Self.pendingReleaseDepth + 3
-        )
-        self.sortManager = sortManager
-        let state = OSAllocatedUnfairLock(initialState: State())
-        self.state = state
-        self.frameCounter = OSAllocatedUnfairLock(initialState: UInt32(0))
-
-        self.listenerTask = Task {
-            for await indices in sortManager.sortedIndicesStream {
-                let toRelease: SplatIndices? = state.withLock { state in
-                    var release: SplatIndices?
-                    if let old = state.sortedIndices {
-                        state.pendingRelease.append(old)
-                        if state.pendingRelease.count > Self.pendingReleaseDepth {
-                            release = state.pendingRelease.removeFirst()
+        var sortManagers: [AsyncSortManager<SparkSplat>] = []
+        var states: [OSAllocatedUnfairLock<State>] = []
+        var listenerTasks: [Task<Void, Never>] = []
+        for _ in 0 ..< Self.eyeCount {
+            let sortManager = try! AsyncSortManager<SparkSplat>(
+                device: device,
+                splatCloud: splatCloud,
+                capacity: splatCloud.count,
+                preallocatedBufferCount: Self.pendingReleaseDepth + 3
+            )
+            let state = OSAllocatedUnfairLock(initialState: State())
+            sortManagers.append(sortManager)
+            states.append(state)
+            listenerTasks.append(Task {
+                for await indices in sortManager.sortedIndicesStream {
+                    let toRelease: SplatIndices? = state.withLock { state in
+                        var release: SplatIndices?
+                        if let old = state.sortedIndices {
+                            state.pendingRelease.append(old)
+                            if state.pendingRelease.count > Self.pendingReleaseDepth {
+                                release = state.pendingRelease.removeFirst()
+                            }
                         }
+                        state.sortedIndices = indices
+                        return release
                     }
-                    state.sortedIndices = indices
-                    return release
+                    if let toRelease {
+                        sortManager.release(toRelease)
+                    }
                 }
-                if let toRelease {
-                    sortManager.release(toRelease)
-                }
-            }
+            })
         }
+        self.sortManagers = sortManagers
+        self.states = states
+        self.listenerTasks = listenerTasks
+        self.frameCounter = OSAllocatedUnfairLock(initialState: UInt32(0))
     }
 
     deinit {
-        listenerTask.cancel()
+        for task in listenerTasks {
+            task.cancel()
+        }
     }
 
-    public func requestSort(cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4) {
-        let parameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
-        sortManager.requestSort(parameters)
+    /// Requests a sort for each eye's camera matrix. Matrices beyond the
+    /// supported eye count are ignored.
+    public func requestSort(cameraMatrices: [simd_float4x4], modelMatrix: simd_float4x4) {
+        for (eye, cameraMatrix) in cameraMatrices.prefix(Self.eyeCount).enumerated() {
+            sortManagers[eye].requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
+        }
     }
 
-    public var currentSortedIndices: SplatIndices? {
-        state.withLock { $0.sortedIndices }
+    /// The most recent sorted indices for the given eye, or `nil` if no sort
+    /// has completed yet.
+    public func currentSortedIndices(eye: Int) -> SplatIndices? {
+        guard eye >= 0, eye < states.count else {
+            return nil
+        }
+        return states[eye].withLock { $0.sortedIndices }
     }
 
     public func nextFrameCount() -> UInt32 {

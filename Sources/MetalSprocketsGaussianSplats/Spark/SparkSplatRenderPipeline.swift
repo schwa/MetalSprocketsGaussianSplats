@@ -110,6 +110,10 @@ public struct SparkSplatRenderPipeline: Element {
     }
     var vertexDescriptor: MTLVertexDescriptor
     var convertSRGBToLinear: Bool
+    /// Optional vertex amplification view mappings, applied when setting the
+    /// amplification count. Use ``viewMappings(_:)`` for per-eye rendering into
+    /// specific layers of a layered render target.
+    var amplificationViewMappings: [MTLVertexAmplificationViewMapping]?
 
     /// Total splat count across all clouds
     var totalSplatCount: Int {
@@ -287,7 +291,11 @@ public struct SparkSplatRenderPipeline: Element {
                 if var bbox = boundingBox {
                     commandEncoder.setVertexBytes(&bbox, length: MemoryLayout<BoundingBox3D>.size, index: 12)
                 }
-                commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
+                if var viewMappings = amplificationViewMappings {
+                    commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: &viewMappings)
+                } else {
+                    commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
+                }
                 if let indirectArgs = sortedIndices.indirectDrawArgs {
                     // GPU sort path: instanceCount is the cull survivor count
                     // written by the sort's block-scan kernel.
@@ -306,9 +314,15 @@ public struct SparkSplatRenderPipeline: Element {
         }
         .vertexDescriptor(vertexDescriptor)
         .renderPassDescriptorModifier { [amplificationCount] descriptor in
+            // On visionOS layered layouts the render target array length is owned
+            // by CompositorServices; forcing it to 1 breaks stereo rendering.
+            #if !os(visionOS)
             if amplificationCount == 1 {
                 descriptor.renderTargetArrayLength = 1
             }
+            #else
+            _ = amplificationCount
+            #endif
         }
         .renderPipelineDescriptorModifier { [amplificationCount] renderPipelineDescriptor in
             renderPipelineDescriptor.inputPrimitiveTopology = .triangle
@@ -322,6 +336,20 @@ public struct SparkSplatRenderPipeline: Element {
             renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
+    }
+}
+
+// MARK: - Modifiers
+
+public extension SparkSplatRenderPipeline {
+    /// Sets vertex amplification view mappings for the draw.
+    ///
+    /// Use with a single camera/projection matrix to render one eye into a
+    /// specific layer of a layered render target (per-eye rendering).
+    func viewMappings(_ mappings: [MTLVertexAmplificationViewMapping]) -> Self {
+        var copy = self
+        copy.amplificationViewMappings = mappings
+        return copy
     }
 }
 

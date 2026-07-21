@@ -888,12 +888,13 @@ Provide a public RealityKit Scene (or ImmersiveSpace content) in the library tha
 ## 35: Support per-eye sorting for visionOS stereo rendering
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: visionOS, sorting, effort:l, not-testable
 created: 2026-04-09T17:40:46Z
-updated: 2026-07-21T20:45:36Z
+updated: 2026-07-21T21:37:23Z
+closed: 2026-07-21T21:37:23Z
 +++
 
 Currently SplatImmersiveElement sorts once using the left eye's camera matrix and shares the sorted index buffer for both eyes. For distant splats the depth order can differ between eyes, causing flicker. Since CPU sort is cheap (~2ms for 150k splats), we could sort twice — once per eye — using separate buffers. This would eliminate any depth-order disagreement between eyes.
