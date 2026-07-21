@@ -37,30 +37,25 @@ public struct SortEvent: Sendable {
 /// ## Typical Usage
 ///
 /// 1. Create a sort manager with one or more splat clouds.
-/// 2. Subscribe to ``sortedIndicesStream`` to receive sorted indices as they complete.
+/// 2. Subscribe to ``managedSortedIndicesStream(pendingReleaseDepth:)`` to receive sorted
+///    indices as they complete; superseded buffers are released back to the pool for you.
 /// 3. Call ``requestSort(_:)`` whenever the camera or model matrix changes.
 /// 4. Pass the received ``SplatIndices`` to a render pipeline.
-/// 5. Call ``release(_:)`` when you receive new sorted indices to return the old buffer to the pool.
 ///
 /// ```swift
 /// let sortManager = try AsyncSortManager(device: device, splatCloud: cloud, capacity: cloud.count)
 ///
 /// // In a .task:
-/// for await indices in sortManager.sortedIndicesStream {
+/// for await indices in sortManager.managedSortedIndicesStream() {
 ///     self.sortedIndices = indices
 /// }
 ///
 /// // On camera change:
 /// sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
-///
-/// // When receiving new indices, release the old ones:
-/// for await indices in sortManager.sortedIndicesStream {
-///     if let old = sortedIndices {
-///         sortManager.release(old)
-///     }
-///     sortedIndices = indices
-/// }
 /// ```
+///
+/// For manual buffer lifecycle control, use ``sortedIndicesStream`` and ``release(_:)``
+/// directly.
 ///
 /// For single-frame offline rendering, use ``sortNowSync(_:)`` instead.
 public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
@@ -93,6 +88,11 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// The current capacity of the internal sorter. Exposed for testing.
     internal var sorterCapacity: Int {
         sorter.capacity
+    }
+
+    /// The current index buffer pool. Exposed for testing.
+    internal var indexBufferPool: Pool<TypedMTLBuffer<IndexedDistance>> {
+        _indexBufferPool
     }
 
     /// The most recent sorted indices (nil until first sort completes)
@@ -179,6 +179,51 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// ```
     nonisolated public var sortedIndicesStream: SingleValueStream<SplatIndices> {
         _sortedIndicesStream
+    }
+
+    /// Stream of sorted indices that automatically releases superseded buffers.
+    ///
+    /// This wraps ``sortedIndicesStream`` and handles the release bookkeeping for you:
+    /// each time new indices arrive, the previous indices are queued and released back
+    /// to the pool once they are more than `pendingReleaseDepth` results old. The delay
+    /// gives in-flight GPU frames time to finish reading superseded buffers.
+    ///
+    /// ```swift
+    /// for await indices in sortManager.managedSortedIndicesStream() {
+    ///     sortedIndices = indices
+    /// }
+    /// ```
+    ///
+    /// When iteration ends (e.g. the enclosing task is cancelled), any still-pending
+    /// buffers are released.
+    ///
+    /// - Parameter pendingReleaseDepth: Number of superseded results to keep alive before
+    ///   releasing them. Should be at least the number of in-flight frames. Default is 3.
+    /// - Returns: An async stream of the latest ``SplatIndices``.
+    nonisolated public func managedSortedIndicesStream(pendingReleaseDepth: Int = 3) -> AsyncStream<SplatIndices> {
+        let source = _sortedIndicesStream
+        return AsyncStream { continuation in
+            let task = Task {
+                var pendingRelease: [SplatIndices] = []
+                for await indices in source {
+                    continuation.yield(indices)
+                    pendingRelease.append(indices)
+                    // Keep the newest `pendingReleaseDepth` results (plus the current one) alive.
+                    while pendingRelease.count > pendingReleaseDepth + 1 {
+                        pendingRelease.removeFirst().release()
+                    }
+                }
+                // Release everything except the current (last yielded) value, which the
+                // consumer may still be using for rendering.
+                while pendingRelease.count > 1 {
+                    pendingRelease.removeFirst().release()
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
     }
 
     /// Stream of sort timing events, updated after each completed sort.

@@ -53,11 +53,6 @@ public struct SplatView: View {
     @Environment(\.displayScale) private var displayScale
 
     @State private var sortedIndices: SplatIndices?
-    /// Queue of recently-superseded indices awaiting release. We hold the last
-    /// few so the GPU can finish rendering with them before their buffers are
-    /// returned to the pool and overwritten by the next sort. Sized to cover
-    /// MTKView's typical in-flight frame count (3) plus a margin.
-    @State private var pendingRelease: [SplatIndices] = []
     @State private var sortManager: AsyncSortManager<SparkSplat>
     @State private var pointSplatStatistics = PointSplatStatistics()
     @State private var pointSplatReprojection = true
@@ -70,6 +65,9 @@ public struct SplatView: View {
     /// when the view is stationary, avoiding constant shimmer (#51).
     @State private var stochasticSeed: UInt32 = 0
 
+    /// Superseded index buffers are held for this many results before release so
+    /// the GPU can finish rendering with them. Sized to cover MTKView's typical
+    /// in-flight frame count (3) plus a margin.
     private static let pendingReleaseDepth = 3
 
 
@@ -226,13 +224,7 @@ public struct SplatView: View {
             if renderer == .spark {
                 sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             }
-            for await indices in sortManager.sortedIndicesStream {
-                if let old = sortedIndices {
-                    pendingRelease.append(old)
-                    while pendingRelease.count > Self.pendingReleaseDepth {
-                        sortManager.release(pendingRelease.removeFirst())
-                    }
-                }
+            for await indices in sortManager.managedSortedIndicesStream(pendingReleaseDepth: Self.pendingReleaseDepth) {
                 sortedIndices = indices
             }
         }

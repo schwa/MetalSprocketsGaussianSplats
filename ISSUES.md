@@ -720,12 +720,13 @@ closed: 2026-04-09T20:32:10Z
 ## 26: Simplify buffer release pattern for sortedIndicesStream consumers
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: api, ergonomics, effort:m
 created: 2026-03-31T19:59:36Z
-updated: 2026-04-09T16:59:20Z
+updated: 2026-07-21T22:35:56Z
+closed: 2026-07-21T22:35:56Z
 +++
 
 The current pattern requires manual release handling:

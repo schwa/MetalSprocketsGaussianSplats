@@ -11,7 +11,7 @@ import Splats
 ///
 /// This pipeline is a pure rendering element — it does not manage sorting. The caller
 /// is responsible for creating an ``AsyncSortManager``, subscribing to its
-/// ``AsyncSortManager/sortedIndicesStream``, requesting sorts when the camera or model
+/// ``AsyncSortManager/managedSortedIndicesStream(pendingReleaseDepth:)``, requesting sorts when the camera or model
 /// changes, and passing the resulting ``SplatIndices`` into the pipeline.
 ///
 /// ## Interactive Rendering (SwiftUI)
@@ -36,7 +36,7 @@ import Splats
 ///         }
 ///     }
 ///     .task {
-///         for await indices in sortManager.sortedIndicesStream {
+///         for await indices in sortManager.managedSortedIndicesStream() {
 ///             sortedIndices = indices
 ///         }
 ///     }
@@ -48,8 +48,10 @@ import Splats
 ///
 /// ## Buffer Pooling
 ///
-/// The ``AsyncSortManager`` uses an internal buffer pool for index buffers. To enable
-/// buffer reuse and reduce allocations, release old indices when receiving new ones:
+/// The ``AsyncSortManager`` uses an internal buffer pool for index buffers.
+/// ``AsyncSortManager/managedSortedIndicesStream(pendingReleaseDepth:)`` releases
+/// superseded buffers back to the pool automatically. For manual control, use
+/// ``AsyncSortManager/sortedIndicesStream`` and release old indices yourself:
 ///
 /// ```swift
 /// for await indices in sortManager.sortedIndicesStream {

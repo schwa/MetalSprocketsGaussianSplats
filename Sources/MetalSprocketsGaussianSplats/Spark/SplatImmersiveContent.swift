@@ -349,7 +349,6 @@ public struct SplatImmersiveGPUSortElement: Element, @unchecked Sendable {
 public final class SplatImmersiveRenderState: Sendable {
     private struct State: Sendable {
         var sortedIndices: SplatIndices?
-        var pendingRelease: [SplatIndices] = []
     }
 
     // One sort manager and state slot per eye, so each eye has its own sort
@@ -384,21 +383,8 @@ public final class SplatImmersiveRenderState: Sendable {
             sortManagers.append(sortManager)
             states.append(state)
             listenerTasks.append(Task {
-                for await indices in sortManager.sortedIndicesStream {
-                    let toRelease: SplatIndices? = state.withLock { state in
-                        var release: SplatIndices?
-                        if let old = state.sortedIndices {
-                            state.pendingRelease.append(old)
-                            if state.pendingRelease.count > Self.pendingReleaseDepth {
-                                release = state.pendingRelease.removeFirst()
-                            }
-                        }
-                        state.sortedIndices = indices
-                        return release
-                    }
-                    if let toRelease {
-                        sortManager.release(toRelease)
-                    }
+                for await indices in sortManager.managedSortedIndicesStream(pendingReleaseDepth: Self.pendingReleaseDepth) {
+                    state.withLock { $0.sortedIndices = indices }
                 }
             })
         }
