@@ -28,6 +28,7 @@ public struct PointSplatRenderPipeline: Element {
 
     private let resolveKernel: ComputeKernel
     private let blendKernel: ComputeKernel
+    private let reprojectKernel: ComputeKernel
     private let blitVertexShader: VertexShader
     private let blitFragmentShader: FragmentShader
 
@@ -49,6 +50,7 @@ public struct PointSplatRenderPipeline: Element {
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
         let renderLibrary = shaderLibrary.namespaced("PointSplatRender")
         resolveKernel = try renderLibrary.function(named: "pointSplatResolve", type: ComputeKernel.self)
+        reprojectKernel = try renderLibrary.function(named: "pointSplatReproject", type: ComputeKernel.self)
         blendKernel = try shaderLibrary.namespaced("TemporalAccumulationShader").function(named: "blend", type: ComputeKernel.self)
         let blitLibrary = shaderLibrary.namespaced("BlitShader")
         blitVertexShader = try blitLibrary.function(named: "vertex_main", type: VertexShader.self)
@@ -127,12 +129,27 @@ public struct PointSplatRenderPipeline: Element {
                     }
                     try resources.encodeFrame(encoder: encoder, uniforms: uniforms, splats: splatCloud.splats.unsafeMTLBuffer, shBuffer: shBuffer, seed: frameIndex)
                 }
-                try ComputePipeline(computeKernel: blendKernel) {
-                    try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
-                        .parameter("currentFrame", texture: resources.resolveTexture)
-                        .parameter("accumulationTexture", texture: accumulation.input)
-                        .parameter("outputTexture", texture: accumulation.output)
-                        .parameter("blendFactor", value: accumulation.blendFactor)
+                if let previousViewProjection = accumulation.reprojectFrom {
+                    // Camera moved: warp + clamp history instead of resetting
+                    // to a single noisy frame (paper Sec. 3.6).
+                    try ComputePipeline(computeKernel: reprojectKernel) {
+                        try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+                            .parameter("framebuffer", buffer: resources.framebuffer)
+                            .parameter("uniforms", value: uniforms)
+                            .parameter("cameraToWorld", value: cameraMatrix)
+                            .parameter("previousViewProjection", value: previousViewProjection)
+                            .parameter("currentFrame", texture: resources.resolveTexture)
+                            .parameter("history", texture: accumulation.input)
+                            .parameter("outTexture", texture: accumulation.output)
+                    }
+                } else {
+                    try ComputePipeline(computeKernel: blendKernel) {
+                        try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+                            .parameter("currentFrame", texture: resources.resolveTexture)
+                            .parameter("accumulationTexture", texture: accumulation.input)
+                            .parameter("outputTexture", texture: accumulation.output)
+                            .parameter("blendFactor", value: accumulation.blendFactor)
+                    }
                 }
             }
             try RenderPass {
@@ -399,13 +416,37 @@ final class PointSplatResources {
         var input: MTLTexture
         var output: MTLTexture
         var blendFactor: Float
+        /// When set, the camera moved: reproject history from this previous
+        /// view-projection instead of running-mean blending.
+        var reprojectFrom: simd_float4x4?
     }
 
-    /// Resets the running mean when the view changes, then advances the
-    /// ping-pong textures and returns this frame's blend inputs.
+    /// Advances the ping-pong textures and returns this frame's blend
+    /// inputs. A static view continues the running mean; camera or
+    /// projection motion switches to reprojection against the previous
+    /// view-projection (model changes still hard-reset — reprojection can't
+    /// warp content change).
     func nextAccumulationStep(cameraMatrix: simd_float4x4, modelMatrix: simd_float4x4, projectionMatrix: simd_float4x4) -> AccumulationStep {
-        if lastCameraMatrix != cameraMatrix || lastModelMatrix != modelMatrix || lastProjectionMatrix != projectionMatrix {
+        let viewMoved = lastCameraMatrix != cameraMatrix || lastProjectionMatrix != projectionMatrix
+        let modelChanged = lastModelMatrix != modelMatrix
+        let previousViewProjection: simd_float4x4? = if let lastCameraMatrix, let lastProjectionMatrix {
+            lastProjectionMatrix * lastCameraMatrix.inverse
+        } else {
+            nil
+        }
+
+        var reprojectFrom: simd_float4x4?
+        if modelChanged {
             accumulatedFrames = 0
+        } else if viewMoved {
+            if let previousViewProjection, accumulatedFrames > 0 {
+                reprojectFrom = previousViewProjection
+                // Resume post-motion convergence from a moderate weight
+                // rather than trusting warped history as a long average.
+                accumulatedFrames = min(accumulatedFrames, 9)
+            } else {
+                accumulatedFrames = 0
+            }
         }
         lastCameraMatrix = cameraMatrix
         lastModelMatrix = modelMatrix
@@ -414,7 +455,8 @@ final class PointSplatResources {
         let step = AccumulationStep(
             input: accumulationTextures[frameParity],
             output: accumulationTextures[(frameParity + 1) % 2],
-            blendFactor: 1.0 / Float(accumulatedFrames + 1)
+            blendFactor: 1.0 / Float(accumulatedFrames + 1),
+            reprojectFrom: reprojectFrom
         )
         accumulatedFrames += 1
         frameParity = (frameParity + 1) % 2

@@ -312,6 +312,74 @@ namespace PointSplatRender {
         }
     }
 
+    // Temporal reprojection (paper Sec. 3.6): during camera motion, warp
+    // the previous accumulated frame into the new view using this frame's
+    // depth, clamp against the 3x3 color neighborhood of the current frame
+    // to limit ghosting, and EMA-blend with history weight 0.9.
+    kernel void pointSplatReproject(device const ulong *framebuffer [[buffer(0)]],
+                                    constant PointSplatUniforms &uniforms [[buffer(1)]],
+                                    constant float4x4 &cameraToWorld [[buffer(2)]],
+                                    constant float4x4 &previousViewProjection [[buffer(3)]],
+                                    texture2d<float, access::read> currentFrame [[texture(0)]],
+                                    texture2d<float, access::sample> history [[texture(1)]],
+                                    texture2d<float, access::write> outTexture [[texture(2)]],
+                                    uint2 gid [[thread_position_in_grid]]) {
+        if (gid.x >= outTexture.get_width() || gid.y >= outTexture.get_height()) {
+            return;
+        }
+        float4 current = currentFrame.read(gid);
+
+        // Minimal view depth across this pixel's subpixels (paper Sec. 3.6).
+        uint s = max(uniforms.supersampling, 1u);
+        uint stride = uint(uniforms.drawableSize.x);
+        float depth = uniforms.farPlane;
+        for (uint dy = 0; dy < s; dy++) {
+            for (uint dx = 0; dx < s; dx++) {
+                ulong value = framebuffer[(gid.y * s + dy) * stride + (gid.x * s + dx)];
+                depth = min(depth, gps_unpack_depth(value >> GPS_DEPTH_SHIFT, uniforms.nearPlane, uniforms.farPlane));
+            }
+        }
+
+        // Reconstruct the world position and project into the previous view.
+        float width = float(outTexture.get_width());
+        float height = float(outTexture.get_height());
+        float ndcX = ((float(gid.x) + 0.5) / width) * 2.0 - 1.0;
+        float ndcY = 0.5 - ((float(gid.y) + 0.5) / height);
+        ndcY *= 2.0;
+        float p00 = uniforms.projectionMatrix[0][0];
+        float p11 = uniforms.projectionMatrix[1][1];
+        float3 viewPos = float3(ndcX * depth / p00, ndcY * depth / p11, -depth);
+        float4 world = cameraToWorld * float4(viewPos, 1.0);
+        float4 previousClip = previousViewProjection * world;
+        if (previousClip.w <= 0.0) {
+            outTexture.write(current, gid);
+            return;
+        }
+        float2 previousNDC = previousClip.xy / previousClip.w;
+        float2 uv = float2(previousNDC.x * 0.5 + 0.5, 0.5 - previousNDC.y * 0.5);
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+            outTexture.write(current, gid);
+            return;
+        }
+        constexpr sampler historySampler(filter::linear, address::clamp_to_edge);
+        float4 reprojected = history.sample(historySampler, uv);
+
+        // Clamp history to the current frame's 3x3 neighborhood color AABB.
+        float3 colorMin = current.rgb;
+        float3 colorMax = current.rgb;
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                uint2 coord = uint2(clamp(int2(gid) + int2(dx, dy), int2(0), int2(width - 1, height - 1)));
+                float3 neighbor = currentFrame.read(coord).rgb;
+                colorMin = min(colorMin, neighbor);
+                colorMax = max(colorMax, neighbor);
+            }
+        }
+        reprojected.rgb = clamp(reprojected.rgb, colorMin, colorMax);
+
+        outTexture.write(float4(mix(current.rgb, reprojected.rgb, 0.9), 1.0), gid);
+    }
+
     // Unpacks the supersampled 64-bit framebuffer into a native-resolution
     // color texture with an S x S box filter (paper Sec. 3.1).
     kernel void pointSplatResolve(device const ulong *framebuffer [[buffer(0)]],

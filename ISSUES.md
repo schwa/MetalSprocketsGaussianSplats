@@ -1542,13 +1542,17 @@ Loading large SOG files (e.g. sphere-48M.sog) through SOGReaderCPU takes minutes
 ## 73: PointSplat: temporal reprojection for camera motion
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
 labels: pointsplat
 created: 2026-07-21T19:07:30Z
+updated: 2026-07-21T19:41:31Z
+closed: 2026-07-21T19:41:31Z
 +++
 
 Accumulation resets to 1 SPP noise the moment the camera moves. The paper's reprojection (Sec 3.6) warps the previous accumulated frame into the new view using last frame's depth and view-projection matrices, clamps against the 3x3 color neighborhood to limit ghosting, and blends with EMA weight 0.9. They call it basic and prone to detail loss; a proper spatiotemporal denoiser would do better. Split out from #69.
+
+- `2026-07-21T19:41:31Z`: Reprojection implemented per paper Sec 3.6: warp previous accumulation via min-subpixel-depth world reconstruction and previous view-projection, 3x3 neighborhood color clamp, 0.9 history EMA. Static views keep the exact running mean; model swaps hard-reset.
 
 ---
