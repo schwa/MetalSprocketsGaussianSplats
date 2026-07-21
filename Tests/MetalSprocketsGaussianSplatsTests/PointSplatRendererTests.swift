@@ -206,7 +206,7 @@ struct PointSplatRendererTests {
 
     @Test("nextAccumulationStep is idempotent per frame index")
     func accumulationStepIdempotent() throws {
-        let resources = try PointSplatResources(drawableSize: SIMD2<Float>(8, 8), splatCount: 1, supersampling: 1, pointsPerThread: 1)
+        let resources = try PointSplatResources(device: device, drawableSize: SIMD2<Float>(8, 8), splatCount: 1, supersampling: 1, pointsPerThread: 1)
         let first = resources.nextAccumulationStep(frameIndex: 0, cameraMatrix: .identity, modelMatrix: .identity, projectionMatrix: .identity)
         #expect(resources.accumulatedFrames == 1)
         // Re-evaluating body for the same frame must not advance parity or count.

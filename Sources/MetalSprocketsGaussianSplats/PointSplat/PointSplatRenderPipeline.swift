@@ -24,7 +24,10 @@ public struct PointSplatRenderPipeline: Element {
     private var drawableSize: SIMD2<Float>
     private var frameIndex: UInt32
 
-    @MSState private var resources: PointSplatResources
+    @MSState private var resources: PointSplatResources?
+
+    @MSEnvironment(\.device)
+    private var environmentDevice
 
     private let resolveKernel: ComputeKernel
     private let blendKernel: ComputeKernel
@@ -81,20 +84,27 @@ public struct PointSplatRenderPipeline: Element {
         var blitConstants = FunctionConstants()
         blitConstants["convert_srgb_to_linear"] = .bool(true)
         blitFragmentShader = try blitLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: blitConstants)
-
-        resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, supersampling: max(supersampling, 1), pointsPerThread: max(pointsPerThread, 1))
     }
 
     /// `@MSState` persists resources across body evaluations, so a splat
     /// cloud swap (e.g. switching models in the demo) can outgrow the counts
     /// buffer and distributor before `.onChange` fires. Validate eagerly.
+    ///
+    /// Resources are created lazily here (not in `init`) so they can be
+    /// allocated on the device MetalSprockets publishes via the environment
+    /// rather than a freshly created system-default device (#83).
     private func validatedResources() throws -> PointSplatResources {
+        guard let device = environmentDevice else {
+            throw MetalSprocketsError.missingEnvironment(\.device)
+        }
         let width = max(Int(drawableSize.x), 1)
         let height = max(Int(drawableSize.y), 1)
-        if resources.splatCount != splatCloud.count || resources.width != width || resources.height != height || resources.supersampling != supersampling || resources.pointsPerThread != pointsPerThread {
-            resources = try PointSplatResources(drawableSize: drawableSize, splatCount: splatCloud.count, supersampling: supersampling, pointsPerThread: pointsPerThread)
+        if let resources, resources.device === device, resources.splatCount == splatCloud.count, resources.width == width, resources.height == height, resources.supersampling == supersampling, resources.pointsPerThread == pointsPerThread {
+            return resources
         }
-        return resources
+        let newResources = try PointSplatResources(device: device, drawableSize: drawableSize, splatCount: splatCloud.count, supersampling: supersampling, pointsPerThread: pointsPerThread)
+        resources = newResources
+        return newResources
     }
 
     public var body: some Element {
@@ -280,10 +290,7 @@ final class PointSplatResources {
         return FrameStats(phase1Used: Int(pointer[0]), phase1Demand: Int(pointer[1]), phase2Used: Int(pointer[2]), phase2Demand: Int(pointer[3]))
     }
 
-    init(device explicitDevice: MTLDevice? = nil, drawableSize: SIMD2<Float>, splatCount: Int, supersampling: Int, pointsPerThread: Int, backgroundColor: SIMD3<Float> = .zero) throws {
-        guard let device = explicitDevice ?? MTLCreateSystemDefaultDevice() else {
-            throw PointSplatRenderer.RendererError.unsupportedDevice
-        }
+    init(device: MTLDevice, drawableSize: SIMD2<Float>, splatCount: Int, supersampling: Int, pointsPerThread: Int, backgroundColor: SIMD3<Float> = .zero) throws {
         guard device.supportsFamily(.apple9) || device.supportsFamily(.mac2) else {
             throw PointSplatRenderer.RendererError.unsupportedDevice
         }

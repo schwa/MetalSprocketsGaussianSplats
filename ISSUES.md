@@ -1766,12 +1766,13 @@ closed: 2026-07-21T21:32:07Z
 ## 83: PointSplatResources creates its own MTLDevice instead of using the environment device
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: pointsplat, code-style, effort:s
 created: 2026-07-21T20:28:46Z
-updated: 2026-07-21T20:43:23Z
+updated: 2026-07-21T22:37:31Z
+closed: 2026-07-21T22:37:31Z
 +++
 
 `PointSplatResources.init` calls `MTLCreateSystemDefaultDevice()` directly rather than using the device MetalSprockets publishes via `@MSEnvironment(\.device)` (e.g. allocation in `.onSetupEnter`). This diverges from framework convention, and on multi-GPU systems the resources could be allocated on a different device than the one the render view uses.
