@@ -1499,3 +1499,19 @@ created: 2026-07-21T17:47:37Z
 Offscreen and live rendering have largely parallel/duplicated code paths. Needs a dramatic cleanup to consolidate the shared logic.
 
 ---
+
+## 71: SOGReaderCPU: ImageIO rejects some lossless WebP textures
+
++++
+status: new
+priority: medium
+kind: bug
+labels: splats
+created: 2026-07-21T18:07:20Z
++++
+
+Loading sphere-32M.sog fails with failedToDecodeImage(quats.webp). The file is a valid 5660x5656 VP8L (lossless) WebP, 1.3 KB (constant-color, likely all-identity quaternions); CGImageSource creates a source but CGImageSourceCreateImageAtIndex returns nil, while the sibling scales.webp (same dims, also from the same encoder) decodes fine. sips can't read its dimensions either, so this is an ImageIO WebP decoder limitation, not a parsing bug in the reader. Affects SOG files from encoders that emit highly-compressed lossless textures. Possible fix: bundle a small VP8L decoder or special-case via libwebp.
+
+- `2026-07-21T18:12:42Z`: Characterized: ImageIO fails on lossless WebP using the VP8L color-indexing (palette) transform when the palette contains alpha and the image is large (fails at >=4095x4095, works at <=2048x2048; opaque palettes work at all sizes; libwebp decodes everything fine). Reproduced with synthetic cwebp -lossless encodes, so it's not specific to the SOG encoder. Tested on macOS 27 beta - possibly a beta ImageIO regression; worth a feedback report. Workaround options: decode via libwebp for VP8L+palette+alpha, or pre-process textures.
+
+---
