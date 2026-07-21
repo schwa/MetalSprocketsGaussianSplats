@@ -25,7 +25,7 @@ public struct TileBasedSplatPipeline: Element {
 
     // MARK: - Initialization
 
-    public init(
+    init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,

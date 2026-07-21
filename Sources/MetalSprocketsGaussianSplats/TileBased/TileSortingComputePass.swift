@@ -8,7 +8,7 @@ import MetalSprocketsGaussianSplatShaders
 ///
 /// - Important: This type is part of the **experimental** tile-based renderer
 ///   and may have significant changes or be removed in future versions.
-public struct TileSortingComputePass: Element {
+struct TileSortingComputePass: Element {
     // MARK: - Properties
 
     var tileSplatResources: TileSplatResources
@@ -18,7 +18,7 @@ public struct TileSortingComputePass: Element {
 
     // MARK: - Initialization
 
-    public init(tileSplatResources: TileSplatResources) throws {
+    init(tileSplatResources: TileSplatResources) throws {
         self.tileSplatResources = tileSplatResources
 
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
@@ -28,7 +28,7 @@ public struct TileSortingComputePass: Element {
 
     // MARK: - Element Body
 
-    public var body: some Element {
+    var body: some Element {
         get throws {
             let numTiles = tileSplatResources.numTiles
 

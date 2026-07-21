@@ -20,7 +20,7 @@ public struct TileBasedSplatPass: Element {
     private var modelMatrix: simd_float4x4
     private var debugTileBorders: Bool
     private var showHeatMap: Bool
-    private var onFrameCompleted: (@Sendable (TileSplatResources) -> Void)?
+    var onFrameCompleted: (@Sendable (TileSplatResources) -> Void)?
     private var drawableSize: SIMD2<Float>
 
     @MSState private var resources: TileSplatResources
@@ -32,8 +32,7 @@ public struct TileBasedSplatPass: Element {
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,
         debugTileBorders: Bool = false,
-        showHeatMap: Bool = false,
-        onFrameCompleted: (@Sendable (TileSplatResources) -> Void)? = nil
+        showHeatMap: Bool = false
     ) throws {
         self.splatCloud = splatCloud
         self.projection = projection
@@ -42,7 +41,6 @@ public struct TileBasedSplatPass: Element {
         self.modelMatrix = modelMatrix
         self.debugTileBorders = debugTileBorders
         self.showHeatMap = showHeatMap
-        self.onFrameCompleted = onFrameCompleted
         self.resources = try Self.makeResources(drawableSize: drawableSize)
     }
 

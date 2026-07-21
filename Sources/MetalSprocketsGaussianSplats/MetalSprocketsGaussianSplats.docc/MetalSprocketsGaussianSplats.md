@@ -45,7 +45,6 @@ The framework ships five interchangeable renderers, selected via
 - ``SplatView``
 - ``SplatRenderer``
 - ``GPUSplatCloud``
-- ``AnyGPUSplatCloud``
 - ``SortableSplatProtocol``
 
 ### Spark Renderer
@@ -60,13 +59,7 @@ The framework ships five interchangeable renderers, selected via
 
 - ``TileBasedSplatPipeline``
 - ``TileBasedSplatPass``
-- ``TileBinningCountPass``
-- ``TileBinningWritePass``
-- ``TilePrefixSumComputePass``
-- ``TileSortingComputePass``
 - ``TileSplatRenderPass``
-- ``TileHeatMapRenderPass``
-- ``TileSplatResources``
 
 ### Stochastic Renderer
 
@@ -76,7 +69,6 @@ The framework ships five interchangeable renderers, selected via
 
 - ``PointSplatRenderPipeline``
 - ``PointSplatRenderer``
-- ``PointSplatWorkloadDistributor``
 - ``PointSplatStatistics``
 
 ### Sorting
@@ -91,5 +83,4 @@ The framework ships five interchangeable renderers, selected via
 
 ### Support
 
-- ``Pool``
 - ``SingleValueStream``

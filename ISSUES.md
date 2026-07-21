@@ -2057,12 +2057,13 @@ ARSplatView.init calls MTLCreateSystemDefaultDevice()! and try! AsyncSortManager
 ## 99: API: demote unused-externally public types to internal
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: api, effort:s
 created: 2026-07-21T23:52:19Z
-updated: 2026-07-21T23:53:12Z
+updated: 2026-07-21T23:56:40Z
+closed: 2026-07-21T23:56:40Z
 +++
 
 These public types have no users outside the library (not demo, CLI, or tests): TileSplatResources, TileBinningCountPass, TileBinningWritePass, TilePrefixSumComputePass, TileSortingComputePass, TileHeatMapRenderPass (tile internals; TileBasedSplatPipeline is the public entry), and AnyGPUSplatCloud (unused everywhere). Pool, SingleValueStream, and PointSplatWorkloadDistributor are used only by tests - internal + @testable candidates. Un-publishing after a version tag is breaking, so demote before the next release.

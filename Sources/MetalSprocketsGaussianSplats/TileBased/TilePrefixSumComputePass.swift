@@ -11,7 +11,7 @@ import MetalSprocketsGaussianSplatShaders
 ///
 /// - Important: This type is part of the **experimental** tile-based renderer
 ///   and may have significant changes or be removed in future versions.
-public struct TilePrefixSumComputePass: Element {
+struct TilePrefixSumComputePass: Element {
     // MARK: - Properties
 
     var tileSplatResources: TileSplatResources
@@ -21,7 +21,7 @@ public struct TilePrefixSumComputePass: Element {
 
     // MARK: - Initialization
 
-    public init(tileSplatResources: TileSplatResources) throws {
+    init(tileSplatResources: TileSplatResources) throws {
         self.tileSplatResources = tileSplatResources
 
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders)
@@ -31,7 +31,7 @@ public struct TilePrefixSumComputePass: Element {
 
     // MARK: - Element Body
 
-    public var body: some Element {
+    var body: some Element {
         get throws {
             // Run prefix sum kernel - single thread
             try ComputePass(label: "Tile Prefix Sum") {

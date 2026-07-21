@@ -9,7 +9,7 @@ import MetalSprocketsSupport
 ///
 /// - Important: This type is part of the **experimental** tile-based renderer
 ///   and may have significant changes or be removed in future versions.
-public struct TileHeatMapRenderPass: Element {
+struct TileHeatMapRenderPass: Element {
     var tileSplatResources: TileSplatResources
     var showTileBorders: Bool
 
@@ -27,7 +27,7 @@ public struct TileHeatMapRenderPass: Element {
 
     var vertexDescriptor: MTLVertexDescriptor
 
-    public init(tileSplatResources: TileSplatResources, showTileBorders: Bool = false) throws {
+    init(tileSplatResources: TileSplatResources, showTileBorders: Bool = false) throws {
         self.tileSplatResources = tileSplatResources
         self.showTileBorders = showTileBorders
 
@@ -61,7 +61,7 @@ public struct TileHeatMapRenderPass: Element {
         return fragmentShader
     }
 
-    public var body: some Element {
+    var body: some Element {
         get throws {
             let fragmentShader = try updatedFragmentShader()
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {

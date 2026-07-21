@@ -2,16 +2,16 @@
 /// A type-erased wrapper for `GPUSplatCloud<Splat>` that hides the splat type.
 ///
 /// Use `typed(as:)` to recover the underlying typed cloud when needed.
-public struct AnyGPUSplatCloud: @unchecked Sendable {
+struct AnyGPUSplatCloud: @unchecked Sendable {
     private let storage: Any
 
-    public init<Splat: SortableSplatProtocol>(_ cloud: GPUSplatCloud<Splat>) {
+    init<Splat: SortableSplatProtocol>(_ cloud: GPUSplatCloud<Splat>) {
         self.storage = cloud
     }
 
     /// Attempt to recover the underlying typed `GPUSplatCloud`.
     /// Returns `nil` if the splat type doesn't match.
-    public func typed<Splat: SortableSplatProtocol>(as _: Splat.Type) -> GPUSplatCloud<Splat>? {
+    func typed<Splat: SortableSplatProtocol>(as _: Splat.Type) -> GPUSplatCloud<Splat>? {
         storage as? GPUSplatCloud<Splat>
     }
 }

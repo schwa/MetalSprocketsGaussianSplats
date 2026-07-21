@@ -33,10 +33,10 @@ import Synchronization
 /// When all pooled objects are in use, `acquire()` allocates a new object using
 /// the allocator closure and logs a warning. This helps identify when the
 /// preallocated count is too low.
-public final class Pool<T: Sendable>: @unchecked Sendable {
+final class Pool<T: Sendable>: @unchecked Sendable {
     /// When true, `release()` is a no-op — objects are never returned to the pool.
     /// Useful for diagnosing buffer reuse issues (e.g. GPU still reading a released buffer).
-    public var releaseDisabled: Bool = false
+    var releaseDisabled: Bool = false
 
     private let allocator: @Sendable (Int) -> T
     private let state: Mutex<State>
@@ -52,7 +52,7 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
     ///   - preallocatedCount: Number of objects to create upfront. Default is 0.
     ///   - allocator: Closure that creates a new object. Receives an incrementing
     ///     ID that can be used for debug labeling.
-    public init(preallocatedCount: Int = 0, allocator: @escaping @Sendable (_ id: Int) -> T) {
+    init(preallocatedCount: Int = 0, allocator: @escaping @Sendable (_ id: Int) -> T) {
         self.allocator = allocator
         var initialState = State()
         for id in 0..<preallocatedCount {
@@ -68,7 +68,7 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
     /// A warning is logged when allocation occurs due to pool exhaustion.
     ///
     /// - Returns: An object ready for use.
-    public func acquire() -> T {
+    func acquire() -> T {
         state.withLock { state in
             if let item = state.available.popLast() {
                 return item
@@ -89,7 +89,7 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
     /// should typically be done in a `commandBuffer.addCompletedHandler`.
     ///
     /// - Parameter item: The object to return to the pool.
-    public func release(_ item: T) {
+    func release(_ item: T) {
         guard !releaseDisabled else {
             return
         }
@@ -101,14 +101,14 @@ public final class Pool<T: Sendable>: @unchecked Sendable {
     /// The number of objects currently available in the pool.
     ///
     /// Useful for debugging and monitoring pool utilization.
-    public var availableCount: Int {
+    var availableCount: Int {
         state.withLock { $0.available.count }
     }
 
     /// The total number of objects ever allocated by this pool.
     ///
     /// Includes both preallocated objects and those allocated on demand.
-    public var totalAllocatedCount: Int {
+    var totalAllocatedCount: Int {
         state.withLock { $0.nextID }
     }
 }

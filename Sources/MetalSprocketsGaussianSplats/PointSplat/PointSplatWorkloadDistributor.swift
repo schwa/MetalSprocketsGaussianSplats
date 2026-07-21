@@ -13,7 +13,7 @@ import MetalSprocketsGaussianSplatShaders
 /// GPU timeline, so consumers can stay readback-free by dispatching over
 /// `capacity` and exiting threads past the total (RFC 0002's
 /// indirect-dispatch gap).
-public final class PointSplatWorkloadDistributor {
+final class PointSplatWorkloadDistributor {
     /// Elements per scan block. Must match WORKLOAD_BLOCK in PointSplatWorkload.metal.
     static let blockSize = 256
 
@@ -27,44 +27,44 @@ public final class PointSplatWorkloadDistributor {
     /// framebuffer size: 32 points per pixel, K points per thread. This is
     /// the distributor's capacity and the index-buffer length (4 bytes per
     /// thread).
-    public static func capacity(forSupersampledPixels pixels: Int, pointsPerThread: Int) -> Int {
+    static func capacity(forSupersampledPixels pixels: Int, pointsPerThread: Int) -> Int {
         max(pixels, 1) * pointsPerPixelBudget / max(pointsPerThread, 1)
     }
 
-    public struct Result {
+    struct Result {
         /// Maps splat-thread index to Gaussian index; valid in `[0, totalPoints)`.
-        public let indices: MTLBuffer
+        let indices: MTLBuffer
         /// Total number of points to splat this frame (sum of all counts, clamped to capacity).
-        public let totalPoints: Int
+        let totalPoints: Int
     }
 
-    public let device: MTLDevice
+    let device: MTLDevice
     /// Maximum number of points per frame (T in the paper).
-    public let capacity: Int
+    let capacity: Int
     /// Maximum number of Gaussians per `elements` call.
-    public let maxSplats: Int
+    let maxSplats: Int
 
     /// Thread-to-Gaussian map, valid after the encoded work completes.
-    public let indicesBuffer: MTLBuffer
+    let indicesBuffer: MTLBuffer
     /// Two uint32s, written on the GPU timeline: [0] the thread count after
     /// over-budget scaling (what the splat stage consumes), [1] the raw
     /// pre-scaling demand.
-    public let totalsBuffer: MTLBuffer
+    let totalsBuffer: MTLBuffer
 
     /// Threads consumed by the last completed frame (post-scaling).
-    public var lastThreadCount: Int {
+    var lastThreadCount: Int {
         Int(totalsBuffer.contents().load(as: UInt32.self))
     }
 
     /// Raw thread demand of the last completed frame; exceeds `capacity`
     /// when the scene wants more points than the budget allows.
-    public var lastThreadDemand: Int {
+    var lastThreadDemand: Int {
         Int(totalsBuffer.contents().load(fromByteOffset: MemoryLayout<UInt32>.stride, as: UInt32.self))
     }
     /// `MTLDispatchThreadgroupsIndirectArguments` for ceil(total/256)
     /// threadgroups, written on the GPU timeline. Use for any dispatch that
     /// should cover exactly the active threads (e.g. the splat stage).
-    public let dispatchArgsBuffer: MTLBuffer
+    let dispatchArgsBuffer: MTLBuffer
 
     private let scanCountsBlock: ComputeKernel
     private let scaleCounts: ComputeKernel
@@ -84,7 +84,7 @@ public final class PointSplatWorkloadDistributor {
 
     private var runner: Runner?
 
-    public init(device: MTLDevice, capacity: Int, maxSplats: Int) throws {
+    init(device: MTLDevice, capacity: Int, maxSplats: Int) throws {
         self.device = device
         self.capacity = capacity
         self.maxSplats = maxSplats
@@ -246,7 +246,7 @@ public final class PointSplatWorkloadDistributor {
 
     /// Builds the thread-to-Gaussian map, blocking until the GPU work
     /// completes, and reads back the total. Convenience for offline/test use.
-    public func build(counts: MTLBuffer, count: Int, commandQueue: MTLCommandQueue) throws -> Result {
+    func build(counts: MTLBuffer, count: Int, commandQueue: MTLCommandQueue) throws -> Result {
         try validate(count: count)
         let runner: Runner
         if let existing = self.runner {

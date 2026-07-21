@@ -11,25 +11,25 @@ import Splats
 ///
 /// - Important: This type is part of the **experimental** tile-based renderer
 ///   and may have significant changes or be removed in future versions.
-public final class TileSplatResources {
+final class TileSplatResources {
     // MARK: - Configuration
 
-    public static let tileSize = UInt32(TILE_SIZE)
+    static let tileSize = UInt32(TILE_SIZE)
 
     /// Maximum total splat-tile intersections (splats * average tiles per splat)
     /// Conservative estimate: each splat overlaps ~8 tiles on average
-    public static let maxTotalSplatTileIntersections = 16 * 1_024 * 1_024  // 16M entries = 128MB
+    static let maxTotalSplatTileIntersections = 16 * 1_024 * 1_024  // 16M entries = 128MB
 
     // MARK: - Properties
 
     /// Device used to create buffers
-    public let device: MTLDevice
+    let device: MTLDevice
 
     /// Size of tile grid (in tiles)
-    public private(set) var tileGridSize: SIMD2<UInt32>
+    private(set) var tileGridSize: SIMD2<UInt32>
 
     /// Total number of tiles
-    public var numTiles: Int {
+    var numTiles: Int {
         Int(tileGridSize.x) * Int(tileGridSize.y)
     }
 
@@ -37,34 +37,34 @@ public final class TileSplatResources {
     /// Layout: [tile_0_indices...][tile_1_indices...]...[tile_N_indices...]
     /// Each tile's range is defined by tileOffsets[tile] to tileOffsets[tile+1]
     /// Two buffers for ping-pong radix sorting
-    public private(set) var tileSplatIndicesA: TypedMTLBuffer<TileSplatIndex>
-    public private(set) var tileSplatIndicesB: TypedMTLBuffer<TileSplatIndex>
+    private(set) var tileSplatIndicesA: TypedMTLBuffer<TileSplatIndex>
+    private(set) var tileSplatIndicesB: TypedMTLBuffer<TileSplatIndex>
 
     /// Atomic counter buffer - one uint per tile tracking actual splat count
-    public private(set) var tileCounters: TypedMTLBuffer<UInt32>
+    private(set) var tileCounters: TypedMTLBuffer<UInt32>
 
     /// Prefix sum of tile counts - tileOffsets[i] is starting index for tile i
     /// tileOffsets[numTiles] contains total count
-    public private(set) var tileOffsets: TypedMTLBuffer<UInt32>
+    private(set) var tileOffsets: TypedMTLBuffer<UInt32>
 
     /// Maximum splat count across all tiles (for heatmap normalization)
     /// Written by prefix sum kernel
-    public private(set) var maxTileCount: TypedMTLBuffer<UInt32>
+    private(set) var maxTileCount: TypedMTLBuffer<UInt32>
 
     /// Per-splat 2D projection data (screen center, conic, linear color),
     /// written by the binning write kernel and read by the render pass (#58).
     /// Grown on demand via ``ensureProjectedSplatCapacity(_:)``.
-    public private(set) var projectedSplats: TypedMTLBuffer<TileProjectedSplat>
+    private(set) var projectedSplats: TypedMTLBuffer<TileProjectedSplat>
 
     /// Shared-mode buffer for reading back tile counts to CPU (for stats display)
-    public private(set) var tileCountersReadback: TypedMTLBuffer<UInt32>
+    private(set) var tileCountersReadback: TypedMTLBuffer<UInt32>
 
     /// Drawable size this resource was created for
-    public private(set) var drawableSize: SIMD2<Float>
+    private(set) var drawableSize: SIMD2<Float>
 
     // MARK: - Initialization
 
-    public init(device: MTLDevice, drawableSize: SIMD2<Float>) throws {
+    init(device: MTLDevice, drawableSize: SIMD2<Float>) throws {
         self.device = device
         self.drawableSize = drawableSize
 
@@ -100,7 +100,7 @@ public final class TileSplatResources {
     }
 
     /// Grow the projected-splat buffer to hold at least `splatCount` entries.
-    public func ensureProjectedSplatCapacity(_ splatCount: Int) throws {
+    func ensureProjectedSplatCapacity(_ splatCount: Int) throws {
         let required = max(splatCount, 1)
         guard projectedSplats.capacity < required else {
             return
@@ -112,14 +112,14 @@ public final class TileSplatResources {
     // MARK: - Resize
 
     /// Check if resources need to be reallocated for new drawable size
-    public func needsResize(for newDrawableSize: SIMD2<Float>) -> Bool {
+    func needsResize(for newDrawableSize: SIMD2<Float>) -> Bool {
         let newGridWidth = (UInt32(newDrawableSize.x) + Self.tileSize - 1) / Self.tileSize
         let newGridHeight = (UInt32(newDrawableSize.y) + Self.tileSize - 1) / Self.tileSize
         return newGridWidth != tileGridSize.x || newGridHeight != tileGridSize.y
     }
 
     /// Resize buffers for new drawable size
-    public func resize(for newDrawableSize: SIMD2<Float>) throws {
+    func resize(for newDrawableSize: SIMD2<Float>) throws {
         guard needsResize(for: newDrawableSize) else {
             return
         }
@@ -147,7 +147,7 @@ public final class TileSplatResources {
     // MARK: - Uniforms
 
     /// Create uniforms struct for shader use
-    public func makeUniforms(
+    func makeUniforms(
         modelMatrix: simd_float4x4,
         viewMatrix: simd_float4x4,
         projectionMatrix: simd_float4x4,
@@ -166,7 +166,7 @@ public final class TileSplatResources {
     // MARK: - Memory Stats
 
     /// Total GPU memory used by tile resources (in bytes)
-    public var totalMemoryUsage: Int {
+    var totalMemoryUsage: Int {
         let indexBufferASize = tileSplatIndicesA.unsafeMTLBuffer.length
         let indexBufferBSize = tileSplatIndicesB.unsafeMTLBuffer.length
         let counterBufferSize = tileCounters.unsafeMTLBuffer.length
@@ -178,7 +178,7 @@ public final class TileSplatResources {
     }
 
     /// Human-readable memory usage string
-    public var memoryUsageDescription: String {
+    var memoryUsageDescription: String {
         let mb = Double(totalMemoryUsage) / (1_024 * 1_024)
         return "\(mb.formatted(.number.precision(.fractionLength(1)))) MB (\(numTiles) tiles, max \(Self.maxTotalSplatTileIntersections) total intersections)"
     }
@@ -186,7 +186,7 @@ public final class TileSplatResources {
     // MARK: - Stats Readback
 
     /// Read tile counts from the readback buffer (call after GPU work completes)
-    public func readTileCounts() -> [UInt32] {
+    func readTileCounts() -> [UInt32] {
         Array(tileCountersReadback)
     }
 }

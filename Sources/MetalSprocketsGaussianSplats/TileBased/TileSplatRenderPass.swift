@@ -39,7 +39,7 @@ public struct TileSplatRenderPass: Element {
 
     // MARK: - Initialization
 
-    public init(
+    init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         tileSplatResources: TileSplatResources,
         projectionMatrix: simd_float4x4,

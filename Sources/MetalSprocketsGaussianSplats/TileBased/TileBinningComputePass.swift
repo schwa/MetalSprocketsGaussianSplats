@@ -8,7 +8,7 @@ import MetalSprocketsGaussianSplatShaders
 ///
 /// - Important: This type is part of the **experimental** tile-based renderer
 ///   and may have significant changes or be removed in future versions.
-public struct TileBinningCountPass: Element {
+struct TileBinningCountPass: Element {
     // MARK: - Properties
 
     var splatCloud: GPUSplatCloud<SparkSplat>
@@ -23,7 +23,7 @@ public struct TileBinningCountPass: Element {
 
     // MARK: - Initialization
 
-    public init(
+    init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,
@@ -45,7 +45,7 @@ public struct TileBinningCountPass: Element {
 
     // MARK: - Element Body
 
-    public var body: some Element {
+    var body: some Element {
         get throws {
             // Clear tile counters before counting
             try BlitPass {
@@ -84,7 +84,7 @@ public struct TileBinningCountPass: Element {
 ///
 /// - Important: This type is part of the **experimental** tile-based renderer
 ///   and may have significant changes or be removed in future versions.
-public struct TileBinningWritePass: Element {
+struct TileBinningWritePass: Element {
     // MARK: - Properties
 
     var splatCloud: GPUSplatCloud<SparkSplat>
@@ -99,7 +99,7 @@ public struct TileBinningWritePass: Element {
 
     // MARK: - Initialization
 
-    public init(
+    init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
         modelMatrix: simd_float4x4,
@@ -122,7 +122,7 @@ public struct TileBinningWritePass: Element {
 
     // MARK: - Element Body
 
-    public var body: some Element {
+    var body: some Element {
         get throws {
             // Clear tile counters before writing (reused as local indices)
             try BlitPass {
