@@ -142,9 +142,10 @@ public struct PointSplatRenderPipeline: Element {
             // motion reprojects history (#73) or, with reprojection disabled
             // (#74), hard-resets so motion shows raw 1-SPP noise.
             let accumulation = resources.nextAccumulationStep(frameIndex: frameIndex, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix, allowReprojection: reprojection)
-            // Temporal point reuse engages on motion frames (RFC 0005 §4):
-            // seed points cover half the budget, fresh sampling the rest.
-            let reuseFactor: Float = accumulation.reprojectFrom != nil ? 0.5 : 0
+            // Temporal point reuse (RFC 0005 §4) is disabled: seeding from
+            // the resolve chains seeded history recursively, so stale
+            // surfaces persist for several frames during rotation (#107).
+            let reuseFactor: Float = 0
             let uniforms = PointSplatUniforms(
                 modelMatrix: modelMatrix,
                 viewMatrix: cameraMatrix.inverse,

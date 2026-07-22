@@ -2185,16 +2185,17 @@ RFC 0005 proposal 3: when over budget, grow point size for small-footprint Gauss
 ## 107: PointSplat: temporal point reuse, reservoir-style (RFC 0005 §4)
 
 +++
-status: closed
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:m, impact:high
+labels: pointsplat, performance, effort:m, impact:high, punted
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:45:01Z
-closed: 2026-07-22T02:45:01Z
+updated: 2026-07-22T02:47:38Z
 +++
 
 RFC 0005 proposal 4: reuse surviving points across frames reservoir-style instead of resampling every frame, reducing noise and work during interactive motion. Depends on the reprojection transform (already available from #73's temporal reprojection). Part of RFCs/0005.
+
+- `2026-07-22T02:47:38Z`: Shipped and reverted: seeding from the resolve texture chains history recursively (the resolve already contains prior seeds), so surfaces from several frames back persist during rotation - visible flashback artifacts. Seeding is now disabled (reuseFactor = 0); the kernel remains. Fix requires a non-chained seed source: either seed from a separate fresh-points-only resolve, or add seed age tracking / depth validation so stale seeds die after one frame.
 
 ---
 
