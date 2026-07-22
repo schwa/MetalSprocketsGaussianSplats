@@ -2154,12 +2154,13 @@ RFC 0005 proposal 1, cheap intermediate: stratify u1 (the angle) across a thread
 ## 105: PointSplat: importance-driven per-Gaussian budget allocation (RFC 0005 §2a)
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: pointsplat, performance, effort:s, impact:high
 created: 2026-07-22T00:10:33Z
-updated: 2026-07-22T02:37:59Z
+updated: 2026-07-22T02:41:03Z
+closed: 2026-07-22T02:41:03Z
 +++
 
 RFC 0005 proposal 2a: the RFC 0004 budget-scaling pass applies a uniform T/demand scale; make it per-Gaussian, weighting by estimated visibility (depth-pyramid occlusion from #69's pyramid). Depends on the existing depth pyramid. Part of RFCs/0005.

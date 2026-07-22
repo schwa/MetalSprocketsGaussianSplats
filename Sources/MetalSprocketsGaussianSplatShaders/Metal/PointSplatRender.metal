@@ -174,7 +174,11 @@ namespace PointSplatRender {
     // *maximum* (farthest) visible depth per region, so this never falsely
     // culls: background texels hold the far plane. minPx/maxPx are in
     // native-resolution pixels.
-    static bool depthAABBOccluded(float2 minPx, float2 maxPx, float minDepth, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
+    // Fraction of the AABB's four covering pyramid texels whose stored
+    // (farthest-visible) depth passes the region's minimum depth: 0 means
+    // provably occluded, 1 fully unoccluded, quarters in between are a soft
+    // visibility estimate (RFC 0005 §2a).
+    static float depthAABBVisibility(float2 minPx, float2 maxPx, float minDepth, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
         float2 size = float2(depthPyramid.get_width(), depthPyramid.get_height());
         minPx = clamp(minPx, float2(0.0), size - 1.0);
         maxPx = clamp(maxPx, float2(0.0), size - 1.0);
@@ -189,15 +193,22 @@ namespace PointSplatRender {
         float d1 = depthPyramid.read(uint2(upper.x, base.y), lod).r;
         float d2 = depthPyramid.read(uint2(base.x, upper.y), lod).r;
         float d3 = depthPyramid.read(uint2(upper.x, upper.y), lod).r;
-        return max(max(d0, d1), max(d2, d3)) < minDepth;
+        return 0.25 * ((d0 >= minDepth ? 1.0 : 0.0)
+                     + (d1 >= minDepth ? 1.0 : 0.0)
+                     + (d2 >= minDepth ? 1.0 : 0.0)
+                     + (d3 >= minDepth ? 1.0 : 0.0));
     }
 
-    static bool isOccluded(ProjectedGaussian projected, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
+    static bool depthAABBOccluded(float2 minPx, float2 maxPx, float minDepth, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
+        return depthAABBVisibility(minPx, maxPx, minDepth, uniforms, depthPyramid) == 0.0;
+    }
+
+    static float visibilityEstimate(ProjectedGaussian projected, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
         float s = float(max(uniforms.supersampling, 1u));
         float2 minPx = (projected.pixelMean - projected.radius) / s;
         float2 maxPx = (projected.pixelMean + projected.radius) / s;
         float minDepth = projected.viewDepth - 3.0 * projected.sigmaZ;
-        return depthAABBOccluded(minPx, maxPx, minDepth, uniforms, depthPyramid);
+        return depthAABBVisibility(minPx, maxPx, minDepth, uniforms, depthPyramid);
     }
 
     // Group-level hierarchical culling (issue #75, paper Sec. 3.5).
@@ -367,8 +378,16 @@ namespace PointSplatRender {
             return;
         }
 
-        if (uniforms.occlusionPhase != 0 && isOccluded(projected, uniforms, depthPyramid)) {
-            return;
+        // Soft occlusion (RFC 0005 §2a): fully occluded Gaussians are culled
+        // as before; partially occluded ones get proportionally fewer points
+        // via the visibility-scaled lambda below. Phase 2's re-test against
+        // the fresh pyramid still catches false culls.
+        float visibility = 1.0;
+        if (uniforms.occlusionPhase != 0) {
+            visibility = visibilityEstimate(projected, uniforms, depthPyramid);
+            if (visibility == 0.0) {
+                return;
+            }
         }
 
         // SH color depends only on the view direction to the Gaussian's
@@ -383,7 +402,7 @@ namespace PointSplatRender {
 
         // Expected point count: lambda = 2 pi sqrt(|Sigma|) Li2(alpha).
         float sqrtDet = projected.c0 * projected.c2;
-        float lambda = 2.0 * GPS_PI * sqrtDet * gps_dilog(projected.opacity);
+        float lambda = 2.0 * GPS_PI * sqrtDet * gps_dilog(projected.opacity) * visibility;
 
         GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed);
         uint numPoints = gps_poisson(&seed, lambda);
