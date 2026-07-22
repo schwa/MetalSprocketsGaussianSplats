@@ -139,7 +139,7 @@ class DemoState {
 
     @concurrent
     nonisolated private static func generateSplatCloudOffMain(device: MTLDevice, count: Int) async throws -> GPUSplatCloud<SparkSplat> {
-        let splats = SplatGenerator.generate(count: count)
+        let splats = await SplatGenerator.generate(count: count)
         return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, mortonOrdered: true)
     }
 
