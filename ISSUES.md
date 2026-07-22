@@ -1011,13 +1011,12 @@ The demo has an AppIcon.icon file (Icon Composer format) but no icon appears. Ic
 ## 41: Splat rendering fails silently in visionOS and iPad simulators
 
 +++
-status: closed
+status: open
 priority: low
 kind: bug
 labels: effort:m, simulator
 created: 2026-04-09T19:09:47Z
-updated: 2026-07-21T23:02:29Z
-closed: 2026-07-21T23:02:29Z
+updated: 2026-07-21T20:43:22Z
 +++
 
 SplatView renders nothing in visionOS and iPad simulators — sorting runs but no pixels appear. No errors logged. Works fine on device and on macOS native. The MetalSprockets cube demo renders fine on simulator, so it's specific to the splat pipeline. Likely cause: GPU buffer addresses (gpuAddressAsUnsafeMutablePointer), argument buffers, or other advanced Metal features used by SparkSplatRenderPipeline that aren't supported by simulator Metal.

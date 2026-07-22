@@ -87,4 +87,10 @@ struct SplatCloudData {
     float opacity;  // Cloud-level opacity multiplier (0.0 - 1.0)
 };
 
+/// Argument buffer containing array of cloud data
+struct MultiCloudArgumentBuffer {
+    unsigned int cloudCount;
+    BUFFER(device, struct SplatCloudData *) clouds;
+};
+
 #endif /* SparkSplatRenderShader_h */
