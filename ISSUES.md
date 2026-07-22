@@ -2261,3 +2261,24 @@ updated: 2026-07-22T02:37:59Z
 RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit fixed-point view-space depth and 3x12-bit sRGB color over [0,16) leave headroom; small quality/precision polish. Part of RFCs/0005.
 
 ---
+
+## 112: PointSplat: flashback/stale-frame artifacts during camera rotation
+
++++
+status: new
+priority: medium
+kind: bug
+labels: pointsplat, not-testable, effort:m
+created: 2026-07-22T02:48:17Z
++++
+
+Rotating the camera shows content that looks a frame or several old, as if rendering lags the camera. Reproduces with temporal point reuse disabled (reuseFactor = 0, #107 reverted), so seeding is not (or not the only) cause.
+
+Suspects, untested:
+- Color-space temporal reprojection (#73): warp + clamp of accumulated history on motion frames may retain stale surfaces (accumulatedFrames is clamped to 9, so history carries ~9 frames of weight).
+- Visibility-weighted budget (#105): stale depth pyramid downweights newly-disoccluded Gaussians for a frame, delaying their appearance.
+- Pre-existing: reprojection ghosting the paper itself admits to.
+
+Repro: demo, PointSplat renderer, rotate camera. Bisect by toggling reprojection (#74 toggle) and reverting #105 to binary occlusion.
+
+---
