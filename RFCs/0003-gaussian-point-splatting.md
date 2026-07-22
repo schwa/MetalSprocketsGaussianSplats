@@ -1,6 +1,6 @@
 # RFC 0003 — Gaussian Point Splatting: sort-free stochastic point renderer
 
-- **Status:** Draft
+- **Status:** Implemented (phases 0-4, plus SH, budget scaling per RFC 0004, occlusion culling, temporal reprojection, group culling, and packed storage)
 - **Date:** 2026-07-21
 - **Author:** jwight
 - **References:**

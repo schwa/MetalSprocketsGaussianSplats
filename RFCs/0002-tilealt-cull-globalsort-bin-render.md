@@ -3,7 +3,7 @@
 - **Status:** Draft
 - **Date:** 2026-07-20
 - **Author:** jwight
-- **Related issues:** #58 (tile perf), #59 (tile blending washed out), #61 (per-tile sort is single-threaded), #62 (unified front-end)
+- **Related issues:** #58 (tile perf, closed: conic precompute landed ~3.5x), #59 (tile blending washed out, closed), #61 (per-tile sort is single-threaded, closed: global radix replacement folded into #58), #62 (unified front-end, open)
 
 ## Summary
 
@@ -73,9 +73,9 @@ for now.
 
 - **GPU-driven dispatch sizing.** Steps 2c and 3 are sized by the survivor
   count and M, which only the GPU knows. Options, in preference order:
-  1. Indirect dispatch (`dispatchThreadgroups(indirectBuffer:)`) —
-     **not currently exposed by MetalSprockets `ComputeDispatch`; file a
-     MetalSprockets ticket**.
+  1. Indirect dispatch via `ComputeDispatch(indirectBuffer:)` — available
+     since MetalSprockets 92dbfa0 and already used throughout the PointSplat
+     pipeline (#90). Preferred; no blocker remains.
   2. Over-dispatch to capacity with early-out guards (works today; wastes
      threadgroups, and the radix scan kernels do per-tile work proportional
      to the dispatch-time tile count, so this is measurably worse).
