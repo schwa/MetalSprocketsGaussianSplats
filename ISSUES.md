@@ -1016,12 +1016,13 @@ priority: low
 kind: bug
 labels: effort:m, simulator
 created: 2026-04-09T19:09:47Z
-updated: 2026-07-21T20:43:22Z
+updated: 2026-07-22T03:05:04Z
 +++
 
 SplatView renders nothing in visionOS and iPad simulators — sorting runs but no pixels appear. No errors logged. Works fine on device and on macOS native. The MetalSprockets cube demo renders fine on simulator, so it's specific to the splat pipeline. Likely cause: GPU buffer addresses (gpuAddressAsUnsafeMutablePointer), argument buffers, or other advanced Metal features used by SparkSplatRenderPipeline that aren't supported by simulator Metal.
 
 - `2026-04-09T19:16:07Z`: Root cause found: 'pointers to an argument buffer inside another argument buffer are not supported in the simulator'. SparkSplatRenderPipeline uses nested argument buffers (MultiCloudArgumentBuffer → SplatCloudData → GPU buffer pointers). This is a simulator Metal limitation, not fixable without restructuring the shader argument passing.
+- `2026-07-22T03:05:04Z`: Fix reverted: nested-argument-buffer flattening backed out at user request; simulator rendering is broken again by design.
 
 ---
 
