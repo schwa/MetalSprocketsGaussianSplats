@@ -55,6 +55,7 @@ struct ContentView: View {
                 .labelsHidden()
                 .frame(width: 200)
                 loadButton
+                generateMenu
                 ImmersiveToggle(demoState: demoState)
                 if demoState.isImmersive, let timing = demoState.immersiveFrameTiming {
                     FrameTimingView(statistics: timing)
@@ -120,6 +121,7 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 loadButton
+                generateMenu
                 #if os(iOS)
                 Button("AR", systemImage: "arkit") {
                     isARMode = true
@@ -151,6 +153,19 @@ struct ContentView: View {
         .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
     }
     #endif
+
+    private var generateMenu: some View {
+        Menu("Generate") {
+            ForEach(SplatGenerator.presetCounts, id: \.self) { count in
+                Button("Sphere \(SplatGenerator.label(for: count))") {
+                    Task {
+                        await demoState.generateSplats(count: count)
+                    }
+                }
+            }
+        }
+        .fixedSize()
+    }
 
     private var loadButton: some View {
         Button("Load\u{2026}") {

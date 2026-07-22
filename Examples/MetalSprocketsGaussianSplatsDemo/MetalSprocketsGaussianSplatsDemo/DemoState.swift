@@ -113,6 +113,36 @@ class DemoState {
         }
     }
 
+    /// Generates a sphere-rainbow splat cloud of `count` splats off the main
+    /// actor and swaps it in.
+    func generateSplats(count: Int) async {
+        isLoading = true
+        defer {
+            isLoading = false
+        }
+        Self.logger.info("Generating \(count) splats…")
+        let start = ContinuousClock.now
+        do {
+            let cloud = try await Self.generateSplatCloudOffMain(device: device, count: count)
+            Self.logger.info("Generated \(count) splats in \((ContinuousClock.now - start).description, privacy: .public)")
+            splatCloud = cloud
+            customModelName = "Sphere \(SplatGenerator.label(for: count)) (generated)"
+            selectedModel = nil
+            #if os(visionOS)
+            renderState = try SplatImmersiveRenderState(splatCloud: cloud)
+            #endif
+        } catch {
+            Self.logger.error("Generation failed: \(error, privacy: .public)")
+            loadError = "Could not generate splats: \(error.localizedDescription)"
+        }
+    }
+
+    @concurrent
+    nonisolated private static func generateSplatCloudOffMain(device: MTLDevice, count: Int) async throws -> GPUSplatCloud<SparkSplat> {
+        let splats = SplatGenerator.generate(count: count)
+        return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, mortonOrdered: true)
+    }
+
     private static func loadSplatCloud(device: MTLDevice, model: SplatModel) -> GPUSplatCloud<SparkSplat> {
         let url = Bundle.main.url(forResource: model.resourceName, withExtension: model.resourceExtension)!
         return try! readSplatCloud(device: device, url: url)
