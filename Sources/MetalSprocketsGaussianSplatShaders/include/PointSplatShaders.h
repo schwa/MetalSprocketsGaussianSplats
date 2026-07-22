@@ -43,6 +43,10 @@ struct PointSplatUniforms {
     unsigned int occlusionPhase;
     unsigned int pyramidLevels;     // mip levels in the depth pyramid
     unsigned int packedSplats;      // 1 = splat buffer holds GPSPackedSplat (issue #77)
+    // Temporal point reuse (RFC 0005 §4): fraction of the point budget
+    // covered by reprojected seed points from the previous frame; fresh
+    // sampling is scaled by (1 - reuseFactor). 0 disables seeding.
+    float reuseFactor;
 };
 
 // Quantized splat storage (issue #77, paper Sec. 4.1): 18 bytes per

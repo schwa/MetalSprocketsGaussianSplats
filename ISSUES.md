@@ -2185,12 +2185,13 @@ RFC 0005 proposal 3: when over budget, grow point size for small-footprint Gauss
 ## 107: PointSplat: temporal point reuse, reservoir-style (RFC 0005 §4)
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: pointsplat, performance, effort:m, impact:high
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:37:59Z
+updated: 2026-07-22T02:45:01Z
+closed: 2026-07-22T02:45:01Z
 +++
 
 RFC 0005 proposal 4: reuse surviving points across frames reservoir-style instead of resampling every frame, reducing noise and work during interactive motion. Depends on the reprojection transform (already available from #73's temporal reprojection). Part of RFCs/0005.

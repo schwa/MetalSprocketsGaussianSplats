@@ -118,7 +118,10 @@ public final class PointSplatRenderer {
             shDegree: 0,
             occlusionPhase: 0,
             pyramidLevels: UInt32(resources.pyramidLevels),
-            packedSplats: packedBounds == nil ? 0 : 1
+            packedSplats: packedBounds == nil ? 0 : 1,
+            // Offline path stays at rho = 0: principled convergence for
+            // ground-truth accumulation (RFC 0005 §4).
+            reuseFactor: 0
         )
 
         // Whole frame in one serial compute pass; the splat dispatches are

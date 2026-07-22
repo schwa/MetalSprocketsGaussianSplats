@@ -404,6 +404,10 @@ namespace PointSplatRender {
         float sqrtDet = projected.c0 * projected.c2;
         float lambda = 2.0 * GPS_PI * sqrtDet * gps_dilog(projected.opacity) * visibility;
 
+        // Temporal point reuse (RFC 0005 §4): seed points cover reuseFactor
+        // of the budget, so fresh sampling shrinks to the remainder.
+        lambda *= (1.0 - clamp(uniforms.reuseFactor, 0.0f, 1.0f));
+
         GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed);
         uint numPoints = gps_poisson(&seed, lambda);
 
@@ -420,6 +424,70 @@ namespace PointSplatRender {
         counts[gid] = min(numThreads, pixelCount / (2 * k));
         if (uniforms.occlusionPhase == 1 && counts[gid] > 0) {
             renderedMask[gid] = 1;
+        }
+    }
+
+    // Temporal point reuse (RFC 0005 §4): reprojects the previous frame's
+    // resolved surface as seed points into the fresh 64-bit framebuffer.
+    // One seed per previously-covered native pixel, written to all S^2
+    // covering subpixels; depth-tested on write like any other point, so
+    // closer fresh samples always win and reprojection errors self-correct.
+    kernel void pointSplatSeedReproject(device atomic_ulong *framebuffer [[buffer(0)]],
+                                        constant PointSplatUniforms &uniforms [[buffer(1)]],
+                                        constant float4x4 &previousCameraToWorld [[buffer(2)]],
+                                        constant float4x4 &previousInverseProjection [[buffer(3)]],
+                                        texture2d<float, access::read> previousResolve [[texture(0)]],
+                                        texture2d<float, access::read> previousDepth [[texture(1)]],
+                                        uint2 gid [[thread_position_in_grid]]) {
+        uint width = previousDepth.get_width();
+        uint height = previousDepth.get_height();
+        if (gid.x >= width || gid.y >= height) {
+            return;
+        }
+        float depth = previousDepth.read(gid).r;
+        // Background pixels hold the far plane; nothing to reuse.
+        if (depth >= uniforms.farPlane * 0.999) {
+            return;
+        }
+
+        // Native pixel -> previous-frame NDC -> view ray -> world position.
+        float2 ndc = float2((float(gid.x) + 0.5) / float(width) * 2.0 - 1.0,
+                            1.0 - (float(gid.y) + 0.5) / float(height) * 2.0);
+        float4 h = previousInverseProjection * float4(ndc, 0.5, 1.0);
+        float3 dir = h.xyz / h.w;
+        float3 previousView = dir * (depth / -dir.z);
+        float4 world = previousCameraToWorld * float4(previousView, 1.0);
+
+        // World -> current clip.
+        float4 view = uniforms.viewMatrix * world;
+        float currentDepth = -view.z;
+        if (currentDepth <= uniforms.nearPlane) {
+            return;
+        }
+        float4 clip = uniforms.projectionMatrix * view;
+        if (clip.w <= 0.0) {
+            return;
+        }
+        float2 currentNDC = clip.xy / clip.w;
+        if (any(abs(currentNDC) > 1.0)) {
+            return;
+        }
+
+        float3 rgb = previousResolve.read(gid).rgb;
+        ulong packed = (gps_pack_depth(currentDepth, uniforms.nearPlane, uniforms.farPlane) << GPS_DEPTH_SHIFT)
+            | gps_pack_color(rgb.r, rgb.g, rgb.b);
+
+        // Supersampled target pixel; cover the native pixel's S^2 subpixels.
+        uint s = max(uniforms.supersampling, 1u);
+        uint2 targetPixel = uint2(float2((currentNDC.x * 0.5 + 0.5) * float(width),
+                                         (0.5 - currentNDC.y * 0.5) * float(height)));
+        uint2 base = min(targetPixel, uint2(width - 1, height - 1)) * s;
+        uint rowStride = uint(uniforms.drawableSize.x);
+        for (uint sy = 0; sy < s; sy++) {
+            for (uint sx = 0; sx < s; sx++) {
+                uint index = (base.y + sy) * rowStride + (base.x + sx);
+                atomic_min_explicit(&framebuffer[index], packed, memory_order_relaxed);
+            }
         }
     }
 

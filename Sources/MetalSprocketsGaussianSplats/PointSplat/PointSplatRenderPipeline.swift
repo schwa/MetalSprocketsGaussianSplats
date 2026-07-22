@@ -138,6 +138,13 @@ public struct PointSplatRenderPipeline: Element {
             let height = resources.height
             let bufferWidth = width * supersampling
             let bufferHeight = height * supersampling
+            // Running mean: weight the new frame by 1/(n+1); camera or model
+            // motion reprojects history (#73) or, with reprojection disabled
+            // (#74), hard-resets so motion shows raw 1-SPP noise.
+            let accumulation = resources.nextAccumulationStep(frameIndex: frameIndex, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix, allowReprojection: reprojection)
+            // Temporal point reuse engages on motion frames (RFC 0005 §4):
+            // seed points cover half the budget, fresh sampling the rest.
+            let reuseFactor: Float = accumulation.reprojectFrom != nil ? 0.5 : 0
             let uniforms = PointSplatUniforms(
                 modelMatrix: modelMatrix,
                 viewMatrix: cameraMatrix.inverse,
@@ -154,16 +161,19 @@ public struct PointSplatRenderPipeline: Element {
                 shDegree: UInt32(splatCloud.shCoefficients != nil ? splatCloud.shDegree : 0),
                 occlusionPhase: 0,
                 pyramidLevels: UInt32(resources.pyramidLevels),
-                packedSplats: 0
+                packedSplats: 0,
+                reuseFactor: reuseFactor
             )
             let shBuffer = splatCloud.shCoefficients?.unsafeMTLBuffer ?? resources.dummySHBuffer
-            // Running mean: weight the new frame by 1/(n+1); camera or model
-            // motion reprojects history (#73) or, with reprojection disabled
-            // (#74), hard-resets so motion shows raw 1-SPP noise.
-            let accumulation = resources.nextAccumulationStep(frameIndex: frameIndex, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix, allowReprojection: reprojection)
+            let seedReprojection: PointSplatResources.SeedReprojection? =
+                if reuseFactor > 0, let previousCameraMatrix = accumulation.previousCameraMatrix, let previousProjectionMatrix = accumulation.previousProjectionMatrix {
+                    PointSplatResources.SeedReprojection(previousCameraToWorld: previousCameraMatrix, previousInverseProjection: previousProjectionMatrix.inverse)
+                } else {
+                    nil
+                }
             let plan = resources.framePlan(planKey: UInt64(frameIndex), splats: splatCloud.splats.unsafeMTLBuffer)
             try ComputePass(label: "PointSplat") {
-                try resources.frameElements(uniforms: uniforms, splats: splatCloud.splats.unsafeMTLBuffer, shBuffer: shBuffer, seed: frameIndex, packedBounds: GPSPackedSplatBounds(), plan: plan)
+                try resources.frameElements(uniforms: uniforms, splats: splatCloud.splats.unsafeMTLBuffer, shBuffer: shBuffer, seed: frameIndex, packedBounds: GPSPackedSplatBounds(), plan: plan, seedReprojection: seedReprojection)
                 try ComputePipeline(computeKernel: resolveKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
                         .parameter("framebuffer", buffer: resources.framebuffer)
@@ -295,6 +305,7 @@ final class PointSplatResources {
     private let splatKernel: ComputeKernel
     private let resolveKernel: ComputeKernel
     private let depthExtractKernel: ComputeKernel
+    private let seedReprojectKernel: ComputeKernel
     private let depthDownsampleKernel: ComputeKernel
     private let copyTotalsKernel: ComputeKernel
 
@@ -393,6 +404,7 @@ final class PointSplatResources {
         splatKernel = try renderLibrary.function(named: "pointSplatSplat", type: ComputeKernel.self)
         resolveKernel = try renderLibrary.function(named: "pointSplatResolve", type: ComputeKernel.self)
         depthExtractKernel = try renderLibrary.function(named: "pointSplatDepthExtract", type: ComputeKernel.self)
+        seedReprojectKernel = try renderLibrary.function(named: "pointSplatSeedReproject", type: ComputeKernel.self)
         depthDownsampleKernel = try renderLibrary.function(named: "pointSplatDepthDownsample", type: ComputeKernel.self)
         copyTotalsKernel = try shaderLibrary.namespaced("PointSplatWorkload").function(named: "workloadCopyTotals", type: ComputeKernel.self)
 
@@ -462,7 +474,13 @@ final class PointSplatResources {
     /// pyramid from a previous frame exists — the paper's phase 2
     /// (re-testing phase-1-culled Gaussians against the fresh pyramid so
     /// stale-depth culling can never lose geometry).
-    func frameElements(uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, packedBounds: GPSPackedSplatBounds = GPSPackedSplatBounds(), plan: FramePlan) throws -> some Element {
+    /// Reprojection inputs for temporal point reuse (RFC 0005 §4).
+    struct SeedReprojection {
+        var previousCameraToWorld: simd_float4x4
+        var previousInverseProjection: simd_float4x4
+    }
+
+    func frameElements(uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, packedBounds: GPSPackedSplatBounds = GPSPackedSplatBounds(), plan: FramePlan, seedReprojection: SeedReprojection? = nil) throws -> some Element {
         try distributor.validate(count: splatCount)
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
         let pixelCount = width * height * supersampling * supersampling
@@ -477,6 +495,21 @@ final class PointSplatResources {
                     .parameter("framebuffer", buffer: framebuffer)
                     .parameter("clearValue", value: clearValue)
                     .parameter("pixelCount", value: UInt32(pixelCount))
+            }
+            if let seedReprojection {
+                // Seed the fresh framebuffer with last frame's depth-tested
+                // surface before any fresh splats (RFC 0005 §4). Reads the
+                // previous frame's resolve and depth pyramid level 0, both
+                // still intact at this point.
+                try ComputePipeline(computeKernel: seedReprojectKernel) {
+                    try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+                        .parameter("framebuffer", buffer: framebuffer)
+                        .parameter("uniforms", value: uniforms)
+                        .parameter("previousCameraToWorld", value: seedReprojection.previousCameraToWorld)
+                        .parameter("previousInverseProjection", value: seedReprojection.previousInverseProjection)
+                        .parameter("previousResolve", texture: resolveTexture)
+                        .parameter("previousDepth", texture: pyramidLevelViews[0])
+                }
             }
             if plan.recomputeBounds {
                 try ComputePipeline(computeKernel: groupBoundsKernel) {
@@ -607,6 +640,10 @@ final class PointSplatResources {
         /// When set, the camera moved: reproject history from this previous
         /// view-projection instead of running-mean blending.
         var reprojectFrom: simd_float4x4?
+        /// Previous frame's camera/projection, for point-level seed
+        /// reprojection (RFC 0005 §4). Set whenever `reprojectFrom` is.
+        var previousCameraMatrix: simd_float4x4?
+        var previousProjectionMatrix: simd_float4x4?
     }
 
     /// Advances the ping-pong textures and returns this frame's blend
@@ -632,11 +669,15 @@ final class PointSplatResources {
         }
 
         var reprojectFrom: simd_float4x4?
+        var previousCamera: simd_float4x4?
+        var previousProjection: simd_float4x4?
         if modelChanged {
             accumulatedFrames = 0
         } else if viewMoved {
             if allowReprojection, let previousViewProjection, accumulatedFrames > 0 {
                 reprojectFrom = previousViewProjection
+                previousCamera = lastCameraMatrix
+                previousProjection = lastProjectionMatrix
                 // Resume post-motion convergence from a moderate weight
                 // rather than trusting warped history as a long average.
                 accumulatedFrames = min(accumulatedFrames, 9)
@@ -652,7 +693,9 @@ final class PointSplatResources {
             input: accumulationTextures[frameParity],
             output: accumulationTextures[(frameParity + 1) % 2],
             blendFactor: 1.0 / Float(accumulatedFrames + 1),
-            reprojectFrom: reprojectFrom
+            reprojectFrom: reprojectFrom,
+            previousCameraMatrix: previousCamera,
+            previousProjectionMatrix: previousProjection
         )
         accumulatedFrames += 1
         frameParity = (frameParity + 1) % 2
