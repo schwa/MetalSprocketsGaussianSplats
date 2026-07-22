@@ -166,12 +166,10 @@ public struct PointSplatRenderPipeline: Element {
                 reuseFactor: reuseFactor
             )
             let shBuffer = splatCloud.shCoefficients?.unsafeMTLBuffer ?? resources.dummySHBuffer
-            let seedReprojection: PointSplatResources.SeedReprojection? =
-                if reuseFactor > 0, let previousCameraMatrix = accumulation.previousCameraMatrix, let previousProjectionMatrix = accumulation.previousProjectionMatrix {
-                    PointSplatResources.SeedReprojection(previousCameraToWorld: previousCameraMatrix, previousInverseProjection: previousProjectionMatrix.inverse)
-                } else {
-                    nil
-                }
+            // Always nil while reuseFactor is pinned to 0 (#107); reconstruct
+            // from accumulation.previousCameraMatrix/previousProjectionMatrix
+            // when re-enabling.
+            let seedReprojection: PointSplatResources.SeedReprojection? = nil
             let plan = resources.framePlan(planKey: UInt64(frameIndex), splats: splatCloud.splats.unsafeMTLBuffer)
             try ComputePass(label: "PointSplat") {
                 try resources.frameElements(uniforms: uniforms, splats: splatCloud.splats.unsafeMTLBuffer, shBuffer: shBuffer, seed: frameIndex, packedBounds: GPSPackedSplatBounds(), plan: plan, seedReprojection: seedReprojection)

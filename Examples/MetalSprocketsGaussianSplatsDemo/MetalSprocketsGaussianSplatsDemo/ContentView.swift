@@ -74,20 +74,71 @@ struct ContentView: View {
                         isARMode = false
                     }
                     .buttonStyle(.bordered)
-                    .padding(8)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .background(.regularMaterial, in: .rect(cornerRadius: 8))
                     .padding()
                 }
         } else {
-            standardContent
+            navigationContent
         }
         #else
-        standardContent
+        navigationContent
         #endif
     }
 
     #if !os(visionOS)
-    private var standardContent: some View {
+    // Toolbar chrome instead of the floating overlay bar. Intentionally also
+    // on macOS despite the MTKView blanking reported in #45 - debugging that
+    // as it comes up.
+    private var navigationContent: some View {
+        NavigationStack {
+            titledSplatSurface
+                .toolbar {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Picker("Model", systemImage: "cube", selection: $demoState.selectedModel) {
+                            ForEach(SplatModel.allCases) { model in
+                                Text(model.rawValue).tag(model as SplatModel?)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        Button("Load\u{2026}", systemImage: "folder") {
+                            presentImporter()
+                        }
+                        generateMenu
+                        Picker("Renderer", systemImage: "paintbrush", selection: $demoState.renderer) {
+                            ForEach(SplatRenderer.allCases, id: \.self) { r in
+                                Text(r.rawValue.capitalized).tag(r)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        #if os(iOS)
+                        Button("AR", systemImage: "arkit") {
+                            isARMode = true
+                        }
+                        #endif
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var titledSplatSurface: some View {
+        let titled = splatSurface
+            .navigationTitle(demoState.customModelName ?? demoState.selectedModel?.rawValue ?? "Splats")
+        #if os(iOS)
+        titled
+            .ignoresSafeArea(edges: .bottom)
+            .navigationBarTitleDisplayMode(.inline)
+        #else
+        titled
+        #endif
+    }
+    #endif
+
+    #if !os(visionOS)
+    /// The shared Metal surface: splat view, camera interaction, drag & drop,
+    /// loading/timing overlays, and the file importer. Platform chrome
+    /// (toolbar on iOS, floating overlay on macOS) wraps this.
+    private var splatSurface: some View {
         SplatView(
             splatCloud: splatCloud,
             cameraMatrix: cameraMatrix
@@ -104,39 +155,6 @@ struct ContentView: View {
             }
             return true
         }
-        .overlay(alignment: .top) {
-            HStack {
-                Picker("Model", selection: $demoState.selectedModel) {
-                    ForEach(SplatModel.allCases) { model in
-                        Text(model.rawValue).tag(model as SplatModel?)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                Picker("Renderer", selection: $demoState.renderer) {
-                    ForEach(SplatRenderer.allCases, id: \.self) { r in
-                        Text(r.rawValue.capitalized).tag(r)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                loadButton
-                generateMenu
-                #if os(iOS)
-                Button("AR", systemImage: "arkit") {
-                    isARMode = true
-                }
-                #endif
-                if let name = demoState.customModelName {
-                    Text(name)
-                        .font(.caption)
-                        .lineLimit(1)
-                }
-            }
-            .padding(8)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-            .padding()
-        }
         .overlay(alignment: .bottomTrailing) {
             if let frameTimingStatistics {
                 FrameTimingView(statistics: frameTimingStatistics, options: .all)
@@ -147,12 +165,22 @@ struct ContentView: View {
             if demoState.isLoading {
                 ProgressView("Loading\u{2026}")
                     .padding(16)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .background(.regularMaterial, in: .rect(cornerRadius: 12))
             }
         }
         .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
     }
+
     #endif
+
+    private func presentImporter() {
+        // Cycle through false: macOS can leave the binding stuck true
+        // after dismissal, and true -> true never re-presents.
+        isImporting = false
+        Task { @MainActor in
+            isImporting = true
+        }
+    }
 
     private var generateMenu: some View {
         Menu("Generate") {
@@ -169,12 +197,7 @@ struct ContentView: View {
 
     private var loadButton: some View {
         Button("Load\u{2026}") {
-            // Cycle through false: macOS can leave the binding stuck true
-            // after dismissal, and true -> true never re-presents.
-            isImporting = false
-            Task { @MainActor in
-                isImporting = true
-            }
+            presentImporter()
         }
     }
 }
