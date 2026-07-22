@@ -204,6 +204,42 @@ struct PointSplatRendererTests {
         #expect(center.x < 0.05)
     }
 
+    @Test("sub-pixel splat renders partial coverage without vanishing")
+    func subPixelSplatPartialCoverage() throws {
+        let size = 64
+        // At scale 0.009 and z = 5 with a 64-px target, the projected sigma
+        // is ~0.1 px (3-sigma well under half a pixel): exact path (RFC 0005
+        // §5) with integrated mass ~2*pi*sigma^2 ~= 0.06. Full opacity red.
+        let splat = SparkSplat(
+            position: simd_half3(0, 0, 0),
+            scale: simd_half3(repeating: 0.009),
+            rotation: simd_half4(0, 0, 0, 1),
+            color: simd_uchar4(255, 0, 0, 255)
+        )
+        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size))
+        let buffer = try makeSplatBuffer([splat])
+        let (view, projection) = makeMatrices(size: size)
+
+        var totalRed: Float = 0
+        let frames = 256
+        for frame in 0..<frames {
+            let texture = try renderer.render(splats: buffer, splatCount: 1, modelMatrix: .identity, viewMatrix: view, projectionMatrix: projection, frameSeed: UInt32(frame))
+            // Sum over a neighborhood: the mean's subpixel may straddle a
+            // pixel boundary.
+            for y in (size / 2 - 2)...(size / 2 + 2) {
+                for x in (size / 2 - 2)...(size / 2 + 2) {
+                    totalRed += readPixels(texture)[y * size + x].x
+                }
+            }
+        }
+        let meanCoverage = totalRed / Float(frames)
+        // The integrated opacity mass of a truly sub-pixel Gaussian is a
+        // proper fraction: it must neither vanish (the pre-#108 floor-dilation
+        // path washed it out entirely at low alpha) nor saturate.
+        #expect(meanCoverage > 0.01, "sub-pixel splat vanished: \(meanCoverage)")
+        #expect(meanCoverage < 1.0, "sub-pixel splat saturated: \(meanCoverage)")
+    }
+
     @Test("nextAccumulationStep is idempotent per frame index")
     func accumulationStepIdempotent() throws {
         let resources = try PointSplatResources(device: device, drawableSize: SIMD2<Float>(8, 8), splatCount: 1, supersampling: 1, pointsPerThread: 1)

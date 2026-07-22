@@ -40,6 +40,10 @@ namespace PointSplatRender {
         float opacity;
         float radius;         // conservative screen radius (supersampled px)
         float sigmaZ;         // view-space depth standard deviation
+        // Pre-floor 2D covariance stats for the exact sub-pixel path
+        // (RFC 0005 §5): the +0.3 floor hides true sub-pixel extent.
+        float preFloorSqrtDet;
+        float preFloorEigenMax;
         bool valid;
     };
 
@@ -85,6 +89,14 @@ namespace PointSplatRender {
         // top-left). Reflecting y negates the covariance cross term:
         // Sigma' = S Sigma S with S = diag(1, -1).
         cov2D.b = -cov2D.b;
+
+        // Pre-floor stats: sub-pixel detection and the exact path's
+        // integrated opacity must see the true (undilated) footprint.
+        float preDet = max(cov2D.a * cov2D.d - cov2D.b * cov2D.b, 0.0);
+        result.preFloorSqrtDet = sqrt(preDet);
+        float preAvg = 0.5 * (cov2D.a + cov2D.d);
+        float preDelta = sqrt(max(0.0, preAvg * preAvg - preDet));
+        result.preFloorEigenMax = preAvg + preDelta;
 
         // The +0.3 floor is in *output pixel* units; the supersampled
         // framebuffer scales areas by S^2 (paper renders at S x S).
@@ -402,6 +414,24 @@ namespace PointSplatRender {
         }
         colors[gid] = gps_pack_color(rgb.r, rgb.g, rgb.b);
 
+        // Exact sub-pixel path (RFC 0005 §5): a Gaussian whose true
+        // (pre-floor) 3-sigma footprint fits within half a subpixel gets a
+        // single Bernoulli point at its mean, with probability equal to the
+        // analytically integrated opacity mass - no density correction, no
+        // Poisson draw, and none of the covariance-floor dilation bias that
+        // causes the paper's aliasing gap.
+        if (9.0 * projected.preFloorEigenMax < 0.25) {
+            float mass = min(projected.opacity * 2.0 * GPS_PI * projected.preFloorSqrtDet, 1.0);
+            mass *= visibility * (1.0 - clamp(uniforms.reuseFactor, 0.0f, 1.0f));
+            GPSUInt2 bernoulliSeed = gps_make_seed(gid, uniforms.frameSeed);
+            counts[gid] = gps_pcg2d(&bernoulliSeed).x < mass ? 1u : 0u;
+            lodFlags[gid] = 2;
+            if (uniforms.occlusionPhase == 1 && counts[gid] > 0) {
+                renderedMask[gid] = 1;
+            }
+            return;
+        }
+
         // Expected point count: lambda = 2 pi sqrt(|Sigma|) Li2(alpha).
         float sqrtDet = projected.c0 * projected.c2;
         float lambda = 2.0 * GPS_PI * sqrtDet * gps_dilog(projected.opacity) * visibility;
@@ -571,6 +601,21 @@ namespace PointSplatRender {
 
         ulong packed = (gps_pack_depth(projected.viewDepth, uniforms.nearPlane, uniforms.farPlane) << GPS_DEPTH_SHIFT)
             | colors[gaussianIndex];
+
+        // Exact sub-pixel path (RFC 0005 §5): one deterministic opaque
+        // point at the mean's subpixel; the Bernoulli happened in preprocess.
+        if (lodFlags[gaussianIndex] == 2u) {
+            int x = int(projected.pixelMean.x);
+            int y = int(projected.pixelMean.y);
+            if (x < 0 || x >= int(uniforms.drawableSize.x) || y < 0 || y >= int(uniforms.drawableSize.y)) {
+                return;
+            }
+            uint index = uint(y) * uint(uniforms.drawableSize.x) + uint(x);
+            if (framebufferRead[index] > packed) {
+                atomic_min_explicit(&framebuffer[index], packed, memory_order_relaxed);
+            }
+            return;
+        }
 
         GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed * 2654435761u + 1u);
         uint k = max(uniforms.pointsPerThread, 1u);
