@@ -10,8 +10,12 @@ For anyone new the Wikipedia article is a great summary of the technique: [Wikip
 
 ## Requirements
 
-- Any current iOS device or Apple Silcon Mac.
+- Any current iOS device or Apple Silicon Mac.
 - Currently requires macOS 26/iOS 26 - but can be backported with minimal effort.
+- **Simulators are not supported.** The Spark pipeline uses nested Metal
+  argument buffers, which simulator Metal rejects, so splat rendering
+  silently produces nothing in the iOS/visionOS simulators. Run on a real
+  device or natively on macOS.
 
 ## Renderers
 
