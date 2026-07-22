@@ -472,7 +472,12 @@ namespace PointSplatRender {
         uint k = max(uniforms.pointsPerThread, 1u);
         for (uint p = 0; p < k; p++) {
             GPSFloat2 u = gps_pcg2d(&seed);
-            GPSFloat2 sample = gps_corrected_box_muller(u.x, u.y, projected.opacity);
+            // Stratify the angle across the thread's K samples (RFC 0005 §1,
+            // cheap variant): jittered strata reduce radial clumping without
+            // changing the corrected radial density. Threads keep independent
+            // seeds, so no cross-thread alignment.
+            float stratifiedAngle = (float(p) + u.y) / float(k);
+            GPSFloat2 sample = gps_corrected_box_muller(u.x, stratifiedAngle, projected.opacity);
 
             float2 pixel = floor(float2(projected.pixelMean.x + projected.c0 * sample.x,
                                         projected.pixelMean.y + projected.c1 * sample.x + projected.c2 * sample.y));

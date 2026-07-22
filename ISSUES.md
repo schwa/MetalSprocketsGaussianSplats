@@ -2138,12 +2138,13 @@ SplatImmersiveRenderState.init constructs its per-eye AsyncSortManagers with try
 ## 104: PointSplat: angle-stratified intra-thread sampling (RFC 0005 §1)
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: pointsplat, performance, effort:s, impact:high
 created: 2026-07-22T00:10:33Z
-updated: 2026-07-22T02:37:58Z
+updated: 2026-07-22T02:39:41Z
+closed: 2026-07-22T02:39:41Z
 +++
 
 RFC 0005 proposal 1, cheap intermediate: stratify u1 (the angle) across a thread's K samples of one Gaussian. Strictly reduces radial clumping with no new math; measurable variance win. The full stratified re-derivation (binomial-of-strata collision correction, points -~40%) is a separate, larger step. Verify with the RFC 0003 convergence test. Part of RFCs/0005.
