@@ -2203,12 +2203,13 @@ RFC 0005 proposal 4: reuse surviving points across frames reservoir-style instea
 ## 108: PointSplat: exact sub-pixel splatting (RFC 0005 §5)
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: pointsplat, effort:m, impact:medium
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:37:59Z
+updated: 2026-07-22T02:54:34Z
+closed: 2026-07-22T02:54:34Z
 +++
 
 RFC 0005 proposal 5: for Gaussians with sub-pixel footprints, splat a single exact point (analytic coverage) instead of stochastic sampling - removes bias and reduces work at distance. Part of RFCs/0005.
@@ -2239,12 +2240,14 @@ RFC 0005 proposal 1, full version: re-derive the collision correction with the P
 status: open
 priority: low
 kind: enhancement
-labels: pointsplat, effort:m, impact:medium
+labels: pointsplat, effort:m, impact:medium, punted
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:37:59Z
+updated: 2026-07-22T02:54:55Z
 +++
 
 RFC 0005 proposal 2b: track per-region variance and weight the temporal accumulation (or budget) toward unconverged regions. Part of RFCs/0005.
+
+- `2026-07-22T02:54:55Z`: Deferring: convergence weighting adds another temporal feedback loop (per-region variance of the accumulation buffer feeding the budget) while #112 (flashback artifacts during rotation) implicates the existing temporal machinery. Unblocker: resolve #112 first so a new history-dependent weighting isn't layered on an unresolved temporal artifact.
 
 ---
 
