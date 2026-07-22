@@ -2,11 +2,12 @@
 
 import Metal
 import MetalSprockets
-internal import os
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import simd
 import Splats
+
+internal import os
 
 /// Interactive PointSplat pipeline (RFC 0003): sort-free stochastic point
 /// splatting with temporal accumulation, presented via a fullscreen blit.

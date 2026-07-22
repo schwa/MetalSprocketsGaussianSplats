@@ -27,8 +27,23 @@
 - Added DocC documentation catalogs and doc comments across the package
 - Splats: human-readable error descriptions
 
+### API
+
+- Demoted internal-only types from public: tile pipeline internals (`TileSplatResources`,
+  binning/prefix-sum/sorting/heatmap passes), `AnyGPUSplatCloud`, `Pool`,
+  `SingleValueStream`, `PointSplatWorkloadDistributor`
+- Consolidated PointSplat error enums into a single `PointSplatError`
+- Configuration structs replace the many-parameter `SparkSplatRenderPipeline` and
+  `PointSplatRenderPipeline` initializers
+- `SOGReaderGPU.load(url:)` renamed to `read(url:)` for reader consistency
+- `SplatImmersiveRenderState.init` now throws instead of crashing via `try!`
+
 ### Fixes
 
+- Concurrency hardening: `GPUSplatCloud` transform/opacity and `PointSplatStatistics`
+  fields are now lock-guarded; `managedSortedIndicesStream` buffering bounded to the
+  newest value so slow consumers cannot dequeue released buffers; ARKit demo frames
+  delivered in order via a latest-value stream
 - Fixed washed-out output in tile and PointSplat renderers
 - Fixed mirrored anisotropic splats in PointSplat
 - PointSplat resources are recreated when the splat cloud or drawable changes
