@@ -360,6 +360,8 @@ namespace PointSplatRender {
                                      device uint *renderedMask [[buffer(5)]],
                                      device const uint *visibleGroups [[buffer(6)]],
                                      constant GPSPackedSplatBounds &packedBounds [[buffer(7)]],
+                                     device const uint *workloadTotals [[buffer(8)]],
+                                     device uchar *lodFlags [[buffer(9)]],
                                      texture2d<float, access::read> depthPyramid [[texture(0)]],
                                      uint groupId [[threadgroup_position_in_grid]],
                                      uint lid [[thread_position_in_threadgroup]]) {
@@ -407,6 +409,20 @@ namespace PointSplatRender {
         // Temporal point reuse (RFC 0005 §4): seed points cover reuseFactor
         // of the budget, so fresh sampling shrinks to the remainder.
         lambda *= (1.0 - clamp(uniforms.reuseFactor, 0.0f, 1.0f));
+
+        // Point-size LoD (RFC 0005 §3): when the previous frame ran well
+        // over budget (scale < 0.5), large low-frequency Gaussians splat
+        // 2x2-pixel points at quarter count - local blur instead of the
+        // transparency/holes uniform thinning produces. workloadTotals still
+        // holds last frame's demand here (the distributor overwrites it
+        // later in the frame).
+        uint lod = 0;
+        float previousScale = float(uniforms.capacity) / float(max(workloadTotals[1], 1u));
+        if (previousScale < 0.5 && sqrtDet > 16.0) {
+            lod = 1;
+            lambda *= 0.25;
+        }
+        lodFlags[gid] = uchar(lod);
 
         GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed);
         uint numPoints = gps_poisson(&seed, lambda);
@@ -540,6 +556,7 @@ namespace PointSplatRender {
                                 device const ulong *framebufferRead [[buffer(5)]],
                                 device const ulong *colors [[buffer(6)]],
                                 constant GPSPackedSplatBounds &packedBounds [[buffer(7)]],
+                                device const uchar *lodFlags [[buffer(8)]],
                                 uint gid [[thread_position_in_grid]]) {
         // Dispatched over the full capacity; totals[0] is the actual thread
         // count written by the workload distributor on the GPU timeline.
@@ -582,15 +599,28 @@ namespace PointSplatRender {
                 continue;
             }
 
-            uint index = uint(y) * uint(uniforms.drawableSize.x) + uint(x);
-            // Early depth test avoids atomic contention for occluded points.
-            // Metal's 64-bit atomics only support min/max (no load), so read
-            // through a plain aliased view; a stale value only costs a
-            // superfluous atomic_min, never correctness.
-            if (framebufferRead[index] <= packed) {
-                continue;
+            // Point-size LoD (RFC 0005 §3): flagged Gaussians write a 2x2
+            // footprint per point (center depth for all four subpixels).
+            uint pointSize = lodFlags[gaussianIndex] != 0 ? 2u : 1u;
+            for (uint dy = 0; dy < pointSize; dy++) {
+                for (uint dx = 0; dx < pointSize; dx++) {
+                    uint xx = uint(x) + dx;
+                    uint yy = uint(y) + dy;
+                    if (xx >= uint(uniforms.drawableSize.x) || yy >= uint(uniforms.drawableSize.y)) {
+                        continue;
+                    }
+                    uint index = yy * uint(uniforms.drawableSize.x) + xx;
+                    // Early depth test avoids atomic contention for occluded
+                    // points. Metal's 64-bit atomics only support min/max (no
+                    // load), so read through a plain aliased view; a stale
+                    // value only costs a superfluous atomic_min, never
+                    // correctness.
+                    if (framebufferRead[index] <= packed) {
+                        continue;
+                    }
+                    atomic_min_explicit(&framebuffer[index], packed, memory_order_relaxed);
+                }
             }
-            atomic_min_explicit(&framebuffer[index], packed, memory_order_relaxed);
         }
     }
 

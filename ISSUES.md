@@ -2170,12 +2170,13 @@ RFC 0005 proposal 2a: the RFC 0004 budget-scaling pass applies a uniform T/deman
 ## 106: PointSplat: point-size LoD under budget pressure (RFC 0005 §3)
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: pointsplat, performance, effort:m, impact:medium
 created: 2026-07-22T00:10:33Z
-updated: 2026-07-22T02:37:59Z
+updated: 2026-07-22T02:50:25Z
+closed: 2026-07-22T02:50:25Z
 +++
 
 RFC 0005 proposal 3: when over budget, grow point size for small-footprint Gaussians instead of thinning uniformly, engaging only below a scale threshold (e.g. s < 0.5). Builds on RFC 0004's scaling pass. Part of RFCs/0005.

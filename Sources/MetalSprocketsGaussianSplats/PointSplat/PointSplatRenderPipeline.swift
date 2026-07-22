@@ -271,6 +271,9 @@ final class PointSplatResources {
     let colors: MTLBuffer
     let dummySHBuffer: MTLBuffer
     let renderedMask: MTLBuffer
+    /// One byte per Gaussian: 1 = splat 2x2 points at quarter count this
+    /// frame (point-size LoD, RFC 0005 §3).
+    private let lodFlags: MTLBuffer
     /// Four uint32s: phase-1 [used, demand], phase-2 [used, demand], all in
     /// threads, copied from the distributor's totals on the GPU timeline.
     let statsBuffer: MTLBuffer
@@ -356,6 +359,7 @@ final class PointSplatResources {
               let colors = device.makeBuffer(length: MemoryLayout<UInt64>.stride * max(splatCount, 1), options: .storageModePrivate),
               let dummySHBuffer = device.makeBuffer(length: MemoryLayout<Float>.stride, options: .storageModePrivate),
               let renderedMask = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(splatCount, 1), options: .storageModePrivate),
+              let lodFlags = device.makeBuffer(length: MemoryLayout<UInt8>.stride * max(splatCount, 1), options: .storageModePrivate),
               let statsBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 4, options: .storageModeShared),
               let zeroTotals = device.makeBuffer(length: MemoryLayout<UInt32>.stride * 2, options: .storageModeShared) else {
             throw PointSplatError.bufferAllocationFailed
@@ -381,6 +385,7 @@ final class PointSplatResources {
         colors.label = "PointSplat colors"
         dummySHBuffer.label = "PointSplat dummy SH"
         renderedMask.label = "PointSplat rendered mask"
+        lodFlags.label = "PointSplat LoD flags"
         statsBuffer.label = "PointSplat stats"
         zeroTotals.label = "PointSplat zero totals"
         self.framebuffer = framebuffer
@@ -388,6 +393,7 @@ final class PointSplatResources {
         self.colors = colors
         self.dummySHBuffer = dummySHBuffer
         self.renderedMask = renderedMask
+        self.lodFlags = lodFlags
         self.statsBuffer = statsBuffer
         self.zeroTotals = zeroTotals
         self.splatCount = splatCount
@@ -590,6 +596,8 @@ final class PointSplatResources {
                     .parameter("renderedMask", buffer: renderedMask)
                     .parameter("visibleGroups", buffer: visibleGroups)
                     .parameter("packedBounds", value: packedBounds)
+                    .parameter("workloadTotals", buffer: distributor.totalsBuffer)
+                    .parameter("lodFlags", buffer: lodFlags)
                     .parameter("depthPyramid", texture: depthPyramid)
             }
             try distributor.elements(counts: counts, count: splatCount, seed: seed)
@@ -609,6 +617,7 @@ final class PointSplatResources {
                     .parameter("framebufferRead", buffer: framebuffer)
                     .parameter("colors", buffer: colors)
                     .parameter("packedBounds", value: packedBounds)
+                    .parameter("lodFlags", buffer: lodFlags)
             }
         }
     }
