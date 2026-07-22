@@ -2138,11 +2138,12 @@ SplatImmersiveRenderState.init constructs its per-eye AsyncSortManagers with try
 ## 104: PointSplat: angle-stratified intra-thread sampling (RFC 0005 §1)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:s
+labels: pointsplat, performance, effort:s, impact:high
 created: 2026-07-22T00:10:33Z
+updated: 2026-07-22T02:37:58Z
 +++
 
 RFC 0005 proposal 1, cheap intermediate: stratify u1 (the angle) across a thread's K samples of one Gaussian. Strictly reduces radial clumping with no new math; measurable variance win. The full stratified re-derivation (binomial-of-strata collision correction, points -~40%) is a separate, larger step. Verify with the RFC 0003 convergence test. Part of RFCs/0005.
@@ -2152,11 +2153,12 @@ RFC 0005 proposal 1, cheap intermediate: stratify u1 (the angle) across a thread
 ## 105: PointSplat: importance-driven per-Gaussian budget allocation (RFC 0005 §2a)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:s
+labels: pointsplat, performance, effort:s, impact:high
 created: 2026-07-22T00:10:33Z
+updated: 2026-07-22T02:37:59Z
 +++
 
 RFC 0005 proposal 2a: the RFC 0004 budget-scaling pass applies a uniform T/demand scale; make it per-Gaussian, weighting by estimated visibility (depth-pyramid occlusion from #69's pyramid). Depends on the existing depth pyramid. Part of RFCs/0005.
@@ -2166,11 +2168,12 @@ RFC 0005 proposal 2a: the RFC 0004 budget-scaling pass applies a uniform T/deman
 ## 106: PointSplat: point-size LoD under budget pressure (RFC 0005 §3)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:m
+labels: pointsplat, performance, effort:m, impact:medium
 created: 2026-07-22T00:10:33Z
+updated: 2026-07-22T02:37:59Z
 +++
 
 RFC 0005 proposal 3: when over budget, grow point size for small-footprint Gaussians instead of thinning uniformly, engaging only below a scale threshold (e.g. s < 0.5). Builds on RFC 0004's scaling pass. Part of RFCs/0005.
@@ -2180,11 +2183,12 @@ RFC 0005 proposal 3: when over budget, grow point size for small-footprint Gauss
 ## 107: PointSplat: temporal point reuse, reservoir-style (RFC 0005 §4)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:m
+labels: pointsplat, performance, effort:m, impact:high
 created: 2026-07-22T00:10:45Z
+updated: 2026-07-22T02:37:59Z
 +++
 
 RFC 0005 proposal 4: reuse surviving points across frames reservoir-style instead of resampling every frame, reducing noise and work during interactive motion. Depends on the reprojection transform (already available from #73's temporal reprojection). Part of RFCs/0005.
@@ -2194,11 +2198,12 @@ RFC 0005 proposal 4: reuse surviving points across frames reservoir-style instea
 ## 108: PointSplat: exact sub-pixel splatting (RFC 0005 §5)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, effort:m
+labels: pointsplat, effort:m, impact:medium
 created: 2026-07-22T00:10:45Z
+updated: 2026-07-22T02:37:59Z
 +++
 
 RFC 0005 proposal 5: for Gaussians with sub-pixel footprints, splat a single exact point (analytic coverage) instead of stochastic sampling - removes bias and reduces work at distance. Part of RFCs/0005.
@@ -2208,13 +2213,13 @@ RFC 0005 proposal 5: for Gaussians with sub-pixel footprints, splat a single exa
 ## 109: PointSplat: full stratified sampling re-derivation (RFC 0005 §1, full)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:l
+labels: pointsplat, performance, effort:l, impact:high
 depends: 104
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T00:10:49Z
+updated: 2026-07-22T02:37:59Z
 +++
 
 RFC 0005 proposal 1, full version: re-derive the collision correction with the Poisson model replaced by a binomial-of-strata model for K stratified per-thread samples; tabulate if no closed form. Expected ~40% fewer points for high-opacity Gaussians at equal quality. Depends on #104 landing first as the cheap baseline. Part of RFCs/0005.
@@ -2224,11 +2229,12 @@ RFC 0005 proposal 1, full version: re-derive the collision correction with the P
 ## 110: PointSplat: convergence-weighted accumulation (RFC 0005 §2b)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, effort:m
+labels: pointsplat, effort:m, impact:medium
 created: 2026-07-22T00:10:45Z
+updated: 2026-07-22T02:37:59Z
 +++
 
 RFC 0005 proposal 2b: track per-region variance and weight the temporal accumulation (or budget) toward unconverged regions. Part of RFCs/0005.
@@ -2238,11 +2244,12 @@ RFC 0005 proposal 2b: track per-region variance and weight the temporal accumula
 ## 111: PointSplat: tighter depth/color packing (RFC 0005 §7)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: pointsplat, memory, effort:s
+labels: pointsplat, memory, effort:s, impact:low
 created: 2026-07-22T00:10:45Z
+updated: 2026-07-22T02:37:59Z
 +++
 
 RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit fixed-point view-space depth and 3x12-bit sRGB color over [0,16) leave headroom; small quality/precision polish. Part of RFCs/0005.
