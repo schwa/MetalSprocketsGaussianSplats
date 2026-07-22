@@ -15,7 +15,7 @@ import Testing
 /// aliasing and residual noise are expected, so the PSNR bar is modest —
 /// it catches orientation flips, projection mismatches, and packing bugs,
 /// not subtle shading differences.
-@Suite("PointSplatConvergence")
+@Suite("PointSplatConvergence", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct PointSplatConvergenceTests {
     enum TestError: Error {
         case noMetalDevice

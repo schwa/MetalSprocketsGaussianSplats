@@ -23,7 +23,7 @@ private struct SeededGenerator: RandomNumberGenerator {
     }
 }
 
-@Suite("PackedSplatCloud")
+@Suite("PackedSplatCloud", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct PackedSplatCloudTests {
     enum TestError: Error {
         case noMetalDevice

@@ -9,7 +9,7 @@ import Testing
 
 /// Parity tests: the GPU decode path (`SOGReaderGPU`) must produce the same
 /// splats and SH coefficients as the CPU path (`SOGReaderCPU`).
-@Suite("SOGReaderGPU")
+@Suite("SOGReaderGPU", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct SOGReaderGPUTests {
     @Test("GPU decode matches CPU reference on test-ring.sog")
     func parityWithCPUReader() throws {

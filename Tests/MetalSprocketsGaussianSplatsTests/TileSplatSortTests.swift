@@ -7,7 +7,7 @@ import Testing
 /// Regression tests for the per-tile depth sort (#61): tile_sort must order
 /// each tile's entries front-to-back (camera-space z is negative in front of
 /// the camera, so closer = larger value) and be stable for equal depths.
-@Suite("TileSplatSort ordering")
+@Suite("TileSplatSort ordering", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct TileSplatSortTests {
     let device: MTLDevice
     let queue: MTLCommandQueue

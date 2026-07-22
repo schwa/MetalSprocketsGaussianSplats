@@ -6,7 +6,7 @@ import MetalSprocketsGaussianSplatShaders
 import simd
 import Testing
 
-@Suite("PointSplatRenderer")
+@Suite("PointSplatRenderer", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct PointSplatRendererTests {
     enum TestError: Error {
         case noMetalDevice

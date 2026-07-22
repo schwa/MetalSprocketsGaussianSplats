@@ -1,0 +1,31 @@
+#if !arch(x86_64)
+import Metal
+
+/// Runtime GPU capability probes for gating tests that need shader features
+/// the CI runner's virtualized GPU cannot compile (e.g. 64-bit device
+/// atomics from MSL 3.1). Family checks alone are not enough: the GitHub
+/// runner reports `mac2` yet fails to compile these kernels, so we probe by
+/// actually compiling one.
+enum MetalTestSupport {
+    private static let probeSource = """
+    #include <metal_stdlib>
+    using namespace metal;
+
+    kernel void atomicMin64Probe(device atomic_ulong *buffer [[buffer(0)]], constant ulong *values [[buffer(1)]], uint tid [[thread_position_in_grid]]) {
+        atomic_min_explicit(&buffer[0], values[tid], memory_order_relaxed);
+    }
+    """
+
+    static let supports64BitAtomics: Bool = {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            return false
+        }
+        guard device.supportsFamily(.apple9) || device.supportsFamily(.mac2) else {
+            return false
+        }
+        let options = MTLCompileOptions()
+        options.languageVersion = .version3_1
+        return (try? device.makeLibrary(source: probeSource, options: options)) != nil
+    }()
+}
+#endif

@@ -28,7 +28,9 @@ struct PointSplatAtomicProbeTests {
         #expect(device.supportsFamily(.apple9) || device.supportsFamily(.mac2), "PointSplat requires Apple9 (A17/M3+) or Mac2 for 64-bit atomics")
     }
 
-    @Test("atomic_min on ulong compiles and computes the minimum")
+    // Gated on the same compile probe: the CI runner's virtual GPU reports
+    // mac2 but cannot compile MSL 3.1 kernels, so this can only run locally.
+    @Test("atomic_min on ulong compiles and computes the minimum", .enabled(if: MetalTestSupport.supports64BitAtomics))
     func atomicMin64() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw ProbeError.noMetalDevice
