@@ -2219,13 +2219,15 @@ RFC 0005 proposal 5: for Gaussians with sub-pixel footprints, splat a single exa
 status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:l, impact:high
+labels: pointsplat, performance, effort:l, impact:high, punted
 depends: 104
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:37:59Z
+updated: 2026-07-22T02:45:14Z
 +++
 
 RFC 0005 proposal 1, full version: re-derive the collision correction with the Poisson model replaced by a binomial-of-strata model for K stratified per-thread samples; tabulate if no closed form. Expected ~40% fewer points for high-opacity Gaussians at equal quality. Depends on #104 landing first as the cheap baseline. Part of RFCs/0005.
+
+- `2026-07-22T02:45:14Z`: Landed the prerequisite #104 (angle stratification). Punting the full re-derivation: replacing the Poisson collision model with a binomial-of-strata correction is open math per the RFC (may need tabulation), and a subtly wrong density would pass the PSNR test while biasing renders. Unblocker: a worked derivation (or a decision to tabulate numerically against Monte Carlo ground truth, with an agreed validation protocol beyond the existing convergence test).
 
 ---
 
