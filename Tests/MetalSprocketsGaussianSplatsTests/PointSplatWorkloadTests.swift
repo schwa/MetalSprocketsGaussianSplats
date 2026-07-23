@@ -3,7 +3,7 @@ import Metal
 @testable import MetalSprocketsGaussianSplats
 import Testing
 
-@Suite("PointSplatWorkload")
+@Suite("PointSplatWorkload", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct PointSplatWorkloadTests {
     enum TestError: Error {
         case noMetalDevice

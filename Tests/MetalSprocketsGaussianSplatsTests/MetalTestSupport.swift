@@ -1,4 +1,5 @@
 #if !arch(x86_64)
+import Foundation
 import Metal
 
 /// Runtime GPU capability probes for gating tests that need shader features
@@ -17,6 +18,12 @@ enum MetalTestSupport {
     """
 
     static let supports64BitAtomics: Bool = {
+        // The probe is not reliable on GitHub's virtualized GPU: it can
+        // succeed while later compiles of the real shaders fail. Skip
+        // GPU-shader suites outright on Actions runners.
+        if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil {
+            return false
+        }
         guard let device = MTLCreateSystemDefaultDevice() else {
             return false
         }

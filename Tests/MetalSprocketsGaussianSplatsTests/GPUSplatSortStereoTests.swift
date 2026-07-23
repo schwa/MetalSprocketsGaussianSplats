@@ -10,7 +10,7 @@ import Testing
 
 /// Regression tests for stereo culling in the GPU sort path (#56): a splat
 /// visible to only one eye must survive the cull when both views are provided.
-@Suite("GPUSplatSort stereo cull")
+@Suite("GPUSplatSort stereo cull", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct GPUSplatSortStereoTests {
     let device: MTLDevice
 
