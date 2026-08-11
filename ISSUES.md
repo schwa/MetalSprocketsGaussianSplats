@@ -2334,3 +2334,17 @@ created: 2026-08-11T05:32:16Z
 splat-render (gaussiansplats-ios) accepts --camera-matrix with 16 column-major values, defining the entire camera-to-world transform in one flag and overriding the eye/look-at/up flags. Our CLI only supports camera position, look-at target, and rotation as a quaternion or 3x3 matrix; there is no way to pass an exact 4x4 camera matrix, e.g. one exported from another tool or dataset, which makes reproducing a reference camera pose exactly awkward.
 
 ---
+
+## 116: PointSplatRenderer cannot be timed with GPU counters
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: pointsplat,performance,cli
+created: 2026-08-11T06:51:36Z
++++
+
+PointSplatRenderer's public API is an imperative class (render(...) -> MTLTexture) rather than a MetalSprockets Element, and the element-building internals (PointSplatResources.frameElements/resolveElements, its private Runner) are internal. Callers therefore cannot attach .gpuCounters() to its compute passes the way they can for SparkSplatRenderPipeline, TileBasedSplatPass, and StochasticSplatRenderPipeline. Concretely, the CLI's --statistics report only shows wall time for --renderer point — no GPU pass time, unlike the other renderers.
+
+---
