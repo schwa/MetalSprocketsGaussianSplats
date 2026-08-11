@@ -2309,10 +2309,24 @@ The reference splat-render CLI (gaussiansplats-ios) reports render statistics vi
 status: new
 priority: low
 kind: feature
-labels: cli,performance
+labels: cli, performance
 created: 2026-08-11T05:32:16Z
 +++
 
 splat-render (gaussiansplats-ios) offers --metalfx <factor>: it renders at a reduced resolution (factor 2 renders a quarter of the fragments) and upscales back to the requested --width/--height using MetalFX spatial upscaling, with a clear error on unsupported devices. Our CLI always renders at full resolution; there is no way to trade fragment work for upscaling quality, which also makes cross-tool performance comparisons at matching settings impossible.
+
+---
+
+## 115: CLI: camera cannot be specified as a full camera-to-world matrix
+
++++
+status: new
+priority: low
+kind: feature
+labels: cli
+created: 2026-08-11T05:32:16Z
++++
+
+splat-render (gaussiansplats-ios) accepts --camera-matrix with 16 column-major values, defining the entire camera-to-world transform in one flag and overriding the eye/look-at/up flags. Our CLI only supports camera position, look-at target, and rotation as a quaternion or 3x3 matrix; there is no way to pass an exact 4x4 camera matrix, e.g. one exported from another tool or dataset, which makes reproducing a reference camera pose exactly awkward.
 
 ---
