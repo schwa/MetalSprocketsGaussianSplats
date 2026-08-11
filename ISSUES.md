@@ -2432,4 +2432,6 @@ Repro:
 
 Expected: PNG written. Actual: 'Browser error: Failed to load resource: the server responded with a status of 404 (Not Found)' followed by the timeout error; exit code 0 despite the failure (a second bug — failures should exit non-zero).
 
+- `2026-08-11T16:44:22Z`: Not .splat-specific after all: on a full golden-images run 17 files failed (7 .splat, 4 .sog, 6 .spz), and on an immediate re-run all 17 succeeded — including files that had failed twice in isolated repros. The init timeout is flaky (possibly resource contention or a race in the loader wait). The exit-code-0-on-failure bug stands.
+
 ---
