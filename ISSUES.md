@@ -2390,3 +2390,17 @@ Concretely, the CLI's performRender has a per-renderer frame function for each p
 - `2026-08-11T07:07:33Z`: Added OffscreenSplatRenderer: a unified offscreen API over spark (cpu/gpu sort), tile, stochastic, and point, with per-frame GPU counter reports and image conversion. CLI performRender is now a thin driver.
 
 ---
+
+## 119: PointSplatRenderer class is redundant now that PointSplatComputePass exists
+
++++
+status: new
+priority: medium
+kind: task
+labels: pointsplat,architecture
+created: 2026-08-11T07:11:33Z
++++
+
+The element is the main unit of composition; PointSplatRenderer survives only as a thin blocking convenience (private Runner + rgba32Float out texture) around PointSplatComputePass, duplicating what OffscreenSplatRenderer's point path already does. Its remaining users are the bench command (benchmarkPointSplat, pointQualitySweep) and the PointSplat test suites (PointSplatRendererTests, PointSplatConvergenceTests, PackedSplatCloudTests), all of which could drive PointSplatComputePass (or OffscreenSplatRenderer) directly. Keeping the class means two public offscreen entry points for the same compute work.
+
+---
