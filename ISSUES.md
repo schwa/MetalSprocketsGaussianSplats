@@ -2341,10 +2341,24 @@ splat-render (gaussiansplats-ios) accepts --camera-matrix with 16 column-major v
 status: new
 priority: medium
 kind: enhancement
-labels: pointsplat,performance,cli
+labels: pointsplat, performance, cli
 created: 2026-08-11T06:51:36Z
 +++
 
 PointSplatRenderer's public API is an imperative class (render(...) -> MTLTexture) rather than a MetalSprockets Element, and the element-building internals (PointSplatResources.frameElements/resolveElements, its private Runner) are internal. Callers therefore cannot attach .gpuCounters() to its compute passes the way they can for SparkSplatRenderPipeline, TileBasedSplatPass, and StochasticSplatRenderPipeline. Concretely, the CLI's --statistics report only shows wall time for --renderer point — no GPU pass time, unlike the other renderers.
+
+---
+
+## 117: Offscreen point splat rendering is not composable as an element
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: pointsplat,cli
+created: 2026-08-11T06:54:29Z
++++
+
+PointSplatRenderer is an imperative class: render(...) blocks on its own private Runner and returns an MTLTexture. Unlike SparkSplatRenderPipeline, TileBasedSplatPass, and StochasticSplatRenderPipeline, there is no way to place offscreen point splat rendering inside an element tree (OffscreenRenderer.render, RenderView, or alongside other passes in one submission), attach modifiers (.gpuCounters beyond the ad-hoc onGPUCounterSample hook added for #116), or combine it with other passes in a single command buffer. The live PointSplatRenderPipeline element shares the same PointSplatResources, so the building blocks exist but are not exposed for offscreen composition.
 
 ---
