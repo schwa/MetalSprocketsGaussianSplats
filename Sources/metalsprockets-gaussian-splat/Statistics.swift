@@ -21,28 +21,6 @@ enum RendererKind: String, CaseIterable, ExpressibleByArgument {
     case stochastic
 }
 
-/// Hands the latest GPU counter sample from the command-buffer completion
-/// handler (an arbitrary thread) to the render loop.
-final class GPUSampleBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var sample: GPUCounterSample?
-
-    func set(_ newSample: GPUCounterSample) {
-        lock.lock()
-        sample = newSample
-        lock.unlock()
-    }
-
-    func take() -> GPUCounterSample? {
-        lock.lock()
-        defer {
-            sample = nil
-            lock.unlock()
-        }
-        return sample
-    }
-}
-
 /// Timings for one measured frame.
 struct FrameSample {
     var wallTime: TimeInterval

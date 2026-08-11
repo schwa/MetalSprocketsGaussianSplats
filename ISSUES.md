@@ -2374,15 +2374,19 @@ PointSplatRenderer is an imperative class: render(...) blocks on its own private
 ## 118: No unified offscreen rendering API; CLI carries renderer-specific logic
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
-labels: cli,architecture
+labels: cli, architecture
 created: 2026-08-11T06:59:15Z
+updated: 2026-08-11T07:07:33Z
+closed: 2026-08-11T07:07:33Z
 +++
 
 Each splat renderer has a different offscreen shape, so every caller must know per-renderer details: SparkSplatRenderPipeline is an element that must be placed inside a RenderPass and fed sortedIndices from a separately-run CPU or GPU sort (attaching counters to the GPU-sort path means hand-mirroring GPUSortedSplatRenderPipeline's body); TileBasedSplatPass and StochasticSplatRenderPipeline are self-contained elements with differing requirements (stochastic needs depthCompare and a per-frame seed); PointSplatComputePass is compute-only, writes an rgba32Float texture instead of the render target, and callers must convert that to an image themselves since MTLTexture.toCGImage() only handles bgra8.
 
 Concretely, the CLI's performRender has a per-renderer frame function for each pipeline, a separate non-OffscreenRenderer path for point, and its own float->sRGB PNG conversion — logic that any other offscreen consumer (tests, thumbnailers, bench) would have to duplicate. The library has no single 'render one offscreen frame of cloud X with renderer Y (with optional GPU counters)' entry point that hides sorting, pass shape, and output-format differences.
+
+- `2026-08-11T07:07:33Z`: Added OffscreenSplatRenderer: a unified offscreen API over spark (cpu/gpu sort), tile, stochastic, and point, with per-frame GPU counter reports and image conversion. CLI performRender is now a thin driver.
 
 ---
