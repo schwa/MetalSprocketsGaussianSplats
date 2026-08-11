@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Screenshot Renderer</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        #canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+                "@sparkjsdev/spark": "https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@0.1.10/dist/spark.module.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { SplatMesh } from '@sparkjsdev/spark';
+
+        // Get parameters from URL
+        const params = new URLSearchParams(window.location.search);
+        const splatPath = params.get('splat');
+        const width = parseInt(params.get('width') || '1200');
+        const height = parseInt(params.get('height') || '800');
+        const cameraPos = params.get('cameraPosition');
+        const lookAt = params.get('lookAt');
+        const cameraRotation = params.get('cameraRotation');
+        const cameraMatrix = params.get('cameraMatrix');
+        const modelPosition = params.get('modelPosition');
+        const fov = parseFloat(params.get('fov') || '60');
+        const near = parseFloat(params.get('near') || '0.1');
+        const far = parseFloat(params.get('far') || '100');
+        const shDegree = params.has('shDegree') ? parseInt(params.get('shDegree')) : null;
+        const colorSpace = params.get('colorSpace') || 'srgb';
+        const backgroundColor = params.get('backgroundColor') || '0,0,0';
+
+        if (!splatPath) {
+            window.renderComplete = false;
+            window.renderError = 'No splat file specified';
+            throw new Error('No splat file specified');
+        }
+
+        // Parse camera position and look-at
+        const parseCameraVector = (str) => {
+            const parts = str.split(',').map(s => parseFloat(s.trim()));
+            return new THREE.Vector3(parts[0], parts[1], parts[2]);
+        };
+
+        // Parse background color from RGB (0-255) to THREE.Color
+        const parseBackgroundColor = (str) => {
+            const parts = str.split(',').map(s => parseInt(s.trim()));
+            return new THREE.Color(parts[0] / 255, parts[1] / 255, parts[2] / 255);
+        };
+
+        const parseFloats = (str) => str.split(',').map(s => parseFloat(s.trim()));
+        const bgColor = parseBackgroundColor(backgroundColor);
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = bgColor;
+        const camera = new THREE.PerspectiveCamera(fov, width / height, near, far);
+
+        // Camera priority mirrors the MetalSprockets CLI:
+        // full matrix > rotation (+ position) > lookat > position.
+        if (cameraMatrix) {
+            // 16 column-major camera-to-world values.
+            const m = new THREE.Matrix4().fromArray(parseFloats(cameraMatrix));
+            m.decompose(camera.position, camera.quaternion, camera.scale);
+        } else if (cameraRotation) {
+            const r = parseFloats(cameraRotation);
+            if (r.length === 4) {
+                // Quaternion components in (x, y, z, w) order.
+                camera.quaternion.set(r[0], r[1], r[2], r[3]);
+            } else {
+                // Row-major 3x3 rotation matrix.
+                const m = new THREE.Matrix4().set(
+                    r[0], r[1], r[2], 0,
+                    r[3], r[4], r[5], 0,
+                    r[6], r[7], r[8], 0,
+                    0, 0, 0, 1
+                );
+                camera.quaternion.setFromRotationMatrix(m);
+            }
+            if (cameraPos) camera.position.copy(parseCameraVector(cameraPos));
+        } else if (lookAt) {
+            camera.position.copy(parseCameraVector(cameraPos || '0,0,1.5'));
+            camera.lookAt(parseCameraVector(lookAt));
+        } else if (cameraPos) {
+            camera.position.copy(parseCameraVector(cameraPos));
+        } else {
+            camera.position.set(0, 0, 1.5);
+            camera.lookAt(new THREE.Vector3(0, 0, 0));
+        }
+
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            preserveDrawingBuffer: true
+        });
+        renderer.setSize(width, height);
+
+        // Set output color space
+        if (colorSpace === 'linear') {
+            renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+        } else {
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+        }
+
+        document.body.appendChild(renderer.domElement);
+
+        // Load splat
+        let splatMesh;
+        try {
+            splatMesh = new SplatMesh({ url: splatPath });
+
+            if (modelPosition) {
+                splatMesh.position.copy(parseCameraVector(modelPosition));
+            }
+
+            // Override SH degree if requested (0 = off).
+            if (shDegree !== null) {
+                splatMesh.maxSh = shDegree;
+                splatMesh.updateGenerator();
+            }
+
+            scene.add(splatMesh);
+            window.splatMesh = splatMesh;
+
+            // Render continuously; declare complete once the splat has
+            // initialized and we've rendered enough extra frames for the
+            // async sort/upload to settle.
+            let framesAfterLoad = 0;
+            let frameCount = 0;
+            const maxFrames = 1800; // 30 second safety cap
+
+            const renderLoop = setInterval(() => {
+                frameCount++;
+                renderer.render(scene, camera);
+
+                if (splatMesh.isInitialized) {
+                    framesAfterLoad++;
+                    window.splatCount = splatMesh.numSplats;
+                }
+
+                if (framesAfterLoad > 60) {
+                    window.renderComplete = true;
+                    clearInterval(renderLoop);
+                } else if (frameCount > maxFrames) {
+                    window.renderComplete = true;
+                    window.renderError = 'Timeout waiting for splat to initialize';
+                    clearInterval(renderLoop);
+                }
+            }, 16); // ~60fps
+
+        } catch (error) {
+            window.renderComplete = false;
+            window.renderError = error.message;
+            console.error('Error loading splat:', error);
+        }
+
+        // Expose for debugging
+        window.scene = scene;
+        window.camera = camera;
+        window.renderer = renderer;
+    </script>
+</body>
+</html>

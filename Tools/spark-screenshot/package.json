@@ -1,0 +1,31 @@
+{
+  "name": "spark-screenshot",
+  "version": "1.0.0",
+  "description": "CLI tool for taking screenshots of 3D Gaussian Splatting renders using sparkjs",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "spark-screenshot": "./index.js"
+  },
+  "scripts": {
+    "test": "node index.js --help"
+  },
+  "keywords": [
+    "3dgs",
+    "gaussian-splatting",
+    "sparkjs",
+    "screenshot",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@sparkjsdev/spark": "0.1.10",
+    "commander": "12.1.0",
+    "puppeteer": "23.11.1",
+    "three": "0.170.0"
+  },
+  "allowScripts": {
+    "puppeteer@23.11.1": true
+  }
+}
