@@ -2412,3 +2412,24 @@ The element is the main unit of composition; PointSplatRenderer survives only as
 - `2026-08-11T07:17:01Z`: PointSplatRenderer deleted; PointSplatComputePass is the offscreen unit. Tests and bench drive the element via small local blocking wrappers.
 
 ---
+
+## 120: spark-screenshot: .splat files time out waiting for splat to initialize
+
++++
+status: new
+priority: medium
+kind: bug
+labels: tools
+created: 2026-08-11T16:23:41Z
++++
+
+Tools/spark-screenshot advertises .splat support (--splat help text: .splat, .ply, .spz) but every antimatter15-style .splat file fails after the 30-second init timeout with 'Error: Render error: Timeout waiting for splat to initialize'. .ply, .spz, and .sog files render fine.
+
+Repro:
+1. node Tools/spark-screenshot/index.js --splat <any .splat file> --output /tmp/out.png
+   (e.g. misc/6Splats.splat or misc/RainbowRing.splat from the local Splats collection)
+2. Wait ~30 s
+
+Expected: PNG written. Actual: 'Browser error: Failed to load resource: the server responded with a status of 404 (Not Found)' followed by the timeout error; exit code 0 despite the failure (a second bug — failures should exit non-zero).
+
+---
