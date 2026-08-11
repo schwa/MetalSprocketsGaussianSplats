@@ -2295,10 +2295,24 @@ Repro: demo, PointSplat renderer, rotate camera. Bisect by toggling reprojection
 status: new
 priority: low
 kind: feature
-labels: cli,performance
+labels: cli, performance
 created: 2026-08-11T05:32:09Z
 +++
 
 The reference splat-render CLI (gaussiansplats-ios) reports render statistics via --statistics text|json: wall time, command-buffer GPU time for sort and render, a per-pass breakdown from GPU timestamp counter sampling (including vertex/fragment stage times), and visible/culled splat counts. It supports --warmup N (discarded frames to warm pipeline caches and GPU clocks) and --frames N (medians over a run), and PNG output is optional so the tool can be used for measurement alone. Our metalsprockets-gaussian-splat render command has none of this — the bench subcommand only measures wall-clock medians, with no per-pass GPU counter timings, no JSON output for tooling, and no stats for a specific render invocation.
+
+---
+
+## 114: CLI: no MetalFX spatial upscaling option
+
++++
+status: new
+priority: low
+kind: feature
+labels: cli,performance
+created: 2026-08-11T05:32:16Z
++++
+
+splat-render (gaussiansplats-ios) offers --metalfx <factor>: it renders at a reduced resolution (factor 2 renders a quarter of the fragments) and upscales back to the requested --width/--height using MetalFX spatial upscaling, with a clear error on unsupported devices. Our CLI always renders at full resolution; there is no way to trade fragment work for upscaling quality, which also makes cross-tool performance comparisons at matching settings impossible.
 
 ---
