@@ -1382,7 +1382,7 @@ closed: 2026-07-21T23:01:46Z
 
 The GPU-sorted pipeline has a proper stable two-pass 8-bit radix sort over the half depth key (SplatGPUSort). The tile-based renderer uses its own per-tile sort (TileSplatSort). Investigate whether the per-tile depth ordering is currently incorrect or unstable (a possible contributor to the washed-out blending) and whether the SplatGPUSort radix approach could replace or feed the per-tile sort.
 
-- `2026-07-20T18:58:32Z`: Findings from code review (2026-07-20):
+\- `2026-07-20T18:58:32Z`: Findings from code review (2026-07-20):
 
 tile_sort (TileSplatSort.metal) is one thread per tile running a serial 4-pass 8-bit radix: 8 full walks of the tile's list (histogram + scatter x 4 passes) with a 256-entry thread-private histogram. Dense tiles serialize on a single thread — likely the bulk of the poor performance in #58. A 32-bit key is also overkill for depth ordering.
 
@@ -1394,7 +1394,7 @@ May also be relevant to #59: guarantees a stable, correct front-to-back order pe
 
 Related: #58, #59.
 
-- `2026-07-21T23:01:46Z`: Investigation complete (2026-07-21):
+\- `2026-07-21T23:01:46Z`: Investigation complete (2026-07-21):
 
 Correctness: per-tile ordering is correct and stable. Camera-space z is negative in front of the camera, so closer = larger value; tile_sort's descending sort (inverted key) therefore yields front-to-back order, matching TileSplatRender's front-to-back accumulation. The LSB-first counting radix is stable. Verified with a new GPU regression test (TileSplatSortTests: ordering across multiple tiles + stability for equal depths). The washed-out blending is NOT caused by sort order/instability.
 
@@ -2286,5 +2286,19 @@ Suspects, untested:
 - Pre-existing: reprojection ghosting the paper itself admits to.
 
 Repro: demo, PointSplat renderer, rotate camera. Bisect by toggling reprojection (#74 toggle) and reverting #105 to binary occlusion.
+
+---
+
+## 113: CLI: no performance statistics reporting on the render command
+
++++
+status: new
+priority: low
+kind: feature
+labels: cli,performance
+created: 2026-08-11T05:32:09Z
++++
+
+The reference splat-render CLI (gaussiansplats-ios) reports render statistics via --statistics text|json: wall time, command-buffer GPU time for sort and render, a per-pass breakdown from GPU timestamp counter sampling (including vertex/fragment stage times), and visible/culled splat counts. It supports --warmup N (discarded frames to warm pipeline caches and GPU clocks) and --frames N (medians over a run), and PNG output is optional so the tool can be used for measurement alone. Our metalsprockets-gaussian-splat render command has none of this — the bench subcommand only measures wall-clock medians, with no per-pass GPU counter timings, no JSON output for tooling, and no stats for a specific render invocation.
 
 ---
