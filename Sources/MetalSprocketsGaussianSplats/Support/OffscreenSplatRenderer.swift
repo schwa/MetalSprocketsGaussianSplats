@@ -131,9 +131,10 @@ public final class OffscreenSplatRenderer {
     private let offscreenRenderer: OffscreenRenderer?
     // Spark with the GPU sort.
     private let gpuSortResources: GPUSortResources?
-    // Point renderer; nil otherwise.
-    private let pointRenderer: PointSplatRenderer?
-    private var lastPointTexture: MTLTexture?
+    // The point renderer is compute-only: it resolves into this float texture
+    // via its own runner instead of the offscreen renderer's render target.
+    private let pointRunner: Runner?
+    private let pointTexture: MTLTexture?
 
     /// - Parameters:
     ///   - renderer: Which splat renderer draws the frames.
@@ -167,23 +168,14 @@ public final class OffscreenSplatRenderer {
 
         switch renderer {
         case .point:
-            let pointRenderer = try PointSplatRenderer(
-                device: device,
-                configuration: .init(
-                    width: configuration.width,
-                    height: configuration.height,
-                    nearPlane: configuration.nearPlane,
-                    farPlane: configuration.farPlane,
-                    backgroundColor: SIMD3<Float>(configuration.backgroundColor.x, configuration.backgroundColor.y, configuration.backgroundColor.z),
-                    supersampling: configuration.pointSupersampling,
-                    pointsPerThread: configuration.pointPointsPerThread
-                )
-            )
-            if configuration.collectGPUCounters {
-                let box = renderSampleBox
-                pointRenderer.onGPUCounterSample = { box.set($0) }
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: configuration.width, height: configuration.height, mipmapped: false)
+            descriptor.usage = [.shaderWrite, .shaderRead]
+            guard let texture = device.makeTexture(descriptor: descriptor) else {
+                throw PointSplatError.textureAllocationFailed
             }
-            self.pointRenderer = pointRenderer
+            texture.label = "PointSplat resolve"
+            self.pointRunner = try Runner(device: device)
+            self.pointTexture = texture
             self.offscreenRenderer = nil
             self.gpuSortResources = nil
 
@@ -191,12 +183,14 @@ public final class OffscreenSplatRenderer {
             let offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: configuration)
             self.offscreenRenderer = offscreenRenderer
             self.gpuSortResources = sort == .gpu ? try GPUSortResources(device: offscreenRenderer.device, capacity: splatCloud.count, slotCount: 1) : nil
-            self.pointRenderer = nil
+            self.pointRunner = nil
+            self.pointTexture = nil
 
         case .tile, .stochastic:
             self.offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: configuration)
             self.gpuSortResources = nil
-            self.pointRenderer = nil
+            self.pointRunner = nil
+            self.pointTexture = nil
         }
     }
 
@@ -236,8 +230,8 @@ public final class OffscreenSplatRenderer {
     ///
     /// Call after at least one ``renderFrame()``.
     public func makeImage() throws -> CGImage {
-        if let lastPointTexture {
-            return try Self.makeImage(fromRGBA32Float: lastPointTexture)
+        if let pointTexture {
+            return try Self.makeImage(fromRGBA32Float: pointTexture)
         }
         guard let offscreenRenderer else {
             throw MetalSprocketsError.generic("No frame rendered yet")
@@ -344,17 +338,29 @@ public final class OffscreenSplatRenderer {
     }
 
     private func renderPointFrame() throws -> FrameReport {
-        guard let pointRenderer else {
+        guard let pointRunner, let pointTexture else {
             throw MetalSprocketsError.generic("Renderer not configured")
         }
-        lastPointTexture = try pointRenderer.render(
-            splats: splatCloud.splats.unsafeMTLBuffer,
-            splatCount: splatCloud.count,
+        // frameIndex is monotonic, so it doubles as the frame-plan key.
+        let pass = PointSplatComputePass(
+            splatCloud: splatCloud,
             modelMatrix: modelMatrix,
             viewMatrix: cameraMatrix.inverse,
             projectionMatrix: projectionMatrix,
-            frameSeed: frameIndex
+            frameSeed: frameIndex,
+            outTexture: pointTexture,
+            nearPlane: configuration.nearPlane,
+            farPlane: configuration.farPlane,
+            backgroundColor: SIMD3<Float>(configuration.backgroundColor.x, configuration.backgroundColor.y, configuration.backgroundColor.z),
+            supersampling: configuration.pointSupersampling,
+            pointsPerThread: configuration.pointPointsPerThread
         )
+        if configuration.collectGPUCounters {
+            let box = renderSampleBox
+            try pointRunner.run(pass.gpuCounters(label: "splat render") { box.set($0) })
+        } else {
+            try pointRunner.run(pass)
+        }
         return FrameReport(render: renderSampleBox.take())
     }
 

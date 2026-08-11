@@ -45,19 +45,10 @@ public final class PointSplatRenderer {
             self.pointsPerThread = max(pointsPerThread, 1)
         }
 
-        /// Frame point budget (T), derived from the supersampled size.
-        var pointBudget: Int {
-            PointSplatWorkloadDistributor.capacity(forSupersampledPixels: width * height * supersampling * supersampling, pointsPerThread: pointsPerThread)
-        }
     }
 
     public let device: MTLDevice
     public let configuration: Configuration
-
-    /// Called after each blocking render with the GPU timestamp sample for the
-    /// frame's compute pass (whole-encoder time; there are no render stages).
-    /// Set before calling `render`. `nil` (the default) skips counter sampling.
-    public var onGPUCounterSample: (@Sendable (GPUCounterSample) -> Void)?
 
     private let runner: Runner
     private let outTexture: MTLTexture
@@ -112,11 +103,7 @@ public final class PointSplatRenderer {
             supersampling: configuration.supersampling,
             pointsPerThread: configuration.pointsPerThread
         )
-        if let onGPUCounterSample {
-            try runner.run(pass.gpuCounters(label: "PointSplat offscreen", onGPUCounterSample))
-        } else {
-            try runner.run(pass)
-        }
+        try runner.run(pass)
 
         return outTexture
     }
