@@ -60,7 +60,7 @@ public final class GPUSortResources {
 
     /// Build ``SplatIndices`` viewing a slot's output buffer + indirect draw
     /// args. Valid until the same slot is reused `slotCount` frames later.
-    func makeIndices(slot slotIndex: Int, count: Int, parameters: SortParameters) -> SplatIndices {
+    public func makeIndices(slot slotIndex: Int, count: Int, parameters: SortParameters) -> SplatIndices {
         var slot = slots[slotIndex]
         slot.output.count = count
         slots[slotIndex] = slot
@@ -78,7 +78,7 @@ public final class GPUSortResources {
     }
 
     /// Advance to the next slot and return its index. Call once per frame.
-    func advance() -> Int {
+    public func advance() -> Int {
         slotIndex = (slotIndex + 1) % slotCount
         return slotIndex
     }

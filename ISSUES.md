@@ -2292,14 +2292,18 @@ Repro: demo, PointSplat renderer, rotate camera. Bisect by toggling reprojection
 ## 113: CLI: no performance statistics reporting on the render command
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
 labels: cli, performance
 created: 2026-08-11T05:32:09Z
+updated: 2026-08-11T06:45:16Z
+closed: 2026-08-11T06:45:16Z
 +++
 
 The reference splat-render CLI (gaussiansplats-ios) reports render statistics via --statistics text|json: wall time, command-buffer GPU time for sort and render, a per-pass breakdown from GPU timestamp counter sampling (including vertex/fragment stage times), and visible/culled splat counts. It supports --warmup N (discarded frames to warm pipeline caches and GPU clocks) and --frames N (medians over a run), and PNG output is optional so the tool can be used for measurement alone. Our metalsprockets-gaussian-splat render command has none of this — the bench subcommand only measures wall-clock medians, with no per-pass GPU counter timings, no JSON output for tooling, and no stats for a specific render invocation.
+
+- `2026-08-11T06:45:16Z`: Render command now supports --statistics text|json, --warmup, --frames, optional --output, and --sort cpu|gpu with per-pass GPU counter timings (vertex/fragment breakdown, GPU sort compute time, culling counts).
 
 ---
 

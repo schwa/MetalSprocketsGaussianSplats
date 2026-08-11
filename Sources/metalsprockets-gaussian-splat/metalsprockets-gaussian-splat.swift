@@ -30,8 +30,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Option(help: "Height of the output image")
     var height: Int = 768
 
-    @Option(help: "Output PNG file path")
-    var output: String = "output.png"
+    @Option(help: "Output PNG file path (default: output.png; with --statistics, omit to skip writing)")
+    var output: String?
 
     @Option(help: "Model position in x,y,z format (e.g., 0,0,0)")
     var modelPosition: String?
@@ -81,6 +81,27 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Option(help: "Export splat data to CSV file")
     var dumpCsv: String?
 
+    @Option(help: "Sort splats on the cpu (radix sort) or gpu (cull + radix sort compute pass)")
+    var sort: SortMethod = .cpu
+
+    @Option(name: [.customLong("statistics"), .customLong("stats")], help: "Report frame timings (wall, CPU sort, GPU render with vertex/fragment breakdown) as text or json")
+    var statistics: StatisticsFormat?
+
+    @Option(help: "Frames to render and discard before measuring, to warm pipeline caches and GPU clocks")
+    var warmup: Int = 0
+
+    @Option(help: "Frames to measure (medians reported)")
+    var frames: Int = 1
+
+    func validate() throws {
+        guard warmup >= 0 else {
+            throw ValidationError("--warmup must not be negative")
+        }
+        guard frames >= 1 else {
+            throw ValidationError("--frames must be at least 1")
+        }
+    }
+
     mutating func run() async throws {
         try await _run()
     }
@@ -92,7 +113,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let device = _MTLCreateSystemDefaultDevice()
         let loadResult = try loadSplats(from: renderConfig.splat)
 
-        print("Loaded \(loadResult.splats.count) splats, SH degree: \(loadResult.shDegree), SH coefficients: \(loadResult.shCoefficients.count)")
+        note("Loaded \(loadResult.splats.count) splats, SH degree: \(loadResult.shDegree), SH coefficients: \(loadResult.shCoefficients.count)")
 
         if let csvPath = dumpCsv {
             try exportToCSV(loadResult: loadResult, path: csvPath)
@@ -110,13 +131,13 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             modelMatrix: modelMatrix
         )
 
-        print("Effective SH degree: \(effectiveSHDegree), SH buffer: \(shCoefficientsBuffer != nil ? "yes" : "no")")
+        note("Effective SH degree: \(effectiveSHDegree), SH buffer: \(shCoefficientsBuffer != nil ? "yes" : "no")")
 
         let size = CGSize(width: renderConfig.width, height: renderConfig.height)
         let projection = try createProjection(from: renderConfig)
         let bgColor = renderConfig.getBackground()
 
-        let (rendering, splatCount) = try performRender(
+        let (rendering, splatCount, samples) = try performRender(
             size: size,
             projection: projection,
             bgColor: bgColor,
@@ -126,15 +147,33 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             sparkGPUSplatCloud: sparkGPUSplatCloud
         )
 
-        var cgImage = try rendering.cgImage
-        if label {
-            cgImage = addLabel(to: cgImage, renderConfig: renderConfig, splatCount: splatCount, useSrgbToLinear: useSrgbToLinear, effectiveSHDegree: effectiveSHDegree)
+        if let statistics {
+            let report = makeReport(samples: samples, splats: splatCount, shDegree: Int(effectiveSHDegree), width: renderConfig.width, height: renderConfig.height, warmup: warmup, sortMethod: sort)
+            try emitReport(report, format: statistics)
         }
 
-        try saveOutput(cgImage: cgImage, to: renderConfig.output, reveal: reveal)
+        // A statistics run with no explicit destination is measurement-only.
+        if statistics == nil || output != nil || config != nil {
+            var cgImage = try rendering.cgImage
+            if label {
+                cgImage = addLabel(to: cgImage, renderConfig: renderConfig, splatCount: splatCount, useSrgbToLinear: useSrgbToLinear, effectiveSHDegree: effectiveSHDegree)
+            }
+
+            try saveOutput(cgImage: cgImage, to: renderConfig.output, reveal: reveal)
+        }
         #else
         throw ValidationError("This tool requires Apple Silicon (ARM64) on macOS")
         #endif
+    }
+
+    /// Chatter that isn't the report. In JSON mode it goes to stderr so stdout
+    /// stays a single parseable document.
+    private func note(_ message: String) {
+        if statistics == .json {
+            FileHandle.standardError.write(Data((message + "\n").utf8))
+        } else {
+            print(message)
+        }
     }
 
     // MARK: - Config Loading
@@ -166,7 +205,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         }
         if width != 1_024 { renderConfig.width = width }
         if height != 768 { renderConfig.height = height }
-        if output != "output.png" { renderConfig.output = output }
+        if let output { renderConfig.output = output }
         if let pos = modelPosition {
             let v = try parseXYZ(pos)
             renderConfig.modelPosition = [v.x, v.y, v.z]
@@ -196,7 +235,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             background: [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w],
             width: width,
             height: height,
-            output: output,
+            output: output ?? "output.png",
             modelPosition: try modelPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
             cameraPosition: try cameraPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
             cameraLookat: try cameraLookat.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
@@ -384,7 +423,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
         sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>
-    ) throws -> (OffscreenRenderer.Rendering, Int) {
+    ) throws -> (OffscreenRenderer.Rendering, Int, [FrameSample]) {
         let renderer = try OffscreenRenderer(size: size)
         renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
             red: Double(bgColor.x),
@@ -393,29 +432,100 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             alpha: Double(bgColor.w)
         )
 
-        let captureManager = MTLCaptureManager.shared()
         let cloud = sparkGPUSplatCloud
         let splatCount = cloud.count
+        let aspectRatio = Float(size.width) / Float(size.height)
+        let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
+        let drawableSize = SIMD2<Float>(Float(size.width), Float(size.height))
+        let renderSampleBox = GPUSampleBox()
+        let sortSampleBox = GPUSampleBox()
+        let collectSamples = statistics != nil
         let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
-        let sortedIndices = try SplatSorter.sort(device: renderer.device, splatCloud: cloud, parameters: sortParameters)
-        let renderContent = try RenderPass {
-            let aspectRatio = Float(size.width) / Float(size.height)
-            let projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
-            try SparkSplatRenderPipeline(
-                splatCloud: cloud,
-                projectionMatrix: projectionMatrix,
-                modelMatrix: modelMatrix,
-                cameraMatrix: cameraMatrix,
-                drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                configuration: .init(convertSRGBToLinear: useSrgbToLinear),
-                sortedIndices: sortedIndices
-            )
-        }
-        let rendering = try captureManager.with(enabled: capture) {
-            try renderer.render(renderContent)
+        let gpuSortResources = sort == .gpu ? try GPUSortResources(device: renderer.device, capacity: cloud.count, slotCount: 1) : nil
+
+        func makeRenderPass(sortedIndices: SplatIndices) throws -> some Element {
+            try RenderPass {
+                try SparkSplatRenderPipeline(
+                    splatCloud: cloud,
+                    projectionMatrix: projectionMatrix,
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrix,
+                    drawableSize: drawableSize,
+                    configuration: .init(convertSRGBToLinear: useSrgbToLinear),
+                    sortedIndices: sortedIndices
+                )
+            }
         }
 
-        return (rendering, splatCount)
+        // One frame: sort, then render the indices it produced. Warm-up frames
+        // run this unchanged so they exercise exactly the measured work.
+        func renderFrame() throws -> (OffscreenRenderer.Rendering, FrameSample) {
+            let start = ContinuousClock.now
+            let rendering: OffscreenRenderer.Rendering
+            var sortCPUTime: TimeInterval?
+            var visibleSplats: Int?
+            if let gpuSortResources {
+                // Sort and render in one submission, mirroring
+                // GPUSortedSplatRenderPipeline but with counters on each pass.
+                let slot = gpuSortResources.advance()
+                let sortedIndices = gpuSortResources.makeIndices(slot: slot, count: cloud.count, parameters: sortParameters)
+                let sortPass = try GPUSplatSortComputePass(
+                    splatCloud: cloud,
+                    projectionMatrix: projectionMatrix,
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrix,
+                    resources: gpuSortResources,
+                    slotIndex: slot
+                )
+                let renderPass = try makeRenderPass(sortedIndices: sortedIndices)
+                if collectSamples {
+                    rendering = try renderer.render(Group {
+                        sortPass.gpuCounters(label: "splat sort") { sortSampleBox.set($0) }
+                        renderPass.gpuCounters(label: "splat render") { renderSampleBox.set($0) }
+                    })
+                } else {
+                    rendering = try renderer.render(Group {
+                        sortPass
+                        renderPass
+                    })
+                }
+                visibleSplats = gpuSortResources.lastSurvivorCount
+            } else {
+                let sortedIndices = try SplatSorter.sort(device: renderer.device, splatCloud: cloud, parameters: sortParameters)
+                sortCPUTime = elapsedSeconds(since: start)
+                let renderPass = try makeRenderPass(sortedIndices: sortedIndices)
+                if collectSamples {
+                    rendering = try renderer.render(renderPass.gpuCounters(label: "splat render") { renderSampleBox.set($0) })
+                } else {
+                    rendering = try renderer.render(renderPass)
+                }
+            }
+            return (rendering, FrameSample(
+                wallTime: elapsedSeconds(since: start),
+                sortCPUTime: sortCPUTime,
+                sortGPU: sortSampleBox.take(),
+                render: renderSampleBox.take(),
+                visibleSplats: visibleSplats
+            ))
+        }
+
+        var lastRendering: OffscreenRenderer.Rendering?
+        var samples: [FrameSample] = []
+        try MTLCaptureManager.shared().with(enabled: capture) {
+            for _ in 0..<warmup {
+                (lastRendering, _) = try renderFrame()
+            }
+            for _ in 0..<frames {
+                let (rendering, sample) = try renderFrame()
+                lastRendering = rendering
+                samples.append(sample)
+            }
+        }
+        guard let lastRendering else {
+            throw ValidationError("No frames rendered")
+        }
+
+        return (lastRendering, splatCount, samples)
     }
 
     // MARK: - Label Overlay
