@@ -2416,12 +2416,13 @@ The element is the main unit of composition; PointSplatRenderer survives only as
 ## 120: spark-screenshot: flaky 'Timeout waiting for splat to initialize' failures; exits 0 on failure
 
 +++
-status: new
+status: closed
 priority: medium
 kind: bug
 labels: tools
 created: 2026-08-11T16:23:41Z
-updated: 2026-08-11T16:44:23Z
+updated: 2026-08-11T16:47:53Z
+closed: 2026-08-11T16:47:53Z
 +++
 
 Tools/spark-screenshot advertises .splat support (--splat help text: .splat, .ply, .spz) but every antimatter15-style .splat file fails after the 30-second init timeout with 'Error: Render error: Timeout waiting for splat to initialize'. .ply, .spz, and .sog files render fine.

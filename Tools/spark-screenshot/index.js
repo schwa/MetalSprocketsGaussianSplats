@@ -145,6 +145,11 @@ if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
   process.exit(1);
 }
 
+// Spark detects antimatter15 .splat files by URL extension only (no magic
+// bytes), so the served path must keep the original extension.
+const splatExt = basename(splatPath).split('.').pop().toLowerCase();
+const splatUrlPath = `/splat.${splatExt}`;
+
 // Create a simple HTTP server to serve files
 const server = createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
@@ -154,24 +159,12 @@ const server = createServer((req, res) => {
     const html = readFileSync(resolve(__dirname, 'render.html'), 'utf8');
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(html);
-  } else if (url.pathname === '/splat') {
+  } else if (url.pathname === splatUrlPath) {
     // Serve the splat file
     try {
       const splatData = readFileSync(splatPath);
-      const ext = basename(splatPath).split('.').pop().toLowerCase();
-
-      // Set appropriate content type based on extension
-      const contentTypes = {
-        'ply': 'application/octet-stream',
-        'splat': 'application/octet-stream',
-        'spz': 'application/octet-stream',
-        'ksplat': 'application/octet-stream',
-        'sogs': 'application/octet-stream'
-      };
-
-      const contentType = contentTypes[ext] || 'application/octet-stream';
       res.writeHead(200, {
-        'Content-Type': contentType,
+        'Content-Type': 'application/octet-stream',
         'Access-Control-Allow-Origin': '*'
       });
       res.end(splatData);
@@ -211,7 +204,7 @@ server.listen(port, async () => {
     const shDegree = cliOptions.shDegree ? parseInt(cliOptions.shDegree) : null;
 
     const urlParams = new URLSearchParams({
-      splat: `http://localhost:${port}/splat`,
+      splat: `http://localhost:${port}${splatUrlPath}`,
       width, height, fov,
       near: config.near,
       far: config.far,
