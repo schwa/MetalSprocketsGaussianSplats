@@ -14,9 +14,10 @@ import Splats
 /// per pixel is noisy by design — accumulate frames (varying `frameSeed`)
 /// for a converged image.
 ///
-/// Frame encoding and GPU resources are shared with the live
-/// ``PointSplatRenderPipeline`` via `PointSplatResources`; this class only
-/// adds a blocking command queue and a CPU-readable output texture.
+/// A thin blocking wrapper around ``PointSplatComputePass``: this class only
+/// adds a private command queue and a CPU-readable output texture. For
+/// element-tree composition use ``PointSplatComputePass`` directly; for live
+/// rendering with temporal accumulation use ``PointSplatRenderPipeline``.
 ///
 /// Requires 64-bit atomics: Apple9 (A17/M3+) or Mac2 GPU family.
 public final class PointSplatRenderer {
@@ -59,7 +60,6 @@ public final class PointSplatRenderer {
     public var onGPUCounterSample: (@Sendable (GPUCounterSample) -> Void)?
 
     private let runner: Runner
-    private var resources: PointSplatResources?
     private let outTexture: MTLTexture
     /// Monotonic per-render key for `framePlan` idempotency; frame seeds can repeat.
     private var planCounter: UInt64 = 0
@@ -94,49 +94,24 @@ public final class PointSplatRenderer {
     }
 
     private func render(splats: MTLBuffer, splatCount: Int, packedBounds: GPSPackedSplatBounds?, modelMatrix: simd_float4x4, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4, frameSeed: UInt32) throws -> MTLTexture {
-        if resources?.splatCount != splatCount {
-            resources = try PointSplatResources(
-                device: device,
-                drawableSize: SIMD2<Float>(Float(configuration.width), Float(configuration.height)),
-                splatCount: splatCount,
-                supersampling: configuration.supersampling,
-                pointsPerThread: configuration.pointsPerThread,
-                backgroundColor: configuration.backgroundColor
-            )
-        }
-        guard let resources else {
-            throw PointSplatError.bufferAllocationFailed
-        }
-        let uniforms = PointSplatUniforms(
+        // Explicit plan key: frame seeds can repeat, the counter cannot.
+        planCounter += 1
+        let pass = PointSplatComputePass(
+            splats: splats,
+            splatCount: splatCount,
+            packedBounds: packedBounds,
             modelMatrix: modelMatrix,
             viewMatrix: viewMatrix,
             projectionMatrix: projectionMatrix,
-            drawableSize: SIMD2<Float>(Float(configuration.width * configuration.supersampling), Float(configuration.height * configuration.supersampling)),
+            frameSeed: frameSeed,
+            planKey: planCounter,
+            outTexture: outTexture,
             nearPlane: configuration.nearPlane,
             farPlane: configuration.farPlane,
-            splatCount: UInt32(splatCount),
-            frameSeed: frameSeed,
-            capacity: UInt32(resources.distributor.capacity),
-            supersampling: UInt32(configuration.supersampling),
-            pointsPerThread: UInt32(configuration.pointsPerThread),
-            cameraPosition: .zero,
-            shDegree: 0,
-            occlusionPhase: 0,
-            pyramidLevels: UInt32(resources.pyramidLevels),
-            packedSplats: packedBounds == nil ? 0 : 1,
-            // Offline path stays at rho = 0: principled convergence for
-            // ground-truth accumulation (RFC 0005 §4).
-            reuseFactor: 0
+            backgroundColor: configuration.backgroundColor,
+            supersampling: configuration.supersampling,
+            pointsPerThread: configuration.pointsPerThread
         )
-
-        // Whole frame in one serial compute pass; the splat dispatches are
-        // indirect from the GPU-side totals.
-        planCounter += 1
-        let plan = resources.framePlan(planKey: planCounter, splats: splats)
-        let pass = try ComputePass(label: "PointSplat offscreen") {
-            try resources.frameElements(uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed, packedBounds: packedBounds ?? GPSPackedSplatBounds(), plan: plan)
-            try resources.resolveElements(uniforms: uniforms, outTexture: outTexture)
-        }
         if let onGPUCounterSample {
             try runner.run(pass.gpuCounters(label: "PointSplat offscreen", onGPUCounterSample))
         } else {

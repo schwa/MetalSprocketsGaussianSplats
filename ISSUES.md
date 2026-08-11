@@ -2356,13 +2356,17 @@ PointSplatRenderer's public API is an imperative class (render(...) -> MTLTextur
 ## 117: Offscreen point splat rendering is not composable as an element
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: pointsplat, cli
 created: 2026-08-11T06:54:29Z
+updated: 2026-08-11T06:58:28Z
+closed: 2026-08-11T06:58:28Z
 +++
 
 PointSplatRenderer is an imperative class: render(...) blocks on its own private Runner and returns an MTLTexture. Unlike SparkSplatRenderPipeline, TileBasedSplatPass, and StochasticSplatRenderPipeline, there is no way to place offscreen point splat rendering inside an element tree (OffscreenRenderer.render, RenderView, or alongside other passes in one submission), attach modifiers (.gpuCounters beyond the ad-hoc onGPUCounterSample hook added for #116), or combine it with other passes in a single command buffer. The live PointSplatRenderPipeline element shares the same PointSplatResources, so the building blocks exist but are not exposed for offscreen composition.
+
+- `2026-08-11T06:58:28Z`: Added PointSplatComputePass, a composable element for offscreen point splat frames; PointSplatRenderer is now a thin blocking wrapper around it.
 
 ---
