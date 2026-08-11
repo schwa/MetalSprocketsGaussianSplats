@@ -63,8 +63,14 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Enable Metal frame capture for debugging in Xcode")
     var capture: Bool = false
 
-    @Option(help: "Renderer to use (currently only spark is supported)")
-    var renderer: String = "spark"
+    @Option(help: "Renderer to use (spark, point, tile, stochastic)")
+    var renderer: RendererKind = .spark
+
+    @Option(help: "Point renderer supersampling factor")
+    var supersampling: Int = 2
+
+    @Option(help: "Point renderer points per thread")
+    var pointsPerThread: Int = 4
 
     @Flag(help: "Convert sRGB to linear in fragment shader (for Spark renderer)")
     var srgbToLinear: Bool = false
@@ -137,24 +143,36 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let projection = try createProjection(from: renderConfig)
         let bgColor = renderConfig.getBackground()
 
-        let (rendering, splatCount, samples) = try performRender(
-            size: size,
-            projection: projection,
-            bgColor: bgColor,
-            useSrgbToLinear: useSrgbToLinear,
-            modelMatrix: modelMatrix,
-            cameraMatrix: cameraMatrix,
-            sparkGPUSplatCloud: sparkGPUSplatCloud
-        )
-
-        if let statistics {
-            let report = makeReport(samples: samples, splats: splatCount, shDegree: Int(effectiveSHDegree), width: renderConfig.width, height: renderConfig.height, warmup: warmup, sortMethod: sort)
-            try emitReport(report, format: statistics)
+        guard let rendererKind = RendererKind(rawValue: renderConfig.renderer ?? "spark") else {
+            throw ValidationError("Unknown renderer: \(renderConfig.renderer ?? ""). Supported: \(RendererKind.allCases.map(\.rawValue).joined(separator: ", "))")
+        }
+        if sort == .gpu, rendererKind != .spark {
+            throw ValidationError("--sort gpu only applies to the spark renderer")
         }
 
         // A statistics run with no explicit destination is measurement-only.
-        if statistics == nil || output != nil || config != nil {
-            var cgImage = try rendering.cgImage
+        let needsImage = statistics == nil || output != nil || config != nil
+
+        let (image, splatCount, samples) = try performRender(
+            size: size,
+            rendererKind: rendererKind,
+            projection: projection,
+            bgColor: bgColor,
+            useSrgbToLinear: useSrgbToLinear,
+            near: renderConfig.near,
+            far: renderConfig.far,
+            modelMatrix: modelMatrix,
+            cameraMatrix: cameraMatrix,
+            sparkGPUSplatCloud: sparkGPUSplatCloud,
+            needsImage: needsImage
+        )
+
+        if let statistics {
+            let report = makeReport(samples: samples, splats: splatCount, shDegree: Int(effectiveSHDegree), width: renderConfig.width, height: renderConfig.height, warmup: warmup, renderer: rendererKind, sortMethod: sort)
+            try emitReport(report, format: statistics)
+        }
+
+        if var cgImage = image {
             if label {
                 cgImage = addLabel(to: cgImage, renderConfig: renderConfig, splatCount: splatCount, useSrgbToLinear: useSrgbToLinear, effectiveSHDegree: effectiveSHDegree)
             }
@@ -225,7 +243,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         if near != 0.1 { renderConfig.near = near }
         if far != 100.0 { renderConfig.far = far }
         if let s = splat { renderConfig.splat = s }
-        if renderer != "spark" { renderConfig.renderer = renderer }
+        if renderer != .spark { renderConfig.renderer = renderer.rawValue }
         if srgbToLinear { renderConfig.srgbToLinear = true }
     }
 
@@ -244,7 +262,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             near: near,
             far: far,
             splat: splatPath,
-            renderer: renderer,
+            renderer: renderer.rawValue,
             srgbToLinear: srgbToLinear
         )
     }
@@ -417,21 +435,17 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @MainActor
     func performRender(
         size: CGSize,
+        rendererKind: RendererKind,
         projection: any ProjectionProtocol,
         bgColor: SIMD4<Float>,
         useSrgbToLinear: Bool,
+        near: Float,
+        far: Float,
         modelMatrix: simd_float4x4,
         cameraMatrix: simd_float4x4,
-        sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>
-    ) throws -> (OffscreenRenderer.Rendering, Int, [FrameSample]) {
-        let renderer = try OffscreenRenderer(size: size)
-        renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
-            red: Double(bgColor.x),
-            green: Double(bgColor.y),
-            blue: Double(bgColor.z),
-            alpha: Double(bgColor.w)
-        )
-
+        sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>,
+        needsImage: Bool
+    ) throws -> (CGImage?, Int, [FrameSample]) {
         let cloud = sparkGPUSplatCloud
         let splatCount = cloud.count
         let aspectRatio = Float(size.width) / Float(size.height)
@@ -441,7 +455,59 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let sortSampleBox = GPUSampleBox()
         let collectSamples = statistics != nil
         let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
-        let gpuSortResources = sort == .gpu ? try GPUSortResources(device: renderer.device, capacity: cloud.count, slotCount: 1) : nil
+        var frameIndex: UInt32 = 0
+
+        // The point renderer is not element-based: it owns its own compute
+        // pipelines and float output texture, so it bypasses OffscreenRenderer
+        // and reports wall time only.
+        if rendererKind == .point {
+            let pointRenderer = try PointSplatRenderer(
+                device: _MTLCreateSystemDefaultDevice(),
+                configuration: .init(
+                    width: Int(size.width),
+                    height: Int(size.height),
+                    nearPlane: near,
+                    farPlane: far,
+                    backgroundColor: SIMD3<Float>(bgColor.x, bgColor.y, bgColor.z),
+                    supersampling: supersampling,
+                    pointsPerThread: pointsPerThread
+                )
+            )
+            var lastTexture: MTLTexture?
+            var samples: [FrameSample] = []
+            func pointFrame() throws -> FrameSample {
+                let start = ContinuousClock.now
+                lastTexture = try pointRenderer.render(
+                    splats: cloud.splats.unsafeMTLBuffer,
+                    splatCount: splatCount,
+                    modelMatrix: modelMatrix,
+                    viewMatrix: cameraMatrix.inverse,
+                    projectionMatrix: projectionMatrix,
+                    frameSeed: frameIndex
+                )
+                frameIndex += 1
+                return FrameSample(wallTime: elapsedSeconds(since: start))
+            }
+            for _ in 0..<warmup {
+                _ = try pointFrame()
+            }
+            for _ in 0..<frames {
+                samples.append(try pointFrame())
+            }
+            guard let lastTexture else {
+                throw ValidationError("No frames rendered")
+            }
+            return (needsImage ? try makeImage(fromFloatTexture: lastTexture) : nil, splatCount, samples)
+        }
+
+        let renderer = try OffscreenRenderer(size: size)
+        renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: Double(bgColor.x),
+            green: Double(bgColor.y),
+            blue: Double(bgColor.z),
+            alpha: Double(bgColor.w)
+        )
+        let gpuSortResources = (rendererKind == .spark && sort == .gpu) ? try GPUSortResources(device: renderer.device, capacity: cloud.count, slotCount: 1) : nil
 
         func makeRenderPass(sortedIndices: SplatIndices) throws -> some Element {
             try RenderPass {
@@ -457,9 +523,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             }
         }
 
-        // One frame: sort, then render the indices it produced. Warm-up frames
-        // run this unchanged so they exercise exactly the measured work.
-        func renderFrame() throws -> (OffscreenRenderer.Rendering, FrameSample) {
+        // Spark frame: sort, then render the indices it produced. Warm-up
+        // frames run this unchanged so they exercise exactly the measured work.
+        func sparkFrame() throws -> (OffscreenRenderer.Rendering, FrameSample) {
             let start = ContinuousClock.now
             let rendering: OffscreenRenderer.Rendering
             var sortCPUTime: TimeInterval?
@@ -509,6 +575,70 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             ))
         }
 
+        // Tile frame: binning/sorting compute passes plus the tile render pass,
+        // all inside one element. Counters report the render pass only.
+        func tileFrame() throws -> (OffscreenRenderer.Rendering, FrameSample) {
+            let start = ContinuousClock.now
+            let pass = try TileBasedSplatPass(
+                splatCloud: cloud,
+                projection: projection,
+                drawableSize: drawableSize,
+                cameraMatrix: cameraMatrix,
+                modelMatrix: modelMatrix
+            )
+            let rendering: OffscreenRenderer.Rendering
+            if collectSamples {
+                rendering = try renderer.render(pass.gpuCounters(label: "splat render") { renderSampleBox.set($0) })
+            } else {
+                rendering = try renderer.render(pass)
+            }
+            return (rendering, FrameSample(wallTime: elapsedSeconds(since: start), render: renderSampleBox.take()))
+        }
+
+        // Stochastic frame: single unaccumulated frame, so the output is noisy
+        // by design; the seed advances per frame like an interactive session.
+        func stochasticFrame() throws -> (OffscreenRenderer.Rendering, FrameSample) {
+            let start = ContinuousClock.now
+            let pass = try RenderPass {
+                try StochasticSplatRenderPipeline(
+                    splatCloud: cloud,
+                    projectionMatrix: projectionMatrix,
+                    modelMatrix: modelMatrix,
+                    cameraMatrix: cameraMatrix,
+                    drawableSize: drawableSize,
+                    frameTime: frameIndex,
+                    convertSRGBToLinear: useSrgbToLinear
+                )
+                .depthCompare(function: .less, enabled: true)
+            }
+            let rendering: OffscreenRenderer.Rendering
+            if collectSamples {
+                rendering = try renderer.render(pass.gpuCounters(label: "splat render") { renderSampleBox.set($0) })
+            } else {
+                rendering = try renderer.render(pass)
+            }
+            return (rendering, FrameSample(wallTime: elapsedSeconds(since: start), render: renderSampleBox.take()))
+        }
+
+        func renderFrame() throws -> (OffscreenRenderer.Rendering, FrameSample) {
+            defer {
+                frameIndex += 1
+            }
+            switch rendererKind {
+            case .spark:
+                return try sparkFrame()
+
+            case .tile:
+                return try tileFrame()
+
+            case .stochastic:
+                return try stochasticFrame()
+
+            case .point:
+                throw ValidationError("point renderer handled separately")
+            }
+        }
+
         var lastRendering: OffscreenRenderer.Rendering?
         var samples: [FrameSample] = []
         try MTLCaptureManager.shared().with(enabled: capture) {
@@ -525,7 +655,47 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             throw ValidationError("No frames rendered")
         }
 
-        return (lastRendering, splatCount, samples)
+        return (needsImage ? try lastRendering.cgImage : nil, splatCount, samples)
+    }
+
+    /// Converts the point renderer's rgba32Float output to an 8-bit image.
+    ///
+    /// Values are sRGB-encoded to match the element renderers, which write
+    /// into an sRGB framebuffer.
+    @MainActor
+    func makeImage(fromFloatTexture texture: MTLTexture) throws -> CGImage {
+        if texture.storageMode == .managed {
+            let runner = try Runner(device: texture.device)
+            try runner.run(
+                BlitPass {
+                    Blit { encoder in
+                        encoder.synchronize(resource: texture)
+                    }
+                }
+            )
+        }
+        let pixelCount = texture.width * texture.height
+        var rgba = [Float](repeating: 0, count: pixelCount * 4)
+        rgba.withUnsafeMutableBytes { pointer in
+            guard let baseAddress = pointer.baseAddress else {
+                return
+            }
+            texture.getBytes(baseAddress, bytesPerRow: texture.width * 16, from: MTLRegionMake2D(0, 0, texture.width, texture.height), mipmapLevel: 0)
+        }
+        var bytes = [UInt8](repeating: 0, count: pixelCount * 4)
+        for pixel in 0..<pixelCount {
+            for channel in 0..<3 {
+                let value = max(0, min(1, rgba[pixel * 4 + channel]))
+                let encoded = value <= 0.003_130_8 ? value * 12.92 : 1.055 * pow(value, 1 / 2.4) - 0.055
+                bytes[pixel * 4 + channel] = UInt8(encoded * 255 + 0.5)
+            }
+            bytes[pixel * 4 + 3] = 255
+        }
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)
+        guard let context = CGContext(data: &bytes, width: texture.width, height: texture.height, bitsPerComponent: 8, bytesPerRow: texture.width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: bitmapInfo.rawValue), let image = context.makeImage() else {
+            throw ValidationError("Failed to convert point renderer output to an image")
+        }
+        return image
     }
 
     // MARK: - Label Overlay

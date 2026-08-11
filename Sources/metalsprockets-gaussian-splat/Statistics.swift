@@ -14,6 +14,13 @@ enum SortMethod: String, CaseIterable, ExpressibleByArgument {
     case gpu
 }
 
+enum RendererKind: String, CaseIterable, ExpressibleByArgument {
+    case spark
+    case point
+    case tile
+    case stochastic
+}
+
 /// Hands the latest GPU counter sample from the command-buffer completion
 /// handler (an arbitrary thread) to the render loop.
 final class GPUSampleBox: @unchecked Sendable {
@@ -46,6 +53,14 @@ struct FrameSample {
     var render: GPUCounterSample?
     /// Frustum-cull survivors; the GPU sort is the only path that culls.
     var visibleSplats: Int?
+
+    init(wallTime: TimeInterval, sortCPUTime: TimeInterval? = nil, sortGPU: GPUCounterSample? = nil, render: GPUCounterSample? = nil, visibleSplats: Int? = nil) {
+        self.wallTime = wallTime
+        self.sortCPUTime = sortCPUTime
+        self.sortGPU = sortGPU
+        self.render = render
+        self.visibleSplats = visibleSplats
+    }
 }
 
 struct Stat: Codable {
@@ -66,6 +81,8 @@ struct StatisticsReport: Codable {
     var height: Int
     var frames: Int
     var warmup: Int
+    var renderer: String
+    /// Only meaningful for the spark renderer; the others do not sort.
     var sortMethod: String
     /// Frustum-cull survivors from the last measured frame (GPU sort only).
     var visibleSplats: Int?
@@ -84,7 +101,7 @@ struct StatisticsReport: Codable {
     var fragment: Stat?
 }
 
-func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, height: Int, warmup: Int, sortMethod: SortMethod) -> StatisticsReport {
+func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, height: Int, warmup: Int, renderer: RendererKind, sortMethod: SortMethod) -> StatisticsReport {
     let sortCPUTimes = samples.compactMap(\.sortCPUTime)
     let sortGPUTimes = samples.compactMap { $0.sortGPU?.duration }
     let gpuTimes = samples.compactMap { $0.render?.duration }
@@ -98,6 +115,7 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
         height: height,
         frames: samples.count,
         warmup: warmup,
+        renderer: renderer.rawValue,
         sortMethod: sortMethod.rawValue,
         visibleSplats: visible,
         culledSplats: visible.map { max(0, splats - $0) },
@@ -126,7 +144,9 @@ private func printTextReport(_ report: StatisticsReport) {
     print("")
     print("Statistics — median of \(report.frames) frame(s), \(report.warmup) warm-up")
     print("  scene       \(report.splats) splats, SH degree \(report.shDegree)")
-    print("  size        \(report.width)x\(report.height), \(report.sortMethod) sort")
+    let sortSuffix = report.renderer == RendererKind.spark.rawValue ? " (\(report.sortMethod) sort)" : ""
+    print("  renderer    \(report.renderer)\(sortSuffix)")
+    print("  size        \(report.width)x\(report.height)")
     if let visible = report.visibleSplats, let culled = report.culledSplats {
         let percent = report.splats > 0 ? Double(culled) / Double(report.splats) * 100 : 0
         print(String(format: "  culling     %d visible, %d culled (%.1f%%)", visible, culled, percent))
