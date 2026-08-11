@@ -2338,14 +2338,18 @@ splat-render (gaussiansplats-ios) accepts --camera-matrix with 16 column-major v
 ## 116: PointSplatRenderer cannot be timed with GPU counters
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: pointsplat, performance, cli
 created: 2026-08-11T06:51:36Z
+updated: 2026-08-11T06:55:18Z
+closed: 2026-08-11T06:55:18Z
 +++
 
 PointSplatRenderer's public API is an imperative class (render(...) -> MTLTexture) rather than a MetalSprockets Element, and the element-building internals (PointSplatResources.frameElements/resolveElements, its private Runner) are internal. Callers therefore cannot attach .gpuCounters() to its compute passes the way they can for SparkSplatRenderPipeline, TileBasedSplatPass, and StochasticSplatRenderPipeline. Concretely, the CLI's --statistics report only shows wall time for --renderer point — no GPU pass time, unlike the other renderers.
+
+- `2026-08-11T06:55:18Z`: PointSplatRenderer gains onGPUCounterSample; the CLI wires it into --statistics so --renderer point reports GPU pass time.
 
 ---
 
@@ -2355,7 +2359,7 @@ PointSplatRenderer's public API is an imperative class (render(...) -> MTLTextur
 status: new
 priority: medium
 kind: enhancement
-labels: pointsplat,cli
+labels: pointsplat, cli
 created: 2026-08-11T06:54:29Z
 +++
 

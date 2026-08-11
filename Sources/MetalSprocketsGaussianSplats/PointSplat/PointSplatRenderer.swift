@@ -53,6 +53,11 @@ public final class PointSplatRenderer {
     public let device: MTLDevice
     public let configuration: Configuration
 
+    /// Called after each blocking render with the GPU timestamp sample for the
+    /// frame's compute pass (whole-encoder time; there are no render stages).
+    /// Set before calling `render`. `nil` (the default) skips counter sampling.
+    public var onGPUCounterSample: (@Sendable (GPUCounterSample) -> Void)?
+
     private let runner: Runner
     private var resources: PointSplatResources?
     private let outTexture: MTLTexture
@@ -128,12 +133,15 @@ public final class PointSplatRenderer {
         // indirect from the GPU-side totals.
         planCounter += 1
         let plan = resources.framePlan(planKey: planCounter, splats: splats)
-        try runner.run(
-            ComputePass(label: "PointSplat offscreen") {
-                try resources.frameElements(uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed, packedBounds: packedBounds ?? GPSPackedSplatBounds(), plan: plan)
-                try resources.resolveElements(uniforms: uniforms, outTexture: outTexture)
-            }
-        )
+        let pass = try ComputePass(label: "PointSplat offscreen") {
+            try resources.frameElements(uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed, packedBounds: packedBounds ?? GPSPackedSplatBounds(), plan: plan)
+            try resources.resolveElements(uniforms: uniforms, outTexture: outTexture)
+        }
+        if let onGPUCounterSample {
+            try runner.run(pass.gpuCounters(label: "PointSplat offscreen", onGPUCounterSample))
+        } else {
+            try runner.run(pass)
+        }
 
         return outTexture
     }

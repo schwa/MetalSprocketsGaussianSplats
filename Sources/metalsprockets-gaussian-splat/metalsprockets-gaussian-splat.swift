@@ -457,9 +457,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
         var frameIndex: UInt32 = 0
 
-        // The point renderer is not element-based: it owns its own compute
-        // pipelines and float output texture, so it bypasses OffscreenRenderer
-        // and reports wall time only.
+        // The point renderer has an imperative API (it owns its own compute
+        // pipelines and float output texture), so it bypasses OffscreenRenderer.
         if rendererKind == .point {
             let pointRenderer = try PointSplatRenderer(
                 device: _MTLCreateSystemDefaultDevice(),
@@ -473,6 +472,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     pointsPerThread: pointsPerThread
                 )
             )
+            if collectSamples {
+                pointRenderer.onGPUCounterSample = { renderSampleBox.set($0) }
+            }
             var lastTexture: MTLTexture?
             var samples: [FrameSample] = []
             func pointFrame() throws -> FrameSample {
@@ -486,7 +488,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     frameSeed: frameIndex
                 )
                 frameIndex += 1
-                return FrameSample(wallTime: elapsedSeconds(since: start))
+                return FrameSample(wallTime: elapsedSeconds(since: start), render: renderSampleBox.take())
             }
             for _ in 0..<warmup {
                 _ = try pointFrame()
