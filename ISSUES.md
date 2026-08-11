@@ -2324,14 +2324,18 @@ splat-render (gaussiansplats-ios) offers --metalfx <factor>: it renders at a red
 ## 115: CLI: camera cannot be specified as a full camera-to-world matrix
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
 labels: cli
 created: 2026-08-11T05:32:16Z
+updated: 2026-08-11T14:44:24Z
+closed: 2026-08-11T14:44:24Z
 +++
 
 splat-render (gaussiansplats-ios) accepts --camera-matrix with 16 column-major values, defining the entire camera-to-world transform in one flag and overriding the eye/look-at/up flags. Our CLI only supports camera position, look-at target, and rotation as a quaternion or 3x3 matrix; there is no way to pass an exact 4x4 camera matrix, e.g. one exported from another tool or dataset, which makes reproducing a reference camera pose exactly awkward.
+
+- `2026-08-11T14:44:24Z`: Added --camera-matrix (16 column-major camera-to-world values) and the cameraMatrix config field; takes priority over and cannot be combined with the other camera flags.
 
 ---
 

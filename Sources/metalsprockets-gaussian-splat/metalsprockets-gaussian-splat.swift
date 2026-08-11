@@ -45,6 +45,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Option(help: "Camera rotation as quaternion (x,y,z,w) or 3x3 matrix (9 values comma-separated)")
     var cameraRotation: String?
 
+    @Option(help: "Camera-to-world matrix, 16 comma-separated column-major values. Overrides every other camera flag.")
+    var cameraMatrix: String?
+
     @Option(help: "Projection field of view in degrees")
     var projectionFov: Double?
 
@@ -239,6 +242,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         if let rot = cameraRotation {
             renderConfig.cameraRotation = rot.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
         }
+        if let matrix = cameraMatrix {
+            renderConfig.cameraMatrix = try parseFloatList(matrix, count: 16, label: "Camera matrix")
+        }
         if let fov = projectionFov { renderConfig.projectionFov = fov }
         if near != 0.1 { renderConfig.near = near }
         if far != 100.0 { renderConfig.far = far }
@@ -258,6 +264,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             cameraPosition: try cameraPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
             cameraLookat: try cameraLookat.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
             cameraRotation: cameraRotation?.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) },
+            cameraMatrix: try cameraMatrix.map { try parseFloatList($0, count: 16, label: "Camera matrix") },
             projectionFov: projectionFov,
             near: near,
             far: far,
@@ -573,6 +580,14 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         return SIMD4<Float>(components[0], components[1], components[2], components[3])
     }
 
+    func parseFloatList(_ string: String, count: Int, label: String) throws -> [Float] {
+        let components = string.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
+        guard components.count == count else {
+            throw ValidationError("\(label) must be \(count) comma-separated values")
+        }
+        return components
+    }
+
     func parseXYZ(_ string: String) throws -> SIMD3<Float> {
         let components = string.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
         guard components.count == 3 else {
@@ -589,7 +604,13 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     }
 
     func parseCameraMatrix(from config: RenderConfig) throws -> simd_float4x4 {
-        // Priority: rotation > lookat > position
+        // Priority: full matrix > rotation > lookat > position
+        if let matrix = config.getCameraMatrix() {
+            if config.cameraPosition != nil || config.cameraLookat != nil || config.cameraRotation != nil {
+                throw ValidationError("--camera-matrix is the whole camera; it cannot be combined with --camera-position, --camera-lookat, or --camera-rotation")
+            }
+            return matrix
+        }
         if let rotation = config.getCameraRotation() {
             return try parseCameraRotationMatrix(rotation, config: config)
         }

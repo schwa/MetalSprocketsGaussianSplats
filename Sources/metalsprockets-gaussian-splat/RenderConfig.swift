@@ -27,6 +27,10 @@ struct RenderConfig: Codable {
     /// Camera rotation as quaternion [x,y,z,w] or 3x3 matrix (9 values)
     var cameraRotation: [Float]?
 
+    /// Camera-to-world matrix, 16 column-major values. Overrides the other
+    /// camera fields.
+    var cameraMatrix: [Float]?
+
     /// Projection field of view in degrees
     var projectionFov: Double?
 
@@ -77,6 +81,18 @@ struct RenderConfig: Codable {
 
     func getCameraRotation() -> [Float]? {
         cameraRotation
+    }
+
+    func getCameraMatrix() -> simd_float4x4? {
+        guard let matrix = cameraMatrix, matrix.count == 16 else {
+            return nil
+        }
+        return simd_float4x4(
+            SIMD4<Float>(matrix[0], matrix[1], matrix[2], matrix[3]),
+            SIMD4<Float>(matrix[4], matrix[5], matrix[6], matrix[7]),
+            SIMD4<Float>(matrix[8], matrix[9], matrix[10], matrix[11]),
+            SIMD4<Float>(matrix[12], matrix[13], matrix[14], matrix[15])
+        )
     }
 
     /// Save configuration to JSON file
