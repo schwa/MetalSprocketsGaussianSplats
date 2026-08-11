@@ -241,11 +241,11 @@ struct BenchRunner {
     }
 
     private func benchmarkPointSplat(splats: [SparkSplat], cameraMatrix: simd_float4x4, projectionMatrix: simd_float4x4) throws -> [Double] {
-        let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, supersampling: supersampling, pointsPerThread: pointsPerThread))
+        let renderer = try BenchPointSplatRenderer(device: device, runner: runner, size: size, supersampling: supersampling, pointsPerThread: pointsPerThread)
         if packed {
             let cloud = try PackedSplatCloud(device: device, splats: splats)
             return try measure { frame in
-                _ = try renderer.render(packed: cloud, modelMatrix: .identity, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: UInt32(frame))
+                _ = try renderer.render(splats: cloud.buffer, splatCount: cloud.count, packedBounds: cloud.bounds, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: UInt32(frame))
             }
         }
         guard let buffer = device.makeBuffer(bytes: splats, length: MemoryLayout<SparkSplat>.stride * splats.count) else {
@@ -253,7 +253,7 @@ struct BenchRunner {
         }
         buffer.label = "Bench splats"
         return try measure { frame in
-            _ = try renderer.render(splats: buffer, splatCount: splats.count, modelMatrix: .identity, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: UInt32(frame))
+            _ = try renderer.render(splats: buffer, splatCount: splats.count, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: UInt32(frame))
         }
     }
 
@@ -345,10 +345,10 @@ struct BenchRunner {
         buffer.label = "Bench splats"
 
         func frames(supersampling: Int, pointsPerThread: Int, count: Int, seedBase: UInt32) throws -> [[Float]] {
-            let renderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size, supersampling: supersampling, pointsPerThread: pointsPerThread))
+            let renderer = try BenchPointSplatRenderer(device: device, runner: runner, size: size, supersampling: supersampling, pointsPerThread: pointsPerThread)
             var result: [[Float]] = []
             for frame in 0..<count {
-                let texture = try renderer.render(splats: buffer, splatCount: splats.count, modelMatrix: .identity, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: seedBase &+ UInt32(frame))
+                let texture = try renderer.render(splats: buffer, splatCount: splats.count, viewMatrix: cameraMatrix.inverse, projectionMatrix: projectionMatrix, frameSeed: seedBase &+ UInt32(frame))
                 result.append(try readRGB(texture))
             }
             return result
@@ -432,6 +432,49 @@ struct BenchRunner {
             lines.append("\(row.label),\(row.splatCount),\(row.renderer),\(row.medianMS),\(row.p10MS),\(row.p90MS)")
         }
         try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+    }
+}
+
+/// Bench-local blocking wrapper: runs ``PointSplatComputePass`` into a float
+/// texture, one stochastic frame per call.
+private final class BenchPointSplatRenderer {
+    private let runner: Runner
+    private let texture: MTLTexture
+    private let supersampling: Int
+    private let pointsPerThread: Int
+    /// Monotonic plan key; frame seeds can repeat across measurements.
+    private var planCounter: UInt64 = 0
+
+    init(device: MTLDevice, runner: Runner, size: Int, supersampling: Int, pointsPerThread: Int) throws {
+        self.runner = runner
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: size, height: size, mipmapped: false)
+        descriptor.usage = [.shaderWrite, .shaderRead]
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            throw BenchCommand.BenchError(message: "Texture allocation failed")
+        }
+        texture.label = "PointSplat resolve"
+        self.texture = texture
+        self.supersampling = supersampling
+        self.pointsPerThread = pointsPerThread
+    }
+
+    func render(splats: MTLBuffer, splatCount: Int, packedBounds: GPSPackedSplatBounds? = nil, viewMatrix: simd_float4x4, projectionMatrix: simd_float4x4, frameSeed: UInt32) throws -> MTLTexture {
+        planCounter += 1
+        let pass = PointSplatComputePass(
+            splats: splats,
+            splatCount: splatCount,
+            packedBounds: packedBounds,
+            modelMatrix: .identity,
+            viewMatrix: viewMatrix,
+            projectionMatrix: projectionMatrix,
+            frameSeed: frameSeed,
+            planKey: planCounter,
+            outTexture: texture,
+            supersampling: supersampling,
+            pointsPerThread: pointsPerThread
+        )
+        try runner.run(pass)
+        return texture
     }
 }
 

@@ -107,8 +107,8 @@ struct PackedSplatCloudTests {
         let frames = 256
         var unpackedMean = [Float](repeating: 0, count: size * size * 4)
         var packedMean = [Float](repeating: 0, count: size * size * 4)
-        let unpackedRenderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size))
-        let packedRenderer = try PointSplatRenderer(device: device, configuration: .init(width: size, height: size))
+        let unpackedRenderer = try PointSplatTestRenderer(device: device, width: size, height: size)
+        let packedRenderer = try PointSplatTestRenderer(device: device, width: size, height: size)
         for frame in 0..<frames {
             let unpackedTexture = try unpackedRenderer.render(splats: buffer, splatCount: splats.count, modelMatrix: .identity, viewMatrix: camera.inverse, projectionMatrix: projection, frameSeed: UInt32(frame))
             let packedTexture = try packedRenderer.render(packed: cloud, modelMatrix: .identity, viewMatrix: camera.inverse, projectionMatrix: projection, frameSeed: UInt32(frame))

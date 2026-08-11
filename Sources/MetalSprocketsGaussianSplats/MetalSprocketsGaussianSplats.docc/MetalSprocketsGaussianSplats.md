@@ -68,7 +68,7 @@ The framework ships five interchangeable renderers, selected via
 ### Point Splat Renderer
 
 - ``PointSplatRenderPipeline``
-- ``PointSplatRenderer``
+- ``PointSplatComputePass``
 - ``PointSplatStatistics``
 
 ### Sorting

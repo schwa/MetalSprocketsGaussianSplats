@@ -2394,13 +2394,17 @@ Concretely, the CLI's performRender has a per-renderer frame function for each p
 ## 119: PointSplatRenderer class is redundant now that PointSplatComputePass exists
 
 +++
-status: new
+status: closed
 priority: medium
 kind: task
-labels: pointsplat,architecture
+labels: pointsplat, architecture
 created: 2026-08-11T07:11:33Z
+updated: 2026-08-11T07:17:01Z
+closed: 2026-08-11T07:17:01Z
 +++
 
 The element is the main unit of composition; PointSplatRenderer survives only as a thin blocking convenience (private Runner + rgba32Float out texture) around PointSplatComputePass, duplicating what OffscreenSplatRenderer's point path already does. Its remaining users are the bench command (benchmarkPointSplat, pointQualitySweep) and the PointSplat test suites (PointSplatRendererTests, PointSplatConvergenceTests, PackedSplatCloudTests), all of which could drive PointSplatComputePass (or OffscreenSplatRenderer) directly. Keeping the class means two public offscreen entry points for the same compute work.
+
+- `2026-08-11T07:17:01Z`: PointSplatRenderer deleted; PointSplatComputePass is the offscreen unit. Tests and bench drive the element via small local blocking wrappers.
 
 ---

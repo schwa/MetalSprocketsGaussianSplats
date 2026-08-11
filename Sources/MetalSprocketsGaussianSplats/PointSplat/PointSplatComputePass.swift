@@ -11,12 +11,12 @@ import Splats
 /// clear, stochastic point splatting, and a box-filter resolve into
 /// `outTexture`.
 ///
-/// This is the element-based counterpart to ``PointSplatRenderer``: place it
-/// in an element tree (a `Runner`, alongside other passes in one submission)
-/// and attach modifiers such as `gpuCounters`. Output at 1 sample per pixel
-/// is noisy by design — accumulate frames (varying `frameSeed`) for a
-/// converged image. For live rendering with temporal accumulation use
-/// ``PointSplatRenderPipeline``.
+/// Place it in an element tree (a `Runner`, alongside other passes in one
+/// submission) and attach modifiers such as `gpuCounters`. Output at 1 sample
+/// per pixel is noisy by design — accumulate frames (varying `frameSeed`) for
+/// a converged image. For live rendering with temporal accumulation use
+/// ``PointSplatRenderPipeline``; for one-shot images use
+/// ``OffscreenSplatRenderer``.
 ///
 /// Requires 64-bit atomics: Apple9 (A17/M3+) or Mac2 GPU family.
 public struct PointSplatComputePass: Element {

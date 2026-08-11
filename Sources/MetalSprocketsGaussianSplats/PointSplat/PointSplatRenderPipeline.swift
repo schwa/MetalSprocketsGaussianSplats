@@ -256,7 +256,7 @@ public final class PointSplatStatistics: Sendable {
 }
 
 /// Per-drawable-size GPU resources and frame encoding shared by
-/// ``PointSplatRenderPipeline`` (live) and ``PointSplatRenderer`` (offscreen).
+/// ``PointSplatRenderPipeline`` (live) and ``PointSplatComputePass`` (offscreen).
 final class PointSplatResources {
     let device: MTLDevice
     let backgroundColor: SIMD3<Float>
