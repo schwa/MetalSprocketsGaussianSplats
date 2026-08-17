@@ -114,7 +114,7 @@ func emitReport(_ report: StatisticsReport, format: StatisticsFormat) throws {
     case .json:
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        print(String(decoding: try encoder.encode(report), as: UTF8.self))
+        print(String(bytes: try encoder.encode(report), encoding: .utf8) ?? "")
     }
 }
 

@@ -241,7 +241,7 @@ public final class OffscreenSplatRenderer {
 
     // MARK: - Per-renderer frames
 
-    private func renderSparkFrame(sort: SortMethod) throws -> FrameReport {
+    private func renderSparkFrame(sort _: SortMethod) throws -> FrameReport {
         guard let offscreenRenderer else {
             throw MetalSprocketsError.generic("Renderer not configured")
         }
@@ -380,6 +380,7 @@ public final class OffscreenSplatRenderer {
     /// Values are sRGB-encoded to match the element renderers, which write
     /// into an sRGB framebuffer.
     private static func makeImage(fromRGBA32Float texture: MTLTexture) throws -> CGImage {
+        #if os(macOS)
         if texture.storageMode == .managed {
             let runner = try Runner(device: texture.device)
             try runner.run(
@@ -390,6 +391,7 @@ public final class OffscreenSplatRenderer {
                 }
             )
         }
+        #endif
         let pixelCount = texture.width * texture.height
         var rgba = [Float](repeating: 0, count: pixelCount * 4)
         rgba.withUnsafeMutableBytes { pointer in
@@ -402,7 +404,7 @@ public final class OffscreenSplatRenderer {
         for pixel in 0..<pixelCount {
             for channel in 0..<3 {
                 let value = max(0, min(1, rgba[pixel * 4 + channel]))
-                let encoded = value <= 0.003_130_8 ? value * 12.92 : 1.055 * pow(value, 1 / 2.4) - 0.055
+                let encoded = value <= 0.0031308 ? value * 12.92 : 1.055 * pow(value, 1 / 2.4) - 0.055
                 bytes[pixel * 4 + channel] = UInt8(encoded * 255 + 0.5)
             }
             bytes[pixel * 4 + 3] = 255

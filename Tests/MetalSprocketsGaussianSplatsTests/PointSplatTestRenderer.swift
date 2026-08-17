@@ -1,7 +1,7 @@
 #if !arch(x86_64)
 import Metal
-@testable import MetalSprocketsGaussianSplats
 import MetalSprockets
+@testable import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import simd
 
