@@ -35,7 +35,9 @@ struct BenchCommand: AsyncParsableCommand {
     @Option(help: "Renderers to benchmark (point, spark, gpu, tile, stochastic)")
     var renderers: [BenchRenderer] = [.point, .spark, .gpu]
 
-    @Option(help: "Frames per measurement (median reported)")
+    // Named --iterations, not --frames, to avoid colliding with the root
+    // command's --frames option (which would otherwise shadow it).
+    @Option(name: .customLong("iterations"), help: "Frames per measurement (median reported)")
     var frames: Int = 50
 
     @Option(help: "Render size (square)")
@@ -61,6 +63,9 @@ struct BenchCommand: AsyncParsableCommand {
 
     @Option(help: "Accumulated frames for the converged PSNR reference")
     var referenceFrames: Int = 512
+
+    @Flag(help: "Emit detailed per-pass GPU-sort spark timings (sort/render/vertex/fragment/total/submit) across sizes as JSON; ignores --renderers")
+    var sortDetail = false
 
     struct BenchError: Error {
         var message: String
@@ -97,6 +102,20 @@ struct BenchCommand: AsyncParsableCommand {
                         try runner.pointQualitySweep(label: count.formatted(.number.grouping(.never)), splats: splats, referenceFrames: referenceFrames)
                     }
                 }
+                return
+            }
+            if sortDetail {
+                var detail: [BenchRunner.SortDetailRow] = []
+                if let splat {
+                    let splats = try BenchRunner.loadSplats(url: URL(fileURLWithPath: splat))
+                    detail.append(try runner.sortDetail(label: URL(fileURLWithPath: splat).lastPathComponent, splats: splats))
+                } else {
+                    for count in countList {
+                        let splats = BenchRunner.syntheticCloud(count: count)
+                        detail.append(try runner.sortDetail(label: count.formatted(.number.grouping(.never)), splats: splats))
+                    }
+                }
+                try BenchRunner.printSortDetailJSON(detail, size: size, frames: frames)
                 return
             }
             if let splat {
@@ -404,6 +423,65 @@ struct BenchRunner {
             rgb[pixel * 3 + 2] = rgba[pixel * 4 + 2]
         }
         return rgb
+    }
+
+    // MARK: - GPU sort detail
+
+    /// Detailed per-pass timings for the GPU-sort spark renderer at one size.
+    struct SortDetailRow: Codable {
+        var label: String
+        var splats: Int
+        var wall: Stat
+        var sortGpu: Stat?
+        var renderGpu: Stat?
+        var vertex: Stat?
+        var fragment: Stat?
+        var gpuTotal: Stat?
+        var commandBufferGpu: Stat?
+    }
+
+    /// Measures the GPU-sort spark renderer through OffscreenSplatRenderer (with
+    /// GPU counters) and aggregates the per-pass FrameReport into a detail row.
+    @MainActor
+    func sortDetail(label: String, splats: [SparkSplat]) throws -> SortDetailRow {
+        let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
+        let camera = LookAt(position: SIMD3<Float>(0, 0, 2.5), target: .zero, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
+        let projection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01...100))
+        let renderer = try OffscreenSplatRenderer(
+            renderer: .spark(sort: .gpu),
+            splatCloud: cloud,
+            projection: projection,
+            cameraMatrix: camera,
+            configuration: .init(width: size, height: size, collectGPUCounters: true)
+        )
+        for _ in 0..<2 { _ = try renderer.renderFrame() }   // warmup
+        var wall: [Double] = [], sortGpu: [Double] = [], renderGpu: [Double] = []
+        var vertex: [Double] = [], fragment: [Double] = [], total: [Double] = [], submit: [Double] = []
+        for _ in 0..<frames {
+            let start = ContinuousClock.now
+            let report = try renderer.renderFrame()
+            wall.append(elapsedSeconds(since: start))
+            if let value = report.sortGPU?.duration { sortGpu.append(value) }
+            if let value = report.render?.duration { renderGpu.append(value) }
+            if let value = report.render?.vertex?.duration { vertex.append(value) }
+            if let value = report.render?.fragment?.duration { fragment.append(value) }
+            if let value = report.render?.duration { total.append((report.sortGPU?.duration ?? 0) + value) }
+            if let value = report.commandBufferGPUTime { submit.append(value) }
+        }
+        func s(_ values: [Double]) -> Stat? { values.isEmpty ? nil : stat(values) }
+        return SortDetailRow(
+            label: label, splats: splats.count, wall: stat(wall),
+            sortGpu: s(sortGpu), renderGpu: s(renderGpu), vertex: s(vertex), fragment: s(fragment),
+            gpuTotal: s(total), commandBufferGpu: s(submit)
+        )
+    }
+
+    static func printSortDetailJSON(_ rows: [SortDetailRow], size: Int, frames: Int) throws {
+        struct Report: Codable { var size: Int; var frames: Int; var rows: [SortDetailRow] }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(Report(size: size, frames: frames, rows: rows))
+        print(String(decoding: data, as: UTF8.self))
     }
 
     // MARK: - Output

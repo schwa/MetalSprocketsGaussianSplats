@@ -36,3 +36,12 @@ benchmark:
     echo "Date:   $(date '+%Y-%m-%d %H:%M')"
     echo
     swift run --configuration release metalsprockets-gaussian-splat bench 2>/dev/null | duckdb -markdown -c "SELECT * FROM read_csv_auto('/dev/stdin')"
+
+# Detailed per-pass timings for the GPU-sort spark renderer across sizes (JSON on stdout, device on stderr)
+sort-perf counts="100000,500000,1000000,4000000,8000000" iterations="120":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    device=$(system_profiler SPHardwareDataType | awk -F': ' '/Model Name|Chip|Memory/ {a = a (a ? " | " : "") $2} END {print a}')
+    echo "Device: $device" >&2
+    echo "Date:   $(date '+%Y-%m-%d %H:%M')" >&2
+    swift run --configuration release metalsprockets-gaussian-splat bench --sort-detail --counts {{counts}} --iterations {{iterations}} 2>/dev/null
