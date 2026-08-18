@@ -2785,12 +2785,33 @@ Medium. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Share
 status: new
 priority: low
 kind: enhancement
-labels: gpu,sorting,performance,memory
+labels: gpu, sorting, performance, memory
 created: 2026-08-18T23:17:38Z
 +++
 
 cullMark reads position from a dense packed_half3 buffer (6 bytes/splat) built once at load, instead of the 32-byte SparkSplat record. This pass touches every splat so fetch traffic dominates. Add a packed_half3 positions buffer on GPUSplatCloud (built at load), a positions arg + usePositions flag on cullMark, and populate it in the loader/builder.
 
 Half positions are for culling/distance only; the render path stays full-precision, so visual output is unaffected. Extra 6 bytes/splat GPU memory. Medium. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+---
+
+## 138: bench: add culling sweep via camera positions that cull a target % of splats
+
++++
+status: new
+priority: medium
+kind: feature
+created: 2026-08-18T23:24:48Z
++++
+
+Add culling coverage to the `bench` subcommand. Today `--counts` takes a vector of splat counts ("100000,500000,..."). We want an analogous vector of cull percentages: for each target %, pick/compute a camera position that frustum-culls roughly that fraction of the synthetic cloud, and benchmark at each.
+
+Requirements:
+- New `--cull` option: comma-separated list of target cull percentages (e.g. "0,25,50,75"), same style as `--counts`. Default keeps current behavior (0% / no extra culling).
+- For each requested %, derive a camera position (distance/orientation off the unit-sphere synthetic cloud) that culls approximately that fraction of splats. Measure actual culled % and report it.
+- Sweep is the cross product of `--counts` x `--cull`, so result tables/CSV gain a cull column.
+- CSV output (BenchCommand ~line 433) and result rows gain the target/actual cull %.
+
+Context: options in Sources/metalsprockets-gaussian-splat/BenchCommand.swift (`--counts` ~line 32, camera ~line 208 via LookAt position (0,0,2.5)).
 
 ---
