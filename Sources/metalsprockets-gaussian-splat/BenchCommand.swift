@@ -85,7 +85,7 @@ struct BenchCommand: AsyncParsableCommand {
             var runner = try BenchRunner(size: size, frames: frames, supersampling: supersampling, pointsPerThread: pointsPerThread, packed: packed)
             var rows: [BenchRunner.Row] = []
             #if DEBUG
-            print("warning: Debug build; numbers will not be representative")
+            FileHandle.standardError.write(Data("warning: Debug build; numbers will not be representative\n".utf8))
             #endif
             if pointQuality {
                 if let splat {
@@ -213,7 +213,7 @@ struct BenchRunner {
                     times = try benchmarkStochastic(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
                 }
             } catch {
-                print("\(label) \(renderer.rawValue): failed (\(error))")
+                FileHandle.standardError.write(Data("  \(label) \(renderer.rawValue): failed (\(error))\n".utf8))
                 continue
             }
             let sorted = times.sorted()
@@ -226,7 +226,8 @@ struct BenchRunner {
                 p90MS: sorted[min(sorted.count - 1, sorted.count * 9 / 10)] * 1_000
             )
             rows.append(row)
-            print("\(label) \(renderer.rawValue): median \(row.medianMS.formatted(.number.precision(.fractionLength(2)))) ms")
+            // Progress to stderr so stdout stays a single clean CSV table.
+            FileHandle.standardError.write(Data("  \(label) \(renderer.rawValue): \(row.medianMS.formatted(.number.precision(.fractionLength(2)))) ms\n".utf8))
         }
         return rows
     }
@@ -407,22 +408,22 @@ struct BenchRunner {
 
     // MARK: - Output
 
-    static func printTable(_ rows: [Row]) {
-        print("")
-        print("splats      renderer  median_ms  p10_ms  p90_ms")
-        for row in rows {
-            let splatColumn = row.splatCount.formatted(.number.grouping(.never)).padding(toLength: 11, withPad: " ", startingAt: 0)
-            let rendererColumn = row.renderer.padding(toLength: 9, withPad: " ", startingAt: 0)
-            print("\(splatColumn) \(rendererColumn) \(row.medianMS.formatted(.number.precision(.fractionLength(2))))       \(row.p10MS.formatted(.number.precision(.fractionLength(2))))    \(row.p90MS.formatted(.number.precision(.fractionLength(2))))")
-        }
-    }
-
-    static func writeCSV(_ rows: [Row], to url: URL) throws {
+    /// CSV lines (header + one row per measurement). Used for both stdout and
+    /// the `--csv` file so they are identical.
+    static func csvLines(_ rows: [Row]) -> [String] {
         var lines = ["label,splats,renderer,median_ms,p10_ms,p90_ms"]
         for row in rows {
             lines.append("\(row.label),\(row.splatCount),\(row.renderer),\(row.medianMS),\(row.p10MS),\(row.p90MS)")
         }
-        try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        return lines
+    }
+
+    static func printTable(_ rows: [Row]) {
+        print(csvLines(rows).joined(separator: "\n"))
+    }
+
+    static func writeCSV(_ rows: [Row], to url: URL) throws {
+        try csvLines(rows).joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
     }
 }
 

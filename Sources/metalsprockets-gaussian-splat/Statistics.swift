@@ -77,6 +77,9 @@ struct StatisticsReport: Codable {
     /// Vertex and fragment stages overlap, so they do not sum to renderGpu.
     var vertex: Stat?
     var fragment: Stat?
+    /// GPU sort + render per frame (summarized per frame, not a sum of the two
+    /// summaries). Absent when render GPU timing is unavailable.
+    var gpuTotal: Stat?
 }
 
 func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, height: Int, warmup: Int, renderer: RendererKind, sortMethod: SortMethod) -> StatisticsReport {
@@ -85,6 +88,12 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
     let gpuTimes = samples.compactMap { $0.render?.duration }
     let vertexTimes = samples.compactMap { $0.render?.vertex?.duration }
     let fragmentTimes = samples.compactMap { $0.render?.fragment?.duration }
+    // Per-frame GPU total: the fastest sort and fastest render need not occur on
+    // the same frame, so sum per frame then summarize (not a sum of summaries).
+    let gpuTotalTimes = samples.compactMap { sample -> Double? in
+        guard let render = sample.render?.duration else { return nil }
+        return (sample.sortGPU?.duration ?? 0) + render
+    }
     let visible = samples.last?.visibleSplats
     return StatisticsReport(
         splats: splats,
@@ -102,7 +111,8 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
         sortGpu: sortGPUTimes.isEmpty ? nil : stat(sortGPUTimes),
         renderGpu: gpuTimes.isEmpty ? nil : stat(gpuTimes),
         vertex: vertexTimes.isEmpty ? nil : stat(vertexTimes),
-        fragment: fragmentTimes.isEmpty ? nil : stat(fragmentTimes)
+        fragment: fragmentTimes.isEmpty ? nil : stat(fragmentTimes),
+        gpuTotal: gpuTotalTimes.isEmpty ? nil : stat(gpuTotalTimes)
     )
 }
 
@@ -144,6 +154,9 @@ private func printTextReport(_ report: StatisticsReport) {
     }
     if let fragment = report.fragment {
         line("  fragment", fragment)
+    }
+    if let gpuTotal = report.gpuTotal {
+        line("gpu total", gpuTotal)
     }
 }
 

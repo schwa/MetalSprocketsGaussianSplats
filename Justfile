@@ -26,3 +26,6 @@ acknowledgements:
         fi
     done
     echo "Done. Licenses copied to {{ack_dir}}"
+
+benchmark:
+    swift run --configuration release metalsprockets-gaussian-splat bench | duckdb -markdown -c "SELECT * FROM read_csv_auto('/dev/stdin')"

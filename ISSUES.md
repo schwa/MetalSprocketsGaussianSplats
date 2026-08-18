@@ -2495,6 +2495,8 @@ The sibling splat-render CLI captures whole-submission GPU time from the command
 
 Our CLI only reports counter-derived GPU times (GPUCounterSample). Add the command-buffer GPU time for the sort and/or render command buffers as a cross-check line in the statistics report. Useful for validating the counter scaling, especially before/after the GPU sort optimization port (see RFC on Desktop).
 
+- `2026-08-18T22:43:05Z`: Blocked by the MetalSprockets dependency. The command-buffer GPU clock (commandBuffer.gpuEndTime - gpuStartTime) is on the MTLCommandBuffer that MetalSprockets OffscreenRenderer.render() creates/commits/waits internally; it returns only Rendering { texture } and never exposes the command buffer or its GPU times. MetalSprockets is a pinned git-URL dependency (separate repo), so this needs an upstream change first: have Runner/OffscreenRenderer capture gpuStartTime/gpuEndTime and surface it on Rendering (or a frame report), then plumb through OffscreenSplatRenderer.FrameReport to the CLI. Deferred until that upstream hook exists.
+
 ---
 
 ## 124: SplatView: support MetalFX spatial upscaling
@@ -2654,7 +2656,7 @@ See SPZReader.parseV4 and the SplatLoaderBenchmark numbers.
 status: new
 priority: low
 kind: enhancement
-labels: spz,performance,io
+labels: spz, performance, io
 created: 2026-08-18T22:38:12Z
 +++
 
