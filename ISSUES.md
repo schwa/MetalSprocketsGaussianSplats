@@ -2437,3 +2437,28 @@ Expected: PNG written. Actual: 'Browser error: Failed to load resource: the serv
 - `2026-08-11T16:44:22Z`: Not .splat-specific after all: on a full golden-images run 17 files failed (7 .splat, 4 .sog, 6 .spz), and on an immediate re-run all 17 succeeded — including files that had failed twice in isolated repros. The init timeout is flaky (possibly resource contention or a race in the loader wait). The exit-code-0-on-failure bug stands.
 
 ---
+
+## 121: Support SPZ v4 format
+
++++
+status: new
+priority: medium
+kind: feature
+labels: spz,format
+created: 2026-08-18T18:11:38Z
++++
+
+Niantic released SPZ 4 (https://www.nianticspatial.com/en/blog/spz4). Current SPZReader (Sources/Splats/SPZReader.swift) only handles v2/v3: single GZip stream, 16-byte compressed header, SH degree <= 3.
+
+SPZ 4 is a breaking format change and needs a new read path:
+
+- Magic changed from GZip bytes to plaintext ASCII `NGSP` in a 32-byte header at a fixed offset, OUTSIDE the compressed region. Dispatch on first 4 bytes: `NGSP` -> v4 path, GZip magic -> existing legacy path.
+- Payload is no longer one GZip stream. Six independently-compressed ZSTD streams, one per attribute (positions, colors, scales, rotations, alphas, SH), with a table-of-contents (offset/size per stream) up front. Needs a ZSTD decoder (Compression framework has no ZSTD; likely need a dependency or libzstd).
+- SH degree 4 now allowed (current code rejects > 3).
+- Configurable SH quantization bit depth (3-8 bits) instead of fixed layout.
+- Optional vendor extension chain (tagged ID + length + payload; skip unknown). First is Adobe 0xADBE0002 Safe Orbit Camera. Can skip/ignore initially.
+- Removed 10M-point cap.
+
+Scope note: v4 read support first. Encode/write is separate. Spec: https://github.com/nianticlabs/spz
+
+---
