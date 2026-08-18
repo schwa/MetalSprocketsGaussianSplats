@@ -2627,11 +2627,13 @@ Depends on / relates to #126 (remove SOGReaderCPU).
 ## 129: Parallelize SPZ v4 ZSTD stream decompression
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: spz, performance, io
 created: 2026-08-18T20:49:44Z
+updated: 2026-08-18T22:38:12Z
+closed: 2026-08-18T22:38:12Z
 +++
 
 SPZ v4 stores six independently-compressed ZSTD streams (positions, alphas, colors, scales, rotations, SH) precisely so decode can run across cores. Our SPZReader.parseV4 currently decompresses them serially (one ZSTD_decompress after another).
@@ -2643,5 +2645,32 @@ Fix: decompress the v4 streams concurrently (e.g. DispatchQueue.concurrentPerfor
 Expected: v4 decode should drop below v3 and approach the SOG timings, realizing the format's intended speedup.
 
 See SPZReader.parseV4 and the SplatLoaderBenchmark numbers.
+
+---
+
+## 130: SPZ v4 decode slower than v3: libzstd vs hardware zlib
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: spz,performance,io
+created: 2026-08-18T22:38:12Z
++++
+
+After parallelizing the v4 ZSTD streams (#129), SPZ v4 load is still much slower than v3 at 1M splats (~82ms vs ~18ms). The gap is NOT serialization (streams now decompress concurrently) — it is decompressor throughput:
+
+- v3: a single zlib stream via Apple's Compression framework (COMPRESSION_ZLIB), which is hardware-accelerated on Apple Silicon and very fast.
+- v4: six independent ZSTD streams via facebook/libzstd (software). Even fully parallel, the wall time is bounded by the largest stream and libzstd's per-byte software throughput is slower than Apple's zlib.
+
+Note the synthetic benchmark understates real files: bench-grid compresses to near-nothing (0.45MB -> 29MB), so decompress is a small slice and shared costs (29MB payload alloc + GPU upload) dominate. On realistic, less-compressible v4 files the picture will differ.
+
+Options to evaluate:
+- Multithreaded/streaming libzstd decode within a stream (ZSTD_decompressStream, multiple contexts).
+- Tune libzstd build flags / window / dictionary.
+- Measure on realistic v4 captures before optimizing further (the synthetic data is misleading).
+- Accept that v4's value is smaller files + tens-of-millions-of-points support, not fastest decode.
+
+Do not over-optimize against the synthetic fixture; gather a real-world SPZ v4 corpus first.
 
 ---

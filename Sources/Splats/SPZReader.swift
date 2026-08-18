@@ -132,20 +132,52 @@ public struct SPZReader: SplatReaderProtocol {
             throw SplatsError.invalidHeader
         }
 
-        // Streams follow the TOC contiguously, in write order with zero-size streams
-        // omitted; concatenating them reproduces the v2/v3 payload layout exactly.
-        var streamOffset = tocByteOffset + tocSize
-        var payload = Data()
+        // First pass: read the TOC into per-stream source ranges and destination
+        // offsets. Streams follow the TOC contiguously in write order (zero-size
+        // streams omitted); concatenating their output reproduces the v2/v3 layout.
+        struct Stream { let srcOffset: Int; let compressedSize: Int; let uncompressedSize: Int; let dstOffset: Int }
+        var streams: [Stream] = []
+        streams.reserveCapacity(numStreams)
+        var srcOffset = tocByteOffset + tocSize
+        var dstOffset = 0
         for i in 0..<numStreams {
             let entry = tocByteOffset + i * 16
             let compressedSize = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: entry, as: UInt64.self) })
             let uncompressedSize = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: entry + 8, as: UInt64.self) })
-            guard streamOffset + compressedSize <= data.count else {
+            guard srcOffset + compressedSize <= data.count else {
                 throw SplatsError.insufficientData
             }
-            let compressed = data.subdata(in: streamOffset..<(streamOffset + compressedSize))
-            payload.append(try decompressZstd(compressed, expectedSize: uncompressedSize))
-            streamOffset += compressedSize
+            streams.append(Stream(srcOffset: srcOffset, compressedSize: compressedSize, uncompressedSize: uncompressedSize, dstOffset: dstOffset))
+            srcOffset += compressedSize
+            dstOffset += uncompressedSize
+        }
+        let totalSize = dstOffset
+        let streamList = streams   // immutable snapshot for concurrent capture
+
+        // Decompress the streams concurrently: each reads a disjoint source range
+        // and writes a disjoint destination range, so the shared base pointers are
+        // safe. Per-stream success is recorded and checked after the barrier.
+        var payload = Data(count: totalSize)
+        nonisolated(unsafe) let results = UnsafeMutableBufferPointer<Bool>.allocate(capacity: max(numStreams, 1))
+        defer { results.deallocate() }
+        results.initialize(repeating: true)
+
+        payload.withUnsafeMutableBytes { (dstRaw: UnsafeMutableRawBufferPointer) in
+            data.withUnsafeBytes { (srcRaw: UnsafeRawBufferPointer) in
+                guard let dstBaseRaw = dstRaw.baseAddress, let srcBaseRaw = srcRaw.baseAddress else { return }
+                nonisolated(unsafe) let dstBase = dstBaseRaw
+                nonisolated(unsafe) let srcBase = srcBaseRaw
+                DispatchQueue.concurrentPerform(iterations: numStreams) { i in
+                    let s = streamList[i]
+                    if s.uncompressedSize == 0 { return }
+                    let ret = ZSTD_decompress(dstBase + s.dstOffset, s.uncompressedSize, srcBase + s.srcOffset, s.compressedSize)
+                    results[i] = ZSTD_isError(ret) == 0 && ret == s.uncompressedSize
+                }
+            }
+        }
+
+        for i in 0..<numStreams where !results[i] {
+            throw SplatsError.decompressionFailed
         }
 
         return (payload, version, pointCount, shDegree, fractionalBits, isAntialiased)
@@ -370,23 +402,6 @@ public struct SPZReader: SplatReaderProtocol {
         default:
             return 0
         }
-    }
-
-    /// Decompress a single ZSTD frame into a buffer of exactly `expectedSize` bytes.
-    private static func decompressZstd(_ data: Data, expectedSize: Int) throws -> Data {
-        guard expectedSize > 0 else {
-            return Data()
-        }
-        var output = Data(count: expectedSize)
-        let produced = output.withUnsafeMutableBytes { dst in
-            data.withUnsafeBytes { src in
-                ZSTD_decompress(dst.baseAddress, expectedSize, src.baseAddress, data.count)
-            }
-        }
-        guard ZSTD_isError(produced) == 0, produced == expectedSize else {
-            throw SplatsError.decompressionFailed
-        }
-        return output
     }
 
     private static func decompressGzip(_ data: Data) throws -> Data {
