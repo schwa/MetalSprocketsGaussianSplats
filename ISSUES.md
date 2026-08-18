@@ -2544,3 +2544,50 @@ Approach (pick one):
 Report per format: file size, splat count, decode wall time (median/min), and MB/s. Include SPZ v4 vs v3 to show the parallel-ZSTD speedup.
 
 ---
+
+## 126: Remove SOGReaderCPU; use SOGReaderGPU everywhere
+
++++
+status: new
+priority: low
+kind: task
+labels: io, sog, refactor, cleanup
+created: 2026-08-18T19:44:55Z
++++
+
+SOGReaderGPU (concurrent WebP decode + a compute-shader de-quantize straight into the SparkSplat GPU buffer) is much faster than the pure-CPU SOGReaderCPU. Goal: drop the CPU SOG decoder and route all SOG loading through the GPU path.
+
+Not a trivial swap — resolve these first:
+
+- Protocol/shape mismatch: SOGReaderCPU conforms to SplatReaderProtocol (device-free, streams ExtendedSplat one-at-a-time via a callback). SOGReaderGPU requires an MTLDevice and produces GPU buffers (SparkSplat + SH float buffer), not the ExtendedSplat callback. SplatReader (the format-dispatching, device-free reader) currently picks SOGReaderCPU precisely because it needs no device.
+- Callers to migrate: SplatReader (.sog case), the CLI (metalsprockets-gaussian-splat), CrossFormatTests, SOGReaderCPUTests, SOGReaderGPUTests (uses CPU as its correctness oracle — needs a new reference), and the Splats.docc mentions.
+- Decide the API: either (a) SplatReader gains an optional MTLDevice and uses GPU for SOG when present, CPU otherwise (keeps CPU as fallback — contradicts "remove"); (b) SplatReader always requires a device (breaking change, forces Metal on all reads incl. headless/CI); or (c) add a device-free ExtendedSplat/CPU-readback adapter over SOGReaderGPU so the streaming contract still holds.
+- CI/headless: SOG decode would then require a Metal device; guard tests that run without one.
+
+Prefer (c) or (a) so non-GPU consumers (parsing, tooling, tests without a device) still work. Confirm the GPU path matches CPU output (SOGReaderGPUTests already cross-checks) before deleting SOGReaderCPU.
+
+---
+
+## 127: SPZReaderGPU: compute-shader unpack into SparkSplat
+
++++
+status: new
+priority: low
+kind: feature
+labels: io,spz,performance,metal
+created: 2026-08-18T19:47:02Z
++++
+
+Add a GPU SPZ loader mirroring SOGReaderGPU: CPU-decompress the container, upload the decompressed packed byte buffer, then a compute kernel unpacks each splat straight into the SparkSplat GPU buffer (+ SH float buffer), eliminating the per-splat CPU unpack loop and ExtendedSplat allocation that dominate SPZReader today.
+
+Split of costs:
+- Decompress (gzip for v2/v3, six ZSTD streams for v4) stays on CPU — no GPU gunzip/zstd. v4 streams are already CPU-parallelizable.
+- Per-splat unpack (24-bit fixed positions, byte colors/scales, smallest-three quaternion rotations, SH bytes) is the GPU-friendly part and the current bottleneck.
+
+Design: shape it like SOGReaderGPU (init(device:), returns SparkSplat + SH buffers, not the device-free ExtendedSplat callback). Add an SPZUnpackShader compute kernel; reuse the existing floatFlip/unpack math from SPZReader.metal-side equivalents. Keep the CPU SPZReader for the device-free streaming path.
+
+MEASURE FIRST: the load benchmark uses highly compressible synthetic data, which overstates the unpack fraction. Profile decompress-vs-unpack on a realistic SPZ (larger SH) before building, to confirm the win.
+
+Scope: SPZ only. PLY and .splat are legacy — no GPU treatment for them.
+
+---
