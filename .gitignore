@@ -37,3 +37,4 @@ tmp
 
 # Generated DocC output
 docs/
+**/project.xcworkspace/xcshareddata
