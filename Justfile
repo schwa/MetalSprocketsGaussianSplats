@@ -27,5 +27,12 @@ acknowledgements:
     done
     echo "Done. Licenses copied to {{ack_dir}}"
 
+# Run the renderer benchmark: print device info, then render the CSV as a markdown table
 benchmark:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    device=$(system_profiler SPHardwareDataType | awk -F': ' '/Model Name|Chip|Memory/ {a = a (a ? " | " : "") $2} END {print a}')
+    echo "Device: $device"
+    echo "Date:   $(date '+%Y-%m-%d %H:%M')"
+    echo
     swift run --configuration release metalsprockets-gaussian-splat bench | duckdb -markdown -c "SELECT * FROM read_csv_auto('/dev/stdin')"
