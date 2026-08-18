@@ -2682,11 +2682,13 @@ Do not over-optimize against the synthetic fixture; gather a real-world SPZ v4 c
 ## 131: GPU sort A1: ballot-based peer ranking in splatRadixScatter
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: gpu, sorting, performance
 created: 2026-08-18T23:17:37Z
+updated: 2026-08-18T23:52:15Z
+closed: 2026-08-18T23:52:15Z
 +++
 
 Replace the 32-iteration simd_shuffle peer-ranking loop in splatRadixScatter with per-bit ballots: 8 simd_ballot calls + popcount compute each lane's rank and the peer total. Lane order within peers is preserved, so the scatter stays stable.
@@ -2824,7 +2826,7 @@ Context: options in Sources/metalsprockets-gaussian-splat/BenchCommand.swift (`-
 status: new
 priority: low
 kind: task
-labels: sorting,performance,cleanup,refactor
+labels: sorting, performance, cleanup, refactor
 created: 2026-08-18T23:38:25Z
 +++
 

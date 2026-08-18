@@ -231,16 +231,20 @@ kernel void splatRadixScatter(device const uint2 *inRecords  [[buffer(0)]],
         uint local  = chunk + lane;
         bool active = local < n;
         uint2 rec   = active ? inRecords[start + local] : uint2(0u, 0u);
-        uint digit  = active ? ((rec.x >> p.shift) & 0xFFu) : 0xFFFFFFFFu;
+        uint digit  = active ? ((rec.x >> p.shift) & 0xFFu) : 0u;
 
-        uint rank = 0, total = 0;
-        for (uint j = 0; j < tsize; j++) {
-            uint dj = simd_shuffle(digit, j);
-            if (dj == digit && dj != 0xFFFFFFFFu) {
-                if (j < lane) rank++;
-                total++;
-            }
+        // Rank same-digit peers with per-bit ballots: peers = active lanes whose
+        // digit matches on every bit. 8 ballots + popcounts instead of a
+        // 32-iteration shuffle loop. Lane order within peers is preserved, so the
+        // scatter stays stable.
+        uint peers = uint((simd_vote::vote_t)simd_ballot(active));
+        for (uint b = 0; b < 8; b++) {
+            bool bit = (digit >> b) & 1u;
+            uint ball = uint((simd_vote::vote_t)simd_ballot(bit));
+            peers &= bit ? ball : ~ball;
         }
+        uint rank  = popcount(peers & ((1u << lane) - 1u));
+        uint total = popcount(peers);
 
         threadgroup_barrier(mem_flags::mem_threadgroup);
         uint base = active ? cursor[digit] : 0u;
