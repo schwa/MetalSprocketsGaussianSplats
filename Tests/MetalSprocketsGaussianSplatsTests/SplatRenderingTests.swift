@@ -50,7 +50,7 @@ struct GoldenImageRenderingTests {
 
     private func loadSplats(fixture: String, extension ext: String) throws -> [GenericSplat] {
         let url = try #require(Bundle.module.url(forResource: fixture, withExtension: ext, subdirectory: "Fixtures"))
-        let reader = try SplatReader(url: url)
+        let reader = try SPZReader(url: url)
         var splats: [GenericSplat] = []
         try reader.read { _, extendedSplat in
             splats.append(extendedSplat.genericSplat)

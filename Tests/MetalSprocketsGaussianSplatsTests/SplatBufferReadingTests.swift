@@ -16,11 +16,11 @@ struct SplatBufferReadingTests {
         let url = try #require(Bundle.module.url(forResource: "test-grid", withExtension: "spz", subdirectory: "Fixtures"))
 
         // Streamed reference.
-        let reader = try SplatReader(url: url)
+        let reader = try SPZReader(url: url)
         var streamed = 0
         try reader.read { _, _ in streamed += 1 }
 
-        let result = try SplatReader(url: url).read(device: device)
+        let result = try SPZReader(url: url).read(device: device)
         #expect(result.count == streamed)
         #expect(result.splats.count == streamed)
         #expect(result.shDegree == reader.shDegree)

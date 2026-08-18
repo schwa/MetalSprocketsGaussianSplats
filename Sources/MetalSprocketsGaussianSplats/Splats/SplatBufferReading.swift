@@ -104,10 +104,19 @@ public enum SplatLoader {
             return try SOGReaderGPU(device: device).read(url: url, name: name).bufferResult
         case "spz":
             return try SPZReaderGPU(device: device).read(url: url, name: name).bufferResult
+        case "ply":
+            // PLY has no GPU decoder; decode on the CPU and pack into a buffer.
+            return try PLYSplatReader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
         default:
-            return try SplatReader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
+            throw SplatLoaderError.unsupportedFormat(url.pathExtension)
         }
     }
+}
+
+/// Errors from ``SplatLoader``.
+public enum SplatLoaderError: Error, Equatable {
+    /// The file extension has no loader (only ply, spz, and sog are supported).
+    case unsupportedFormat(String)
 }
 
 // MARK: - Cloud construction

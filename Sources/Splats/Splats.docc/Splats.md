@@ -9,16 +9,20 @@ reads splat files from disk, converts each record to a common in-memory
 representation (``ExtendedSplat``), and provides ``TypedMTLBuffer`` for
 uploading splat data to the GPU.
 
-The simplest entry point is ``SplatReader``, which picks the correct
-format reader from the file extension:
+The concrete per-format readers stream splats one at a time, converting each
+record to an ``ExtendedSplat``:
 
 ```swift
-let reader = try SplatReader(url: url)
+let reader = try SPZReader(url: url)   // or PLYSplatReader
 var splats: [ExtendedSplat] = []
 try reader.read { _, splat in
     splats.append(splat)
 }
 ```
+
+For rendering, load straight into GPU buffers with `SplatLoader` (in the
+`MetalSprocketsGaussianSplats` module), which routes SPZ and SOG through their
+GPU decoders and PLY through the CPU reader.
 
 Supported formats:
 
@@ -32,7 +36,6 @@ Supported formats:
 
 ### Reading Splat Files
 
-- ``SplatReader``
 - ``SplatReaderProtocol``
 
 ### Format Readers

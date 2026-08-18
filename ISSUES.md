@@ -2599,11 +2599,13 @@ Scope: SPZ only. PLY and .splat are legacy — no GPU treatment for them.
 ## 128: Deprecate per-splat CPU streaming loading; make SplatLoader the public path
 
 +++
-status: new
+status: closed
 priority: low
 kind: task
 labels: io, api, deprecation, refactor
 created: 2026-08-18T20:21:46Z
+updated: 2026-08-18T21:03:46Z
+closed: 2026-08-18T21:03:46Z
 +++
 
 With SplatLoader (GPU buffers) as the primary loading path and SOG decoding ~28x faster on the GPU, the per-splat CPU streaming API (SplatReaderProtocol.read { (Int, ExtendedSplat) in ... } and the concrete SplatReader/SPZReader/PLYSplatReader) is, in practice, only used by decode-correctness tests and internally by SplatLoader. There is no production caller that needs caller-facing CPU structs (the CSV/SH-degree tooling that did was removed).
@@ -2628,7 +2630,7 @@ Depends on / relates to #126 (remove SOGReaderCPU).
 status: new
 priority: low
 kind: enhancement
-labels: spz,performance,io
+labels: spz, performance, io
 created: 2026-08-18T20:49:44Z
 +++
 

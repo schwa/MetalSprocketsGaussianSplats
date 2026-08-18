@@ -182,16 +182,7 @@ struct BenchRunner {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw BenchCommand.BenchError(message: "No Metal device")
         }
-        if url.pathExtension.lowercased() == "sog" {
-            return Array(try SOGReaderGPU(device: device).read(url: url).splats)
-        }
-        let reader = try SplatReader(url: url)
-        var splats: [SparkSplat] = []
-        splats.reserveCapacity(reader.splatCount)
-        try reader.read { _, extendedSplat in
-            splats.append(SparkSplat(extendedSplat.genericSplat))
-        }
-        return splats
+        return Array(try SplatLoader.read(device: device, url: url).splats)
     }
 
     // MARK: - Benchmarks

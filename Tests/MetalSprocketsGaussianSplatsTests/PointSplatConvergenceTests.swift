@@ -38,7 +38,7 @@ struct PointSplatConvergenceTests {
         let cameraPosition = SIMD3<Float>(0.1, 5, 5)
 
         let url = try #require(Bundle.module.url(forResource: "test-grid", withExtension: "spz", subdirectory: "Fixtures"))
-        let reader = try SplatReader(url: url)
+        let reader = try SPZReader(url: url)
         var splats: [SparkSplat] = []
         try reader.read { _, extendedSplat in
             splats.append(SparkSplat(extendedSplat.genericSplat))
