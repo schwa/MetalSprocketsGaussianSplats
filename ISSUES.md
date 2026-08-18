@@ -2678,3 +2678,119 @@ Options to evaluate:
 Do not over-optimize against the synthetic fixture; gather a real-world SPZ v4 corpus first.
 
 ---
+
+## 131: GPU sort A1: ballot-based peer ranking in splatRadixScatter
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: gpu, sorting, performance
+created: 2026-08-18T23:17:37Z
++++
+
+Replace the 32-iteration simd_shuffle peer-ranking loop in splatRadixScatter with per-bit ballots: 8 simd_ballot calls + popcount compute each lane's rank and the peer total. Lane order within peers is preserved, so the scatter stays stable.
+
+Biggest single sort win (source: 'sort halved'). Low effort: self-contained kernel-body swap, no dispatch change, output identical.
+
+See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+---
+
+## 132: GPU sort A2: COMPACT_BLOCK 256 to 512
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: gpu, sorting, performance
+created: 2026-08-18T23:17:38Z
++++
+
+Change COMPACT_BLOCK from 256 to 512 in SplatGPUSort.metal, halving the block count. Verify the Swift dispatch's block-count math and threadgroup sizing follow the constant.
+
+Trivial. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+---
+
+## 133: GPU sort A3: parallel splatCompactScanBlocks
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: gpu, sorting, performance
+created: 2026-08-18T23:17:38Z
++++
+
+Replace the single-thread serial prefix sum over all blocks in splatCompactScanBlocks with a 256-wide scan (simd-prefix chunks + cross-simd combine + a carry across chunks). Dispatch as one 256-thread threadgroup instead of a single thread.
+
+Low-medium effort; pure reduction, output identical. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+---
+
+## 134: GPU sort A4: fold digit-base scan into splatRadixScanOffsets
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: gpu, sorting, performance
+created: 2026-08-18T23:17:38Z
++++
+
+Fold the per-digit-base exclusive scan into splatRadixScanOffsets (one RADIX-thread group, simd-prefix across digits). Deletes the splatRadixScanDigitBase kernel and its serializing dispatch. Dispatch scanOffsets as a RADIX-thread group.
+
+Medium (dispatch topology change). See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+---
+
+## 135: GPU sort A5: fold decode into splatRadixScatter (decode_output function constant)
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: gpu, sorting, performance
+created: 2026-08-18T23:17:38Z
++++
+
+Add constant bool decode_output [[function_constant(0)]]. On the final radix pass, the scatter writes decoded IndexedDistance records directly (same 8-byte stride as uint2), deleting the splatDecodeIndices kernel and a full-buffer roundtrip. Compile two scatter variants; Swift dispatch drops the decode stage and selects the decoding variant for the last pass; adjust output buffer stride.
+
+Medium; interacts with A1 (same kernel). See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+---
+
+## 136: GPU sort A6: block-compact cullMark + barrier-free scatter (stereo-sensitive)
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: gpu, sorting, performance, visionOS
+created: 2026-08-18T23:17:38Z
++++
+
+splatCullMark compacts survivors within their block via simd_prefix_exclusive_sum of the alive flags (no atomic counter, no sentinel records, only survivor slots written); splatCompactScatter then becomes a barrier-free copy.
+
+WARNING - stereo: our cullMark keeps splats visible to either eye when viewCount>1 (modelView1/projection1). The ported block-compaction must run AFTER the merged two-eye alive test, not replace it. Requires visionOS stereo golden/visual re-verification.
+
+Medium. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+---
+
+## 137: GPU sort A7: dense packed_half3 position stream for cullMark
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: gpu,sorting,performance,memory
+created: 2026-08-18T23:17:38Z
++++
+
+cullMark reads position from a dense packed_half3 buffer (6 bytes/splat) built once at load, instead of the 32-byte SparkSplat record. This pass touches every splat so fetch traffic dominates. Add a packed_half3 positions buffer on GPUSplatCloud (built at load), a positions arg + usePositions flag on cullMark, and populate it in the loader/builder.
+
+Half positions are for culling/distance only; the render path stays full-precision, so visual output is unaffected. Extra 6 bytes/splat GPU memory. Medium. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+---
