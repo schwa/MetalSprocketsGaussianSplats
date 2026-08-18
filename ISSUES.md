@@ -2524,11 +2524,13 @@ Out of scope: MetalFX temporal (separate; needs motion vectors + jitter).
 ## 125: Benchmark splat loading across formats
 
 +++
-status: new
+status: closed
 priority: low
 kind: task
-labels: performance,testing,io
+labels: performance, testing, io
 created: 2026-08-18T19:00:51Z
+updated: 2026-08-18T19:40:42Z
+closed: 2026-08-18T19:40:42Z
 +++
 
 We have no benchmark for splat-file loading/decoding time. Add one covering the reader paths in Sources/Splats: SPZ (v2/v3 GZip and v4 parallel-ZSTD), PLY, and SOG (CPU + GPU decode).

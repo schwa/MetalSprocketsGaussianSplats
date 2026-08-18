@@ -61,3 +61,23 @@ splat: ply
 clean:
     rm -f test-grid.csv test-grid.ply test-grid.sog test-grid.spz test-grid.splat test-grid.ply.splat
     rm -f means_l.webp means_u.webp quats.webp scales.webp sh0.webp shN_centroids.webp shN_labels.webp
+
+# Generate large synthetic benchmark fixtures (ply, sog, spz v3, spz v4) into
+# Bench/ (gitignored). These are what SplatLoadBenchmarkTests reads when present.
+# Usage: just bench 1000000
+bench count="1000000":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    size=$(echo "sqrt({{count}})" | bc)
+    if [ $((size * size)) -lt {{count}} ]; then size=$((size + 1)); fi
+    mkdir -p Bench
+    echo "Generating bench cloud (${size}x${size} = $((size*size)) splats)..."
+    splat-transform -w gen-grid.mjs -p width=${size},height=${size},spacing=1.0,scale=0.1 Bench/bench-grid.ply
+    splat-transform Bench/bench-grid.ply Bench/bench-grid.sog
+    splat-transform --spz-version 3 Bench/bench-grid.ply Bench/bench-grid.v3.spz
+    splat-transform --spz-version 4 Bench/bench-grid.ply Bench/bench-grid.v4.spz
+    echo "Wrote Bench/bench-grid.{ply,sog,v3.spz,v4.spz}"
+
+# Remove generated benchmark fixtures
+clean-bench:
+    rm -rf Bench

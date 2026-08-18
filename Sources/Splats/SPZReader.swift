@@ -398,7 +398,15 @@ public struct SPZReader: SplatReaderProtocol {
                 throw SplatsError.decompressionFailed
             }
 
-            var outputSize = compressedData.count * 10
+            // The gzip footer's ISIZE (last 4 bytes, little-endian) is the
+            // uncompressed size mod 2^32 — size the buffer from it instead of
+            // guessing. The +64 slack means a correct decode returns fewer bytes
+            // than the buffer holds, so a result that exactly fills the buffer
+            // signals a truncated decode (compression_decode_buffer reports bytes
+            // written, not completion) and we grow and retry.
+            let isize = Int(data[data.count - 4]) | (Int(data[data.count - 3]) << 8)
+                | (Int(data[data.count - 2]) << 16) | (Int(data[data.count - 1]) << 24)
+            var outputSize = (isize > 0 ? isize : compressedData.count * 10) + 64
             var outputData = Data(count: outputSize)
 
             var decompressedSize = 0
@@ -418,13 +426,14 @@ public struct SPZReader: SplatReaderProtocol {
                     )
                 }
 
-                if decompressedSize == 0 {
+                if decompressedSize == 0 || decompressedSize == outputSize {
                     outputSize *= 2
                     outputData = Data(count: outputSize)
+                    decompressedSize = 0
                 } else {
                     break
                 }
-            } while decompressedSize == 0 && outputSize < compressedData.count * 100
+            } while outputSize < (isize > 0 ? isize * 2 : compressedData.count * 100) + 4096
 
             guard decompressedSize > 0 else {
                 throw SplatsError.decompressionFailed
