@@ -163,36 +163,11 @@ class DemoState {
     /// when present (flattened to the coefficient-major layout the shaders
     /// expect).
     nonisolated private static func readSplatCloud(device: MTLDevice, url: URL) throws -> GPUSplatCloud<SparkSplat> {
-        // SOG: GPU decode path (concurrent WebP decode + compute-kernel
-        // de-quantize straight into the SparkSplat buffer). Orders of
-        // magnitude faster than the per-splat CPU reader for large files.
-        if url.pathExtension.lowercased() == "sog" {
-            let result = try SOGReaderGPU(device: device).read(url: url)
-            let shCoefficients = result.shDegree > 0 ? result.shCoefficients : nil
-            return GPUSplatCloud<SparkSplat>(splats: result.splats, shCoefficients: shCoefficients, shDegree: result.shDegree)
-        }
-
-        let reader = try SplatReader(url: url)
-        let shDegree = reader.shDegree
-        var splats: [SparkSplat] = []
-        splats.reserveCapacity(reader.splatCount)
-        var shCoefficients: [Float] = []
-        try reader.read { _, extendedSplat in
-            splats.append(SparkSplat(extendedSplat.genericSplat))
-            if shDegree > 0, let sh = extendedSplat.sphericalHarmonics {
-                for coefficient in sh {
-                    shCoefficients.append(contentsOf: coefficient)
-                }
-            }
-        }
-        let floatsPerSplat = [0, 9, 24, 45][min(Int(shDegree), 3)]
-        // Morton-reorder for group-culling coherence (#89); the SOG GPU
-        // path above skips this since its splats decode straight into GPU
-        // buffers.
-        if floatsPerSplat > 0, shCoefficients.count == splats.count * floatsPerSplat {
-            return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, shCoefficients: shCoefficients, shDegree: shDegree, mortonOrdered: true)
-        }
-        return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, mortonOrdered: true)
+        // SOG decodes on the GPU (compute-kernel de-quantize); every other
+        // format streams through the CPU reader. Morton reorder (#89) is applied
+        // to the CPU paths; the SOG GPU path decodes straight into buffers.
+        let result = try SplatLoader.read(device: device, url: url, mortonOrdered: true)
+        return GPUSplatCloud(result)
     }
 }
 #endif

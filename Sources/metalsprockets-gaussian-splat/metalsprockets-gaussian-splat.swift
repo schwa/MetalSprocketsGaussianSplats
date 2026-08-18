@@ -81,14 +81,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Render settings label on top of the image")
     var label: Bool = false
 
-    @Option(help: "Override SH degree (0=off, 1-3=use specified degree)")
-    var shDegree: Int?
-
     @Flag(help: "Reveal output file in Finder after rendering")
     var reveal: Bool = false
-
-    @Option(help: "Export splat data to CSV file")
-    var dumpCsv: String?
 
     @Option(help: "Sort splats on the cpu (radix sort) or gpu (cull + radix sort compute pass)")
     var sort: SortMethod = .cpu
@@ -120,27 +114,16 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         #if !arch(x86_64)
         let renderConfig = try loadConfig()
         let device = _MTLCreateSystemDefaultDevice()
-        let loadResult = try loadSplats(from: renderConfig.splat)
-
-        note("Loaded \(loadResult.splats.count) splats, SH degree: \(loadResult.shDegree), SH coefficients: \(loadResult.shCoefficients.count)")
-
-        if let csvPath = dumpCsv {
-            try exportToCSV(loadResult: loadResult, path: csvPath)
-            print("Exported \(loadResult.splats.count) splats to \(csvPath)")
-            return
-        }
-
         let modelMatrix = try parseModelMatrix(from: renderConfig)
         let cameraMatrix = try parseCameraMatrix(from: renderConfig)
         let useSrgbToLinear = renderConfig.srgbToLinear ?? false
 
-        let (sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree) = try createGPUSplatClouds(
-            loadResult: loadResult,
-            device: device,
-            modelMatrix: modelMatrix
-        )
-
-        note("Effective SH degree: \(effectiveSHDegree), SH buffer: \(shCoefficientsBuffer != nil ? "yes" : "no")")
+        // SOG decodes on the GPU (compute-kernel de-quantize); every other
+        // format streams through the CPU reader. See SplatLoader / #126.
+        let result = try SplatLoader.read(device: device, url: URL(fileURLWithPath: renderConfig.splat))
+        let sparkGPUSplatCloud = GPUSplatCloud(result, modelTransform: modelMatrix)
+        let effectiveSHDegree = result.shDegree
+        note("Loaded \(result.count) splats, SH degree: \(effectiveSHDegree)")
 
         let size = CGSize(width: renderConfig.width, height: renderConfig.height)
         let projection = try createProjection(from: renderConfig)
@@ -274,169 +257,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         )
     }
 
-    // MARK: - Splat Loading
-
-    /// Result of loading splats, including optional SH data
-    struct SplatLoadResult {
-        let splats: [GenericSplat]
-        let shCoefficients: [Float]
-        let shDegree: UInt8
-    }
-
     #if !arch(x86_64)
-    func loadSplats(from splatPath: String) throws -> SplatLoadResult {
-        let splatURL = URL(fileURLWithPath: splatPath)
-        let fileExtension = splatURL.pathExtension.lowercased()
-
-        var splats: [GenericSplat] = []
-        var shCoefficients: [Float] = []
-        var detectedSHDegree: UInt8 = 0
-
-        switch fileExtension {
-        case "spz":
-            let reader = try Splats.SPZReader(url: splatURL)
-            detectedSHDegree = reader.shDegree
-            let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
-            if floatsPerSplat > 0 {
-                shCoefficients.reserveCapacity(reader.splatCount * floatsPerSplat)
-            }
-            try reader.read { _, extendedSplat in
-                splats.append(extendedSplat.genericSplat)
-                if let sh = extendedSplat.sphericalHarmonics {
-                    for coeff in sh {
-                        shCoefficients.append(contentsOf: coeff)
-                    }
-                }
-            }
-
-        case "ply":
-            let reader = try PLYSplatReader(url: splatURL)
-            detectedSHDegree = reader.shDegree
-            let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
-            if floatsPerSplat > 0 {
-                shCoefficients.reserveCapacity(reader.splatCount * floatsPerSplat)
-            }
-            try reader.read { _, extendedSplat in
-                splats.append(extendedSplat.genericSplat)
-                if let sh = extendedSplat.sphericalHarmonics {
-                    for coeff in sh {
-                        shCoefficients.append(contentsOf: coeff)
-                    }
-                }
-            }
-
-        case "sog":
-            let reader = try SOGReaderCPU(url: splatURL)
-            detectedSHDegree = UInt8(reader.shDegree)
-            let floatsPerSplat = Self.shFloatsPerSplat(degree: detectedSHDegree)
-            if floatsPerSplat > 0 {
-                shCoefficients.reserveCapacity(reader.splatCount * floatsPerSplat)
-            }
-            try reader.read { _, extendedSplat in
-                splats.append(extendedSplat.genericSplat)
-                if let sh = extendedSplat.sphericalHarmonics {
-                    for coeff in sh {
-                        shCoefficients.append(contentsOf: coeff)
-                    }
-                }
-            }
-
-        default:
-            throw ValidationError("Unsupported file format: .\(fileExtension)")
-        }
-
-        return SplatLoadResult(splats: splats, shCoefficients: shCoefficients, shDegree: detectedSHDegree)
-    }
-
-    /// Returns the number of floats per splat for a given SH degree
-    private static func shFloatsPerSplat(degree: UInt8) -> Int {
-        switch degree {
-        case 0:
-            return 0
-        case 1:
-            return 3 * 3   // 3 basis functions * 3 channels (RGB)
-        case 2:
-            return 8 * 3   // 8 basis functions * 3 channels
-        case 3:
-            return 15 * 3  // 15 basis functions * 3 channels
-        default:
-            return 0
-        }
-    }
-
-    // MARK: - CSV Export
-
-    func exportToCSV(loadResult: SplatLoadResult, path: String) throws {
-        var csv = "index,pos_x,pos_y,pos_z,scale_x,scale_y,scale_z,rot_x,rot_y,rot_z,rot_w,r,g,b,a"
-
-        let floatsPerSplat = Self.shFloatsPerSplat(degree: loadResult.shDegree)
-        let numCoeffs = floatsPerSplat / 3
-        for i in 0..<numCoeffs {
-            csv += ",sh\(i)_r,sh\(i)_g,sh\(i)_b"
-        }
-        csv += "\n"
-
-        for (index, splat) in loadResult.splats.enumerated() {
-            var row = "\(index)"
-            row += ",\(splat.position.x),\(splat.position.y),\(splat.position.z)"
-            row += ",\(splat.scale.x),\(splat.scale.y),\(splat.scale.z)"
-            row += ",\(splat.rotation.x),\(splat.rotation.y),\(splat.rotation.z),\(splat.rotation.w)"
-            row += ",\(splat.color.x),\(splat.color.y),\(splat.color.z),\(splat.color.w)"
-
-            if floatsPerSplat > 0, !loadResult.shCoefficients.isEmpty {
-                let baseOffset = index * floatsPerSplat
-                for i in 0..<numCoeffs {
-                    let r = loadResult.shCoefficients[baseOffset + i * 3]
-                    let g = loadResult.shCoefficients[baseOffset + i * 3 + 1]
-                    let b = loadResult.shCoefficients[baseOffset + i * 3 + 2]
-                    row += ",\(r),\(g),\(b)"
-                }
-            }
-
-            csv += row + "\n"
-        }
-
-        try csv.write(toFile: path, atomically: true, encoding: .utf8)
-    }
-
-    // MARK: - Splat Cloud Creation
-
-    func createGPUSplatClouds(
-        loadResult: SplatLoadResult,
-        device: MTLDevice,
-        modelMatrix: simd_float4x4
-    ) throws -> (GPUSplatCloud<SparkSplat>, TypedMTLBuffer<Float>?, UInt8) {
-        let effectiveSHDegree: UInt8
-        if let override = shDegree {
-            effectiveSHDegree = UInt8(override)
-        } else {
-            effectiveSHDegree = loadResult.shDegree
-        }
-
-        var shCoefficientsBuffer: TypedMTLBuffer<Float>?
-        if !loadResult.shCoefficients.isEmpty, effectiveSHDegree > 0 {
-            shCoefficientsBuffer = try device.makeTypedBuffer(values: loadResult.shCoefficients, options: []).labeled("SHCoefficients")
-        }
-
-        let gpuSplats = loadResult.splats.map { SparkSplat($0) }
-        let splatBuffer = try device.makeTypedBuffer(values: gpuSplats, options: []).labeled("Splats")
-        let sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>
-        if let shBuffer = shCoefficientsBuffer {
-            sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(
-                splats: splatBuffer,
-                modelTransform: modelMatrix,
-                shCoefficients: shBuffer,
-                shDegree: effectiveSHDegree
-            )
-        } else {
-            sparkGPUSplatCloud = GPUSplatCloud<SparkSplat>(
-                splats: splatBuffer,
-                modelTransform: modelMatrix
-            )
-        }
-        return (sparkGPUSplatCloud, shCoefficientsBuffer, effectiveSHDegree)
-    }
-
     // MARK: - Rendering
 
     @MainActor
