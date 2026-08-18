@@ -110,6 +110,10 @@ public final class OffscreenSplatRenderer {
         /// Frustum-cull survivors (spark with ``SortMethod/gpu``; the GPU sort
         /// is the only path that culls).
         public var visibleSplats: Int?
+        /// Whole-submission GPU time from the command-buffer clock
+        /// (`gpuEndTime - gpuStartTime`), correlation-free. `nil` if unavailable.
+        /// For the GPU sort path this spans sort+render (one submission).
+        public var commandBufferGPUTime: TimeInterval?
     }
 
     public let renderer: Renderer
@@ -263,15 +267,15 @@ public final class OffscreenSplatRenderer {
             if configuration.collectGPUCounters {
                 let sortBox = sortSampleBox
                 let renderBox = renderSampleBox
-                _ = try offscreenRenderer.render(Group {
+                report.commandBufferGPUTime = try offscreenRenderer.render(Group {
                     sortPass.gpuCounters(label: "splat sort") { sortBox.set($0) }
                     renderPass.gpuCounters(label: "splat render") { renderBox.set($0) }
-                })
+                }).gpuTime
             } else {
-                _ = try offscreenRenderer.render(Group {
+                report.commandBufferGPUTime = try offscreenRenderer.render(Group {
                     sortPass
                     renderPass
-                })
+                }).gpuTime
             }
             report.visibleSplats = gpuSortResources.lastSurvivorCount
         } else {
@@ -279,7 +283,7 @@ public final class OffscreenSplatRenderer {
             let sortedIndices = try SplatSorter.sort(device: offscreenRenderer.device, splatCloud: splatCloud, parameters: sortParameters)
             let elapsed = ContinuousClock.now - start
             report.sortCPUTime = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) * 1e-18
-            try render(pass: makeSparkRenderPass(sortedIndices: sortedIndices), in: offscreenRenderer)
+            report.commandBufferGPUTime = try render(pass: makeSparkRenderPass(sortedIndices: sortedIndices), in: offscreenRenderer)
         }
         report.sortGPU = sortSampleBox.take()
         report.render = renderSampleBox.take()
@@ -364,12 +368,14 @@ public final class OffscreenSplatRenderer {
         return FrameReport(render: renderSampleBox.take())
     }
 
-    private func render(pass: some Element, in offscreenRenderer: OffscreenRenderer) throws {
+    /// Renders the pass and returns the command-buffer GPU time, if available.
+    @discardableResult
+    private func render(pass: some Element, in offscreenRenderer: OffscreenRenderer) throws -> TimeInterval? {
         if configuration.collectGPUCounters {
             let box = renderSampleBox
-            _ = try offscreenRenderer.render(pass.gpuCounters(label: "splat render") { box.set($0) })
+            return try offscreenRenderer.render(pass.gpuCounters(label: "splat render") { box.set($0) }).gpuTime
         } else {
-            _ = try offscreenRenderer.render(pass)
+            return try offscreenRenderer.render(pass).gpuTime
         }
     }
 

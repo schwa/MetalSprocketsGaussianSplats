@@ -31,13 +31,16 @@ struct FrameSample {
     var render: GPUCounterSample?
     /// Frustum-cull survivors; the GPU sort is the only path that culls.
     var visibleSplats: Int?
+    /// Whole-submission GPU time from the command-buffer clock (correlation-free).
+    var commandBufferGPUTime: TimeInterval?
 
-    init(wallTime: TimeInterval, sortCPUTime: TimeInterval? = nil, sortGPU: GPUCounterSample? = nil, render: GPUCounterSample? = nil, visibleSplats: Int? = nil) {
+    init(wallTime: TimeInterval, sortCPUTime: TimeInterval? = nil, sortGPU: GPUCounterSample? = nil, render: GPUCounterSample? = nil, visibleSplats: Int? = nil, commandBufferGPUTime: TimeInterval? = nil) {
         self.wallTime = wallTime
         self.sortCPUTime = sortCPUTime
         self.sortGPU = sortGPU
         self.render = render
         self.visibleSplats = visibleSplats
+        self.commandBufferGPUTime = commandBufferGPUTime
     }
 }
 
@@ -80,6 +83,10 @@ struct StatisticsReport: Codable {
     /// GPU sort + render per frame (summarized per frame, not a sum of the two
     /// summaries). Absent when render GPU timing is unavailable.
     var gpuTotal: Stat?
+    /// Whole-submission GPU time from the command-buffer clock. Correlation-free,
+    /// so a sanity cross-check on the counter-derived numbers (for GPU sort this
+    /// spans sort+render in one submission).
+    var commandBufferGpu: Stat?
 }
 
 func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, height: Int, warmup: Int, renderer: RendererKind, sortMethod: SortMethod) -> StatisticsReport {
@@ -88,6 +95,7 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
     let gpuTimes = samples.compactMap { $0.render?.duration }
     let vertexTimes = samples.compactMap { $0.render?.vertex?.duration }
     let fragmentTimes = samples.compactMap { $0.render?.fragment?.duration }
+    let commandBufferGPUTimes = samples.compactMap(\.commandBufferGPUTime)
     // Per-frame GPU total: the fastest sort and fastest render need not occur on
     // the same frame, so sum per frame then summarize (not a sum of summaries).
     let gpuTotalTimes = samples.compactMap { sample -> Double? in
@@ -112,7 +120,8 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
         renderGpu: gpuTimes.isEmpty ? nil : stat(gpuTimes),
         vertex: vertexTimes.isEmpty ? nil : stat(vertexTimes),
         fragment: fragmentTimes.isEmpty ? nil : stat(fragmentTimes),
-        gpuTotal: gpuTotalTimes.isEmpty ? nil : stat(gpuTotalTimes)
+        gpuTotal: gpuTotalTimes.isEmpty ? nil : stat(gpuTotalTimes),
+        commandBufferGpu: commandBufferGPUTimes.isEmpty ? nil : stat(commandBufferGPUTimes)
     )
 }
 
@@ -157,6 +166,9 @@ private func printTextReport(_ report: StatisticsReport) {
     }
     if let gpuTotal = report.gpuTotal {
         line("gpu total", gpuTotal)
+    }
+    if let commandBufferGpu = report.commandBufferGpu {
+        line("gpu submit", commandBufferGpu)
     }
 }
 

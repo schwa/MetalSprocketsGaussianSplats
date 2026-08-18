@@ -321,7 +321,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                     sortCPUTime: report.sortCPUTime,
                     sortGPU: report.sortGPU,
                     render: report.render,
-                    visibleSplats: report.visibleSplats
+                    visibleSplats: report.visibleSplats,
+                    commandBufferGPUTime: report.commandBufferGPUTime
                 ))
             }
         }

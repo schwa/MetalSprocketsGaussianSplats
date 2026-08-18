@@ -2484,11 +2484,13 @@ Our CLI (Sources/metalsprockets-gaussian-splat/Statistics.swift) reports `sortGp
 ## 123: CLI stats: command-buffer GPU clock as correlation-free cross-check
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: cli, metrics
 created: 2026-08-18T18:58:01Z
+updated: 2026-08-18T23:15:55Z
+closed: 2026-08-18T23:15:55Z
 +++
 
 The sibling splat-render CLI captures whole-submission GPU time from the command buffer (commandBuffer.gpuEndTime - gpuStartTime) alongside the timestamp-counter-derived per-pass times. It serves as a correlation-free sanity check on the counter numbers (the counters need CPU/GPU timestamp correlation; the command-buffer clock does not).
