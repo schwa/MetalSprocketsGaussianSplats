@@ -31,7 +31,7 @@ public final class GPUSortResources {
     }
 
     /// Elements per compaction block. Must match COMPACT_BLOCK in SplatGPUSort.metal.
-    static let compactBlock = 256
+    static let compactBlock = 512   // must match COMPACT_BLOCK in SplatGPUSort.metal
     /// Elements per radix tile. Must match the histogram/scatter kernel tiling.
     static let elementsPerTile = 1_024
 

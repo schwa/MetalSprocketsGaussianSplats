@@ -2702,11 +2702,13 @@ See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/P
 ## 132: GPU sort A2: COMPACT_BLOCK 256 to 512
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: gpu, sorting, performance
 created: 2026-08-18T23:17:38Z
+updated: 2026-08-18T23:57:31Z
+closed: 2026-08-18T23:57:31Z
 +++
 
 Change COMPACT_BLOCK from 256 to 512 in SplatGPUSort.metal, halving the block count. Verify the Swift dispatch's block-count math and threadgroup sizing follow the constant.

@@ -50,7 +50,7 @@ inline bool splatPassesCull(float4 clip, float guardBand) {
 // elements; block index == threadgroup index, so the dispatch must be uniform.
 constant ushort kCulledKey = 0xFFFFu;
 constant ushort kMaxSurvivorKey = 0xFFFEu;
-constant uint COMPACT_BLOCK = 256;
+constant uint COMPACT_BLOCK = 512;
 
 // Phase 1: per-splat cull + distance. Build the sort record
 // { flippedKey|cloud, splatIndex } in place at records[gid]; culled splats get
