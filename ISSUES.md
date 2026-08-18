@@ -2464,3 +2464,81 @@ SPZ 4 is a breaking format change and needs a new read path:
 Scope note: v4 read support first. Encode/write is separate. Spec: https://github.com/nianticlabs/spz
 
 ---
+
+## 122: CLI stats: report combined gpu total (sort+render)
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: cli, metrics
+created: 2026-08-18T18:58:01Z
++++
+
+The splat-render CLI in the sibling project (gaussiansplats-ios) reports a `gpuTotal` stat: sort GPU time + render GPU time summarized per frame (the fastest sort and fastest render need not be on the same frame, so it sums per-frame then takes the median/min, not a sum of summaries).
+
+Our CLI (Sources/metalsprockets-gaussian-splat/Statistics.swift) reports `sortGpu` and `renderGpu` separately but no combined total. Add a `gpuTotal: Stat` computed per-frame as sortGPU.duration + render.duration, then summarized, to both text and JSON output.
+
+---
+
+## 123: CLI stats: command-buffer GPU clock as correlation-free cross-check
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: cli, metrics
+created: 2026-08-18T18:58:01Z
++++
+
+The sibling splat-render CLI captures whole-submission GPU time from the command buffer (commandBuffer.gpuEndTime - gpuStartTime) alongside the timestamp-counter-derived per-pass times. It serves as a correlation-free sanity check on the counter numbers (the counters need CPU/GPU timestamp correlation; the command-buffer clock does not).
+
+Our CLI only reports counter-derived GPU times (GPUCounterSample). Add the command-buffer GPU time for the sort and/or render command buffers as a cross-check line in the statistics report. Useful for validating the counter scaling, especially before/after the GPU sort optimization port (see RFC on Desktop).
+
+---
+
+## 124: SplatView: support MetalFX spatial upscaling
+
++++
+status: new
+priority: medium
+kind: feature
+labels: rendering, performance, cli
+created: 2026-08-18T19:00:23Z
++++
+
+Add optional MetalFX spatial upscaling to SplatView (Sources/MetalSprocketsGaussianSplats/Spark/SplatView.swift): render the splats at a reduced resolution (e.g. factor 2 = quarter the fragments) and upscale to the final drawable size. A large fragment-cost lever for the Spark/GPU renderers.
+
+MetalFX already exists as first-class MetalSprockets elements (MetalSprockets/Sources/MetalSprockets/Metal/MetalFXSpatial.swift) and MetalSprockets is already a dependency here, so wire those in rather than porting the sibling project’s standalone MetalFXUpscaler. See MetalSprocketsExamples MetalFXDemo for the integration shape.
+
+Scope:
+- Opt-in scale factor on SplatView (off/1.0 = no upscaling), plumbed through the render path to an MTLFXSpatialScaler-backed pass.
+- Reduced-res offscreen render target + spatial upscale to drawable size; final view size unchanged.
+- Graceful fallback when the device does not support MetalFX spatial scaling.
+- Wire the same option into the CLI (metalsprockets-gaussian-splat) as a --metalfx <factor> flag, matching the sibling gaussiansplats-ios splat-render, and surface the upscale pass in the statistics per-pass timings.
+
+Out of scope: MetalFX temporal (separate; needs motion vectors + jitter).
+
+---
+
+## 125: Benchmark splat loading across formats
+
++++
+status: new
+priority: low
+kind: task
+labels: performance,testing,io
+created: 2026-08-18T19:00:51Z
++++
+
+We have no benchmark for splat-file loading/decoding time. Add one covering the reader paths in Sources/Splats: SPZ (v2/v3 GZip and v4 parallel-ZSTD), PLY, and SOG (CPU + GPU decode).
+
+Goal: measurable, repeatable load timings so we can track regressions and quantify wins (e.g. SPZ v4 parallel decode, SOGReaderGPU vs CPU).
+
+Approach (pick one):
+- Swift Testing benchmark test in Tests/ that times reads over the bundled fixtures / Samples (tomatoes.v4.spz, lion.v3.spz, test-grid.*), reporting median/min ms. Keep it out of the default CI gate (GPU/timing-sensitive) or mark not-testable-on-CI like the golden-image suite. The sibling project has SOGReaderBenchmarkTests as prior art.
+- Or a `bench-load` subcommand on the metalsprockets-gaussian-splat CLI, reusing the existing Statistics (median/min, warmup/frames, text|json).
+
+Report per format: file size, splat count, decode wall time (median/min), and MB/s. Include SPZ v4 vs v3 to show the parallel-ZSTD speedup.
+
+---
