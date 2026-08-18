@@ -2817,3 +2817,29 @@ Requirements:
 Context: options in Sources/metalsprockets-gaussian-splat/BenchCommand.swift (`--counts` ~line 32, camera ~line 208 via LookAt position (0,0,2.5)).
 
 ---
+
+## 139: Remove CPU sort; GPU sort is the only sort path
+
++++
+status: new
+priority: low
+kind: task
+labels: sorting,performance,cleanup,refactor
+created: 2026-08-18T23:38:25Z
++++
+
+The CPU radix sort is the worst renderer path by a wide margin at scale (bench: spark/CPU-sort 169ms vs gpu 81ms at 8M splats; it also scales far worse below that). The GPU sort (cull + radix compute pass) supersedes it. Remove the CPU sort entirely and make GPU sort the only sort.
+
+Surface to remove/collapse:
+- Sources/MetalSprocketsGaussianSplats/Sorting: CPURadixSort.swift, CPUSplatRadixSorter.swift, and SplatSorter.sort (the CPU entry). Keep GPUSplatSortComputePass / GPUSortResources / AsyncSortManager (GPU path).
+- SortMethod enum (library) .cpu case and the OffscreenSplatRenderer .spark(sort:) CPU branch (renderSparkFrame CPU-sort path).
+- SplatRenderer enum: the .spark (CPU-sorted) case vs .gpu (GPU-sorted) — collapse to a single GPU-sorted spark renderer (gpu is already the default).
+- CLI: --sort cpu|gpu option, Statistics SortMethod, sortCpu stat, and BenchCommand.benchmarkSpark (CPU) — leave only the GPU-sort path.
+- Tests: SplatSorterTests, and any CPU-sort references in PointSplatConvergenceTests.
+- Docc references.
+
+BLOCKER / caveat to resolve first: the GPU sort uses 64-bit atomics and needs Apple9/Mac2 (MetalTestSupport.supports64BitAtomics gates the GPU sort tests). If any supported target device lacks 64-bit image/buffer atomics, removing CPU sort drops rendering support for it. Confirm the minimum supported GPU families all support the GPU sort before deleting; otherwise keep CPU sort as a narrow fallback (feature-detected) rather than a user-selectable mode.
+
+Motivation data: see just sort-perf / bench output.
+
+---

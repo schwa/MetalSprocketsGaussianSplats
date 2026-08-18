@@ -38,7 +38,7 @@ benchmark:
     swift run --configuration release metalsprockets-gaussian-splat bench 2>/dev/null | duckdb -markdown -c "SELECT * FROM read_csv_auto('/dev/stdin')"
 
 # Detailed per-pass timings for the GPU-sort spark renderer across sizes x cull %, rendered as a markdown table
-sort-perf counts="100000,500000,1000000,4000000,8000000" cull="0" iterations="120":
+sort-perf counts="100000,500000,1000000,4000000,8000000" cull="0,10,20,50,100" iterations="120":
     #!/usr/bin/env bash
     set -euo pipefail
     device=$(system_profiler SPHardwareDataType | awk -F': ' '/Model Name|Chip|Memory/ {a = a (a ? " | " : "") $2} END {print a}')
@@ -46,4 +46,4 @@ sort-perf counts="100000,500000,1000000,4000000,8000000" cull="0" iterations="12
     echo "Date:   $(date '+%Y-%m-%d %H:%M')"
     echo
     swift run --configuration release metalsprockets-gaussian-splat bench --sort-detail --counts {{counts}} --cull {{cull}} --iterations {{iterations}} 2>/dev/null \
-      | duckdb -markdown -c "SELECT r.splats AS splats, r.targetCullPercent AS target_cull, round(r.actualCullPercent, 1) AS actual_cull, round(r.sortGpu.medianMs, 3) AS sort_ms, round(r.renderGpu.medianMs, 3) AS render_ms, round(r.vertex.medianMs, 3) AS vertex_ms, round(r.fragment.medianMs, 3) AS fragment_ms, round(r.gpuTotal.medianMs, 3) AS total_ms, round(r.commandBufferGpu.medianMs, 3) AS submit_ms FROM (SELECT unnest(rows) AS r FROM read_json_auto('/dev/stdin'))"
+      | duckdb -markdown -c "SELECT r.splats AS splats, r.targetCullPercent AS target_cull, round(r.actualCullPercent, 1) AS actual_cull, r.visibleSplats AS visible, r.culledSplats AS culled, round(r.sortGpu.medianMs, 3) AS sort_ms, round(r.renderGpu.medianMs, 3) AS render_ms, round(r.vertex.medianMs, 3) AS vertex_ms, round(r.fragment.medianMs, 3) AS fragment_ms, round(r.gpuTotal.medianMs, 3) AS total_ms, round(r.commandBufferGpu.medianMs, 3) AS submit_ms FROM (SELECT unnest(rows) AS r FROM read_json_auto('/dev/stdin'))"

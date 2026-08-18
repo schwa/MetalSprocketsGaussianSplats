@@ -33,7 +33,7 @@ struct BenchCommand: AsyncParsableCommand {
     var counts: String = "100000,500000,1000000,4000000,8000000"
 
     @Option(help: "Comma-separated target cull percentages for --sort-detail; the camera is rotated to frustum-cull ~that fraction (e.g. 0,25,50,75)")
-    var cull: String = "0"
+    var cull: String = "0,10,20,50,100"
 
     @Option(help: "Renderers to benchmark (point, spark, gpu, tile, stochastic)")
     var renderers: [BenchRenderer] = [.point, .spark, .gpu]
@@ -449,6 +449,8 @@ struct BenchRunner {
         var splats: Int
         var targetCullPercent: Double
         var actualCullPercent: Double?
+        var visibleSplats: Int?
+        var culledSplats: Int?
         var wall: Stat
         var sortGpu: Stat?
         var renderGpu: Stat?
@@ -528,6 +530,7 @@ struct BenchRunner {
         let actualCull = lastVisible.map { count > 0 ? (1 - Double($0) / Double(count)) * 100 : 0 }
         return SortDetailRow(
             label: label, splats: count, targetCullPercent: targetCull, actualCullPercent: actualCull,
+            visibleSplats: lastVisible, culledSplats: lastVisible.map { max(0, count - $0) },
             wall: stat(wall),
             sortGpu: s(sortGpu), renderGpu: s(renderGpu), vertex: s(vertex), fragment: s(fragment),
             gpuTotal: s(total), commandBufferGpu: s(submit)
