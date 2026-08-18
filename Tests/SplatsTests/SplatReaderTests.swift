@@ -15,13 +15,13 @@ struct SplatReaderTests {
     }
 
     @Test
-    func testReadSOG() throws {
+    func testReadSOGThrows() throws {
+        // SOG has no device-free decoder (GPU-only via SplatLoader); the
+        // device-free SplatReader must reject it rather than decode.
         let url = Bundle.module.url(forResource: "test-grid", withExtension: "sog", subdirectory: "Fixtures")!
-        let reader = try SplatReader(url: url)
-        #expect(reader.splatCount == 100)
-        var count = 0
-        try reader.read { _, _ in count += 1 }
-        #expect(count == 100)
+        #expect(throws: SplatsError.self) {
+            try SplatReader(url: url)
+        }
     }
 
     @Test

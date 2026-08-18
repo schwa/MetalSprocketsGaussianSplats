@@ -2548,11 +2548,13 @@ Report per format: file size, splat count, decode wall time (median/min), and MB
 ## 126: Remove SOGReaderCPU; use SOGReaderGPU everywhere
 
 +++
-status: new
+status: closed
 priority: low
 kind: task
 labels: io, sog, refactor, cleanup
 created: 2026-08-18T19:44:55Z
+updated: 2026-08-18T20:39:20Z
+closed: 2026-08-18T20:39:20Z
 +++
 
 SOGReaderGPU (concurrent WebP decode + a compute-shader de-quantize straight into the SparkSplat GPU buffer) is much faster than the pure-CPU SOGReaderCPU. Goal: drop the CPU SOG decoder and route all SOG loading through the GPU path.
@@ -2574,7 +2576,7 @@ Prefer (c) or (a) so non-GPU consumers (parsing, tooling, tests without a device
 status: new
 priority: low
 kind: feature
-labels: io,spz,performance,metal
+labels: io, spz, performance, metal
 created: 2026-08-18T19:47:02Z
 +++
 
@@ -2589,5 +2591,31 @@ Design: shape it like SOGReaderGPU (init(device:), returns SparkSplat + SH buffe
 MEASURE FIRST: the load benchmark uses highly compressible synthetic data, which overstates the unpack fraction. Profile decompress-vs-unpack on a realistic SPZ (larger SH) before building, to confirm the win.
 
 Scope: SPZ only. PLY and .splat are legacy — no GPU treatment for them.
+
+---
+
+## 128: Deprecate per-splat CPU streaming loading; make SplatLoader the public path
+
++++
+status: new
+priority: low
+kind: task
+labels: io, api, deprecation, refactor
+created: 2026-08-18T20:21:46Z
++++
+
+With SplatLoader (GPU buffers) as the primary loading path and SOG decoding ~28x faster on the GPU, the per-splat CPU streaming API (SplatReaderProtocol.read { (Int, ExtendedSplat) in ... } and the concrete SplatReader/SPZReader/PLYSplatReader) is, in practice, only used by decode-correctness tests and internally by SplatLoader. There is no production caller that needs caller-facing CPU structs (the CSV/SH-degree tooling that did was removed).
+
+Goal: signal that GPU buffers are the product and CPU per-splat decode is an implementation detail.
+
+Plan / options:
+- Mark the public per-splat streaming surface as deprecated (@available(*, deprecated, message: "Use SplatLoader for GPU buffers")) on SplatReader and SplatReaderProtocol.read(_:), pointing callers to SplatLoader.
+- Or reduce visibility: make SplatReaderProtocol / SplatReader package/SPI (test-visible) rather than public, exposing only SplatLoader + read(device:) publicly.
+- Keep the CPU readers internally: SplatLoader still streams them to build buffers for PLY/SPZ, and reader tests still need CPU-side values to assert on (decode correctness cannot be checked from an opaque GPU buffer).
+- Migrate the remaining production consumer: the `bench` CLI subcommand (BenchCommand) still loads via SplatReader; it has a device, so it can move to SplatLoader.
+
+Non-goal: deleting the CPU decoders (they back SplatLoader and the correctness tests). This is about the public API shape, not removing decode logic.
+
+Depends on / relates to #126 (remove SOGReaderCPU).
 
 ---

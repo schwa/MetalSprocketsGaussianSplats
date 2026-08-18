@@ -19,7 +19,9 @@ public struct SplatReader: SplatReaderProtocol {
         case "splat":
             throw SplatsError.unsupportedFormat("splat (Antimatter15 format has been removed, use .spz or .ply)")
         case "sog":
-            inner = try SOGReaderCPU(url: url)
+            // SOG decodes on the GPU only (SOGReaderGPU); there is no device-free
+            // CPU decoder. Use SplatLoader (which requires an MTLDevice).
+            throw SplatsError.unsupportedFormat("sog (decode on the GPU via SplatLoader; SplatReader is device-free)")
         case "spz":
             inner = try SPZReader(url: url)
         default:

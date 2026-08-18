@@ -3,9 +3,8 @@
 
 #import <simd/simd.h>
 
-// Parameters for the GPU SOG decode kernel. Mirrors the CPU de-quantize loop
-// in SOGReaderCPU. All texture reads are raw integer texels (no sRGB /
-// normalization), matching the byte values the CPU path reads.
+// Parameters for the GPU SOG decode kernel. All texture reads are raw integer
+// texels (no sRGB / normalization), matching the byte values in the SOG planes.
 struct SOGDecodeParams {
     unsigned int count;          // Number of splats
 

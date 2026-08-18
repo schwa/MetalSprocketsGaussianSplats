@@ -119,44 +119,6 @@ struct CrossFormatTests {
         }
     }
 
-    // MARK: - SOG vs CSV
-
-    @Test(.disabled("SOG k-means quantization collapses 10 colors to 3 centroids - format needs larger datasets"))
-    func testSOGMatchesCSV() throws {
-        let csvSplats = try loadCSVGroundTruth().sorted { sortKeyCSV($0).lexicographicallyPrecedes(sortKeyCSV($1)) }
-
-        let sogURL = Bundle.module.url(forResource: "test-grid", withExtension: "sog", subdirectory: "Fixtures")!
-        let sogReader = try SOGReaderCPU(url: sogURL)
-        var sogSplats: [GenericSplat] = []
-        try sogReader.read { _, extendedSplat in sogSplats.append(extendedSplat.genericSplat) }
-        sogSplats.sort { sortKey($0).lexicographicallyPrecedes(sortKey($1)) }
-
-        #expect(sogSplats.count == csvSplats.count, "Count mismatch: SOG=\(sogSplats.count), CSV=\(csvSplats.count)")
-
-        for i in 0..<sogSplats.count {
-            let sog = sogSplats[i]
-            let csv = csvSplats[i]
-
-            #expect(sog.position.isApproximatelyEqual(to: csv.position, absoluteTolerance: 0.001))
-
-            let expectedScale = SIMD3<Float>(exp(csv.scale.x), exp(csv.scale.y), exp(csv.scale.z))
-            #expect(sog.scale.isApproximatelyEqual(to: expectedScale, absoluteTolerance: 0.0001))
-
-            let sogQuat = sog.rotation
-            let csvQuat = SIMD4<Float>(csv.rotation.imag.x, csv.rotation.imag.y, csv.rotation.imag.z, csv.rotation.real)
-            #expect(sogQuat.isApproximatelyEqual(to: csvQuat, absoluteTolerance: 0.01))
-
-            let SH_C0: Float = 0.28209479177387814
-            let expectedColor = SIMD3<Float>(
-                csv.color.x * SH_C0 + 0.5,
-                csv.color.y * SH_C0 + 0.5,
-                csv.color.z * SH_C0 + 0.5
-            )
-            let sogColor = SIMD3<Float>(sog.color.x, sog.color.y, sog.color.z)
-            #expect(sogColor.isApproximatelyEqual(to: expectedColor, absoluteTolerance: 0.01))
-        }
-    }
-
     // MARK: - SPZ vs CSV
 
     @Test

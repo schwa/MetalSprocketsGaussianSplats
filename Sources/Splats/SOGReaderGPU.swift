@@ -18,9 +18,9 @@ import ZIPFoundation
 /// Unzips the archive, decodes the SOG's WebP planes concurrently into
 /// `.rgba8Uint` textures, and runs a compute kernel
 /// (`SOGDecodeShader::decode`) that performs the per-splat de-quantize loop
-/// on the GPU, producing the same `SparkSplat` buffer (and flattened
-/// higher-order SH float buffer) that `SOGReaderCPU` produces — orders of
-/// magnitude faster for multi-million-splat files.
+/// on the GPU, producing a `SparkSplat` buffer (and flattened higher-order SH
+/// float buffer) ready for rendering — orders of magnitude faster than a
+/// per-splat CPU decode for multi-million-splat files.
 ///
 /// Unlike the other readers, `SOGReaderGPU` does not conform to
 /// ``SplatReaderProtocol``: that protocol streams CPU-side `ExtendedSplat`

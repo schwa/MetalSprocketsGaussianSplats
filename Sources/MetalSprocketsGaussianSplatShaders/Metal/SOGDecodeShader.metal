@@ -4,7 +4,7 @@
 
 using namespace metal;
 
-// GPU implementation of the SOG de-quantize loop (see SOGReaderCPU.loadSplats).
+// GPU implementation of the SOG de-quantize loop (driven by SOGReaderGPU).
 // One thread per splat. Reads raw integer texels from the SOG textures and
 // writes a SparkSplat (and, if present, flattened higher-order SH floats).
 namespace SOGDecodeShader {

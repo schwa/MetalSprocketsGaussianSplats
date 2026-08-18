@@ -25,8 +25,8 @@ Supported formats:
 - **PLY** — the standard Gaussian splatting interchange format, in ASCII
   and binary encodings (``PLYSplatReader``, built on ``PLYReader``).
 - **SPZ** — Niantic's compressed splat format (``SPZReader``).
-- **SOG** — PlayCanvas' compressed splat format, decoded on the CPU
-  (``SOGReaderCPU``) or the GPU (``SOGReaderGPU``).
+- **SOG** — PlayCanvas' compressed splat format, decoded on the GPU
+  (``SOGReaderGPU``).
 
 ## Topics
 
@@ -39,7 +39,6 @@ Supported formats:
 
 - ``PLYSplatReader``
 - ``SPZReader``
-- ``SOGReaderCPU``
 - ``SOGReaderGPU``
 
 ### Splat Representations

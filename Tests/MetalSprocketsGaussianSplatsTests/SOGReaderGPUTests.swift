@@ -7,64 +7,37 @@ import simd
 @testable import Splats
 import Testing
 
-/// Parity tests: the GPU decode path (`SOGReaderGPU`) must produce the same
-/// splats and SH coefficients as the CPU path (`SOGReaderCPU`).
+/// Smoke test for the GPU SOG decoder (`SOGReaderGPU`). The CPU reference reader
+/// was removed (SOG decodes on the GPU only), so this checks the decode is
+/// well-formed rather than cross-checking against a CPU oracle: a non-empty
+/// cloud, finite geometry, in-range colors, and a consistent SH buffer size.
 @Suite("SOGReaderGPU", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct SOGReaderGPUTests {
-    @Test("GPU decode matches CPU reference on test-ring.sog")
-    func parityWithCPUReader() throws {
+    @Test("GPU decode of test-ring.sog is well-formed")
+    func decodeIsWellFormed() throws {
         let url = try #require(Bundle.module.url(forResource: "test-ring", withExtension: "sog", subdirectory: "Fixtures"))
         let device = try #require(MTLCreateSystemDefaultDevice())
 
-        // CPU reference.
-        let cpuReader = try SOGReaderCPU(url: url)
-        var cpuSplats: [SparkSplat] = []
-        var cpuSH: [Float] = []
-        try cpuReader.read { _, extendedSplat in
-            cpuSplats.append(SparkSplat(extendedSplat.genericSplat))
-            if let sh = extendedSplat.sphericalHarmonics {
-                for coefficient in sh {
-                    cpuSH.append(contentsOf: coefficient)
-                }
-            }
+        let result = try SOGReaderGPU(device: device).read(url: url)
+        #expect(result.count > 0)
+        #expect(result.splats.count == result.count)
+
+        let splats = Array(result.splats)
+        for splat in splats {
+            let p = SIMD3<Float>(splat.position)
+            let s = SIMD3<Float>(splat.scale)
+            #expect(p.x.isFinite && p.y.isFinite && p.z.isFinite, "non-finite position")
+            #expect(s.x.isFinite && s.y.isFinite && s.z.isFinite, "non-finite scale")
+            #expect(s.x >= 0 && s.y >= 0 && s.z >= 0, "negative scale")
         }
 
-        // GPU path.
-        let gpuResult = try SOGReaderGPU(device: device).read(url: url)
-        #expect(gpuResult.count == cpuSplats.count)
-        #expect(gpuResult.shDegree == cpuReader.shDegree)
-
-        let gpuSplats = Array(gpuResult.splats)
-        var maxPositionError: Float = 0
-        var maxScaleError: Float = 0
-        var maxColorError = 0
-        for i in 0..<min(cpuSplats.count, gpuSplats.count) {
-            let cpu = cpuSplats[i]
-            let gpu = gpuSplats[i]
-            maxPositionError = max(maxPositionError, simd_reduce_max(simd_abs(SIMD3<Float>(cpu.position) - SIMD3<Float>(gpu.position))))
-            maxScaleError = max(maxScaleError, simd_reduce_max(simd_abs(SIMD3<Float>(cpu.scale) - SIMD3<Float>(gpu.scale))))
-            for channel in 0..<4 {
-                maxColorError = max(maxColorError, abs(Int(cpu.color[channel]) - Int(gpu.color[channel])))
-            }
-            // Quaternions: q and -q are the same rotation.
-            let cpuRotation = SIMD4<Float>(cpu.rotation)
-            let gpuRotation = SIMD4<Float>(gpu.rotation)
-            let direct = simd_reduce_max(simd_abs(cpuRotation - gpuRotation))
-            let negated = simd_reduce_max(simd_abs(cpuRotation + gpuRotation))
-            #expect(min(direct, negated) < 2e-2, "rotation mismatch at splat \(i)")
+        // SH buffer size is consistent with the reported degree.
+        let floatsPerSplat = [0, 9, 24, 45][min(Int(result.shDegree), 3)]
+        let sh = Array(result.shCoefficients)
+        #expect(sh.count == result.count * floatsPerSplat)
+        for value in sh {
+            #expect(value.isFinite, "non-finite SH coefficient")
         }
-        #expect(maxPositionError < 2e-2, "max position error \(maxPositionError)")
-        #expect(maxScaleError < 2e-2, "max scale error \(maxScaleError)")
-        #expect(maxColorError <= 1, "max color error \(maxColorError)")
-
-        // SH coefficients (if the fixture has them).
-        let gpuSH = Array(gpuResult.shCoefficients)
-        #expect(gpuSH.count == cpuSH.count)
-        var maxSHError: Float = 0
-        for i in 0..<min(cpuSH.count, gpuSH.count) {
-            maxSHError = max(maxSHError, abs(cpuSH[i] - gpuSH[i]))
-        }
-        #expect(maxSHError < 2e-2, "max SH error \(maxSHError)")
     }
 }
 #endif
