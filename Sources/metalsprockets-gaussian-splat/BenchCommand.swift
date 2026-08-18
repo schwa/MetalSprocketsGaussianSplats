@@ -32,6 +32,9 @@ struct BenchCommand: AsyncParsableCommand {
     @Option(help: "Comma-separated splat counts for synthetic clouds")
     var counts: String = "100000,500000,1000000,4000000,8000000"
 
+    @Option(help: "Comma-separated target cull percentages for --sort-detail; the camera is rotated to frustum-cull ~that fraction (e.g. 0,25,50,75)")
+    var cull: String = "0"
+
     @Option(help: "Renderers to benchmark (point, spark, gpu, tile, stochastic)")
     var renderers: [BenchRenderer] = [.point, .spark, .gpu]
 
@@ -105,14 +108,26 @@ struct BenchCommand: AsyncParsableCommand {
                 return
             }
             if sortDetail {
+                let cullList = try cull.split(separator: ",").map { part -> Double in
+                    guard let value = Double(part.trimmingCharacters(in: .whitespaces)) else {
+                        throw BenchError(message: "Invalid cull percentage: \(part)")
+                    }
+                    return value
+                }
                 var detail: [BenchRunner.SortDetailRow] = []
                 if let splat {
                     let splats = try BenchRunner.loadSplats(url: URL(fileURLWithPath: splat))
-                    detail.append(try runner.sortDetail(label: URL(fileURLWithPath: splat).lastPathComponent, splats: splats))
+                    let name = URL(fileURLWithPath: splat).lastPathComponent
+                    for cullPercent in cullList {
+                        detail.append(try runner.sortDetail(label: name, splats: splats, targetCull: cullPercent))
+                    }
                 } else {
                     for count in countList {
                         let splats = BenchRunner.syntheticCloud(count: count)
-                        detail.append(try runner.sortDetail(label: count.formatted(.number.grouping(.never)), splats: splats))
+                        let name = count.formatted(.number.grouping(.never))
+                        for cullPercent in cullList {
+                            detail.append(try runner.sortDetail(label: name, splats: splats, targetCull: cullPercent))
+                        }
                     }
                 }
                 try BenchRunner.printSortDetailJSON(detail, size: size, frames: frames)
@@ -427,10 +442,13 @@ struct BenchRunner {
 
     // MARK: - GPU sort detail
 
-    /// Detailed per-pass timings for the GPU-sort spark renderer at one size.
+    /// Detailed per-pass timings for the GPU-sort spark renderer at one size
+    /// and target cull fraction.
     struct SortDetailRow: Codable {
         var label: String
         var splats: Int
+        var targetCullPercent: Double
+        var actualCullPercent: Double?
         var wall: Stat
         var sortGpu: Stat?
         var renderGpu: Stat?
@@ -440,23 +458,60 @@ struct BenchRunner {
         var commandBufferGpu: Stat?
     }
 
-    /// Measures the GPU-sort spark renderer through OffscreenSplatRenderer (with
-    /// GPU counters) and aggregates the per-pass FrameReport into a detail row.
+    private static let sortDetailProjection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01...100))
+
+    /// Camera-to-world at distance 2.5 from the origin, its forward rotated by
+    /// `theta` about Y. theta=0 looks at the cloud (minimal cull); larger theta
+    /// rotates the cloud out of frustum, culling progressively more.
+    private func cullCamera(theta: Float) -> simd_float4x4 {
+        simd_float4x4(translation: SIMD3<Float>(0, 0, 2.5)) * simd_float4x4(simd_quatf(angle: theta, axis: SIMD3<Float>(0, 1, 0)))
+    }
+
     @MainActor
-    func sortDetail(label: String, splats: [SparkSplat]) throws -> SortDetailRow {
-        let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
-        let camera = LookAt(position: SIMD3<Float>(0, 0, 2.5), target: .zero, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
-        let projection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01...100))
-        let renderer = try OffscreenSplatRenderer(
+    private func makeSortRenderer(cloud: GPUSplatCloud<SparkSplat>, camera: simd_float4x4) throws -> OffscreenSplatRenderer {
+        try OffscreenSplatRenderer(
             renderer: .spark(sort: .gpu),
             splatCloud: cloud,
-            projection: projection,
+            projection: Self.sortDetailProjection,
             cameraMatrix: camera,
             configuration: .init(width: size, height: size, collectGPUCounters: true)
         )
+    }
+
+    /// Culled fraction (0..100) for one camera, from the GPU sort's survivor count.
+    @MainActor
+    private func probeCull(cloud: GPUSplatCloud<SparkSplat>, count: Int, theta: Float) throws -> Double {
+        let report = try makeSortRenderer(cloud: cloud, camera: cullCamera(theta: theta)).renderFrame()
+        guard let visible = report.visibleSplats, count > 0 else { return 0 }
+        return (1 - Double(visible) / Double(count)) * 100
+    }
+
+    /// Measures the GPU-sort spark renderer through OffscreenSplatRenderer (with
+    /// GPU counters), rotating the camera to cull ~targetCull%, and aggregates
+    /// the per-pass FrameReport into a detail row.
+    @MainActor
+    func sortDetail(label: String, splats: [SparkSplat], targetCull: Double) throws -> SortDetailRow {
+        let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
+        let count = splats.count
+
+        // Binary-search the camera rotation for ~targetCull% (culled fraction
+        // rises monotonically with theta over [0, pi]).
+        var theta: Float = 0
+        if targetCull > 0 {
+            var lo: Float = 0, hi: Float = .pi
+            for _ in 0..<14 {
+                let mid = (lo + hi) / 2
+                let culled = try probeCull(cloud: cloud, count: count, theta: mid)
+                if culled < targetCull { lo = mid } else { hi = mid }
+            }
+            theta = (lo + hi) / 2
+        }
+
+        let renderer = try makeSortRenderer(cloud: cloud, camera: cullCamera(theta: theta))
         for _ in 0..<2 { _ = try renderer.renderFrame() }   // warmup
         var wall: [Double] = [], sortGpu: [Double] = [], renderGpu: [Double] = []
         var vertex: [Double] = [], fragment: [Double] = [], total: [Double] = [], submit: [Double] = []
+        var lastVisible: Int?
         for _ in 0..<frames {
             let start = ContinuousClock.now
             let report = try renderer.renderFrame()
@@ -467,10 +522,13 @@ struct BenchRunner {
             if let value = report.render?.fragment?.duration { fragment.append(value) }
             if let value = report.render?.duration { total.append((report.sortGPU?.duration ?? 0) + value) }
             if let value = report.commandBufferGPUTime { submit.append(value) }
+            lastVisible = report.visibleSplats ?? lastVisible
         }
         func s(_ values: [Double]) -> Stat? { values.isEmpty ? nil : stat(values) }
+        let actualCull = lastVisible.map { count > 0 ? (1 - Double($0) / Double(count)) * 100 : 0 }
         return SortDetailRow(
-            label: label, splats: splats.count, wall: stat(wall),
+            label: label, splats: count, targetCullPercent: targetCull, actualCullPercent: actualCull,
+            wall: stat(wall),
             sortGpu: s(sortGpu), renderGpu: s(renderGpu), vertex: s(vertex), fragment: s(fragment),
             gpuTotal: s(total), commandBufferGpu: s(submit)
         )

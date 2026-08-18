@@ -2798,10 +2798,12 @@ Half positions are for culling/distance only; the render path stays full-precisi
 ## 138: bench: add culling sweep via camera positions that cull a target % of splats
 
 +++
-status: new
+status: closed
 priority: medium
 kind: feature
 created: 2026-08-18T23:24:48Z
+updated: 2026-08-18T23:34:17Z
+closed: 2026-08-18T23:34:17Z
 +++
 
 Add culling coverage to the `bench` subcommand. Today `--counts` takes a vector of splat counts ("100000,500000,..."). We want an analogous vector of cull percentages: for each target %, pick/compute a camera position that frustum-culls roughly that fraction of the synthetic cloud, and benchmark at each.
