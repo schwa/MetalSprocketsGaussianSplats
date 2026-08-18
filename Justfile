@@ -35,4 +35,4 @@ benchmark:
     echo "Device: $device"
     echo "Date:   $(date '+%Y-%m-%d %H:%M')"
     echo
-    swift run --configuration release metalsprockets-gaussian-splat bench | duckdb -markdown -c "SELECT * FROM read_csv_auto('/dev/stdin')"
+    swift run --configuration release metalsprockets-gaussian-splat bench 2>/dev/null | duckdb -markdown -c "SELECT * FROM read_csv_auto('/dev/stdin')"
