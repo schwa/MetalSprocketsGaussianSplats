@@ -74,7 +74,7 @@ public extension SplatReaderProtocol {
     }
 }
 
-// MARK: - SOGReaderGPU bridge
+// MARK: - GPU reader bridges
 
 public extension SOGReaderGPU.Result {
     /// This GPU decode result as the common ``SplatBufferResult``.
@@ -83,19 +83,30 @@ public extension SOGReaderGPU.Result {
     }
 }
 
+public extension SPZReaderGPU.Result {
+    /// This GPU decode result as the common ``SplatBufferResult``.
+    var bufferResult: SplatBufferResult {
+        SplatBufferResult(splats: splats, shCoefficients: shCoefficients, shDegree: shDegree, count: count)
+    }
+}
+
 // MARK: - Unified loader
 
-/// Loads any supported splat file into GPU buffers, routing `.sog` through the
-/// compute-shader `SOGReaderGPU` and every other format through the CPU reader's
-/// ``SplatReaderProtocol/read(device:name:)``.
+/// Loads any supported splat file into GPU buffers, routing `.sog` and `.spz`
+/// through their compute-shader decoders (`SOGReaderGPU` / `SPZReaderGPU`) and
+/// `.ply` through the CPU reader's ``SplatReaderProtocol/read(device:name:)``.
 public enum SplatLoader {
-    /// - Parameter mortonOrdered: Applies to the CPU decode paths only; the SOG
-    ///   GPU path decodes straight into buffers and is left in source order.
+    /// - Parameter mortonOrdered: Applies to the CPU decode path (`.ply`) only;
+    ///   the GPU decoders write straight into buffers in source order.
     public static func read(device: MTLDevice, url: URL, name: String? = nil, mortonOrdered: Bool = false) throws -> SplatBufferResult {
-        if url.pathExtension.lowercased() == "sog" {
+        switch url.pathExtension.lowercased() {
+        case "sog":
             return try SOGReaderGPU(device: device).read(url: url, name: name).bufferResult
+        case "spz":
+            return try SPZReaderGPU(device: device).read(url: url, name: name).bufferResult
+        default:
+            return try SplatReader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
         }
-        return try SplatReader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
     }
 }
 

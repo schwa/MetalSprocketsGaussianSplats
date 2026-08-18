@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 /// Reader for SPZ (Splat) files - a compressed format for 3D Gaussian splats
 /// Supports SPZ versions 2, 3 (GZip), and 4 (NGSP / parallel ZSTD streams)
 public struct SPZReader: SplatReaderProtocol {
-    private let decompressedData: Data
+    let decompressedData: Data
 
     public let version: UInt32
     private let pointCount: UInt32
@@ -17,10 +17,48 @@ public struct SPZReader: SplatReaderProtocol {
     public let fractionalBits: UInt8
     public let isAntialiased: Bool
 
-    private let headerSize: Int
+    let headerSize: Int
 
     public var splatCount: Int {
         Int(pointCount)
+    }
+
+    /// Byte offsets of each attribute section within `decompressedData`, for the
+    /// GPU unpack path (``SPZReaderGPU``). Mirrors the layout `read(_:)` walks.
+    struct SectionLayout {
+        let count: Int
+        let shCoeffCount: Int
+        let rotationBytes: Int
+        let fractionalBits: Int
+        let positionsOffset: Int
+        let alphasOffset: Int
+        let colorsOffset: Int
+        let scalesOffset: Int
+        let rotationsOffset: Int
+        let shOffset: Int
+    }
+
+    func sectionLayout() throws -> SectionLayout {
+        let count = splatCount
+        let shCoeffCount = shCoefficients(for: shDegree)
+        let rotationBytes = version >= 3 ? 4 : 3
+        var offset = headerSize
+        let positionsOffset = offset; offset += count * 9
+        let alphasOffset = offset; offset += count * 1
+        let colorsOffset = offset; offset += count * 3
+        let scalesOffset = offset; offset += count * 3
+        let rotationsOffset = offset; offset += count * rotationBytes
+        let shOffset = offset; offset += count * shCoeffCount * 3
+        guard decompressedData.count >= offset else {
+            throw SplatsError.insufficientData
+        }
+        return SectionLayout(
+            count: count, shCoeffCount: shCoeffCount, rotationBytes: rotationBytes,
+            fractionalBits: Int(fractionalBits),
+            positionsOffset: positionsOffset, alphasOffset: alphasOffset,
+            colorsOffset: colorsOffset, scalesOffset: scalesOffset,
+            rotationsOffset: rotationsOffset, shOffset: shOffset
+        )
     }
 
     public init(data: Data) throws {

@@ -259,7 +259,7 @@ public struct SOGReaderGPU {
 /// single-isolation, so the lock is held for the whole `run` — concurrent
 /// decode dispatches serialize here, but the dispatch is cheap next to the
 /// WebP decode, which stays parallel.
-private final class RunnerCache: @unchecked Sendable {
+final class RunnerCache: @unchecked Sendable {
     private let lock = NSLock()
     private var cache: [ObjectIdentifier: Runner] = [:]
 
@@ -312,7 +312,7 @@ private struct SOGGPUMetadata: Codable {
 
 // MARK: - Bundle lookup
 
-private extension Bundle {
+extension Bundle {
     func peerBundle(withSuffix suffix: String) -> Bundle? {
         let url = bundleURL.deletingLastPathComponent()
         let fileManager = FileManager()

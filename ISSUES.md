@@ -2573,11 +2573,13 @@ Prefer (c) or (a) so non-GPU consumers (parsing, tooling, tests without a device
 ## 127: SPZReaderGPU: compute-shader unpack into SparkSplat
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
 labels: io, spz, performance, metal
 created: 2026-08-18T19:47:02Z
+updated: 2026-08-18T20:49:44Z
+closed: 2026-08-18T20:49:44Z
 +++
 
 Add a GPU SPZ loader mirroring SOGReaderGPU: CPU-decompress the container, upload the decompressed packed byte buffer, then a compute kernel unpacks each splat straight into the SparkSplat GPU buffer (+ SH float buffer), eliminating the per-splat CPU unpack loop and ExtendedSplat allocation that dominate SPZReader today.
@@ -2617,5 +2619,27 @@ Plan / options:
 Non-goal: deleting the CPU decoders (they back SplatLoader and the correctness tests). This is about the public API shape, not removing decode logic.
 
 Depends on / relates to #126 (remove SOGReaderCPU).
+
+---
+
+## 129: Parallelize SPZ v4 ZSTD stream decompression
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: spz,performance,io
+created: 2026-08-18T20:49:44Z
++++
+
+SPZ v4 stores six independently-compressed ZSTD streams (positions, alphas, colors, scales, rotations, SH) precisely so decode can run across cores. Our SPZReader.parseV4 currently decompresses them serially (one ZSTD_decompress after another).
+
+Impact: with GPU unpack (SPZReaderGPU, #127) the decompress is now the dominant cost. The load benchmark shows v4 SLOWER than v3 at 1M splats (93.6ms vs 17.3ms) even though v4 is the format designed for fast parallel decode — because our v4 path is serial while v3 is a single gzip stream via the Compression framework.
+
+Fix: decompress the v4 streams concurrently (e.g. DispatchQueue.concurrentPerform over the TOC entries, each stream into its slice of the payload), mirroring how SOGReaderGPU decodes WebP planes in parallel. Streams are independent and their output offsets are known from the section layout, so this is embarrassingly parallel.
+
+Expected: v4 decode should drop below v3 and approach the SOG timings, realizing the format's intended speedup.
+
+See SPZReader.parseV4 and the SplatLoaderBenchmark numbers.
 
 ---
