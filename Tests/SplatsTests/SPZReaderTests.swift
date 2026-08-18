@@ -26,4 +26,22 @@ struct SPZReaderTests {
         #expect(first.position.z.isFinite)
         #expect(first.scale.x.isFinite)
     }
+
+    @Test
+    func testSPZReaderV4() throws {
+        let url = Bundle.module.url(forResource: "test-grid.v4", withExtension: "spz", subdirectory: "Fixtures")!
+        let reader = try SPZReader(url: url)
+
+        #expect(reader.version == 4)
+        #expect(reader.splatCount == 100)
+
+        var splats: [GenericSplat] = []
+        try reader.read { _, extendedSplat in
+            splats.append(extendedSplat.genericSplat)
+        }
+
+        #expect(splats.count == 100)
+        #expect(splats[0].position.x.isFinite)
+        #expect(splats[0].scale.x.isFinite)
+    }
 }

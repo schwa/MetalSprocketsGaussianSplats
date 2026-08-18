@@ -1,5 +1,5 @@
 {
-  "originHash" : "9508f9ae90c7dab20116e796cd23a37546df1897cb00b48f4993105d98949a79",
+  "originHash" : "204b5069ba91fb3e6d6c0281f53fd3ce702b32a3c520a966cab0c749508cab17",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -107,6 +107,15 @@
       "state" : {
         "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
         "version" : "0.9.20"
+      }
+    },
+    {
+      "identity" : "zstd",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/facebook/zstd",
+      "state" : {
+        "revision" : "f8745da6ff1ad1e7bab384bd1f9d742439278e99",
+        "version" : "1.5.7"
       }
     }
   ],

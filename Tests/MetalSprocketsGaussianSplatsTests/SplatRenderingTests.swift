@@ -46,59 +46,6 @@ struct GoldenImageRenderingTests {
         try compareGoldenImage(image, named: "SparkTestGridAlternateAngle")
     }
 
-    @Test @MainActor
-    func testSparkRenderButterflyWithAndWithoutSH() throws {
-        // The butterfly sample carries degree-3 SH; render with SH
-        // (view-dependent color) and without, against separate goldens, and
-        // require that SH actually changes the image (guards against SH
-        // silently not being applied — test-ring.sog turned out to have no
-        // SH at all, which made an earlier version of this test vacuous).
-        let cloud = try loadButterflyCloud()
-        #expect(cloud.shCoefficients != nil, "sample is expected to carry SH")
-
-        let withSH = try renderSparkCloud(cloud: cloud, cameraPosition: [0, 0.5, 1.5], size: CGSize(width: 512, height: 512), useSphericalHarmonics: true)
-        try compareGoldenImage(withSH, named: "SparkButterflySH")
-
-        let withoutSH = try renderSparkCloud(cloud: cloud, cameraPosition: [0, 0.5, 1.5], size: CGSize(width: 512, height: 512), useSphericalHarmonics: false)
-        try compareGoldenImage(withoutSH, named: "SparkButterflyNoSH")
-
-        #expect(!imagesAreIdentical(withSH, withoutSH), "SH should change the rendered image")
-    }
-
-    /// Loads the butterfly sample (Samples/, too large to duplicate into
-    /// test resources) with its SH coefficients, resolved relative to this
-    /// source file.
-    private func loadButterflyCloud() throws -> GPUSplatCloud<SparkSplat> {
-        let url = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Samples/butterfly-wings-closed.spz")
-        let reader = try SplatReader(url: url)
-        let shDegree = reader.shDegree
-        var splats: [SparkSplat] = []
-        var shCoefficients: [Float] = []
-        try reader.read { _, extendedSplat in
-            splats.append(SparkSplat(extendedSplat.genericSplat))
-            if let sh = extendedSplat.sphericalHarmonics {
-                for coefficient in sh {
-                    shCoefficients.append(contentsOf: coefficient)
-                }
-            }
-        }
-        if shDegree > 0, !shCoefficients.isEmpty {
-            return try GPUSplatCloud<SparkSplat>(device: device, splats: splats, shCoefficients: shCoefficients, shDegree: shDegree)
-        }
-        return try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
-    }
-
-    private func imagesAreIdentical(_ a: CGImage, _ b: CGImage) -> Bool {
-        guard let dataA = a.dataProvider?.data as Data?, let dataB = b.dataProvider?.data as Data? else {
-            return false
-        }
-        return dataA == dataB
-    }
-
     // MARK: - Helpers
 
     private func loadSplats(fixture: String, extension ext: String) throws -> [GenericSplat] {

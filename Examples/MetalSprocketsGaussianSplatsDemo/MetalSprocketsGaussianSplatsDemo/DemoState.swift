@@ -10,35 +10,38 @@ import Observation
 import os
 
 enum SplatModel: String, CaseIterable, Identifiable {
-    case butterfly = "Butterfly"
     case helmet = "Helmet"
+    case lion = "Lion"
+    case tomatoes = "Tomatoes"
 
     var id: String { rawValue }
 
     var resourceName: String {
         switch self {
-        case .butterfly:
-            "butterfly-wings-closed"
         case .helmet:
             "Helmet"
+        case .lion:
+            "lion.v3"
+        case .tomatoes:
+            "tomatoes.v4"
         }
     }
 
     var resourceExtension: String {
         switch self {
-        case .butterfly:
-            "spz"
         case .helmet:
             "sog"
+        case .lion, .tomatoes:
+            "spz"
         }
     }
 }
 
 @Observable
 class DemoState {
-    var renderer: SplatRenderer = .spark
+    var renderer: SplatRenderer = .gpu
     /// The selected bundled model; nil while a user-loaded file is shown.
-    var selectedModel: SplatModel? = .butterfly {
+    var selectedModel: SplatModel? = .tomatoes {
         didSet {
             if let selectedModel, selectedModel != oldValue {
                 customModelName = nil
@@ -66,7 +69,7 @@ class DemoState {
     init() {
         let device = MTLCreateSystemDefaultDevice()!
         self.device = device
-        let cloud = Self.loadSplatCloud(device: device, model: .butterfly)
+        let cloud = Self.loadSplatCloud(device: device, model: .tomatoes)
         self.splatCloud = cloud
         #if os(visionOS)
         // Demo-only: a missing Metal device is unrecoverable here.

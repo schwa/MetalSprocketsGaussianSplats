@@ -2441,11 +2441,13 @@ Expected: PNG written. Actual: 'Browser error: Failed to load resource: the serv
 ## 121: Support SPZ v4 format
 
 +++
-status: new
+status: closed
 priority: medium
 kind: feature
-labels: spz,format
+labels: spz, format
 created: 2026-08-18T18:11:38Z
+updated: 2026-08-18T18:39:44Z
+closed: 2026-08-18T18:39:44Z
 +++
 
 Niantic released SPZ 4 (https://www.nianticspatial.com/en/blog/spz4). Current SPZReader (Sources/Splats/SPZReader.swift) only handles v2/v3: single GZip stream, 16-byte compressed header, SH degree <= 3.

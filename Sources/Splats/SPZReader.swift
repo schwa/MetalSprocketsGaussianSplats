@@ -1,4 +1,5 @@
 import Compression
+import libzstd
 import Foundation
 import simd
 import UniformTypeIdentifiers
@@ -6,7 +7,7 @@ import UniformTypeIdentifiers
 // MARK: - SPZReader
 
 /// Reader for SPZ (Splat) files - a compressed format for 3D Gaussian splats
-/// Supports both version 2 and version 3 SPZ files
+/// Supports SPZ versions 2, 3 (GZip), and 4 (NGSP / parallel ZSTD streams)
 public struct SPZReader: SplatReaderProtocol {
     private let decompressedData: Data
 
@@ -16,39 +17,100 @@ public struct SPZReader: SplatReaderProtocol {
     public let fractionalBits: UInt8
     public let isAntialiased: Bool
 
-    private let headerSize = 16
+    private let headerSize: Int
 
     public var splatCount: Int {
         Int(pointCount)
     }
 
     public init(data: Data) throws {
-        let decompressed = try Self.decompressGzip(data)
-        self.decompressedData = decompressed
+        // Dispatch on the raw first four bytes: v4 files begin with plaintext
+        // "NGSP"; legacy v2/v3 files begin with the GZip magic (0x1f 0x8b).
+        let isNGSP = data.count >= 4 &&
+            data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt32.self) } == 0x5053_474e
 
-        guard decompressed.count >= headerSize else {
+        if isNGSP {
+            let parsed = try Self.parseV4(data)
+            decompressedData = parsed.payload
+            headerSize = 0
+            version = parsed.version
+            pointCount = parsed.pointCount
+            shDegree = parsed.shDegree
+            fractionalBits = parsed.fractionalBits
+            isAntialiased = parsed.isAntialiased
+        } else {
+            let decompressed = try Self.decompressGzip(data)
+            decompressedData = decompressed
+            headerSize = 16
+
+            guard decompressed.count >= 16 else {
+                throw SplatsError.invalidHeader
+            }
+
+            let magic = decompressed.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt32.self) }
+            guard magic == 0x5053_474e else {
+                throw SplatsError.invalidMagic
+            }
+
+            version = decompressed.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: UInt32.self) }
+            guard version == 2 || version == 3 else {
+                throw SplatsError.unsupportedVersion(version)
+            }
+
+            pointCount = decompressed.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 8, as: UInt32.self) }
+            shDegree = decompressed.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 12, as: UInt8.self) }
+            fractionalBits = decompressed.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 13, as: UInt8.self) }
+            let flags = decompressed.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 14, as: UInt8.self) }
+            isAntialiased = (flags & 0x1) != 0
+        }
+
+        guard shDegree <= 4 else {
+            throw SplatsError.invalidSHDegree(shDegree)
+        }
+    }
+
+    /// Parse an SPZ v4 (NGSP) file: read the plaintext header and TOC, ZSTD-decompress
+    /// each attribute stream, and concatenate them into a single payload whose layout
+    /// matches the v2/v3 in-memory format (positions, alphas, colors, scales, rotations, sh).
+    private static func parseV4(
+        _ data: Data
+    ) throws -> (payload: Data, version: UInt32, pointCount: UInt32, shDegree: UInt8, fractionalBits: UInt8, isAntialiased: Bool) {
+        guard data.count >= 32 else {
             throw SplatsError.invalidHeader
         }
 
-        let magic = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt32.self) }
-        guard magic == 0x5053474e else {
-            throw SplatsError.invalidMagic
+        let version = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: UInt32.self) }
+        let pointCount = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 8, as: UInt32.self) }
+        let shDegree = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 12, as: UInt8.self) }
+        let fractionalBits = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 13, as: UInt8.self) }
+        let flags = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 14, as: UInt8.self) }
+        let numStreams = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 15, as: UInt8.self) })
+        let tocByteOffset = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 16, as: UInt32.self) })
+        let isAntialiased = (flags & 0x1) != 0
+
+        // TOC: numStreams entries, each two little-endian UInt64s (compressed, uncompressed).
+        let tocSize = numStreams * 16
+        guard tocByteOffset >= 32, tocByteOffset + tocSize <= data.count else {
+            throw SplatsError.invalidHeader
         }
 
-        version = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 4, as: UInt32.self) }
-        guard version == 2 || version == 3 else {
-            throw SplatsError.unsupportedVersion(version)
+        // Streams follow the TOC contiguously, in write order with zero-size streams
+        // omitted; concatenating them reproduces the v2/v3 payload layout exactly.
+        var streamOffset = tocByteOffset + tocSize
+        var payload = Data()
+        for i in 0..<numStreams {
+            let entry = tocByteOffset + i * 16
+            let compressedSize = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: entry, as: UInt64.self) })
+            let uncompressedSize = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: entry + 8, as: UInt64.self) })
+            guard streamOffset + compressedSize <= data.count else {
+                throw SplatsError.insufficientData
+            }
+            let compressed = data.subdata(in: streamOffset..<(streamOffset + compressedSize))
+            payload.append(try decompressZstd(compressed, expectedSize: uncompressedSize))
+            streamOffset += compressedSize
         }
 
-        pointCount = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 8, as: UInt32.self) }
-        shDegree = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 12, as: UInt8.self) }
-        fractionalBits = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 13, as: UInt8.self) }
-        let flags = decompressed.withUnsafeBytes { $0.load(fromByteOffset: 14, as: UInt8.self) }
-        isAntialiased = (flags & 0x1) != 0
-
-        guard shDegree <= 3 else {
-            throw SplatsError.invalidSHDegree(shDegree)
-        }
+        return (payload, version, pointCount, shDegree, fractionalBits, isAntialiased)
     }
 
     /// Read all splats using a callback
@@ -265,9 +327,28 @@ public struct SPZReader: SplatReaderProtocol {
             return 8
         case 3:
             return 15
+        case 4:
+            return 24
         default:
             return 0
         }
+    }
+
+    /// Decompress a single ZSTD frame into a buffer of exactly `expectedSize` bytes.
+    private static func decompressZstd(_ data: Data, expectedSize: Int) throws -> Data {
+        guard expectedSize > 0 else {
+            return Data()
+        }
+        var output = Data(count: expectedSize)
+        let produced = output.withUnsafeMutableBytes { dst in
+            data.withUnsafeBytes { src in
+                ZSTD_decompress(dst.baseAddress, expectedSize, src.baseAddress, data.count)
+            }
+        }
+        guard ZSTD_isError(produced) == 0, produced == expectedSize else {
+            throw SplatsError.decompressionFailed
+        }
+        return output
     }
 
     private static func decompressGzip(_ data: Data) throws -> Data {
