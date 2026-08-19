@@ -52,25 +52,31 @@ constant ushort kCulledKey = 0xFFFFu;
 constant ushort kMaxSurvivorKey = 0xFFFEu;
 constant uint COMPACT_BLOCK = 512;
 
-// Phase 1: per-splat cull + distance. Build the sort record
-// { flippedKey|cloud, splatIndex } in place at records[gid]; culled splats get
-// the sentinel key 0xFFFF (survivors clamp to 0xFFFE so the sentinel is
-// unambiguous). Tally survivors per block into blockCounts[block].
+// Phase 1: per-splat cull + distance. Survivors are compacted WITHIN their block
+// as they are produced: a simd-prefix scan of the alive flags ranks each
+// survivor, which lands at records[block*COMPACT_BLOCK + rank]. Culled splats
+// write nothing (their record slots stay stale and are never read), so this pass
+// and the global scatter after it touch only survivor records instead of the
+// full splat count. blockCounts[block] gets the survivor tally.
 kernel void splatCullMark(device const SparkSplat  *splats      [[buffer(0)]],
                           device uint2             *records     [[buffer(1)]],
                           constant SplatDistanceParams &p        [[buffer(2)]],
                           device uint              *blockCounts  [[buffer(3)]],
                           uint gid     [[thread_position_in_grid]],
                           uint lid     [[thread_position_in_threadgroup]],
-                          uint groupId [[threadgroup_position_in_grid]]) {
-    threadgroup atomic_uint tgCount;
-    if (lid == 0) { atomic_store_explicit(&tgCount, 0u, memory_order_relaxed); }
-    threadgroup_barrier(mem_flags::mem_threadgroup);
+                          uint groupId [[threadgroup_position_in_grid]],
+                          uint lane    [[thread_index_in_simdgroup]],
+                          uint warp    [[simdgroup_index_in_threadgroup]],
+                          uint warps   [[simdgroups_per_threadgroup]]) {
+    threadgroup uint warpTotals[COMPACT_BLOCK / 32];
+    threadgroup uint tgTotal;
 
+    bool alive = false;
+    uint2 rec = uint2(0u, 0u);
     if (gid < p.numElements) {
         float3 position = float3(splats[gid].position);
         float4 viewPos = p.modelView * float4(position, 1.0);
-        bool alive = (p.cullEnabled == 0) || splatPassesCull(p.projection * viewPos, p.guardBand);
+        alive = (p.cullEnabled == 0) || splatPassesCull(p.projection * viewPos, p.guardBand);
         if (!alive && p.viewCount > 1) {
             // Stereo: keep splats visible to either eye so per-eye visibility
             // never causes incorrect culling.
@@ -78,14 +84,25 @@ kernel void splatCullMark(device const SparkSplat  *splats      [[buffer(0)]],
             alive = splatPassesCull(p.projection1 * viewPos1, p.guardBand);
         }
         float distance = viewPos.z * (p.reversed ? -1.0 : 1.0);
-        ushort key = alive ? min(floatFlip16(as_type<ushort>(half(distance))), kMaxSurvivorKey)
-                           : kCulledKey;
-        records[gid] = uint2(uint(key) | (p.cloudIndex << 16), gid);
-        if (alive) { atomic_fetch_add_explicit(&tgCount, 1u, memory_order_relaxed); }
+        ushort key = min(floatFlip16(as_type<ushort>(half(distance))), kMaxSurvivorKey);
+        rec = uint2(uint(key) | (p.cloudIndex << 16), gid);
+    }
+
+    // Exclusive scan of alive flags -> stable in-block rank (gid order).
+    uint flag = alive ? 1u : 0u;
+    uint lanePrefix = simd_prefix_exclusive_sum(flag);
+    if (lane == 31) { warpTotals[warp] = lanePrefix + flag; }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (warp == 0) {
+        uint v = (lane < warps) ? warpTotals[lane] : 0u;
+        uint pfx = simd_prefix_exclusive_sum(v);
+        if (lane < warps) { warpTotals[lane] = pfx; }
+        if (lane == warps - 1) { tgTotal = pfx + v; }
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
 
-    if (lid == 0) { blockCounts[groupId] = atomic_load_explicit(&tgCount, memory_order_relaxed); }
+    if (alive) { records[groupId * COMPACT_BLOCK + warpTotals[warp] + lanePrefix] = rec; }
+    if (lid == 0) { blockCounts[groupId] = tgTotal; }
 }
 
 // Phase 2 (single thread): exclusive prefix sum of the per-block survivor counts
@@ -109,39 +126,18 @@ kernel void splatCompactScanBlocks(device const uint *blockCounts [[buffer(0)]],
     drawArgs[3] = 0;         // baseInstance
 }
 
-// Phase 3: compact survivors into outRecords[blockBase[block] + localRank],
-// where localRank is the exclusive prefix sum of the alive flag within the
-// block. Block order + in-block lid order == original gid order => stable.
+// Phase 3: copy each block's (already block-compact) survivors to their global
+// position. Block order + in-block rank order == original gid order => stable.
+// Barrier-free: every thread either copies one survivor record or exits.
 kernel void splatCompactScatter(device const uint2 *inRecords   [[buffer(0)]],
                                 device uint2       *outRecords  [[buffer(1)]],
                                 device const uint  *blockBase   [[buffer(2)]],
-                                constant uint      &numElements [[buffer(3)]],
-                                uint gid     [[thread_position_in_grid]],
+                                device const uint  *blockCounts [[buffer(3)]],
                                 uint lid     [[thread_position_in_threadgroup]],
-                                uint groupId [[threadgroup_position_in_grid]],
-                                uint tsize   [[threads_per_threadgroup]]) {
-    threadgroup uint s[COMPACT_BLOCK];
-    bool alive = false;
-    uint2 rec = uint2(0u, 0u);
-    if (gid < numElements) {
-        rec = inRecords[gid];
-        alive = (rec.x & 0xFFFFu) != uint(kCulledKey);
+                                uint groupId [[threadgroup_position_in_grid]]) {
+    if (lid < blockCounts[groupId]) {
+        outRecords[blockBase[groupId] + lid] = inRecords[groupId * COMPACT_BLOCK + lid];
     }
-
-    // In-place Hillis-Steele inclusive scan of the alive flags (double barrier
-    // per step avoids the intra-step read/write hazard); exclusive = inclusive
-    // minus this thread's own flag.
-    s[lid] = alive ? 1u : 0u;
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint offset = 1; offset < tsize; offset <<= 1) {
-        uint add = (lid >= offset) ? s[lid - offset] : 0u;
-        threadgroup_barrier(mem_flags::mem_threadgroup);
-        s[lid] += add;
-        threadgroup_barrier(mem_flags::mem_threadgroup);
-    }
-    uint localRank = s[lid] - (alive ? 1u : 0u);
-
-    if (alive) { outRecords[blockBase[groupId] + localRank] = rec; }
 }
 
 // One threadgroup per tile: cooperative digit histogram in threadgroup memory.

@@ -158,7 +158,7 @@ public struct GPUSplatSortComputePass: Element {
                         .parameter("inRecords", buffer: slot.recordsA)
                         .parameter("outRecords", buffer: slot.recordsB)
                         .parameter("blockBase", buffer: slot.blockBase)
-                        .parameter("numElements", value: UInt32(count))
+                        .parameter("blockCounts", buffer: slot.blockCounts)
                 }
                 // Two 8-bit radix passes over the 16-bit key. Pass 0 sorts
                 // recordsB -> recordsA; pass 1 (decode) scatters directly into the

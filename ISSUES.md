@@ -2778,11 +2778,13 @@ Medium; interacts with A1 (same kernel). See ~/Desktop/RFC-port-gpu-sort-render-
 ## 136: GPU sort A6: block-compact cullMark + barrier-free scatter (stereo-sensitive)
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: gpu, sorting, performance, visionOS
 created: 2026-08-18T23:17:38Z
+updated: 2026-08-19T15:32:35Z
+closed: 2026-08-19T15:32:35Z
 +++
 
 splatCullMark compacts survivors within their block via simd_prefix_exclusive_sum of the alive flags (no atomic counter, no sentinel records, only survivor slots written); splatCompactScatter then becomes a barrier-free copy.
