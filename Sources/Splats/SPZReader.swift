@@ -6,8 +6,9 @@ import UniformTypeIdentifiers
 
 // MARK: - SPZReader
 
-/// Reader for SPZ (Splat) files - a compressed format for 3D Gaussian splats
-/// Supports SPZ versions 2, 3 (GZip), and 4 (NGSP / parallel ZSTD streams)
+/// Reads an SPZ (Splat) file, a compressed format for 3D Gaussian splats.
+///
+/// Supports SPZ versions 2 and 3 (GZip), and version 4 (NGSP, with parallel ZSTD streams).
 public struct SPZReader: SplatReaderProtocol {
     let decompressedData: Data
 
@@ -23,8 +24,8 @@ public struct SPZReader: SplatReaderProtocol {
         Int(pointCount)
     }
 
-    /// Byte offsets of each attribute section within `decompressedData`, for the
-    /// GPU unpack path (``SPZReaderGPU``). Mirrors the layout `read(_:)` walks.
+    /// Byte offset of each attribute section within `decompressedData`, for the
+    /// GPU unpack path (``SPZReaderGPU``). Mirrors the layout that `read(_:)` walks.
     struct SectionLayout {
         let count: Int
         let shCoeffCount: Int
@@ -62,8 +63,8 @@ public struct SPZReader: SplatReaderProtocol {
     }
 
     public init(data: Data) throws {
-        // Dispatch on the raw first four bytes: v4 files begin with plaintext
-        // "NGSP"; legacy v2/v3 files begin with the GZip magic (0x1f 0x8b).
+        // Dispatch on the raw first four bytes. v4 files start with plaintext
+        // "NGSP". Legacy v2/v3 files start with the GZip magic (0x1f 0x8b).
         let isNGSP = data.count >= 4 &&
             data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt32.self) } == 0x5053_474e
 
@@ -107,9 +108,12 @@ public struct SPZReader: SplatReaderProtocol {
         }
     }
 
-    /// Parse an SPZ v4 (NGSP) file: read the plaintext header and TOC, ZSTD-decompress
-    /// each attribute stream, and concatenate them into a single payload whose layout
-    /// matches the v2/v3 in-memory format (positions, alphas, colors, scales, rotations, sh).
+    /// Parses an SPZ v4 (NGSP) file.
+    ///
+    /// Reads the plaintext header and TOC. ZSTD-decompresses each attribute
+    /// stream. Concatenates the streams into one payload. The payload layout
+    /// matches the v2/v3 in-memory format: positions, alphas, colors, scales,
+    /// rotations, sh.
     private static func parseV4(
         _ data: Data
     ) throws -> (payload: Data, version: UInt32, pointCount: UInt32, shDegree: UInt8, fractionalBits: UInt8, isAntialiased: Bool) {
@@ -126,15 +130,16 @@ public struct SPZReader: SplatReaderProtocol {
         let tocByteOffset = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 16, as: UInt32.self) })
         let isAntialiased = (flags & 0x1) != 0
 
-        // TOC: numStreams entries, each two little-endian UInt64s (compressed, uncompressed).
+        // TOC: numStreams entries. Each entry is two little-endian UInt64s (compressed, uncompressed).
         let tocSize = numStreams * 16
         guard tocByteOffset >= 32, tocByteOffset + tocSize <= data.count else {
             throw SplatsError.invalidHeader
         }
 
-        // First pass: read the TOC into per-stream source ranges and destination
-        // offsets. Streams follow the TOC contiguously in write order (zero-size
-        // streams omitted); concatenating their output reproduces the v2/v3 layout.
+        // First pass. Read the TOC into per-stream source ranges and
+        // destination offsets. The streams follow the TOC in write order, with
+        // zero-size streams omitted. Concatenating their output reproduces the
+        // v2/v3 layout.
         struct Stream { let srcOffset: Int; let compressedSize: Int; let uncompressedSize: Int; let dstOffset: Int }
         var streams: [Stream] = []
         streams.reserveCapacity(numStreams)
@@ -154,9 +159,10 @@ public struct SPZReader: SplatReaderProtocol {
         let totalSize = dstOffset
         let streamList = streams   // immutable snapshot for concurrent capture
 
-        // Decompress the streams concurrently: each reads a disjoint source range
-        // and writes a disjoint destination range, so the shared base pointers are
-        // safe. Per-stream success is recorded and checked after the barrier.
+        // Decompress the streams concurrently. Each stream reads a disjoint
+        // source range and writes a disjoint destination range, so the shared
+        // base pointers are safe. The code records per-stream success and
+        // checks it after the barrier.
         var payload = Data(count: totalSize)
         nonisolated(unsafe) let results = UnsafeMutableBufferPointer<Bool>.allocate(capacity: max(numStreams, 1))
         defer { results.deallocate() }
@@ -183,7 +189,7 @@ public struct SPZReader: SplatReaderProtocol {
         return (payload, version, pointCount, shDegree, fractionalBits, isAntialiased)
     }
 
-    /// Read all splats using a callback
+    /// Reads all splats through a callback.
     public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {
         let count = splatCount
         var offset = headerSize
@@ -233,15 +239,15 @@ public struct SPZReader: SplatReaderProtocol {
 
             let sh = shCoeffCount > 0 ? try unpackSphericalHarmonics(at: shOffset + i * shCoeffCount * 3, coeffCount: shCoeffCount) : nil
 
-            // Convert scale from log space to actual scale
+            // Convert scale from log space to actual scale.
             let actualScale = SIMD3<Float>(exp(scale.x), exp(scale.y), exp(scale.z))
 
-            // Convert color from SH DC coefficient space to 0-1 RGB
-            // Using SH_C0 = 0.28209479177387814 for proper color without SH
+            // Convert color from SH DC coefficient space to 0-1 RGB.
+            // SH_C0 = 0.28209479177387814 gives the correct color without SH.
             let SH_C0: Float = 0.28209479177387814
             let rgb = simd_clamp(color * SH_C0 + 0.5, SIMD3<Float>(repeating: 0), SIMD3<Float>(repeating: 1))
 
-            // Convert alpha from logit space to probability using sigmoid
+            // Convert alpha from logit space to probability with a sigmoid.
             let alphaProbability = 1.0 / (1.0 + exp(-alpha))
 
             let splat = ExtendedSplat(
@@ -327,19 +333,19 @@ public struct SPZReader: SplatReaderProtocol {
         let byte2 = UInt32(decompressedData[offset + 2])
         let byte3 = UInt32(decompressedData[offset + 3])
 
-        // Little-endian
+        // Little-endian.
         let comp = byte0 | (byte1 << 8) | (byte2 << 16) | (byte3 << 24)
 
         let iLargest = Int(comp >> 30)
         let cMask: UInt32 = (1 << 9) - 1
 
-        // SPZ V3 uses XYZW order: [x, y, z, w]
-        // iLargest: 0=x, 1=y, 2=z, 3=w
+        // SPZ V3 uses XYZW order: [x, y, z, w].
+        // iLargest: 0=x, 1=y, 2=z, 3=w.
         var rotation = [Float](repeating: 0, count: 4)
         var sumSquares: Float = 0
         var tempComp = comp
 
-        // Extract 3 components in DESCENDING order, skipping iLargest
+        // Extract 3 components in descending order. Skip iLargest.
         for i in stride(from: 3, through: 0, by: -1) where i != iLargest {
             let mag = tempComp & cMask
             let negbit = (tempComp >> 9) & 0x1
@@ -354,17 +360,16 @@ public struct SPZReader: SplatReaderProtocol {
 
         rotation[iLargest] = sqrt(1.0 - sumSquares)
 
-        // rotation is [x, y, z, w], convert to simd_quatf
+        // rotation is [x, y, z, w]. Convert to simd_quatf.
         return simd_quatf(ix: rotation[0], iy: rotation[1], iz: rotation[2], r: rotation[3])
     }
 
     private func unpackSphericalHarmonics(at offset: Int, coeffCount: Int) throws -> [[Float]] {
         var result: [[Float]] = []
 
-        // SPZ SH coefficients are stored as unsigned bytes
-        // Reference implementation: (float(x) - 128.0) / 128.0
-        // This gives range approximately [-1, ~0.99]
-
+        // SPZ stores SH coefficients as unsigned bytes. The reference
+        // implementation uses (float(x) - 128.0) / 128.0. This gives a range of
+        // about [-1, 0.99].
         for i in 0..<coeffCount {
             var coeff = [Float](repeating: 0, count: 3)
             for channel in 0..<3 {
@@ -451,12 +456,13 @@ public struct SPZReader: SplatReaderProtocol {
                 throw SplatsError.decompressionFailed
             }
 
-            // The gzip footer's ISIZE (last 4 bytes, little-endian) is the
-            // uncompressed size mod 2^32 — size the buffer from it instead of
-            // guessing. The +64 slack means a correct decode returns fewer bytes
-            // than the buffer holds, so a result that exactly fills the buffer
-            // signals a truncated decode (compression_decode_buffer reports bytes
-            // written, not completion) and we grow and retry.
+            // The gzip footer ISIZE (last 4 bytes, little-endian) is the
+            // uncompressed size mod 2^32. Size the buffer from it instead of a
+            // guess. The +64 slack means a correct decode returns fewer bytes
+            // than the buffer holds. So a result that exactly fills the buffer
+            // signals a truncated decode, because compression_decode_buffer
+            // reports bytes written, not completion. In that case, grow the
+            // buffer and retry.
             let isize = Int(data[data.count - 4]) | (Int(data[data.count - 3]) << 8)
                 | (Int(data[data.count - 2]) << 16) | (Int(data[data.count - 1]) << 24)
             var outputSize = (isize > 0 ? isize : compressedData.count * 10) + 64

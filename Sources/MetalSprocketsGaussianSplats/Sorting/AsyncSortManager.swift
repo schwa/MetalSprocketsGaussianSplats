@@ -7,7 +7,7 @@ import simd
 import Splats
 import Synchronization
 
-/// Assert that we're not on the main thread
+/// Asserts that the caller is not on the main thread.
 @inline(__always)
 private func assertNotMainThread(_ message: @autoclosure () -> String, file: StaticString = #file, line: UInt = #line) {
     assert(!Thread.isMainThread, "\(message()) should not be called on main thread", file: file, line: line)
@@ -31,14 +31,14 @@ public struct SortEvent: Sendable {
 /// Manages asynchronous sorting of Gaussian splat clouds by distance from the camera.
 ///
 /// The sort manager runs sorts on a background thread and publishes results via
-/// ``sortedIndicesStream``. It is intended to be owned by the caller (typically a
-/// SwiftUI view or view model), not by the render pipeline.
+/// ``sortedIndicesStream``. The caller owns it (typically a SwiftUI view or view
+/// model), not the render pipeline.
 ///
 /// ## Typical Usage
 ///
 /// 1. Create a sort manager with one or more splat clouds.
 /// 2. Subscribe to ``managedSortedIndicesStream(pendingReleaseDepth:)`` to receive sorted
-///    indices as they complete; superseded buffers are released back to the pool for you.
+///    indices as they complete. Superseded buffers are released back to the pool for you.
 /// 3. Call ``requestSort(_:)`` whenever the camera or model matrix changes.
 /// 4. Pass the received ``SplatIndices`` to a render pipeline.
 ///
@@ -74,7 +74,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     public private(set) var isSorted: Bool = false
 
     /// When true, released index buffers are not returned to the pool.
-    /// Useful for diagnosing buffer reuse issues (e.g. GPU still reading a released buffer).
+    /// Useful to diagnose buffer reuse faults (for example, the GPU still reads a released buffer).
     public var poolReleaseDisabled: Bool {
         get { _indexBufferPool.releaseDisabled }
         set { _indexBufferPool.releaseDisabled = newValue }
@@ -108,7 +108,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     ///     Typical value is 4 (in-flight MTKView buffers + 1 for sorting). Default is 0
     ///     which allocates buffers on demand.
     ///   - poolReleaseDisabled: Disables returning index buffers to the pool, forcing
-    ///     fresh allocations. Useful for debugging buffer reuse issues.
+    ///     fresh allocations. Useful to debug buffer reuse faults.
     public init(device: MTLDevice, splatClouds: [GPUSplatCloud<Splat>], capacity: Int, preallocatedBufferCount: Int = 0, poolReleaseDisabled: Bool = false) throws {
         self.device = device
         self.capacity = capacity
@@ -126,7 +126,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
                 } catch is CancellationError {
                     break
                 } catch {
-                    // No logger available here; drop the error.
+                    // No logger available here. Drop the error.
                 }
             }
         }
@@ -170,7 +170,7 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Stream of sorted indices, updated after each completed sort.
     ///
     /// Subscribe with `for await` to receive the latest sorted indices.
-    /// Old values are dropped if not consumed — only the most recent sort matters.
+    /// Old values are dropped if not consumed. Only the most recent sort matters.
     ///
     /// ```swift
     /// for await indices in sortManager.sortedIndicesStream {
@@ -194,18 +194,18 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// }
     /// ```
     ///
-    /// When iteration ends (e.g. the enclosing task is cancelled), any still-pending
+    /// When iteration ends (for example, the enclosing task is cancelled), any still-pending
     /// buffers are released.
     ///
     /// - Parameter pendingReleaseDepth: Number of superseded results to keep alive before
-    ///   releasing them. Should be at least the number of in-flight frames. Default is 3.
+    ///   releasing them. Must be at least the number of in-flight frames. Default is 3.
     /// - Returns: An async stream of the latest ``SplatIndices``.
     nonisolated public func managedSortedIndicesStream(pendingReleaseDepth: Int = 3) -> AsyncStream<SplatIndices> {
         let source = _sortedIndicesStream
-        // Buffer only the newest value: with unbounded buffering a lagging consumer
-        // could dequeue indices whose buffers were already released back to the
-        // pool once they fell out of the pendingRelease window (#94). The newest
-        // value is always within the window, so it is guaranteed alive.
+        // Buffer only the newest value. With unbounded buffering, a lagging
+        // consumer can dequeue indices whose buffers were already released back
+        // to the pool once they fell out of the pendingRelease window (#94).
+        // The newest value is always within the window, so it stays alive.
         let (stream, continuation) = AsyncStream.makeStream(of: SplatIndices.self, bufferingPolicy: .bufferingNewest(1))
         let task = Task {
             var pendingRelease: [SplatIndices] = []
@@ -217,8 +217,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
                     pendingRelease.removeFirst().release()
                 }
             }
-            // Release everything except the current (last yielded) value, which the
-            // consumer may still be using for rendering.
+            // Release everything except the current (last yielded) value. The
+            // consumer can still use it for rendering.
             while pendingRelease.count > 1 {
                 pendingRelease.removeFirst().release()
             }
@@ -258,11 +258,11 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Replace the active splat clouds without recreating the sort manager.
     ///
     /// If the combined splat count of the new clouds exceeds the sorter's current
-    /// capacity, the internal scratch buffer is grown automatically and a new buffer
+    /// capacity, the internal scratch buffer grows automatically and a new buffer
     /// pool is created. The old pool drains naturally as GPU completions return buffers.
     ///
-    /// The existing ``currentSortedIndices`` are deliberately **not** cleared — the stale
-    /// indices remain available for rendering until the next sort completes, preventing a
+    /// The existing ``currentSortedIndices`` are deliberately **not** cleared. The stale
+    /// indices remain available for rendering until the next sort completes. This prevents a
     /// blank frame on every cloud switch.
     ///
     /// After calling this, request a fresh sort to update the indices:
@@ -314,8 +314,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
     /// Perform a synchronous sort immediately and return the result (nonisolated wrapper).
     /// Blocks the calling thread until the sort completes.
     ///
-    /// - Important: Must not be called from an async context: the spin-wait
-    ///   would occupy a cooperative-pool thread until the sort finishes. Use
+    /// - Important: Do not call this from an async context. The spin-wait
+    ///   occupies a cooperative-pool thread until the sort finishes. Use
     ///   ``sortNowAsync(_:)`` from async code.
     nonisolated
     public func sortNowSync(_ parameters: SortParameters) -> SplatIndices {
@@ -328,8 +328,8 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
             done.store(true, ordering: .releasing)
         }
 
-        // Spin wait: blocking a nonisolated caller on an async task without a
-        // semaphore; sorts finish in milliseconds so the busy-wait is bounded.
+        // Spin wait: block a nonisolated caller on an async task without a
+        // semaphore. Sorts finish in milliseconds, so the busy-wait is bounded.
         while !done.load(ordering: .acquiring) {
             Thread.sleep(forTimeInterval: 0.0001)
         }
@@ -376,9 +376,9 @@ public actor AsyncSortManager<Splat> where Splat: SortableSplatProtocol {
         try Task.checkCancellation()
         assertNotMainThread("processSortRequest")
         let start = CFAbsoluteTimeGetCurrent()
-        // Snapshot pool and clouds atomically on the actor before doing any work.
-        // This ensures we always use a pool buffer whose capacity matches the current
-        // splatClouds — even if setSplatCloud/resize races with this call.
+        // Snapshot the pool and clouds atomically on the actor before any work.
+        // This always uses a pool buffer whose capacity matches the current
+        // splatClouds, even if setSplatCloud/resize races with this call.
         let pool = _indexBufferPool
         let clouds = splatClouds
         var outputBuffer = pool.acquire()

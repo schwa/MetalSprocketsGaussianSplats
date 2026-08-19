@@ -2,7 +2,7 @@
 import Metal
 import Testing
 
-// RFC 0003 Phase 0 go/no-go probe: the PointSplat renderer requires 64-bit
+// RFC 0003 Phase 0 go/no-go probe. The PointSplat renderer needs 64-bit
 // atomic_min on device memory (MSL 3.1, Apple9/Mac2 GPU families).
 @Suite("PointSplatAtomicProbe")
 struct PointSplatAtomicProbeTests {
@@ -28,8 +28,8 @@ struct PointSplatAtomicProbeTests {
         #expect(device.supportsFamily(.apple9) || device.supportsFamily(.mac2), "PointSplat requires Apple9 (A17/M3+) or Mac2 for 64-bit atomics")
     }
 
-    // Gated on the same compile probe: the CI runner's virtual GPU reports
-    // mac2 but cannot compile MSL 3.1 kernels, so this can only run locally.
+    // Gated on the same compile probe. The CI runner's virtual GPU reports
+    // mac2 but cannot compile MSL 3.1 kernels, so this runs only locally.
     @Test("atomic_min on ulong compiles and computes the minimum", .enabled(if: MetalTestSupport.supports64BitAtomics))
     func atomicMin64() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
@@ -43,7 +43,7 @@ struct PointSplatAtomicProbeTests {
         }
         let pipeline = try device.makeComputePipelineState(function: function)
 
-        // Depth-packed style values: high bits vary, minimum should win.
+        // Depth-packed style values: the high bits vary, and the minimum wins.
         let count = 4_096
         var values = (0..<count).map { _ in UInt64.random(in: 0..<UInt64.max) }
         let expectedMinimum = values.min() ?? 0

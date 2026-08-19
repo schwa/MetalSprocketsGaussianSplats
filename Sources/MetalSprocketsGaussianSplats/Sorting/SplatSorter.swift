@@ -7,15 +7,15 @@ import Splats
 
 /// A lightweight one-shot sorter for Gaussian splat clouds.
 ///
-/// `SplatSorter` is intended for offline or single-frame contexts — snapshot rendering,
-/// tests, CLI tools — where the full ``AsyncSortManager`` is unnecessary overhead.
+/// `SplatSorter` is for offline or single-frame contexts (snapshot rendering,
+/// tests, CLI tools) where the full ``AsyncSortManager`` is unnecessary overhead.
 /// It performs a synchronous, blocking sort and returns ``SplatIndices`` directly.
 ///
 /// For continuous interactive rendering, use ``AsyncSortManager`` instead.
 ///
 /// > Note: ``SplatIndices`` returned by `SplatSorter` are not pool-managed.
-/// > Calling ``SplatIndices/release()`` on them is a no-op. The underlying
-/// > buffer will be deallocated normally when the ``SplatIndices`` value is discarded.
+/// > A call to ``SplatIndices/release()`` on them is a no-op. The underlying
+/// > buffer deallocates normally when the ``SplatIndices`` value is discarded.
 ///
 /// ## Usage
 ///

@@ -2,10 +2,10 @@ import Foundation
 
 // Pure-Swift lossless WebP (VP8L, RFC 9649) decoder.
 //
-// ImageIO on recent macOS rejects some valid VP8L streams (lossless WebP using
-// the color-indexing transform with an alpha-carrying palette at large
-// dimensions), which breaks loading SOG files from encoders that emit such
-// textures (issue #71). This decoder is used as a fallback when
+// ImageIO on recent macOS rejects some valid VP8L streams. These are lossless
+// WebP that use the color-indexing transform with an alpha-carrying palette at
+// large dimensions. The result is a load failure for SOG files whose encoder
+// emits such textures (issue #71). This decoder is the fallback when
 // CGImageSourceCreateImageAtIndex fails. Lossy (VP8) WebP is not supported.
 
 enum VP8LError: Error, Equatable {
@@ -16,7 +16,7 @@ enum VP8LError: Error, Equatable {
 }
 
 enum VP8LDecoder {
-    /// Decodes a WebP file containing a VP8L (lossless) bitstream to
+    /// Decodes a WebP file with a VP8L (lossless) bitstream to
     /// non-premultiplied RGBA8 bytes in scan-line order.
     static func decodeRGBA(_ data: Data) throws -> (pixels: [UInt8], width: Int, height: Int) {
         let stream = try vp8lChunk(in: data)
@@ -84,11 +84,11 @@ private struct BitReader {
 // MARK: - Prefix (Huffman) codes
 
 private struct PrefixCode {
-    /// Non-nil when the code has a single symbol; decoding consumes no bits.
+    /// Non-nil when the code has a single symbol. Decoding then consumes no bits.
     let singleSymbol: Int?
-    /// Symbols sorted by (code length, symbol), lengths ascending.
+    /// Symbols sorted by code length, then by symbol, with lengths ascending.
     let symbols: [Int]
-    /// count[len] = number of symbols with that code length.
+    /// count[len] is the number of symbols with that code length.
     let counts: [Int]
 
     init(codeLengths: [Int]) throws {
@@ -503,8 +503,8 @@ private struct Decoder {
                     let left = pixels[index - 1]
                     let top = pixels[index - width]
                     let topLeft = pixels[index - width - 1]
-                    // For the rightmost column this reads the current row's
-                    // leftmost (already decoded) pixel, per the spec.
+                    // For the rightmost column, this reads the leftmost pixel of
+                    // the current row, which is already decoded, per the spec.
                     let topRight = pixels[index - width + 1]
                     let mode = (blocks[(y >> sizeBits) * blocksPerRow + (x >> sizeBits)] >> 8) & 0xFF
                     switch mode {

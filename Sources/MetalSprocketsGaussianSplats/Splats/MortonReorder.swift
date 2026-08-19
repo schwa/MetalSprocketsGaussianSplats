@@ -3,19 +3,19 @@ import simd
 /// Morton (Z-order) reordering of splat arrays at load time (#89).
 ///
 /// Group-level hierarchical culling groups consecutive splats and culls them
-/// against a per-group AABB, so culling effectiveness depends on consecutive
-/// splats being spatially coherent. PLY/SOG files are often only loosely
-/// ordered; reordering along a Morton curve makes group AABBs tight so whole
-/// groups cull cleanly.
+/// against a per-group AABB. So the cull works well only when consecutive
+/// splats are spatially coherent. PLY and SOG files are often loosely ordered.
+/// A reorder along a Morton curve tightens the group AABBs, so whole groups
+/// cull cleanly.
 public enum SplatMortonReorder {
-    /// Number of quantization bits per axis (3 × 21 = 63-bit keys).
+    /// The number of quantization bits per axis (3 × 21 = 63-bit keys).
     private static let bitsPerAxis = 21
 
     /// Returns the permutation that sorts `splats` into Morton order.
     ///
-    /// Positions are quantized to a 21-bit-per-axis grid over the cloud's
-    /// bounding box and sorted by interleaved (Z-order) key. The returned
-    /// array maps destination index to source index.
+    /// Positions are quantized to a 21-bit-per-axis grid over the bounding box
+    /// of the cloud and sorted by the interleaved (Z-order) key. The returned
+    /// array maps each destination index to a source index.
     public static func mortonOrder(of splats: [some SortableSplatProtocol]) -> [Int] {
         guard splats.count > 1 else {
             return Array(splats.indices)
@@ -42,10 +42,10 @@ public enum SplatMortonReorder {
         return splats.indices.sorted { keys[$0] < keys[$1] }
     }
 
-    /// Reorders `splats` (and, when present, per-splat SH coefficients) into
-    /// Morton order. `shCoefficients` must be laid out as `floatsPerSplat`
-    /// consecutive floats per splat; it is reordered in lockstep so
-    /// coefficients stay attached to their splat.
+    /// Reorders `splats` into Morton order, along with the per-splat SH
+    /// coefficients when they are present. `shCoefficients` must hold
+    /// `floatsPerSplat` consecutive floats per splat. It is reordered together
+    /// with the splats, so each coefficient stays attached to its splat.
     public static func reorder<Splat: SortableSplatProtocol>(splats: inout [Splat], shCoefficients: inout [Float]) {
         let order = mortonOrder(of: splats)
         let floatsPerSplat = splats.isEmpty ? 0 : shCoefficients.count / splats.count

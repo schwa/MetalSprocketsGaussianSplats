@@ -1,2 +1,2 @@
 // This file is intentionally empty.
-// Support functions are now defined in SparkSplatSupport.h
+// The support functions are defined in SparkSplatSupport.h.

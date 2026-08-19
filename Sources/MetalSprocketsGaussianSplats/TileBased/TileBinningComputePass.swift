@@ -6,8 +6,8 @@ import MetalSprocketsGaussianSplatShaders
 
 /// Compute pass that counts splats per tile (phase 1 of two-phase binning).
 ///
-/// - Important: This type is part of the **experimental** tile-based renderer
-///   and may have significant changes or be removed in future versions.
+/// - Important: This type is part of the **experimental** tile-based renderer.
+///   It can change or move in a future version.
 struct TileBinningCountPass: Element {
     // MARK: - Properties
 
@@ -47,7 +47,7 @@ struct TileBinningCountPass: Element {
 
     var body: some Element {
         get throws {
-            // Clear tile counters before counting
+            // Clear the tile counters before the count.
             try BlitPass {
                 Blit { encoder in
                     encoder.fill(
@@ -58,7 +58,7 @@ struct TileBinningCountPass: Element {
                 }
             }
 
-            // Run count kernel - one thread per splat
+            // Run the count kernel with one thread per splat.
             try ComputePass(label: "Tile Binning Count") {
                 try ComputePipeline(computeKernel: computeKernel) {
                     try ComputeDispatch(
@@ -80,10 +80,10 @@ struct TileBinningCountPass: Element {
     }
 }
 
-/// Compute pass that writes splats to compacted buffer (phase 2 of two-phase binning).
+/// Compute pass that writes splats to the compacted buffer (phase 2 of two-phase binning).
 ///
-/// - Important: This type is part of the **experimental** tile-based renderer
-///   and may have significant changes or be removed in future versions.
+/// - Important: This type is part of the **experimental** tile-based renderer.
+///   It can change or move in a future version.
 struct TileBinningWritePass: Element {
     // MARK: - Properties
 
@@ -124,7 +124,7 @@ struct TileBinningWritePass: Element {
 
     var body: some Element {
         get throws {
-            // Clear tile counters before writing (reused as local indices)
+            // Clear the tile counters before the write. The write reuses them as local indices.
             try BlitPass {
                 Blit { encoder in
                     encoder.fill(
@@ -135,7 +135,7 @@ struct TileBinningWritePass: Element {
                 }
             }
 
-            // Run write kernel - one thread per splat
+            // Run the write kernel with one thread per splat.
             try ComputePass(label: "Tile Binning Write") {
                 try ComputePipeline(computeKernel: computeKernel) {
                     try ComputeDispatch(

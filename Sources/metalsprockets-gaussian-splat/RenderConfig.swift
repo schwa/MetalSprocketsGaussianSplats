@@ -1,52 +1,52 @@
 import Foundation
 import simd
 
-/// Configuration for rendering Gaussian splats
+/// Configuration for the render of Gaussian splats.
 struct RenderConfig: Codable {
-    /// Background color in RGBA format
+    /// Background color in RGBA format.
     var background: [Float] = [0, 0, 0, 1]
 
-    /// Width of the output image
+    /// Width of the output image.
     var width: Int = 1_024
 
-    /// Height of the output image
+    /// Height of the output image.
     var height: Int = 768
 
-    /// Output PNG file path
+    /// Output PNG file path.
     var output: String = "output.png"
 
-    /// Model position in x,y,z format
+    /// Model position in x,y,z format.
     var modelPosition: [Float]?
 
-    /// Camera position in x,y,z format
+    /// Camera position in x,y,z format.
     var cameraPosition: [Float]?
 
-    /// Camera look-at target in x,y,z format
+    /// Camera look-at target in x,y,z format.
     var cameraLookat: [Float]?
 
-    /// Camera rotation as quaternion [x,y,z,w] or 3x3 matrix (9 values)
+    /// Camera rotation as a quaternion [x,y,z,w] or a 3x3 matrix (9 values).
     var cameraRotation: [Float]?
 
-    /// Camera-to-world matrix, 16 column-major values. Overrides the other
+    /// Camera-to-world matrix, 16 column-major values. This overrides the other
     /// camera fields.
     var cameraMatrix: [Float]?
 
-    /// Projection field of view in degrees
+    /// Projection field of view in degrees.
     var projectionFov: Double?
 
-    /// Camera near clipping plane
+    /// Camera near clipping plane.
     var near: Float = 0.1
 
-    /// Camera far clipping plane
+    /// Camera far clipping plane.
     var far: Float = 100.0
 
-    /// Path to splat file (.ply, .spz, .sog) to render
+    /// Path to the splat file (.ply, .spz, .sog) to render.
     var splat: String
 
-    /// Renderer to use (currently only "spark" is supported)
+    /// Renderer to use. Only "spark" is supported now.
     var renderer: String?
 
-    /// Convert sRGB to linear in fragment shader (for Spark renderer)
+    /// True if the fragment shader converts sRGB to linear (for the Spark renderer).
     var srgbToLinear: Bool?
 
     // MARK: - Helpers
@@ -95,7 +95,7 @@ struct RenderConfig: Codable {
         )
     }
 
-    /// Save configuration to JSON file
+    /// Saves the configuration to a JSON file.
     func save(to path: String) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -103,7 +103,7 @@ struct RenderConfig: Codable {
         try data.write(to: URL(fileURLWithPath: path))
     }
 
-    /// Load configuration from JSON file
+    /// Loads the configuration from a JSON file.
     static func load(from path: String) throws -> Self {
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         let decoder = JSONDecoder()

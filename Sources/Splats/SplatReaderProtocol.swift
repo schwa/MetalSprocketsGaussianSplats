@@ -2,13 +2,13 @@ import Foundation
 
 /// A reader that decodes Gaussian splats from a specific file format.
 ///
-/// Conforming types stream splats one at a time via ``read(_:)``, converting
-/// each record to an `ExtendedSplat`. Use ``SplatReader`` to pick a reader
-/// automatically from a file extension.
+/// A conforming type streams splats one at a time through ``read(_:)``. It
+/// converts each record to an `ExtendedSplat`. Use ``SplatReader`` to pick a
+/// reader from a file extension.
 public protocol SplatReaderProtocol {
     /// The total number of splats in the file.
     var splatCount: Int { get }
-    /// Spherical harmonics degree of the file's splats (0 = none).
+    /// The spherical harmonics degree of the splats in the file. 0 means none.
     var shDegree: UInt8 { get }
 
     init(url: URL) throws

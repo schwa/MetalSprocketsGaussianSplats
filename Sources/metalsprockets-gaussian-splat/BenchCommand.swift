@@ -12,9 +12,9 @@ import Splats
 
 /// Frame-time scaling benchmark across renderers and splat counts.
 ///
-/// Clouds are generated procedurally (seeded), so no large fixture files are
-/// needed; pass `--splat` to benchmark a real file instead. Run in Release —
-/// Debug numbers are meaningless (especially the CPU sort).
+/// The clouds are generated with a seed, so no large fixture files are needed.
+/// To benchmark a real file, pass `--splat`. Run in Release. Debug numbers are
+/// not representative, above all for the CPU sort.
 struct BenchCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "bench",
@@ -38,8 +38,8 @@ struct BenchCommand: AsyncParsableCommand {
     @Option(help: "Renderers to benchmark (point, spark, gpu, tile, stochastic)")
     var renderers: [BenchRenderer] = [.point, .spark, .gpu]
 
-    // Named --iterations, not --frames, to avoid colliding with the root
-    // command's --frames option (which would otherwise shadow it).
+    // Named --iterations, not --frames, so it does not collide with the root
+    // command's --frames option.
     @Option(name: .customLong("iterations"), help: "Frames per measurement (median reported)")
     var frames: Int = 50
 
@@ -184,15 +184,15 @@ struct BenchRunner {
 
     // MARK: - Cloud generation / loading
 
-    /// Random ball of splats: uniform positions in a unit sphere, log-normal
-    /// scales, random orientation and color, mostly-opaque alphas. Seeded so
-    /// runs are comparable.
+    /// Makes a random ball of splats. The positions are uniform in a unit
+    /// sphere. The scales are log-normal. The orientation and color are random,
+    /// and the alphas are mostly opaque. A seed makes the runs comparable.
     static func syntheticCloud(count: Int) -> [SparkSplat] {
         var generator = SplitMix64(seed: 0x5EED)
         var splats = [SparkSplat]()
         splats.reserveCapacity(count)
         for _ in 0..<count {
-            // Uniform in ball via rejection.
+            // Rejection sampling keeps the point uniform in the ball.
             var position: SIMD3<Float>
             repeat {
                 position = SIMD3<Float>(Float.random(in: -1...1, using: &generator), Float.random(in: -1...1, using: &generator), Float.random(in: -1...1, using: &generator))
@@ -260,7 +260,7 @@ struct BenchRunner {
                 p90MS: sorted[min(sorted.count - 1, sorted.count * 9 / 10)] * 1_000
             )
             rows.append(row)
-            // Progress to stderr so stdout stays a single clean CSV table.
+            // Progress goes to stderr so stdout stays a single clean CSV table.
             FileHandle.standardError.write(Data("  \(label) \(renderer.rawValue): \(row.medianMS.formatted(.number.precision(.fractionLength(2)))) ms\n".utf8))
         }
         return rows
@@ -287,8 +287,8 @@ struct BenchRunner {
         let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
         let offscreen = try OffscreenRenderer(size: CGSize(width: size, height: size))
         let drawableSize = SIMD2<Float>(Float(size), Float(size))
-        // Sort every frame: interactive use resorts on camera motion, and
-        // that cost is the point of the comparison.
+        // The sort runs every frame. Interactive use resorts on camera motion,
+        // and that cost is the point of the comparison.
         return try measure { _ in
             let sortedIndices = try SplatSorter.sort(device: device, splatCloud: cloud, parameters: SortParameters(camera: cameraMatrix, model: .identity))
             let renderPass = try RenderPass {
@@ -326,8 +326,8 @@ struct BenchRunner {
         let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
         let offscreen = try OffscreenRenderer(size: CGSize(width: size, height: size))
         let drawableSize = SIMD2<Float>(Float(size), Float(size))
-        // Single stochastic frame per measurement, no temporal accumulation:
-        // this is the per-frame cost an interactive session pays.
+        // One stochastic frame per measurement, with no temporal accumulation.
+        // This is the per-frame cost an interactive session pays.
         return try measure { frame in
             let renderPass = try RenderPass {
                 try StochasticSplatRenderPipeline(splatCloud: cloud, projectionMatrix: projectionMatrix, modelMatrix: .identity, cameraMatrix: cameraMatrix, drawableSize: drawableSize, frameTime: UInt32(frame))
@@ -340,8 +340,9 @@ struct BenchRunner {
         }
     }
 
-    /// Wall-clock per frame; every renderer blocks until GPU completion, so
-    /// this approximates frame cost. Two warmup frames are discarded.
+    /// Measures the wall-clock time per frame. Every renderer blocks until the
+    /// GPU completes, so this approximates the frame cost. It discards two
+    /// warmup frames.
     private func measure(_ body: (Int) throws -> Void) throws -> [Double] {
         try body(0)
         try body(1)
@@ -358,9 +359,10 @@ struct BenchRunner {
 
     // MARK: - PointSplat quality sweep
 
-    /// Single-frame PSNR per (S, K) configuration against a converged
-    /// reference (mean of many stochastic frames at the S = 2, K = 4
-    /// default). Complements the timing sweep for picking defaults.
+    /// Measures single-frame PSNR for each (S, K) configuration against a
+    /// converged reference. The reference is the mean of many stochastic frames
+    /// at the default S = 2, K = 4. This complements the timing sweep for the
+    /// choice of defaults.
     func pointQualitySweep(label: String, splats: [SparkSplat], referenceFrames: Int) throws {
         let cameraMatrix = LookAt(position: SIMD3<Float>(0, 0, 2.5), target: .zero, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
         let projection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01...100))
@@ -412,7 +414,7 @@ struct BenchRunner {
         }
     }
 
-    /// Reads back RGB (dropping alpha) from an rgba32Float texture.
+    /// Reads back RGB from an rgba32Float texture and drops the alpha.
     private func readRGB(_ texture: MTLTexture) throws -> [Float] {
         let pixelCount = texture.width * texture.height
         var rgba = [Float](repeating: 0, count: pixelCount * 4)
@@ -443,7 +445,7 @@ struct BenchRunner {
     // MARK: - GPU sort detail
 
     /// Detailed per-pass timings for the GPU-sort spark renderer at one size
-    /// and target cull fraction.
+    /// and one target cull fraction.
     struct SortDetailRow: Codable {
         var label: String
         var splats: Int
@@ -462,9 +464,10 @@ struct BenchRunner {
 
     private static let sortDetailProjection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01...100))
 
-    /// Camera-to-world at distance 2.5 from the origin, its forward rotated by
-    /// `theta` about Y. theta=0 looks at the cloud (minimal cull); larger theta
-    /// rotates the cloud out of frustum, culling progressively more.
+    /// Returns a camera-to-world matrix at distance 2.5 from the origin. The
+    /// forward direction rotates by `theta` about Y. At theta=0 the camera
+    /// looks at the cloud and culls the least. A larger theta rotates the cloud
+    /// out of the frustum and culls more.
     private func cullCamera(theta: Float) -> simd_float4x4 {
         simd_float4x4(translation: SIMD3<Float>(0, 0, 2.5)) * simd_float4x4(simd_quatf(angle: theta, axis: SIMD3<Float>(0, 1, 0)))
     }
@@ -480,7 +483,8 @@ struct BenchRunner {
         )
     }
 
-    /// Culled fraction (0..100) for one camera, from the GPU sort's survivor count.
+    /// Returns the culled fraction (0..100) for one camera, from the survivor
+    /// count of the GPU sort.
     @MainActor
     private func probeCull(cloud: GPUSplatCloud<SparkSplat>, count: Int, theta: Float) throws -> Double {
         let report = try makeSortRenderer(cloud: cloud, camera: cullCamera(theta: theta)).renderFrame()
@@ -488,16 +492,16 @@ struct BenchRunner {
         return (1 - Double(visible) / Double(count)) * 100
     }
 
-    /// Measures the GPU-sort spark renderer through OffscreenSplatRenderer (with
-    /// GPU counters), rotating the camera to cull ~targetCull%, and aggregates
+    /// Measures the GPU-sort spark renderer through OffscreenSplatRenderer with
+    /// GPU counters. The camera rotates to cull ~targetCull%. This aggregates
     /// the per-pass FrameReport into a detail row.
     @MainActor
     func sortDetail(label: String, splats: [SparkSplat], targetCull: Double) throws -> SortDetailRow {
         let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
         let count = splats.count
 
-        // Binary-search the camera rotation for ~targetCull% (culled fraction
-        // rises monotonically with theta over [0, pi]).
+        // The culled fraction rises monotonically with theta over [0, pi], so a
+        // binary search finds the camera rotation for ~targetCull%.
         var theta: Float = 0
         if targetCull > 0 {
             var lo: Float = 0, hi: Float = .pi
@@ -547,8 +551,8 @@ struct BenchRunner {
 
     // MARK: - Output
 
-    /// CSV lines (header + one row per measurement). Used for both stdout and
-    /// the `--csv` file so they are identical.
+    /// Returns CSV lines: a header and one row per measurement. Both stdout and
+    /// the `--csv` file use this, so they are identical.
     static func csvLines(_ rows: [Row]) -> [String] {
         var lines = ["label,splats,renderer,median_ms,p10_ms,p90_ms"]
         for row in rows {
@@ -566,14 +570,14 @@ struct BenchRunner {
     }
 }
 
-/// Bench-local blocking wrapper: runs ``PointSplatComputePass`` into a float
-/// texture, one stochastic frame per call.
+/// Bench-local blocking wrapper around ``PointSplatComputePass``. It renders one
+/// stochastic frame per call into a float texture.
 private final class BenchPointSplatRenderer {
     private let runner: Runner
     private let texture: MTLTexture
     private let supersampling: Int
     private let pointsPerThread: Int
-    /// Monotonic plan key; frame seeds can repeat across measurements.
+    /// Monotonic plan key. The frame seeds can repeat across measurements.
     private var planCounter: UInt64 = 0
 
     init(device: MTLDevice, runner: Runner, size: Int, supersampling: Int, pointsPerThread: Int) throws {
@@ -609,7 +613,7 @@ private final class BenchPointSplatRenderer {
     }
 }
 
-/// Seeded RNG so synthetic clouds are identical across runs.
+/// Seeded RNG so the synthetic clouds are identical across runs.
 struct SplitMix64: RandomNumberGenerator {
     private var state: UInt64
 

@@ -56,12 +56,12 @@ struct ManagedSortedIndicesStreamTests {
         let parameters = SortParameters(camera: .identity, model: .identity)
         for _ in 0 ..< sortCount {
             _ = await sortManager.sortNowAsync(parameters)
-            // Give the consumer a chance to keep up so no yields are dropped.
+            // The sleep lets the consumer keep up so no yields are dropped.
             try await Task.sleep(for: .milliseconds(20))
         }
 
-        // With depth 0, all superseded buffers must return to the pool; only the
-        // current (latest) buffer is still held. Poll to avoid timing flakiness.
+        // At depth 0, all superseded buffers return to the pool. Only the latest
+        // buffer is still held. The poll avoids timing flakiness.
         let pool = await sortManager.indexBufferPool
         var deadline = 100
         while pool.availableCount < pool.totalAllocatedCount - 1, deadline > 0 {
@@ -85,9 +85,9 @@ struct ManagedSortedIndicesStreamTests {
         )
 
         let consumer = Task {
-            // Large depth: nothing is released during iteration.
+            // A large depth releases nothing during iteration.
             for await _ in sortManager.managedSortedIndicesStream(pendingReleaseDepth: 100) {
-                // Consume without releasing; depth check happens after cancellation.
+                // Consume without release. The depth check runs after cancellation.
             }
         }
 
@@ -100,7 +100,7 @@ struct ManagedSortedIndicesStreamTests {
         consumer.cancel()
         await consumer.value
 
-        // After cancellation, all but the last-yielded buffer must be released.
+        // After cancellation, all buffers except the last-yielded one release.
         let pool = await sortManager.indexBufferPool
         var deadline = 100
         while pool.availableCount < pool.totalAllocatedCount - 1, deadline > 0 {

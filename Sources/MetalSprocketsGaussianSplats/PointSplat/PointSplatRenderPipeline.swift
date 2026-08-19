@@ -13,8 +13,8 @@ internal import os
 /// splatting with temporal accumulation, presented via a fullscreen blit.
 ///
 /// Each frame is rendered at 1 sample per pixel and blended into a running
-/// mean; callers should bump `resetAccumulation` inputs (camera/model
-/// changes reset automatically via matrix comparison).
+/// mean. Callers must bump `resetAccumulation` inputs. A camera or model
+/// change resets accumulation automatically through matrix comparison.
 ///
 /// - Important: This renderer is **experimental**. Requires Apple9/Mac2
 ///   (64-bit atomics).
@@ -46,8 +46,8 @@ public struct PointSplatRenderPipeline: Element {
     /// Rendering options for ``PointSplatRenderPipeline`` (#101).
     public struct Configuration {
         /// View-space range for the framebuffer's 28-bit fixed-point depth
-        /// quantization and the near cull. Should match the projection's clip
-        /// range; reversed-infinite-Z callers must supply a finite far for
+        /// quantization and the near cull. Must match the projection's clip
+        /// range. Reversed-infinite-Z callers must supply a finite far for
         /// quantization purposes.
         public var depthRange: ClosedRange<Float>
         /// Framebuffer supersampling factor. Clamped to at least 1.
@@ -58,7 +58,7 @@ public struct PointSplatRenderPipeline: Element {
         /// paper's K = 4 (issue #76).
         public var pointsPerThread: Int
         /// Whether the previous frame's accumulation is reprojected when the
-        /// camera moves, reducing convergence noise.
+        /// camera moves, to reduce convergence noise.
         public var reprojection: Bool
         /// Optional collector for per-frame render statistics.
         public var statistics: PointSplatStatistics?
@@ -103,15 +103,15 @@ public struct PointSplatRenderPipeline: Element {
         let blitLibrary = shaderLibrary.namespaced("BlitShader")
         blitVertexShader = try blitLibrary.function(named: "vertex_main", type: VertexShader.self)
         // The accumulation texture holds sRGB-encoded splat values (the paper
-        // averages in sRGB); linearize so the sRGB drawable's store encode
+        // averages in sRGB). Linearize so the sRGB drawable's store encode
         // round-trips instead of double-encoding (#68).
         var blitConstants = FunctionConstants()
         blitConstants["convert_srgb_to_linear"] = .bool(true)
         blitFragmentShader = try blitLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: blitConstants)
     }
 
-    /// `@MSState` persists resources across body evaluations, so a splat
-    /// cloud swap (e.g. switching models in the demo) can outgrow the counts
+    /// `@MSState` persists resources across body evaluations. A splat cloud
+    /// swap (for example, switching models in the demo) can outgrow the counts
     /// buffer and distributor before `.onChange` fires. Validate eagerly.
     ///
     /// Resources are created lazily here (not in `init`) so they can be
@@ -138,11 +138,11 @@ public struct PointSplatRenderPipeline: Element {
             let height = resources.height
             let bufferWidth = width * supersampling
             let bufferHeight = height * supersampling
-            // Running mean: weight the new frame by 1/(n+1); camera or model
-            // motion reprojects history (#73) or, with reprojection disabled
-            // (#74), hard-resets so motion shows raw 1-SPP noise.
+            // Running mean: weight the new frame by 1/(n+1). Camera or model
+            // motion reprojects history (#73). With reprojection disabled
+            // (#74), motion hard-resets, so motion shows raw 1-SPP noise.
             let accumulation = resources.nextAccumulationStep(frameIndex: frameIndex, cameraMatrix: cameraMatrix, modelMatrix: modelMatrix, projectionMatrix: projectionMatrix, allowReprojection: reprojection)
-            // Temporal point reuse (RFC 0005 §4) is disabled: seeding from
+            // Temporal point reuse (RFC 0005 §4) is disabled. Seeding from
             // the resolve chains seeded history recursively, so stale
             // surfaces persist for several frames during rotation (#107).
             let reuseFactor: Float = 0
@@ -166,7 +166,7 @@ public struct PointSplatRenderPipeline: Element {
                 reuseFactor: reuseFactor
             )
             let shBuffer = splatCloud.shCoefficients?.unsafeMTLBuffer ?? resources.dummySHBuffer
-            // Always nil while reuseFactor is pinned to 0 (#107); reconstruct
+            // Always nil while reuseFactor is pinned to 0 (#107). Reconstruct
             // from accumulation.previousCameraMatrix/previousProjectionMatrix
             // when re-enabling.
             let seedReprojection: PointSplatResources.SeedReprojection? = nil
@@ -239,8 +239,8 @@ public final class PointSplatStatistics: Sendable {
         get { state.withLock(\.pointCount) }
         set { state.withLock { $0.pointCount = newValue } }
     }
-    /// Raw point demand last frame; exceeding the budget means splats are
-    /// being thinned proportionally.
+    /// Raw point demand last frame. A demand above the budget means the splats
+    /// are thinned proportionally.
     public var pointDemand: Int {
         get { state.withLock(\.pointDemand) }
         set { state.withLock { $0.pointDemand = newValue } }
@@ -251,7 +251,7 @@ public final class PointSplatStatistics: Sendable {
     }
 
     public init() {
-        // No stored configuration; all fields start at zero.
+        // No stored configuration. All fields start at zero.
     }
 }
 
@@ -277,7 +277,7 @@ final class PointSplatResources {
     let statsBuffer: MTLBuffer
     private let zeroTotals: MTLBuffer
     let splatCount: Int
-    /// Gaussians per hierarchical-culling group (#75); must match
+    /// Gaussians per hierarchical-culling group (#75). Must match
     /// GROUP_SIZE in PointSplatRender.metal.
     static let groupSize = 256
     let groupCount: Int
@@ -288,7 +288,7 @@ final class PointSplatResources {
     private let visibleGroups: MTLBuffer
     private let visibleGroupCount: MTLBuffer
     private let groupDispatchArgs: MTLBuffer
-    /// Splat buffer the group AABBs were computed from; recompute on change.
+    /// Splat buffer the group AABBs were computed from. Recompute on change.
     private var boundsSourceBuffer: ObjectIdentifier?
     let distributor: PointSplatWorkloadDistributor
     let resolveTexture: MTLTexture
@@ -475,10 +475,10 @@ final class PointSplatResources {
 
     /// One full PointSplat frame up to (not including) the resolve, as
     /// compute elements for an enclosing ``ComputePass``: clear, phase-1
-    /// preprocess/distribute/splat, depth pyramid build, and — when a
-    /// pyramid from a previous frame exists — the paper's phase 2
-    /// (re-testing phase-1-culled Gaussians against the fresh pyramid so
-    /// stale-depth culling can never lose geometry).
+    /// preprocess/distribute/splat, depth pyramid build. When a pyramid from
+    /// a previous frame exists, it also runs the paper's phase 2. Phase 2
+    /// re-tests phase-1-culled Gaussians against the fresh pyramid, so
+    /// stale-depth culling can never lose geometry.
     /// Reprojection inputs for temporal point reuse (RFC 0005 §4).
     struct SeedReprojection {
         var previousCameraToWorld: simd_float4x4
@@ -504,8 +504,8 @@ final class PointSplatResources {
             if let seedReprojection {
                 // Seed the fresh framebuffer with last frame's depth-tested
                 // surface before any fresh splats (RFC 0005 §4). Reads the
-                // previous frame's resolve and depth pyramid level 0, both
-                // still intact at this point.
+                // previous frame's resolve and depth pyramid level 0. Both
+                // are still intact at this point.
                 try ComputePipeline(computeKernel: seedReprojectKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
                         .parameter("framebuffer", buffer: framebuffer)
@@ -559,9 +559,9 @@ final class PointSplatResources {
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
         let single = MTLSize(width: 1, height: 1, depth: 1)
 
-        // Reset counts/mask/visible-group counter, cull whole groups against
-        // the frustum and depth pyramid, then run the per-Gaussian
-        // preprocess only for surviving groups (#75).
+        // Reset counts/mask/visible-group counter. Cull whole groups against
+        // the frustum and depth pyramid. Then run the per-Gaussian preprocess
+        // only for surviving groups (#75).
         return try Group {
             try ComputePipeline(computeKernel: clearCountsKernel) {
                 try ComputeDispatch(threadsPerGrid: MTLSize(width: max(splatCount, 1), height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
@@ -655,10 +655,10 @@ final class PointSplatResources {
     }
 
     /// Advances the ping-pong textures and returns this frame's blend
-    /// inputs. A static view continues the running mean; camera or
+    /// inputs. A static view continues the running mean. Camera or
     /// projection motion switches to reprojection against the previous
-    /// view-projection (model changes still hard-reset — reprojection can't
-    /// warp content change).
+    /// view-projection. Model changes still hard-reset, because reprojection
+    /// cannot warp a content change.
     ///
     /// Idempotent per `frameIndex`: `body` can be evaluated multiple times
     /// per frame (diffing/re-expansion), so repeat calls for the same frame

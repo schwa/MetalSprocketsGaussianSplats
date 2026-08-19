@@ -14,10 +14,10 @@ import Splats
 /// Renders offscreen frames of a splat cloud with any of the splat renderers
 /// behind one interface.
 ///
-/// Hides the per-renderer differences — pass shape, sorting, output format —
-/// that otherwise leak into every offscreen consumer: spark needs sorted
-/// indices from a CPU or GPU sort, tile and stochastic are self-contained
-/// passes, and point is compute-only with a float output texture.
+/// This type hides the per-renderer differences in pass shape, sorting, and
+/// output format. Spark needs sorted indices from a CPU or GPU sort. Tile and
+/// stochastic are self-contained passes. Point is compute-only and writes a
+/// float output texture.
 ///
 /// ```swift
 /// let renderer = try OffscreenSplatRenderer(
@@ -32,10 +32,10 @@ import Splats
 /// let image = try renderer.makeImage()
 /// ```
 ///
-/// Each ``renderFrame()`` call blocks until the GPU completes and advances the
-/// stochastic frame seed, so repeated calls behave like successive interactive
-/// frames. Set ``Configuration/collectGPUCounters`` to receive GPU timestamp
-/// samples in the returned ``FrameReport``.
+/// Each ``renderFrame()`` call blocks until the GPU completes. It then advances
+/// the stochastic frame seed, so repeated calls behave like successive
+/// interactive frames. Set ``Configuration/collectGPUCounters`` to receive GPU
+/// timestamp samples in the returned ``FrameReport``.
 @MainActor
 public final class OffscreenSplatRenderer {
     /// Which splat renderer draws the frame.
@@ -54,7 +54,7 @@ public final class OffscreenSplatRenderer {
     public enum SortMethod: String, CaseIterable, Sendable {
         /// Blocking CPU radix sort.
         case cpu
-        /// Cull + radix sort compute pass in the same submission as the render.
+        /// Cull and radix sort compute pass in the same submission as the render.
         case gpu
     }
 
@@ -63,7 +63,7 @@ public final class OffscreenSplatRenderer {
         public var height: Int
         public var backgroundColor: SIMD4<Float>
         public var convertSRGBToLinear: Bool
-        /// View-space depth range; the point renderer uses it for depth
+        /// View-space depth range. The point renderer uses it for depth
         /// quantization and the near cull.
         public var nearPlane: Float
         public var farPlane: Float
@@ -97,22 +97,22 @@ public final class OffscreenSplatRenderer {
         }
     }
 
-    /// Timings and stats for one rendered frame. Fields are `nil` where the
-    /// renderer or configuration does not produce them.
+    /// Timings and stats for one rendered frame. A field is `nil` when the
+    /// renderer or configuration does not produce it.
     public struct FrameReport: Sendable {
         /// Blocking CPU radix sort time (spark with ``SortMethod/cpu``).
         public var sortCPUTime: TimeInterval?
         /// GPU sort compute pass sample (spark with ``SortMethod/gpu``).
         public var sortGPU: GPUCounterSample?
-        /// Main pass sample: render pass time with vertex/fragment intervals,
-        /// or whole-encoder compute time for the point renderer.
+        /// Main pass sample: the render pass time with vertex and fragment
+        /// intervals, or the whole-encoder compute time for the point renderer.
         public var render: GPUCounterSample?
         /// Frustum-cull survivors (spark with ``SortMethod/gpu``; the GPU sort
         /// is the only path that culls).
         public var visibleSplats: Int?
         /// Whole-submission GPU time from the command-buffer clock
         /// (`gpuEndTime - gpuStartTime`), correlation-free. `nil` if unavailable.
-        /// For the GPU sort path this spans sort+render (one submission).
+        /// For the GPU sort path this spans sort and render (one submission).
         public var commandBufferGPUTime: TimeInterval?
     }
 
@@ -135,15 +135,15 @@ public final class OffscreenSplatRenderer {
     private let offscreenRenderer: OffscreenRenderer?
     // Spark with the GPU sort.
     private let gpuSortResources: GPUSortResources?
-    // The point renderer is compute-only: it resolves into this float texture
-    // via its own runner instead of the offscreen renderer's render target.
+    // The point renderer is compute-only. It resolves into this float texture
+    // through its own runner, not the offscreen renderer's render target.
     private let pointRunner: Runner?
     private let pointTexture: MTLTexture?
 
     /// - Parameters:
     ///   - renderer: Which splat renderer draws the frames.
     ///   - splatCloud: The splat cloud to render.
-    ///   - projection: The camera projection; its matrix is derived from the
+    ///   - projection: The camera projection. Its matrix comes from the
     ///     configured aspect ratio.
     ///   - cameraMatrix: The camera (view-to-world) matrix.
     ///   - modelMatrix: The scene-level model transform.
@@ -232,7 +232,7 @@ public final class OffscreenSplatRenderer {
 
     /// The last rendered frame as an image.
     ///
-    /// Call after at least one ``renderFrame()``.
+    /// Call this after at least one ``renderFrame()``.
     public func makeImage() throws -> CGImage {
         if let pointTexture {
             return try Self.makeImage(fromRGBA32Float: pointTexture)
@@ -251,8 +251,8 @@ public final class OffscreenSplatRenderer {
         }
         var report = FrameReport()
         if let gpuSortResources {
-            // Sort and render in one submission, mirroring
-            // GPUSortedSplatRenderPipeline but with counters on each pass.
+            // Sort and render in one submission, like GPUSortedSplatRenderPipeline
+            // but with counters on each pass.
             let slot = gpuSortResources.advance()
             let sortedIndices = gpuSortResources.makeIndices(slot: slot, count: splatCloud.count, parameters: sortParameters)
             let sortPass = try GPUSplatSortComputePass(
@@ -304,7 +304,7 @@ public final class OffscreenSplatRenderer {
         }
     }
 
-    /// Counters report the final tile render pass; the binning and sorting
+    /// Counters report the final tile render pass. The binning and sorting
     /// compute passes share its sample buffer and are not reported.
     private func renderTileFrame() throws -> FrameReport {
         guard let offscreenRenderer else {
@@ -383,7 +383,7 @@ public final class OffscreenSplatRenderer {
 
     /// Converts the point renderer's rgba32Float output to an 8-bit image.
     ///
-    /// Values are sRGB-encoded to match the element renderers, which write
+    /// The values are sRGB-encoded to match the element renderers, which write
     /// into an sRGB framebuffer.
     private static func makeImage(fromRGBA32Float texture: MTLTexture) throws -> CGImage {
         #if os(macOS)

@@ -3,14 +3,14 @@ import Synchronization
 
 /// A thread-safe generic object pool.
 ///
-/// `Pool` manages reusable objects, reducing allocation overhead for frequently
-/// created and discarded items. Objects are acquired from the pool and must be
-/// explicitly released back when no longer needed.
+/// `Pool` manages reusable objects. It reduces the allocation cost for items
+/// that you create and discard often. Acquire an object from the pool. Release
+/// it back when you no longer need it.
 ///
 /// ## Thread Safety
 ///
-/// All operations are thread-safe via internal locking. Objects can be acquired
-/// and released from any thread.
+/// Internal locking makes all operations thread-safe. You can acquire and
+/// release objects from any thread.
 ///
 /// ## Typical Usage
 ///
@@ -30,12 +30,13 @@ import Synchronization
 ///
 /// ## Pool Exhaustion
 ///
-/// When all pooled objects are in use, `acquire()` allocates a new object using
-/// the allocator closure and logs a warning. This helps identify when the
+/// If all pooled objects are in use, `acquire()` allocates a new object with
+/// the allocator closure and logs a warning. The warning shows when the
 /// preallocated count is too low.
 final class Pool<T: Sendable>: @unchecked Sendable {
-    /// When true, `release()` is a no-op — objects are never returned to the pool.
-    /// Useful for diagnosing buffer reuse issues (e.g. GPU still reading a released buffer).
+    /// When true, `release()` does nothing and objects never return to the pool.
+    /// Use it to diagnose buffer reuse problems, such as a GPU that still reads
+    /// a released buffer.
     var releaseDisabled: Bool = false
 
     private let allocator: @Sendable (Int) -> T
@@ -50,8 +51,8 @@ final class Pool<T: Sendable>: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - preallocatedCount: Number of objects to create upfront. Default is 0.
-    ///   - allocator: Closure that creates a new object. Receives an incrementing
-    ///     ID that can be used for debug labeling.
+    ///   - allocator: Closure that creates a new object. It receives an
+    ///     incrementing ID for debug labeling.
     init(preallocatedCount: Int = 0, allocator: @escaping @Sendable (_ id: Int) -> T) {
         self.allocator = allocator
         var initialState = State()
@@ -64,8 +65,8 @@ final class Pool<T: Sendable>: @unchecked Sendable {
 
     /// Acquires an object from the pool.
     ///
-    /// Returns a pooled object if available, otherwise allocates a new one.
-    /// A warning is logged when allocation occurs due to pool exhaustion.
+    /// Returns a pooled object if one is available. If none is available, it
+    /// allocates a new one. Pool exhaustion logs a warning.
     ///
     /// - Returns: An object ready for use.
     func acquire() -> T {
@@ -85,8 +86,8 @@ final class Pool<T: Sendable>: @unchecked Sendable {
 
     /// Releases an object back to the pool for reuse.
     ///
-    /// Call this when the object is no longer in use. For GPU buffers, this
-    /// should typically be done in a `commandBuffer.addCompletedHandler`.
+    /// Call this when the object is no longer in use. For GPU buffers, call it
+    /// in a `commandBuffer.addCompletedHandler`.
     ///
     /// - Parameter item: The object to return to the pool.
     func release(_ item: T) {
@@ -100,14 +101,14 @@ final class Pool<T: Sendable>: @unchecked Sendable {
 
     /// The number of objects currently available in the pool.
     ///
-    /// Useful for debugging and monitoring pool utilization.
+    /// Use it to debug and monitor pool use.
     var availableCount: Int {
         state.withLock { $0.available.count }
     }
 
-    /// The total number of objects ever allocated by this pool.
+    /// The total number of objects this pool ever allocated.
     ///
-    /// Includes both preallocated objects and those allocated on demand.
+    /// The total includes preallocated objects and objects allocated on demand.
     var totalAllocatedCount: Int {
         state.withLock { $0.nextID }
     }

@@ -9,9 +9,10 @@ import MetalSprocketsGaussianSplatShaders
 import simd
 import Testing
 
-/// Smoke tests for the tile-based renderer: an opaque splat in front of the
-/// camera must produce visible, correctly colored output (guards the
-/// precomputed-conic fast path added for #58).
+/// Smoke tests for the tile-based renderer.
+///
+/// An opaque splat in front of the camera must produce visible, correctly
+/// colored output. The test guards the precomputed-conic fast path (#58).
 @Suite(.disabled(if: ProcessInfo.processInfo.environment["CI"] != nil, "GPU-dependent"))
 struct TileRenderingTests {
     @Test @MainActor
@@ -38,8 +39,8 @@ struct TileRenderingTests {
         let pixels = try #require(image.dataProvider?.data as Data?)
         let bytesPerRow = image.bytesPerRow
         let bytesPerPixel = image.bitsPerPixel / 8
-        // Offscreen renders come back byteOrder32Little/premultipliedFirst,
-        // i.e. B,G,R,A byte order.
+        // Offscreen renders come back as byteOrder32Little/premultipliedFirst,
+        // that is B,G,R,A byte order.
         func pixel(_ x: Int, _ y: Int) -> (r: UInt8, g: UInt8, b: UInt8) {
             let offset = y * bytesPerRow + x * bytesPerPixel
             return (pixels[offset + 2], pixels[offset + 1], pixels[offset])

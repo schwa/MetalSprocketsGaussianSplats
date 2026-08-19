@@ -5,8 +5,8 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import simd
 
-/// Test-local blocking wrapper: runs ``PointSplatComputePass`` into a
-/// CPU-readable float texture, one stochastic frame per call.
+/// Test-local blocking wrapper around ``PointSplatComputePass``. It renders one
+/// stochastic frame per call into a CPU-readable float texture.
 final class PointSplatTestRenderer {
     enum Error: Swift.Error {
         case textureAllocationFailed
@@ -17,7 +17,7 @@ final class PointSplatTestRenderer {
     private let backgroundColor: SIMD3<Float>
     private let supersampling: Int
     private let pointsPerThread: Int
-    /// Monotonic plan key; frame seeds can repeat.
+    /// Monotonic plan key. The frame seeds can repeat.
     private var planCounter: UInt64 = 0
 
     init(device: MTLDevice, width: Int, height: Int, supersampling: Int = 1, pointsPerThread: Int = 1, backgroundColor: SIMD3<Float> = .zero) throws {

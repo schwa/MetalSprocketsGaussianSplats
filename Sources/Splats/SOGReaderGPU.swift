@@ -13,20 +13,20 @@ import ZIPFoundation
 
 // MARK: - SOGReaderGPU
 
-/// GPU-accelerated SOG reader, ported from schwa/gaussiansplats-ios.
+/// A GPU-accelerated SOG reader, ported from schwa/gaussiansplats-ios.
 ///
-/// Unzips the archive, decodes the SOG's WebP planes concurrently into
-/// `.rgba8Uint` textures, and runs a compute kernel
-/// (`SOGDecodeShader::decode`) that performs the per-splat de-quantize loop
-/// on the GPU, producing a `SparkSplat` buffer (and flattened higher-order SH
-/// float buffer) ready for rendering — orders of magnitude faster than a
-/// per-splat CPU decode for multi-million-splat files.
+/// The reader unzips the archive. It decodes the SOG WebP planes concurrently
+/// into `.rgba8Uint` textures. Then it runs a compute kernel
+/// (`SOGDecodeShader::decode`) that does the per-splat de-quantize loop on the
+/// GPU. The kernel produces a `SparkSplat` buffer and a flattened higher-order
+/// SH float buffer, ready for rendering. This is much faster than a per-splat
+/// CPU decode for files with millions of splats.
 ///
-/// Unlike the other readers, `SOGReaderGPU` does not conform to
-/// ``SplatReaderProtocol``: that protocol streams CPU-side `ExtendedSplat`
-/// values one at a time, while this reader needs a `MTLDevice` and produces
-/// GPU-resident buffers wholesale. It follows the same `read` naming, but
-/// takes the URL per call (the device, not the file, is the reader's state).
+/// `SOGReaderGPU` does not conform to ``SplatReaderProtocol``. That protocol
+/// streams CPU-side `ExtendedSplat` values one at a time. This reader needs a
+/// `MTLDevice` and produces GPU-resident buffers all at once. It uses the same
+/// `read` name, but takes the URL per call. The device is the reader state, not
+/// the file.
 public struct SOGReaderGPU {
     /// Decoded result, GPU-resident.
     public struct Result {
@@ -43,9 +43,9 @@ public struct SOGReaderGPU {
         self.device = device
     }
 
-    // Cache a Runner (and its element System) per device. Reusing the Runner
-    // keeps the compiled decode pipeline state cached across `read` calls,
-    // which would otherwise recompile the compute function every read.
+    // Cache one Runner (and its element System) per device. A reused Runner
+    // keeps the compiled decode pipeline state across `read` calls. Without the
+    // cache, each read recompiles the compute function.
     private static let runnerCache = RunnerCache()
 
     private func decodeKernel() throws -> ComputeKernel {
@@ -59,7 +59,7 @@ public struct SOGReaderGPU {
     ///
     /// - Parameters:
     ///   - url: The `.sog` archive to read.
-    ///   - name: Overrides the buffer label; defaults to the file's name.
+    ///   - name: Overrides the buffer label. The default is the file name.
     public func read(url: URL, name: String? = nil) throws -> Result {
         let archive: Archive
         do {
@@ -71,8 +71,8 @@ public struct SOGReaderGPU {
         let metadataData = try Self.extractData(from: archive, filename: "meta.json")
         let metadata = try JSONDecoder().decode(SOGGPUMetadata.self, from: metadataData)
 
-        // Gather the image filenames. WebP decode dominates load time and each
-        // image is independent, so we extract serially (cheap) then decode +
+        // Gather the image filenames. WebP decode dominates the load time, and
+        // each image is independent. Extract serially (cheap), then decode and
         // upload concurrently.
         let hasSH = (metadata.shN?.files.count ?? 0) >= 2
         var filenames = [
@@ -112,8 +112,8 @@ public struct SOGReaderGPU {
         let sh0Codebook = try makeFloatBuffer(metadata.sh0.codebook, label: "sh0Codebook")
         let shNCodebook = try makeFloatBuffer(metadata.shN?.codebook ?? [0], label: "shNCodebook")
 
-        // Output buffers. Label them with the source filename so GPU captures
-        // identify which cloud each buffer belongs to.
+        // Output buffers. Label each one with the source filename. The label
+        // lets a GPU capture identify which cloud each buffer belongs to.
         let cloudName = name ?? url.deletingPathExtension().lastPathComponent
         let count = metadata.count
         let splatsOut = try device.makeTypedBuffer(element: SparkSplat.self, capacity: count, options: [.storageModeShared]).labeled("Splats (\(cloudName))")
@@ -172,15 +172,17 @@ public struct SOGReaderGPU {
         return buffer
     }
 
-    /// Extract each image serially (cheap), then decode + upload all of them
-    /// concurrently. WebP decode is the dominant cost and each image is
-    /// independent, so this parallelizes the bottleneck.
+    /// Extracts each image serially (cheap), then decodes and uploads all of
+    /// them concurrently.
+    ///
+    /// WebP decode is the dominant cost, and each image is independent. This
+    /// parallelizes the bottleneck.
     private func loadTextures(from archive: Archive, filenames: [String]) throws -> [MTLTexture] {
         let blobs = try filenames.map { try Self.extractData(from: archive, filename: $0) }
 
         let device = self.device
         // Each concurrentPerform iteration writes to a distinct index, so the
-        // shared buffer is safe to capture despite being non-Sendable.
+        // shared buffer is safe to capture even though it is non-Sendable.
         nonisolated(unsafe) let results = UnsafeMutableBufferPointer<DecodeResult>.allocate(capacity: filenames.count)
         defer {
             results.deallocate()
@@ -216,8 +218,10 @@ public struct SOGReaderGPU {
         case failure(Error)
     }
 
-    /// Decode a SOG image to raw, non-premultiplied RGBA bytes and upload as an
-    /// `.rgba8Uint` texture (integer texels; no sRGB / normalization).
+    /// Decodes a SOG image to raw, non-premultiplied RGBA bytes and uploads it
+    /// as an `.rgba8Uint` texture.
+    ///
+    /// The texture uses integer texels, with no sRGB and no normalization.
     private static func decodeAndUpload(device: MTLDevice, data imageData: Data, filename: String) throws -> MTLTexture {
         let (pixels, width, height) = try SOGImageDecode.decodeRGBA(imageData, filename: filename)
 
@@ -255,10 +259,11 @@ public struct SOGReaderGPU {
 
 // MARK: - Runner cache
 
-/// Thread-safe per-device cache of MetalSprockets Runners. A Runner is
-/// single-isolation, so the lock is held for the whole `run` — concurrent
-/// decode dispatches serialize here, but the dispatch is cheap next to the
-/// WebP decode, which stays parallel.
+/// A thread-safe per-device cache of MetalSprockets Runners.
+///
+/// A Runner is single-isolation, so the lock is held for the whole `run`.
+/// Concurrent decode dispatches serialize here. The dispatch is cheap next to
+/// the WebP decode, which stays parallel.
 final class RunnerCache: @unchecked Sendable {
     private let lock = NSLock()
     private var cache: [ObjectIdentifier: Runner] = [:]

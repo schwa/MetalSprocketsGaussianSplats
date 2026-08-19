@@ -5,10 +5,10 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-/// Renders a heatmap overlay showing splat density per tile.
+/// Renders a heatmap overlay that shows the splat density per tile.
 ///
-/// - Important: This type is part of the **experimental** tile-based renderer
-///   and may have significant changes or be removed in future versions.
+/// - Important: This type is part of the **experimental** tile-based renderer.
+///   It can change or move in a future version.
 struct TileHeatMapRenderPass: Element {
     var tileSplatResources: TileSplatResources
     var showTileBorders: Bool
@@ -19,9 +19,9 @@ struct TileHeatMapRenderPass: Element {
     var vertexShader: VertexShader
     @MSState
     var fragmentShader: FragmentShader
-    /// Function-constant value baked into `fragmentShader`. Body recompiles the
-    /// shader when this drifts from `showTileBorders`, propagating compile
-    /// errors instead of crashing.
+    /// Function-constant value baked into `fragmentShader`. The body recompiles
+    /// the shader when this drifts from `showTileBorders`. Compile errors
+    /// propagate instead of a crash.
     @MSState
     private var lastShowTileBorders: Bool?
 
@@ -50,9 +50,9 @@ struct TileHeatMapRenderPass: Element {
         return try shaderLibrary.function(named: "tile_heatmap_fragment", type: FragmentShader.self, constants: fragmentConstants)
     }
 
-    /// Returns the fragment shader matching the current `showTileBorders`,
-    /// recompiling it when the flag changed. Errors propagate to the caller
-    /// instead of crashing.
+    /// Returns the fragment shader that matches the current `showTileBorders`.
+    /// It recompiles the shader when the flag changed. Errors propagate to the
+    /// caller instead of a crash.
     private func updatedFragmentShader() throws -> FragmentShader {
         if lastShowTileBorders != showTileBorders {
             fragmentShader = try Self.makeFragmentShader(shaderLibrary: shaderLibrary, showTileBorders: showTileBorders)
@@ -66,7 +66,7 @@ struct TileHeatMapRenderPass: Element {
             let fragmentShader = try updatedFragmentShader()
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
-                    // Full-screen quad vertices in NDC
+                    // Full-screen quad vertices in NDC.
                     let vertices: [SIMD2<Float>] = [
                         [-1, -1], [-1, 1], [1, -1], [1, 1]
                     ]

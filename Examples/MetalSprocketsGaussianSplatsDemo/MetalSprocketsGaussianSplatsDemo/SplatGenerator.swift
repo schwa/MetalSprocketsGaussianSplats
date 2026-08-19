@@ -2,11 +2,11 @@
 import MetalSprocketsGaussianSplatShaders
 import simd
 
-/// Procedural sphere-rainbow splat generator, a port of
-/// `gen-sphere-rainbow.mjs` from splat-transform: uniform points in a
-/// sphere, hue mapped to height, with a subtle lat/long checkerboard.
+/// Procedural sphere-rainbow splat generator. A port of
+/// `gen-sphere-rainbow.mjs` from splat-transform. It places uniform points in
+/// a sphere, maps hue to height, and adds a subtle lat/long checkerboard.
 enum SplatGenerator {
-    /// Preset counts matching the pre-generated sphere-NN.sog test files.
+    /// Preset counts that match the pre-generated sphere-NN.sog test files.
     static let presetCounts: [Int] = [
         100_000, 500_000, 1_000_000, 2_000_000, 4_000_000,
         8_000_000, 16_000_000, 32_000_000, 48_000_000
@@ -53,12 +53,12 @@ enum SplatGenerator {
                 rad * sinTheta * sin(phi)
             )
 
-            // Splat size proportional to sphere radius (linear scale; the
-            // script stores log-scale, which the PLY reader would exp()).
+            // Splat size proportional to sphere radius (linear scale). The
+            // script stores log-scale, which the PLY reader would exp().
             let s = (0.002 + r(3) * 0.004) * radius
 
             // Rainbow: hue from bottom (red) to top (violet), with a subtle
-            // checkerboard via lat/long cells of the direction from center.
+            // checkerboard from lat/long cells of the direction from center.
             var color = hueToRGB(((position.y / radius) + 1) * 0.5 * 0.83)
             let lat = acos(cosTheta) / .pi
             let lon = phi / (2 * .pi)
@@ -71,7 +71,7 @@ enum SplatGenerator {
             let u3 = r(6)
             let a = (1 - u1).squareRoot()
             let b = u1.squareRoot()
-            // Script emits rot_0..3 = (w, x, y, z); SparkSplat stores (x, y, z, w).
+            // The script emits rot_0..3 = (w, x, y, z). SparkSplat stores (x, y, z, w).
             let rotation = SIMD4<Float>(
                 a * cos(2 * .pi * u2),
                 b * sin(2 * .pi * u3),

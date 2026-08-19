@@ -4,10 +4,10 @@ import ImageIO
 
 /// Decodes a SOG texture (WebP) to raw, non-premultiplied RGBA8 bytes.
 ///
-/// Tries ImageIO first. ImageIO rejects some valid lossless WebP streams
-/// (VP8L color-indexing transform with an alpha-carrying palette at large
-/// dimensions — issue #71), so on failure this falls back to the pure-Swift
-/// ``VP8LDecoder``.
+/// The decoder tries ImageIO first. ImageIO rejects some valid lossless WebP
+/// streams (issue #71). These use a VP8L color-indexing transform with an
+/// alpha-carrying palette at large dimensions. On failure, the decoder falls
+/// back to the pure-Swift ``VP8LDecoder``.
 enum SOGImageDecode {
     static func decodeRGBA(_ imageData: Data, filename: String) throws -> (pixels: [UInt8], width: Int, height: Int) {
         if let result = decodeViaImageIO(imageData) {
@@ -29,8 +29,8 @@ enum SOGImageDecode {
 
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
-        // CGContext only supports premultiplied (or skip) alpha for 8-bit RGBA,
-        // so we draw premultiplied then un-premultiply to recover the original
+        // CGContext supports only premultiplied (or skip) alpha for 8-bit RGBA.
+        // Draw premultiplied, then un-premultiply to recover the original
         // quantized bytes.
         guard let context = CGContext(
             data: &pixels,

@@ -1,7 +1,8 @@
 import simd
 
-/// A generic splat representation used as an intermediate format when reading splat files.
-/// This is a CPU-side struct for file I/O - renderers convert this to their own GPU formats.
+/// A generic splat, used as an intermediate format when the code reads splat files.
+///
+/// This is a CPU-side struct for file I/O. Each renderer converts it to its own GPU format.
 public struct GenericSplat: Equatable, Sendable {
     public var position: SIMD3<Float>
     public var scale: SIMD3<Float>
@@ -41,9 +42,10 @@ extension GenericSplat: Decodable {
 
 // MARK: - ExtendedSplat
 
-/// ExtendedSplat includes spherical harmonics data.
-/// Each inner array in `sphericalHarmonics` contains 3 floats (RGB) for one SH basis function.
-/// For degree 1: 3 coefficients, degree 2: 8 coefficients, degree 3: 15 coefficients.
+/// A splat with spherical harmonics data.
+///
+/// Each inner array in `sphericalHarmonics` has 3 floats (RGB) for one SH basis function.
+/// Degree 1 has 3 coefficients, degree 2 has 8, and degree 3 has 15.
 public struct ExtendedSplat: Equatable, Sendable {
     public var genericSplat: GenericSplat
     public var sphericalHarmonics: [[Float]]?

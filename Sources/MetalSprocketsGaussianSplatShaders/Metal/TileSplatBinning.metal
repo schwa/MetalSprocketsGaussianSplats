@@ -13,7 +13,7 @@ namespace TileSplatBinning {
 
     // MARK: - Shared Splat Processing
 
-    /// Compute tile bounds for a splat, returns false if splat should be culled
+    /// Computes the tile bounds for a splat. Returns false if the splat is culled.
     inline bool computeSplatTileBounds(
         uint splatID,
         constant SparkSplat* splats,
@@ -34,58 +34,50 @@ namespace TileSplatBinning {
         float4 quaternion = float4(splat.rotation);
         float4 rgba = float4(splat.color) / 255.0;
 
-        // Cull by alpha
         if (rgba.a < MIN_ALPHA) {
             return false;
         }
 
-        // Cull if all scales are zero
         if (scales.x == 0.0 && scales.y == 0.0 && scales.z == 0.0) {
             return false;
         }
 
-        // Transform center to world space
         float4 worldCenter = modelMatrix * float4(center, 1.0);
 
-        // Transform to view space
         float4 viewCenter4 = viewMatrix * worldCenter;
         float3 viewCenter = viewCenter4.xyz;
 
-        // Cull splats behind camera
+        // Cull splats behind the camera.
         if (viewCenter.z >= 0.0) {
             return false;
         }
 
-        // Store depth for sorting (negative Z, closer = less negative / larger value)
+        // Depth for sorting: negative Z, so closer is a larger value.
         depth = viewCenter.z;
 
-        // Compute clip space center
         float4 clipCenter = projectionMatrix * float4(viewCenter, 1.0);
 
-        // Cull outside near/far planes
+        // Cull outside the near and far planes.
         if (abs(clipCenter.z) >= clipCenter.w) {
             return false;
         }
 
-        // Cull outside XY frustum
+        // Cull outside the XY frustum.
         float clip = CLIP_XY * clipCenter.w;
         if (abs(clipCenter.x) > clip || abs(clipCenter.y) > clip) {
             return false;
         }
 
-        // Build rotation-scale matrix and transform to view space
         float3x3 localRS = scaleQuaternionToMatrix(scales, quaternion);
         float3x3 viewRS = transformToViewSpace(modelMatrix, viewMatrix, localRS);
 
-        // Compute 3D covariance in view space
         float3x3 cov3D = compute3DCovariance(viewRS);
 
-        // Compute projection Jacobian and project to 2D
         float2 focal = computeFocalLength(projectionMatrix, drawableSize);
         float3x3 J = computeProjectionJacobian(viewCenter, focal);
         Covariance2D cov2D = projectCovarianceTo2D(cov3D, J);
 
-        // Add small blur for anti-aliasing
+        // Small blur for anti-aliasing.
         float blurAmount = 0.3;
         float detOrig = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
         cov2D.a += blurAmount;
@@ -96,15 +88,13 @@ namespace TileSplatBinning {
             return false;
         }
 
-        // Eigendecomposition for ellipse axes
         Eigen2D eigen = eigendecompose2D(cov2D, MAX_PIXEL_RADIUS, MAX_STD_DEV);
 
-        // Compute NDC center
         float3 ndcCenter = clipCenter.xyz / clipCenter.w;
 
         // Precompute the per-pixel evaluation data: screen-space center,
         // inverse covariance (conic), and anti-aliased base alpha. The
-        // render loop evaluates only this — never the projection math.
+        // render loop evaluates only this, never the projection math.
         float2 screenCenter = float2(
             (ndcCenter.x + 1.0) * 0.5 * drawableSize.x,
             (1.0 - ndcCenter.y) * 0.5 * drawableSize.y
@@ -118,26 +108,22 @@ namespace TileSplatBinning {
         projected.colorAlpha = float4(pow(rgba.rgb, float3(2.2)), baseAlpha);
         projected.conicD = conic.z;
 
-        // Compute bounding box in NDC space
         float2 majorAxisNDC = (2.0 / drawableSize) * eigen.majorAxis;
         float2 minorAxisNDC = (2.0 / drawableSize) * eigen.minorAxis;
 
-        // Compute extent of ellipse in NDC
         float2 extent = abs(majorAxisNDC) + abs(minorAxisNDC);
 
-        // Add minimum padding of 1 tile in NDC space to handle small/distant splats
-        // This ensures splats near tile boundaries are assigned to neighboring tiles
+        // Minimum padding of 1 tile in NDC handles small and distant splats.
+        // Splats near the tile boundaries then reach the neighboring tiles.
         float2 tilePaddingNDC = 2.0 * float2(TILE_SIZE) / drawableSize;
         extent = max(extent, tilePaddingNDC);
 
         float2 ndcMin = ndcCenter.xy - extent;
         float2 ndcMax = ndcCenter.xy + extent;
 
-        // Clamp to NDC space
         ndcMin = clamp(ndcMin, float2(-1.0), float2(1.0));
         ndcMax = clamp(ndcMax, float2(-1.0), float2(1.0));
 
-        // Convert to tile coordinates
         ndcBoundsToTiles(ndcMin, ndcMax, tileGridSize, minTile, maxTile);
 
         return true;
@@ -145,8 +131,7 @@ namespace TileSplatBinning {
 
     // MARK: - Phase 1: Count Splats Per Tile
 
-    /// Count how many splats overlap each tile (phase 1 of binning)
-    /// One thread per splat
+    /// Counts how many splats overlap each tile (phase 1 of binning). One thread per splat.
     [[kernel]] void tile_binning_count(
         uint splatID [[thread_position_in_grid]],
         constant SparkSplat* splats [[buffer(0)]],
@@ -173,7 +158,6 @@ namespace TileSplatBinning {
             return;
         }
 
-        // Increment counter for all overlapping tiles
         for (uint ty = minTile.y; ty <= maxTile.y; ty++) {
             for (uint tx = minTile.x; tx <= maxTile.x; tx++) {
                 uint tileIndex = tileToLinearIndex(uint2(tx, ty), tileGridSize);
@@ -184,8 +168,7 @@ namespace TileSplatBinning {
 
     // MARK: - Phase 2: Write Splats to Compacted Buffer
 
-    /// Write splats to compacted buffer using precomputed offsets (phase 2 of binning)
-    /// One thread per splat
+    /// Writes splats to the compacted buffer with precomputed offsets (phase 2). One thread per splat.
     [[kernel]] void tile_binning_write(
         uint splatID [[thread_position_in_grid]],
         constant SparkSplat* splats [[buffer(0)]],
@@ -218,18 +201,16 @@ namespace TileSplatBinning {
 
         projectedSplats[splatID] = projected;
 
-        // Write to all overlapping tiles
         for (uint ty = minTile.y; ty <= maxTile.y; ty++) {
             for (uint tx = minTile.x; tx <= maxTile.x; tx++) {
                 uint tileIndex = tileToLinearIndex(uint2(tx, ty), tileGridSize);
 
-                // Atomic increment counter to get local index within tile
+                // Atomic increment gives the local index within the tile.
                 uint localIndex = atomic_fetch_add_explicit(&tileCounters[tileIndex], 1u, memory_order_relaxed);
 
-                // Compute write index using precomputed offset
                 uint writeIndex = tileOffsets[tileIndex] + localIndex;
 
-                // Bounds check against total buffer size
+                // Bounds check against the total buffer size.
                 if (writeIndex < maxTotalIntersections) {
                     tileSplatIndices[writeIndex].splatID = splatID;
                     tileSplatIndices[writeIndex].depth = depth;

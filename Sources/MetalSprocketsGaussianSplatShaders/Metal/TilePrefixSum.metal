@@ -7,13 +7,14 @@ using namespace metal;
 
 namespace TilePrefixSum {
 
-    /// Compute exclusive prefix sum of tile counters and find max tile count
-    /// Output: tileOffsets[i] = sum of tileCounters[0..i-1]
-    /// tileOffsets[numTiles] = total count
-    /// maxTileCount[0] = maximum count across all tiles (for heatmap normalization)
+    /// Computes the exclusive prefix sum of the tile counters and the maximum tile count.
     ///
-    /// This is a simple single-threaded implementation suitable for ~10K tiles.
-    /// For larger tile counts, a parallel prefix sum would be needed.
+    /// tileOffsets[i] is the sum of tileCounters[0..i-1]. tileOffsets[numTiles]
+    /// is the total count. maxTileCount[0] is the maximum count across all
+    /// tiles, for heatmap normalization.
+    ///
+    /// This single-threaded version suits about 10K tiles. Larger tile counts
+    /// need a parallel prefix sum.
     [[kernel]] void tile_prefix_sum(
         device const uint* tileCounters [[buffer(0)]],
         device uint* tileOffsets [[buffer(1)]],
@@ -28,15 +29,13 @@ namespace TilePrefixSum {
             sum += count;
             maxCount = max(maxCount, count);
         }
-        // Store total count at the end
+        // Total count at the end.
         tileOffsets[numTiles] = sum;
-        // Store max count for heatmap normalization
         maxTileCount[0] = maxCount;
     }
 
     // MARK: - Tile Heatmap Rendering
 
-    // Function constant for tile border rendering
     constant bool showTileBorders [[function_constant(0)]];
 
     struct TileHeatmapVertexOut {
@@ -50,7 +49,7 @@ namespace TilePrefixSum {
     ) {
         TileHeatmapVertexOut out;
         out.position = float4(vertices[vertex_id], 0.0, 1.0);
-        // Convert from NDC [-1, 1] to texture coordinates [0, 1]
+        // Convert from NDC [-1, 1] to texture coordinates [0, 1].
         out.tileCoord = (vertices[vertex_id] + 1.0) * 0.5;
         return out;
     }
@@ -62,7 +61,7 @@ namespace TilePrefixSum {
         constant uint* maxTileCount [[buffer(2)]],
         constant float2& drawableSize [[buffer(3)]]
     ) {
-        // Draw red border at tile edges (if enabled)
+        // Draw a red border at the tile edges, if enabled.
         if (showTileBorders) {
             float2 pixelPos = in.position.xy;
             uint tileSize = TILE_SIZE;
@@ -72,7 +71,7 @@ namespace TilePrefixSum {
             }
         }
 
-        // Convert texture coordinates to tile indices (flip Y to match screen space)
+        // Convert texture coordinates to tile indices. Flip Y to match screen space.
         float2 flippedCoord = float2(in.tileCoord.x, 1.0 - in.tileCoord.y);
         uint2 tileIndex = uint2(flippedCoord * float2(tileGridSize));
         tileIndex = clamp(tileIndex, uint2(0), tileGridSize - 1);
@@ -84,14 +83,14 @@ namespace TilePrefixSum {
             return float4(0.0, 0.0, 0.0, 0.0); // Transparent for empty tiles
         }
 
-        // Normalize count to [0, 1]
+        // Normalize the count to [0, 1].
         uint maxCountValue = maxTileCount[0];
         if (maxCountValue == 0) {
             maxCountValue = 1;
         }
         float normalized = float(count) / float(maxCountValue);
 
-        // Heat map color gradient: blue -> green -> yellow -> red
+        // Heat map color gradient: blue -> green -> yellow -> red.
         float3 color;
         if (normalized < 0.33) {
             // Blue to Green

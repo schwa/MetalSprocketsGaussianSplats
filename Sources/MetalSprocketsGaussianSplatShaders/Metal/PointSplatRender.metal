@@ -9,13 +9,13 @@ using namespace metal;
 using namespace SparkSplatSupport;
 
 // Sort-free stochastic point renderer (RFC 0003). Per frame: preprocess
-// computes a Poisson-sampled point count per Gaussian; the workload
-// distributor (PointSplatWorkload.metal) maps splat threads to Gaussians;
-// the splat kernel scatters pixel-sized opaque points into a 64-bit
-// depth+color buffer with atomic_min; resolve unpacks to a color texture.
+// computes a Poisson-sampled point count per Gaussian. The workload
+// distributor (PointSplatWorkload.metal) maps splat threads to Gaussians.
+// The splat kernel scatters pixel-sized opaque points into a 64-bit
+// depth+color buffer with atomic_min. Resolve unpacks to a color texture.
 //
 // Supports SxS supersampling with K points per thread (paper Sec. 3.4:
-// point counts are stochastically rounded to multiples of K, amortizing
+// point counts are stochastically rounded to multiples of K, which amortizes
 // the per-Gaussian projection across K samples). Frustum cull only.
 
 namespace PointSplatRender {
@@ -24,7 +24,7 @@ namespace PointSplatRender {
     constant float COVARIANCE_FLOOR = 0.3;
 
     // Gaussians per culling group (issue #75, paper Sec. 3.5). Matches the
-    // preprocess threadgroup size so one surviving group maps to one
+    // preprocess threadgroup size, so one surviving group maps to one
     // threadgroup. Must match PointSplatResources.groupSize.
     constant uint GROUP_SIZE = 256;
     // NDC margin shared with the per-Gaussian cull in project().
@@ -41,13 +41,13 @@ namespace PointSplatRender {
         float radius;         // conservative screen radius (supersampled px)
         float sigmaZ;         // view-space depth standard deviation
         // Pre-floor 2D covariance stats for the exact sub-pixel path
-        // (RFC 0005 §5): the +0.3 floor hides true sub-pixel extent.
+        // (RFC 0005 §5): the +0.3 floor hides the true sub-pixel extent.
         float preFloorSqrtDet;
         float preFloorEigenMax;
         bool valid;
     };
 
-    // Shared projection between preprocess and splat so both agree exactly.
+    // Shared projection between preprocess and splat, so both agree exactly.
     static ProjectedGaussian project(SparkSplat splat, constant PointSplatUniforms &uniforms) {
         ProjectedGaussian result;
         result.valid = false;
@@ -65,7 +65,7 @@ namespace PointSplatRender {
 
         float4 worldCenter = uniforms.modelMatrix * float4(float3(splat.position), 1.0);
         float3 viewCenter = (uniforms.viewMatrix * worldCenter).xyz;
-        // Near cull; reference uses 0.2 view units.
+        // Near cull; the reference uses 0.2 view units.
         if (-viewCenter.z <= uniforms.nearPlane) {
             return result;
         }
@@ -86,7 +86,7 @@ namespace PointSplatRender {
         float3x3 J = computeProjectionJacobian(viewCenter, focal);
         Covariance2D cov2D = projectCovarianceTo2D(cov3D, J);
         // The pixel-space y axis is flipped relative to NDC (texture origin
-        // top-left). Reflecting y negates the covariance cross term:
+        // top-left). A reflection of y negates the covariance cross term:
         // Sigma' = S Sigma S with S = diag(1, -1).
         cov2D.b = -cov2D.b;
 
@@ -98,8 +98,8 @@ namespace PointSplatRender {
         float preDelta = sqrt(max(0.0, preAvg * preAvg - preDet));
         result.preFloorEigenMax = preAvg + preDelta;
 
-        // The +0.3 floor is in *output pixel* units; the supersampled
-        // framebuffer scales areas by S^2 (paper renders at S x S).
+        // The +0.3 floor is in *output pixel* units. The supersampled
+        // framebuffer scales areas by S^2 (the paper renders at S x S).
         float floorScale = COVARIANCE_FLOOR * float(uniforms.supersampling * uniforms.supersampling);
         cov2D.a += floorScale;
         cov2D.d += floorScale;
@@ -161,8 +161,8 @@ namespace PointSplatRender {
         return splat;
     }
 
-    // Loads a splat from either storage format; `splats` aliases an array
-    // of SparkSplat or GPSPackedSplat depending on `packedFlag`.
+    // Loads a splat from either storage format. `splats` aliases an array
+    // of SparkSplat or GPSPackedSplat, depending on `packedFlag`.
     static inline SparkSplat gps_load_splat(device const uchar *splats, uint index, uint packedFlag, constant GPSPackedSplatBounds &bounds) {
         if (packedFlag != 0) {
             return gps_unpack_splat(reinterpret_cast<device const GPSPackedSplat *>(splats)[index], bounds);
@@ -181,15 +181,15 @@ namespace PointSplatRender {
     }
 
     // Hierarchical depth test (paper Sec. 3.5): a region is provably
-    // occluded when the four pyramid texels covering its screen AABB are
+    // occluded when the four pyramid texels that cover its screen AABB are
     // all closer than its minimum possible depth. The pyramid stores the
     // *maximum* (farthest) visible depth per region, so this never falsely
-    // culls: background texels hold the far plane. minPx/maxPx are in
+    // culls: background texels hold the far plane. minPx and maxPx are in
     // native-resolution pixels.
-    // Fraction of the AABB's four covering pyramid texels whose stored
-    // (farthest-visible) depth passes the region's minimum depth: 0 means
-    // provably occluded, 1 fully unoccluded, quarters in between are a soft
-    // visibility estimate (RFC 0005 §2a).
+    // Returns the fraction of the AABB's four covering pyramid texels whose
+    // stored (farthest-visible) depth passes the region's minimum depth:
+    // 0 means provably occluded, 1 fully unoccluded. Quarters between are a
+    // soft visibility estimate (RFC 0005 §2a).
     static float depthAABBVisibility(float2 minPx, float2 maxPx, float minDepth, constant PointSplatUniforms &uniforms, texture2d<float, access::read> depthPyramid) {
         float2 size = float2(depthPyramid.get_width(), depthPyramid.get_height());
         minPx = clamp(minPx, float2(0.0), size - 1.0);
@@ -225,9 +225,9 @@ namespace PointSplatRender {
 
     // Group-level hierarchical culling (issue #75, paper Sec. 3.5).
     //
-    // One-time per splat buffer: model-space AABB per group of GROUP_SIZE
+    // One time per splat buffer: model-space AABB per group of GROUP_SIZE
     // consecutive Gaussians, expanded by 3 sigma of each Gaussian's largest
-    // scale so the box conservatively contains the splatted points.
+    // scale, so the box conservatively contains the splatted points.
     kernel void pointSplatGroupBounds(device const uchar *splats [[buffer(0)]],
                                       device float4 *bounds [[buffer(1)]],
                                       constant uint &splatCount [[buffer(2)]],
@@ -276,10 +276,10 @@ namespace PointSplatRender {
 
     // One thread per group: transform the AABB's 8 corners and cull the
     // whole group when it is provably behind the near plane, outside the
-    // frustum (same 1.4 NDC margin as the per-Gaussian cull), or occluded
+    // frustum (the same 1.4 NDC margin as the per-Gaussian cull), or occluded
     // by the depth pyramid. Survivors are compacted into visibleGroups.
-    // All tests are conservative: any doubt (e.g. a corner behind the
-    // camera making the projected AABB unbounded) keeps the group.
+    // All tests are conservative: any doubt keeps the group. For example, a
+    // corner behind the camera makes the projected AABB unbounded.
     kernel void pointSplatGroupCull(device const float4 *bounds [[buffer(0)]],
                                     device uint *visibleGroups [[buffer(1)]],
                                     device atomic_uint *visibleGroupCount [[buffer(2)]],
@@ -313,8 +313,8 @@ namespace PointSplatRender {
             }
             float4 clip = uniforms.projectionMatrix * float4(view, 1.0);
             if (clip.w <= 0.0) {
-                // Corner behind the camera: the projected footprint is not
-                // bounded by the corner projections. Disable the NDC tests.
+                // Corner behind the camera: the corner projections do not
+                // bound the projected footprint. Disable the NDC tests.
                 projectionBounded = false;
                 continue;
             }
@@ -346,7 +346,7 @@ namespace PointSplatRender {
         visibleGroups[slot] = gid;
     }
 
-    // Single thread: indirect dispatch arguments for the preprocess — one
+    // Single thread: indirect dispatch arguments for the preprocess, one
     // threadgroup per surviving group.
     kernel void pointSplatGroupDispatchArgs(device const uint *visibleGroupCount [[buffer(0)]],
                                             device uint3 *args [[buffer(1)]],
@@ -361,9 +361,9 @@ namespace PointSplatRender {
     // *surviving* culling group (issue #75): cull, project, Poisson-sample
     // the opacity-corrected point count (paper Secs. 3.3-3.4), write counts
     // for the distributor, and cache the packed (SH-evaluated) color for
-    // the splat stage. Counts and renderedMask are pre-cleared by
-    // pointSplatClearCounts; renderedMask records phase-1 participation so
-    // phase 2 only considers Gaussians the stale pyramid culled.
+    // the splat stage. pointSplatClearCounts pre-clears counts and
+    // renderedMask. renderedMask records phase-1 participation, so phase 2
+    // only considers Gaussians that the stale pyramid culled.
     kernel void pointSplatPreprocess(device const uchar *splats [[buffer(0)]],
                                      device uint *counts [[buffer(1)]],
                                      constant PointSplatUniforms &uniforms [[buffer(2)]],
@@ -393,9 +393,9 @@ namespace PointSplatRender {
         }
 
         // Soft occlusion (RFC 0005 §2a): fully occluded Gaussians are culled
-        // as before; partially occluded ones get proportionally fewer points
-        // via the visibility-scaled lambda below. Phase 2's re-test against
-        // the fresh pyramid still catches false culls.
+        // as before. Partially occluded ones get proportionally fewer points
+        // through the visibility-scaled lambda below. Phase 2's re-test
+        // against the fresh pyramid still catches false culls.
         float visibility = 1.0;
         if (uniforms.occlusionPhase != 0) {
             visibility = visibilityEstimate(projected, uniforms, depthPyramid);
@@ -405,7 +405,7 @@ namespace PointSplatRender {
         }
 
         // SH color depends only on the view direction to the Gaussian's
-        // mean, so evaluate once here rather than per point.
+        // mean, so evaluate it once here instead of per point.
         float3 rgb = float3(splat.color.xyz) / 255.0;
         if (uniforms.shDegree > 0) {
             float3 worldCenter = (uniforms.modelMatrix * float4(float3(splat.position), 1.0)).xyz;
@@ -417,9 +417,9 @@ namespace PointSplatRender {
         // Exact sub-pixel path (RFC 0005 §5): a Gaussian whose true
         // (pre-floor) 3-sigma footprint fits within half a subpixel gets a
         // single Bernoulli point at its mean, with probability equal to the
-        // analytically integrated opacity mass - no density correction, no
-        // Poisson draw, and none of the covariance-floor dilation bias that
-        // causes the paper's aliasing gap.
+        // analytically integrated opacity mass. This path has no density
+        // correction, no Poisson draw, and none of the covariance-floor
+        // dilation bias that causes the paper's aliasing gap.
         if (9.0 * projected.preFloorEigenMax < 0.25) {
             float mass = min(projected.opacity * 2.0 * GPS_PI * projected.preFloorSqrtDet, 1.0);
             mass *= visibility * (1.0 - clamp(uniforms.reuseFactor, 0.0f, 1.0f));
@@ -440,12 +440,12 @@ namespace PointSplatRender {
         // of the budget, so fresh sampling shrinks to the remainder.
         lambda *= (1.0 - clamp(uniforms.reuseFactor, 0.0f, 1.0f));
 
-        // Point-size LoD (RFC 0005 §3): when the previous frame ran well
-        // over budget (scale < 0.5), large low-frequency Gaussians splat
-        // 2x2-pixel points at quarter count - local blur instead of the
-        // transparency/holes uniform thinning produces. workloadTotals still
-        // holds last frame's demand here (the distributor overwrites it
-        // later in the frame).
+        // Point-size LoD (RFC 0005 §3): if the previous frame ran well over
+        // budget (scale < 0.5), large low-frequency Gaussians splat 2x2-pixel
+        // points at quarter count. This gives local blur instead of the
+        // transparency and holes that uniform thinning produces.
+        // workloadTotals still holds last frame's demand here. The
+        // distributor overwrites it later in the frame.
         uint lod = 0;
         float previousScale = float(uniforms.capacity) / float(max(workloadTotals[1], 1u));
         if (previousScale < 0.5 && sqrtDet > 16.0) {
@@ -457,8 +457,8 @@ namespace PointSplatRender {
         GPSUInt2 seed = gps_make_seed(gid, uniforms.frameSeed);
         uint numPoints = gps_poisson(&seed, lambda);
 
-        // Stochastically round to a multiple of K and emit *thread* counts;
-        // each splat thread draws K points.
+        // Stochastically round to a multiple of K and emit *thread* counts.
+        // Each splat thread draws K points.
         uint k = max(uniforms.pointsPerThread, 1u);
         uint numThreads = numPoints;
         if (k > 1) {
@@ -476,7 +476,7 @@ namespace PointSplatRender {
     // Temporal point reuse (RFC 0005 §4): reprojects the previous frame's
     // resolved surface as seed points into the fresh 64-bit framebuffer.
     // One seed per previously-covered native pixel, written to all S^2
-    // covering subpixels; depth-tested on write like any other point, so
+    // covering subpixels. Depth-tested on write like any other point, so
     // closer fresh samples always win and reprojection errors self-correct.
     kernel void pointSplatSeedReproject(device atomic_ulong *framebuffer [[buffer(0)]],
                                         constant PointSplatUniforms &uniforms [[buffer(1)]],
@@ -538,7 +538,7 @@ namespace PointSplatRender {
     }
 
     // Extracts a native-resolution view-space depth image from the 64-bit
-    // framebuffer, taking the farthest subpixel per pixel (conservative for
+    // framebuffer. Takes the farthest subpixel per pixel (conservative for
     // the occlusion test; background subpixels hold the far plane).
     kernel void pointSplatDepthExtract(device const ulong *framebuffer [[buffer(0)]],
                                        constant PointSplatUniforms &uniforms [[buffer(1)]],
@@ -559,7 +559,7 @@ namespace PointSplatRender {
         outDepth.write(float4(depth, 0.0, 0.0, 0.0), gid);
     }
 
-    // One 2x2 max-downsample step of the depth pyramid; src and dst are
+    // One 2x2 max-downsample step of the depth pyramid. src and dst are
     // single-mip texture views of adjacent levels.
     kernel void pointSplatDepthDownsample(texture2d<float, access::read> src [[texture(0)]],
                                           texture2d<float, access::write> dst [[texture(1)]],
@@ -588,8 +588,8 @@ namespace PointSplatRender {
                                 constant GPSPackedSplatBounds &packedBounds [[buffer(7)]],
                                 device const uchar *lodFlags [[buffer(8)]],
                                 uint gid [[thread_position_in_grid]]) {
-        // Dispatched over the full capacity; totals[0] is the actual thread
-        // count written by the workload distributor on the GPU timeline.
+        // Dispatched over the full capacity. totals[0] is the actual thread
+        // count that the workload distributor writes on the GPU timeline.
         if (gid >= min(totals[0], uniforms.capacity)) {
             return;
         }
@@ -603,7 +603,7 @@ namespace PointSplatRender {
             | colors[gaussianIndex];
 
         // Exact sub-pixel path (RFC 0005 §5): one deterministic opaque
-        // point at the mean's subpixel; the Bernoulli happened in preprocess.
+        // point at the mean's subpixel. The Bernoulli happened in preprocess.
         if (lodFlags[gaussianIndex] == 2u) {
             int x = int(projected.pixelMean.x);
             int y = int(projected.pixelMean.y);
@@ -623,8 +623,8 @@ namespace PointSplatRender {
             GPSFloat2 u = gps_pcg2d(&seed);
             // Stratify the angle across the thread's K samples (RFC 0005 §1,
             // cheap variant): jittered strata reduce radial clumping without
-            // changing the corrected radial density. Threads keep independent
-            // seeds, so no cross-thread alignment.
+            // a change to the corrected radial density. Threads keep
+            // independent seeds, so there is no cross-thread alignment.
             float stratifiedAngle = (float(p) + u.y) / float(k);
             GPSFloat2 sample = gps_corrected_box_muller(u.x, stratifiedAngle, projected.opacity);
 
@@ -656,8 +656,8 @@ namespace PointSplatRender {
                     }
                     uint index = yy * uint(uniforms.drawableSize.x) + xx;
                     // Early depth test avoids atomic contention for occluded
-                    // points. Metal's 64-bit atomics only support min/max (no
-                    // load), so read through a plain aliased view; a stale
+                    // points. Metal's 64-bit atomics only support min and max
+                    // (no load), so read through a plain aliased view. A stale
                     // value only costs a superfluous atomic_min, never
                     // correctness.
                     if (framebufferRead[index] <= packed) {
@@ -670,7 +670,7 @@ namespace PointSplatRender {
     }
 
     // Temporal reprojection (paper Sec. 3.6): during camera motion, warp
-    // the previous accumulated frame into the new view using this frame's
+    // the previous accumulated frame into the new view with this frame's
     // depth, clamp against the 3x3 color neighborhood of the current frame
     // to limit ghosting, and EMA-blend with history weight 0.9.
     kernel void pointSplatReproject(device const ulong *framebuffer [[buffer(0)]],

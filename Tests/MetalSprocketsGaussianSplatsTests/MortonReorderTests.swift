@@ -18,7 +18,7 @@ struct MortonReorderTests {
         #expect(SplatMortonReorder.mortonKey(x: 0, y: 1, z: 0) == 0b010)
         #expect(SplatMortonReorder.mortonKey(x: 0, y: 0, z: 1) == 0b100)
         #expect(SplatMortonReorder.mortonKey(x: 0b11, y: 0, z: 0) == 0b001_001)
-        // Top bit of each 21-bit axis lands in the top three key bits.
+        // The top bit of each 21-bit axis lands in the top three key bits.
         #expect(SplatMortonReorder.mortonKey(x: 1 << 20, y: 1 << 20, z: 1 << 20) == 0b111 << 60)
     }
 
@@ -32,10 +32,10 @@ struct MortonReorderTests {
             splats.append(TestSplat(floatPosition: SIMD3<Float>(100 + jitter, 100 + jitter, 100), id: index * 2 + 1))
         }
         SplatMortonReorder.reorder(splats: &splats)
-        // After reordering, each cluster occupies one contiguous half.
+        // After the reorder, each cluster occupies one contiguous half.
         let firstHalfIDs = Set(splats.prefix(8).map(\.id))
         #expect(firstHalfIDs == Set(stride(from: 0, to: 16, by: 2)) || firstHalfIDs == Set(stride(from: 1, to: 16, by: 2)))
-        // Reordering is a permutation: nothing lost or duplicated.
+        // The reorder is a permutation, so nothing is lost or duplicated.
         #expect(Set(splats.map(\.id)) == Set(0..<16))
     }
 
@@ -46,7 +46,7 @@ struct MortonReorderTests {
             TestSplat(floatPosition: SIMD3<Float>(0, 0, 0), id: 1),
             TestSplat(floatPosition: SIMD3<Float>(5, 5, 5), id: 2)
         ]
-        // 3 floats per splat, tagged by original splat id.
+        // 3 floats per splat, tagged by the original splat id.
         var shCoefficients: [Float] = [0, 0.1, 0.2, 1, 1.1, 1.2, 2, 2.1, 2.2]
         SplatMortonReorder.reorder(splats: &splats, shCoefficients: &shCoefficients)
         for (index, splat) in splats.enumerated() {
@@ -63,7 +63,7 @@ struct MortonReorderTests {
         SplatMortonReorder.reorder(splats: &empty)
         #expect(empty.isEmpty)
 
-        // All splats at one point: any order is valid, but count is preserved.
+        // All splats at one point. Any order is valid, but the count is preserved.
         var coincident = (0..<4).map { TestSplat(floatPosition: SIMD3<Float>(1, 2, 3), id: $0) }
         SplatMortonReorder.reorder(splats: &coincident)
         #expect(Set(coincident.map(\.id)) == Set(0..<4))

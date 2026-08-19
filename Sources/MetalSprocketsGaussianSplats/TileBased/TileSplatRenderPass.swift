@@ -5,14 +5,14 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 
-/// Render pass that uses Metal's native tile shading with imageblock.
+/// Render pass that uses Metal's native tile shading with an imageblock.
 ///
 /// Two-pass approach:
-/// 1. Fragment shader computes splat colors and writes to imageblock
-/// 2. Blit shader reads from imageblock and outputs to color attachment
+/// 1. The fragment shader computes the splat colors and writes to the imageblock.
+/// 2. The blit shader reads from the imageblock and outputs to the color attachment.
 ///
-/// - Important: This type is part of the **experimental** tile-based renderer
-///   and may have significant changes or be removed in future versions.
+/// - Important: This type is part of the **experimental** tile-based renderer.
+///   It can change or move in a future version.
 public struct TileSplatRenderPass: Element {
     // MARK: - Properties
 
@@ -31,9 +31,9 @@ public struct TileSplatRenderPass: Element {
     var fragmentShader: FragmentShader
     @MSState
     var blitFragmentShader: FragmentShader
-    /// Function-constant value baked into `fragmentShader`. Body recompiles the
-    /// shader when this drifts from `debugTileBorders`, propagating compile
-    /// errors instead of crashing.
+    /// Function-constant value baked into `fragmentShader`. The body recompiles
+    /// the shader when this drifts from `debugTileBorders`. Compile errors
+    /// propagate instead of a crash.
     @MSState
     private var lastDebugTileBorders: Bool?
 
@@ -67,9 +67,9 @@ public struct TileSplatRenderPass: Element {
         return try shaderLibrary.function(named: "tile_fragment", type: FragmentShader.self, constants: fragmentConstants)
     }
 
-    /// Returns the fragment shader matching the current `debugTileBorders`,
-    /// recompiling it when the flag changed. Errors propagate to the caller
-    /// instead of crashing.
+    /// Returns the fragment shader that matches the current `debugTileBorders`.
+    /// It recompiles the shader when the flag changed. Errors propagate to the
+    /// caller instead of a crash.
     private func updatedFragmentShader() throws -> FragmentShader {
         if lastDebugTileBorders != debugTileBorders {
             fragmentShader = try Self.makeFragmentShader(shaderLibrary: shaderLibrary, debugTileBorders: debugTileBorders)
@@ -90,14 +90,14 @@ public struct TileSplatRenderPass: Element {
                 projectionMatrix: projectionMatrix
             )
 
-            // Full-screen triangle (more efficient than quad)
+            // Full-screen triangle (more efficient than a quad).
             let vertices: [SIMD2<Float>] = [
                 [-1, -1],
                 [ 3, -1],
                 [-1, 3]
             ]
 
-            // Step 1: Render splats to imageblock (no color output)
+            // Step 1: render the splats to the imageblock (no color output).
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
                     commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
@@ -109,10 +109,10 @@ public struct TileSplatRenderPass: Element {
                 .parameter("uniforms", value: uniforms)
             }
 
-            // Step 2: Blit imageblock to color attachment (framebuffer).
-            // The tile shader blends splats internally, but the result is
-            // premultiplied with coverage alpha — composite it over the cleared
-            // background so empty pixels stay opaque instead of punching a
+            // Step 2: blit the imageblock to the color attachment (framebuffer).
+            // The tile shader blends the splats internally, but the result is
+            // premultiplied with the coverage alpha. Composite it over the
+            // cleared background so empty pixels stay opaque instead of a
             // transparent hole in the layer.
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: blitFragmentShader) {
                 Draw { commandEncoder in

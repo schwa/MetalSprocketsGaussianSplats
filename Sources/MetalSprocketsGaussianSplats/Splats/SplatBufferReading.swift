@@ -8,14 +8,14 @@ import simd
 
 // MARK: - SplatBufferResult
 
-/// A GPU-resident splat decode result: a `SparkSplat` buffer plus flattened
-/// spherical-harmonics coefficients. This is the common currency for loading
-/// any splat format into GPU memory — `SOGReaderGPU` produces it via its
-/// compute kernel, and every CPU `SplatReaderProtocol` reader produces it via
+/// A GPU-resident splat decode result: a `SparkSplat` buffer and flattened
+/// spherical-harmonics coefficients. This is the common form for loading any
+/// splat format into GPU memory. `SOGReaderGPU` produces it through its compute
+/// kernel, and every CPU `SplatReaderProtocol` reader produces it through
 /// ``SplatReaderProtocol/read(device:name:)``.
 public struct SplatBufferResult {
     public var splats: TypedMTLBuffer<SparkSplat>
-    /// Flattened SH coefficients (`count * shFloatsPerSplat` floats); empty when
+    /// Flattened SH coefficients (`count * shFloatsPerSplat` floats). Empty when
     /// `shDegree == 0`.
     public var shCoefficients: TypedMTLBuffer<Float>
     public var shDegree: UInt8
@@ -32,15 +32,15 @@ public struct SplatBufferResult {
 // MARK: - CPU readers -> buffers
 
 public extension SplatReaderProtocol {
-    /// Decode this file into GPU buffers, converting each streamed splat to a
-    /// `SparkSplat`. The `SparkSplat` conversion lives in this module (above the
-    /// `Splats` decode layer), so this extension does too.
+    /// Decodes this file into GPU buffers and converts each streamed splat to a
+    /// `SparkSplat`. The `SparkSplat` conversion lives in this module, above the
+    /// `Splats` decode layer, so this extension does too.
     ///
     /// - Parameters:
-    ///   - device: Device to allocate the output buffers on.
-    ///   - name: Optional label for the buffers (GPU-capture identification).
-    ///   - mortonOrdered: When true, reorders splats (and their SH, in lockstep)
-    ///     along a Morton curve before upload for group-culling coherence (#89).
+    ///   - device: The device to allocate the output buffers on.
+    ///   - name: An optional label for the buffers, for GPU-capture identification.
+    ///   - mortonOrdered: If true, reorders the splats and their SH together
+    ///     along a Morton curve before upload, for group-culling coherence (#89).
     func read(device: MTLDevice, name: String? = nil, mortonOrdered: Bool = false) throws -> SplatBufferResult {
         let degree = shDegree
         var splats: [SparkSplat] = []
@@ -65,8 +65,8 @@ public extension SplatReaderProtocol {
 
         let label = name ?? "splats"
         let splatsBuffer = try device.makeTypedBuffer(values: splats, options: [.storageModeShared]).labeled("Splats (\(label))")
-        // makeBuffer rejects a zero-length buffer, so allocate a 1-float
-        // placeholder when there is no SH and report count 0.
+        // makeBuffer rejects a zero-length buffer. Allocate a 1-float
+        // placeholder when there is no SH, and report count 0.
         var shBuffer = try device.makeTypedBuffer(values: sh.isEmpty ? [0] : sh, options: [.storageModeShared]).labeled("SHCoefficients (\(label))")
         shBuffer.count = degree > 0 ? sh.count : 0
 
@@ -92,12 +92,12 @@ public extension SPZReaderGPU.Result {
 
 // MARK: - Unified loader
 
-/// Loads any supported splat file into GPU buffers, routing `.sog` and `.spz`
-/// through their compute-shader decoders (`SOGReaderGPU` / `SPZReaderGPU`) and
-/// `.ply` through the CPU reader's ``SplatReaderProtocol/read(device:name:)``.
+/// Loads any supported splat file into GPU buffers. It routes `.sog` and `.spz`
+/// through their compute-shader decoders (`SOGReaderGPU` and `SPZReaderGPU`),
+/// and `.ply` through the CPU reader's ``SplatReaderProtocol/read(device:name:)``.
 public enum SplatLoader {
-    /// - Parameter mortonOrdered: Applies to the CPU decode path (`.ply`) only;
-    ///   the GPU decoders write straight into buffers in source order.
+    /// - Parameter mortonOrdered: Applies to the CPU decode path (`.ply`) only.
+    ///   The GPU decoders write straight into buffers in source order.
     public static func read(device: MTLDevice, url: URL, name: String? = nil, mortonOrdered: Bool = false) throws -> SplatBufferResult {
         switch url.pathExtension.lowercased() {
         case "sog":
@@ -105,7 +105,7 @@ public enum SplatLoader {
         case "spz":
             return try SPZReaderGPU(device: device).read(url: url, name: name).bufferResult
         case "ply":
-            // PLY has no GPU decoder; decode on the CPU and pack into a buffer.
+            // PLY has no GPU decoder. Decode on the CPU and pack into a buffer.
             return try PLYSplatReader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
         default:
             throw SplatLoaderError.unsupportedFormat(url.pathExtension)
@@ -115,7 +115,7 @@ public enum SplatLoader {
 
 /// Errors from ``SplatLoader``.
 public enum SplatLoaderError: Error, Equatable {
-    /// The file extension has no loader (only ply, spz, and sog are supported).
+    /// The file extension has no loader. Only ply, spz, and sog are supported.
     case unsupportedFormat(String)
 }
 

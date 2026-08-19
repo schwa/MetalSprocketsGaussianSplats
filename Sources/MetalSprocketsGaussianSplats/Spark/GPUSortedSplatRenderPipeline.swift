@@ -7,16 +7,15 @@ import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import Splats
 
-/// Self-contained splat pipeline: GPU sort (+ frustum cull) and render in the
-/// same GPU workload, with no CPU sorting or ``AsyncSortManager``.
+/// A self-contained splat pipeline. It sorts on the GPU, culls the frustum, and
+/// renders in the same GPU workload. It does no CPU sort and needs no ``AsyncSortManager``.
 ///
-/// Each frame it encodes a ``GPUSplatSortComputePass`` into one slot of a shared
-/// ``GPUSortResources``, then renders via ``SparkSplatRenderPipeline`` using an
-/// indirect draw whose instance count is the cull survivor count.
+/// Each frame encodes a ``GPUSplatSortComputePass`` into one slot of a shared
+/// ``GPUSortResources``. It then renders through ``SparkSplatRenderPipeline`` with an
+/// indirect draw. The instance count is the number of splats that pass the cull.
 ///
-/// Unlike ``SparkSplatRenderPipeline`` (used *inside* a `RenderPass`), this
-/// element owns its own `ComputePass` + `RenderPass`, so place it at the top
-/// level of the frame:
+/// ``SparkSplatRenderPipeline`` runs inside a `RenderPass`. This element owns its own
+/// `ComputePass` and `RenderPass`, so put it at the top level of the frame:
 ///
 /// ```swift
 /// RenderView { _, drawableSize in
@@ -31,8 +30,8 @@ import Splats
 /// }
 /// ```
 ///
-/// - Important: The caller's frames-in-flight must not exceed
-///   ``GPUSortResources/slotCount`` (default 3), or slots will race.
+/// - Important: The frames-in-flight count of the caller must not be more than
+///   ``GPUSortResources/slotCount`` (default 3). If it is more, the slots race.
 public struct GPUSortedSplatRenderPipeline: Element {
     var splatCloud: GPUSplatCloud<SparkSplat>
     var projectionMatrices: [simd_float4x4]
@@ -45,7 +44,7 @@ public struct GPUSortedSplatRenderPipeline: Element {
     var guardBand: Float
     var resources: GPUSortResources
 
-    /// Convenience initializer for mono (single-view) rendering.
+    /// Creates a pipeline for mono (single-view) rendering.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
@@ -72,9 +71,9 @@ public struct GPUSortedSplatRenderPipeline: Element {
         )
     }
 
-    /// Full initializer supporting stereo/amplification rendering. With two
-    /// views the GPU cull keeps splats visible to either eye, and the render
-    /// uses vertex amplification into a layered render target.
+    /// Creates a pipeline for stereo (amplification) rendering. With two views
+    /// the GPU cull keeps splats visible to either eye. The render uses vertex
+    /// amplification into a layered render target.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrices: [simd_float4x4],
@@ -100,10 +99,9 @@ public struct GPUSortedSplatRenderPipeline: Element {
         self.guardBand = guardBand
         self.resources = resources
         try resources.ensure(capacity: splatCloud.count)
-        // Advance the frame slot here, not in body: the element is
-        // constructed once per frame, while body can be re-evaluated
-        // multiple times (diffing/re-expansion), which would burn through
-        // the frames-in-flight slot rotation.
+        // Advance the frame slot here, not in body. The element is constructed
+        // once per frame. The body can be re-evaluated many times through
+        // diffing and re-expansion, which uses up the frames-in-flight slots.
         slotIndex = resources.advance()
         sortedIndices = resources.makeIndices(
             slot: slotIndex,

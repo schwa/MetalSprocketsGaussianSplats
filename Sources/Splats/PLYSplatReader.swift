@@ -1,12 +1,13 @@
 import Foundation
 import simd
 
-/// Reader for PLY files containing Gaussian splat data
-/// Wraps PLYReader and converts records to GenericSplat
+/// Reads a PLY file with Gaussian splat data.
+///
+/// Wraps ``PLYReader`` and converts each record to a ``GenericSplat``.
 public struct PLYSplatReader: SplatReaderProtocol {
     private let plyReader: PLYReader
 
-    /// The degree of spherical harmonics detected in the file (0 = none, 1-3 = higher-order SH)
+    /// The spherical harmonics degree found in the file. 0 means none. 1 to 3 are higher-order SH.
     public let shDegree: UInt8
 
     public var splatCount: Int {
@@ -38,17 +39,12 @@ public struct PLYSplatReader: SplatReaderProtocol {
 
     // MARK: - Private
 
-    /// Detects SH degree by checking which f_rest_N properties exist
-    /// - Degree 1: 3 coefficients (indices 0-8, but DC is separate, so f_rest_0 to f_rest_8)
-    /// - Degree 2: 8 coefficients (indices 0-23, so f_rest_0 to f_rest_23)
-    /// - Degree 3: 15 coefficients (indices 0-44, so f_rest_0 to f_rest_44)
+    /// Finds the SH degree from the `f_rest_N` properties in the file.
     ///
-    /// Actually the standard 3DGS PLY format stores:
-    /// - f_dc_0, f_dc_1, f_dc_2: DC (degree 0) coefficients for R, G, B
-    /// - f_rest_0 to f_rest_N: Higher order SH coefficients
-    ///
-    /// For degree 3 (15 basis functions total, minus 1 DC = 14 higher order):
-    /// 14 coefficients * 3 channels = 42 values -> f_rest_0 to f_rest_44 (45 total, but some implementations vary)
+    /// The 3DGS PLY format stores the DC term in `f_dc_0`, `f_dc_1`, and `f_dc_2`.
+    /// It stores the higher-order coefficients in `f_rest_0` to `f_rest_N`.
+    /// Each degree adds coefficients per channel: 3 for l=1, 5 for l=2, 7 for l=3.
+    /// So degree 1 has 9 `f_rest` values, degree 2 has 24, and degree 3 has 45.
     private static func detectSHDegree(from reader: PLYReader) -> UInt8 {
         guard let element = reader.primaryElement else {
             return 0
@@ -56,8 +52,6 @@ public struct PLYSplatReader: SplatReaderProtocol {
 
         let propertyNames = Set(element.properties.map(\.name))
 
-        // 3DGS stores (3 + 5 + 7) = 15 per-channel coefficients above DC, so
-        // degree 1 -> 9 f_rest values, degree 2 -> 24, degree 3 -> 45.
         if propertyNames.contains("f_rest_44") {
             return 3
         }
@@ -71,8 +65,9 @@ public struct PLYSplatReader: SplatReaderProtocol {
         return 0
     }
 
-    /// Extracts SH coefficients from a PLY record
-    /// Returns array of [R, G, B] for each basis function (excluding DC)
+    /// Extracts the SH coefficients from a PLY record.
+    ///
+    /// Returns an array of `[R, G, B]` for each basis function above the DC term.
     private static func extractSphericalHarmonics(from record: PLYReader.Record, degree: UInt8) -> [[Float]]? {
         guard degree > 0 else {
             return nil
@@ -91,7 +86,7 @@ public struct PLYSplatReader: SplatReaderProtocol {
             return nil
         }
 
-        // PLY f_rest is planar (all R, then all G, then all B); output is interleaved [[R,G,B], ...].
+        // PLY f_rest is planar (all R, then all G, then all B). The output is interleaved [[R,G,B], ...].
         var coefficients: [[Float]] = []
         coefficients.reserveCapacity(numCoeffs)
 
@@ -114,36 +109,37 @@ public struct PLYSplatReader: SplatReaderProtocol {
 // MARK: - GenericSplat PLY Conversion
 
 public extension GenericSplat {
-    /// Initializes a GenericSplat from a PLY record
-    /// Supports standard Gaussian Splat PLY format with properties:
-    /// - Position: x, y, z
-    /// - Scale: scale_0, scale_1, scale_2
-    /// - Color: f_dc_0, f_dc_1, f_dc_2 or red, green, blue
-    /// - Rotation: rot_0, rot_1, rot_2, rot_3 (quaternion)
-    /// - Opacity: opacity
+    /// Creates a ``GenericSplat`` from a PLY record.
+    ///
+    /// Reads the standard Gaussian splat PLY properties:
+    /// - Position: `x`, `y`, `z`
+    /// - Scale: `scale_0`, `scale_1`, `scale_2`
+    /// - Color: `f_dc_0`, `f_dc_1`, `f_dc_2`, or `red`, `green`, `blue`
+    /// - Rotation: `rot_0`, `rot_1`, `rot_2`, `rot_3` (a quaternion)
+    /// - Opacity: `opacity`
     init?(plyRecord record: PLYReader.Record) {
         guard let x = record["x"]?.floatValue, let y = record["y"]?.floatValue, let z = record["z"]?.floatValue else {
             return nil
         }
 
-        // scale_0/1/2 with sx/sy/sz fallback
+        // scale_0/1/2, with sx/sy/sz as the fallback.
         let scaleX = record["scale_0"]?.floatValue ?? record["sx"]?.floatValue ?? 0.0
         let scaleY = record["scale_1"]?.floatValue ?? record["sy"]?.floatValue ?? 0.0
         let scaleZ = record["scale_2"]?.floatValue ?? record["sz"]?.floatValue ?? 0.0
 
-        // f_dc_0/1/2 (Gaussian splat format) with red/green/blue fallback
+        // f_dc_0/1/2 (Gaussian splat format), with red/green/blue as the fallback.
         let colorR: Float
         let colorG: Float
         let colorB: Float
 
         if let fdc0 = record["f_dc_0"]?.floatValue, let fdc1 = record["f_dc_1"]?.floatValue, let fdc2 = record["f_dc_2"]?.floatValue {
-            // SH DC coefficient to color via the C0 basis constant
+            // Convert the SH DC coefficient to color with the C0 basis constant.
             let SH_C0: Float = 0.28209479177387814
             colorR = (fdc0 * SH_C0 + 0.5).clamped(to: 0...1)
             colorG = (fdc1 * SH_C0 + 0.5).clamped(to: 0...1)
             colorB = (fdc2 * SH_C0 + 0.5).clamped(to: 0...1)
         } else if let red = record["red"]?.floatValue, let green = record["green"]?.floatValue, let blue = record["blue"]?.floatValue {
-            // Normalize if values are in 0-255 range
+            // Normalize when the values are in the 0-255 range.
             if red > 1.0 || green > 1.0 || blue > 1.0 {
                 colorR = (red / 255.0).clamped(to: 0...1)
                 colorG = (green / 255.0).clamped(to: 0...1)
@@ -161,13 +157,13 @@ public extension GenericSplat {
 
         let opacity: Float
         if let rawOpacity = record["opacity"]?.floatValue {
-            // Sigmoid converts from logit space
+            // Sigmoid converts from logit space.
             opacity = 1.0 / (1.0 + exp(-rawOpacity))
         } else {
             opacity = record["alpha"]?.floatValue ?? 1.0
         }
 
-        // Quaternion in standard 3DGS PLY order (w, x, y, z)
+        // Quaternion in the standard 3DGS PLY order (w, x, y, z).
         let rotW = record["rot_0"]?.floatValue ?? 1.0
         let rotX = record["rot_1"]?.floatValue ?? 0.0
         let rotY = record["rot_2"]?.floatValue ?? 0.0

@@ -239,7 +239,6 @@ struct PLYReaderTests {
 
         var data = Data(header.utf8)
 
-        // Write binary vertex data
         let x: Float = 7.5
         let y: Float = 8.5
         let z: Float = 9.5
@@ -307,7 +306,6 @@ struct PLYReaderTests {
 
         var data = Data(header.utf8)
 
-        // Write binary vertex data
         let vertices: [(Float, Float, Float)] = [(1.5, 2.5, 3.5), (4.5, 5.5, 6.5)]
 
         for vertex in vertices {

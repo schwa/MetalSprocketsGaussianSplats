@@ -2,11 +2,11 @@
 import Foundation
 import Metal
 
-/// Runtime GPU capability probes for gating tests that need shader features
-/// the CI runner's virtualized GPU cannot compile (e.g. 64-bit device
-/// atomics from MSL 3.1). Family checks alone are not enough: the GitHub
-/// runner reports `mac2` yet fails to compile these kernels, so we probe by
-/// actually compiling one.
+/// Runtime GPU capability probes. These gate tests that need shader features
+/// the CI runner's virtualized GPU cannot compile, for example 64-bit device
+/// atomics from MSL 3.1. Family checks alone are not enough. The GitHub runner
+/// reports `mac2` but fails to compile these kernels, so the probe compiles one
+/// kernel to make sure.
 enum MetalTestSupport {
     private static let probeSource = """
     #include <metal_stdlib>
@@ -18,9 +18,9 @@ enum MetalTestSupport {
     """
 
     static let supports64BitAtomics: Bool = {
-        // The probe is not reliable on GitHub's virtualized GPU: it can
-        // succeed while later compiles of the real shaders fail. Skip
-        // GPU-shader suites outright on Actions runners.
+        // The probe is not reliable on GitHub's virtualized GPU. It can succeed
+        // while later compiles of the real shaders fail. Skip the GPU-shader
+        // suites on Actions runners.
         if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil {
             return false
         }

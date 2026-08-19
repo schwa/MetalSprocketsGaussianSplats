@@ -4,8 +4,8 @@ import Testing
 
 /// Regression tests for the pure-Swift VP8L fallback decoder (issue #71).
 ///
-/// Fixtures were produced with `cwebp -lossless -q 100 -exact`; the `.pam`
-/// reference outputs come from `dwebp -pam` (libwebp's own decoder).
+/// `cwebp -lossless -q 100 -exact` produced the fixtures. The `.pam` reference
+/// outputs come from `dwebp -pam` (libwebp's own decoder).
 @Suite
 struct VP8LDecoderTests {
     private func fixture(_ name: String, _ ext: String) throws -> Data {
@@ -65,7 +65,7 @@ struct VP8LDecoderTests {
         #expect(width == 4_200)
         #expect(height == 4_200)
         #expect(pixels.count == 4_200 * 4_200 * 4)
-        // Constant color (77, 88, 99, 128) everywhere; spot-check corners and center.
+        // The color is constant (77, 88, 99, 128) everywhere. Spot-check the corners and center.
         for index in [0, (4_200 * 4_200) / 2, 4_200 * 4_200 - 1] {
             #expect(pixels[index * 4 + 0] == 77)
             #expect(pixels[index * 4 + 1] == 88)

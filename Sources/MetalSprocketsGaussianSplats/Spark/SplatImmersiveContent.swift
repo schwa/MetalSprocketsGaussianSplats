@@ -21,8 +21,8 @@ import SwiftUI
 /// }
 /// ```
 ///
-/// For more control (custom render pass composition, frame timing callbacks,
-/// mixing with other elements), drop down to ``SplatImmersiveElement`` directly.
+/// For more control, use ``SplatImmersiveElement`` directly. It supports custom
+/// render pass composition, frame timing callbacks, and mixing with other elements.
 public struct SplatImmersiveContent: ImmersiveSpaceContent {
     let splatCloud: GPUSplatCloud<SparkSplat>
     let modelMatrix: simd_float4x4
@@ -49,8 +49,8 @@ public struct SplatImmersiveContent: ImmersiveSpaceContent {
     public var body: some ImmersiveSpaceContent {
         ImmersiveRenderContent { [splatCloud, modelMatrix, renderer, renderState] context in
             if renderer == .gpu {
-                // The GPU sort is a compute pass and must be encoded before
-                // (outside) the render pass.
+                // The GPU sort is a compute pass. Encode it before the render
+                // pass, outside it.
                 try SplatImmersiveGPUSortElement(
                     context: context,
                     splatCloud: splatCloud,
@@ -73,7 +73,7 @@ public struct SplatImmersiveContent: ImmersiveSpaceContent {
 
 /// A MetalSprockets `Element` that renders a Gaussian splat cloud in a visionOS immersive space.
 ///
-/// Use inside `ImmersiveRenderContent` and `ImmersiveRenderPass`, exactly like any other
+/// Use inside `ImmersiveRenderContent` and `ImmersiveRenderPass`, like any other
 /// MetalSprockets element:
 ///
 /// ```swift
@@ -90,8 +90,8 @@ public struct SplatImmersiveContent: ImmersiveSpaceContent {
 /// }
 /// ```
 ///
-/// Manages sorting internally via a shared ``SplatImmersiveRenderState``.
-/// The first frame may render nothing while the initial sort completes.
+/// Manages sorting internally through a shared ``SplatImmersiveRenderState``.
+/// The first frame can render nothing while the first sort completes.
 public struct SplatImmersiveElement: Element, @unchecked Sendable {
     let context: ImmersiveContext
     let splatCloud: GPUSplatCloud<SparkSplat>
@@ -123,8 +123,9 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
         self.frameCount = renderState.nextFrameCount()
 
         if renderer == .spark {
-            // Sort once per eye — CPU sorts are cheap and this eliminates any
-            // depth-order disagreement between eyes for distant splats.
+            // Sort once per eye. CPU sorts are cheap, and a separate sort per
+            // eye removes any depth-order disagreement between the eyes for
+            // distant splats.
             let cameraMatrices = (0 ..< context.viewCount).map { context.viewMatrix(eye: $0).inverse }
             renderState.requestSort(cameraMatrices: cameraMatrices, modelMatrix: modelMatrix)
             self.sortedIndicesPerEye = (0 ..< context.viewCount).map { renderState.currentSortedIndices(eye: $0) }
@@ -151,8 +152,9 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
 
             switch renderer {
             case .spark:
-                // Per-eye rendering: each eye gets its own draw with its own sort
-                // order, targeting its render target layer via a view mapping.
+                // Per-eye rendering. Each eye gets its own draw with its own
+                // sort order, and targets its render target layer through a
+                // view mapping.
                 try eyeElement(eye: 0, projectionMatrices: projectionMatrices, cameraMatrices: cameraMatrices, drawableSize: drawableSize)
                 if context.viewCount > 1 {
                     try eyeElement(eye: 1, projectionMatrices: projectionMatrices, cameraMatrices: cameraMatrices, drawableSize: drawableSize)
@@ -184,11 +186,11 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                     descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
                 }
             case .gpu:
-                // GPU-sorted path: requires a ``SplatImmersiveGPUSortElement``
-                // encoded before this render pass (``SplatImmersiveContent``
-                // does this automatically). Renders both eyes in one draw via
-                // vertex amplification; the indirect draw's instance count is
-                // the cull survivor count.
+                // GPU-sorted path. It needs a ``SplatImmersiveGPUSortElement``
+                // encoded before this render pass. ``SplatImmersiveContent``
+                // does this automatically. It renders both eyes in one draw
+                // through vertex amplification. The instance count of the
+                // indirect draw is the number of splats that pass the cull.
                 if let gpuSortedIndices {
                     Draw { encoder in
                         var viewMappings = (0 ..< context.viewCount).map {
@@ -263,8 +265,8 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
 
 // MARK: - GPU Sort Element
 
-/// Encodes the GPU splat sort (frustum cull + radix sort) for immersive
-/// rendering. Place before ``ImmersiveRenderPass`` — the sort is a compute
+/// Encodes the GPU splat sort (frustum cull and radix sort) for immersive
+/// rendering. Put it before ``ImmersiveRenderPass``. The sort is a compute
 /// pass and cannot live inside a render pass:
 ///
 /// ```swift
@@ -281,9 +283,9 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
 /// }
 /// ```
 ///
-/// The cull keeps splats visible to either eye; the sort key is the left
-/// eye's depth. ``SplatImmersiveElement`` picks up the sorted indices from
-/// the shared render state.
+/// The cull keeps splats visible to either eye. The sort key is the depth of
+/// the left eye. ``SplatImmersiveElement`` reads the sorted indices from the
+/// shared render state.
 public struct SplatImmersiveGPUSortElement: Element, @unchecked Sendable {
     let splatCloud: GPUSplatCloud<SparkSplat>
     let projectionMatrices: [simd_float4x4]
@@ -304,8 +306,8 @@ public struct SplatImmersiveGPUSortElement: Element, @unchecked Sendable {
         let viewCount = min(context.viewCount, 2)
         self.projectionMatrices = (0 ..< viewCount).map { context.projectionMatrix(eye: $0) }
         self.cameraMatrices = (0 ..< viewCount).map { context.viewMatrix(eye: $0).inverse }
-        // Advance the slot in init, not body: body can be re-evaluated
-        // multiple times per frame.
+        // Advance the slot in init, not body. The body can be re-evaluated
+        // many times per frame.
         (self.resources, self.slotIndex) = try renderState.beginGPUSort(
             splatCloud: splatCloud,
             cameraMatrix: cameraMatrices[0],
@@ -347,7 +349,7 @@ public struct SplatImmersiveGPUSortElement: Element, @unchecked Sendable {
 /// }
 /// ```
 public final class SplatImmersiveRenderState: Sendable {
-    /// Failures creating the render state.
+    /// Failures that occur when the render state is created.
     public enum Error: Swift.Error {
         /// No Metal device is available on this system.
         case noMetalDevice
@@ -403,9 +405,9 @@ public final class SplatImmersiveRenderState: Sendable {
         self.gpuSortState = OSAllocatedUnfairLock(uncheckedState: GPUSortState())
     }
 
-    /// Prepares the shared GPU sort resources for a new frame: lazily creates
-    /// them, advances the frame slot, and publishes the slot's ``SplatIndices``
-    /// for ``SplatImmersiveElement`` to render with.
+    /// Prepares the shared GPU sort resources for a new frame. It creates them
+    /// on first use, advances the frame slot, and publishes the ``SplatIndices``
+    /// of the slot for ``SplatImmersiveElement`` to render with.
     func beginGPUSort(
         splatCloud: GPUSplatCloud<SparkSplat>,
         cameraMatrix: simd_float4x4,
@@ -443,7 +445,7 @@ public final class SplatImmersiveRenderState: Sendable {
         }
     }
 
-    /// Requests a sort for each eye's camera matrix. Matrices beyond the
+    /// Requests a sort for the camera matrix of each eye. Matrices past the
     /// supported eye count are ignored.
     public func requestSort(cameraMatrices: [simd_float4x4], modelMatrix: simd_float4x4) {
         for (eye, cameraMatrix) in cameraMatrices.prefix(Self.eyeCount).enumerated() {

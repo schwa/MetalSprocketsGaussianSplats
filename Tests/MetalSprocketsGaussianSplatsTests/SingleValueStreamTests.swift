@@ -30,7 +30,7 @@ final class CurrentValueTests: XCTestCase {
     func testCurrentValueWorksWithOptionalElement() {
         let stream = SingleValueStream<Int?>()
         stream.yield(nil)
-        // currentValue is Optional<Optional<Int>>, outer is .some, inner is nil
+        // currentValue is Optional<Optional<Int>>: the outer is .some, the inner is nil.
         XCTAssertEqual(stream.currentValue, Int??.some(nil))
     }
 
@@ -93,7 +93,7 @@ final class YieldAndConsumeTests: XCTestCase {
     func testYieldBeforeConsumerStarts() async {
         let stream = SingleValueStream<Int>()
 
-        // Yield before any consumer exists — buffered
+        // Yield before any consumer exists, so the value is buffered.
         stream.yield(42)
 
         let task = Task {
@@ -263,7 +263,7 @@ final class ConsumerLifecycleTests: XCTestCase {
         let count = await task.value
         XCTAssertEqual(count, 2)
 
-        // Yielding after consumer left should not block or crash
+        // A yield after the consumer leaves must not block or crash.
         stream.yield(3)
         stream.yield(4)
         stream.finish()
@@ -294,7 +294,6 @@ final class ConsumerLifecycleTests: XCTestCase {
 
         let task = Task {
             for await _ in stream {
-                // consumed
             }
         }
 
@@ -336,7 +335,7 @@ final class ForAwaitTests: XCTestCase {
         let expectation = XCTestExpectation(description: "loop exited")
 
         let task = Task {
-            for await _ in stream { /* consume */ }
+            for await _ in stream {}
             expectation.fulfill()
         }
 
@@ -434,7 +433,7 @@ final class EdgeCaseTests: XCTestCase {
         stream.yield(1)
         stream.yield(2)
         stream.yield(3)
-        // deinit should call finish — no leak or crash
+        // deinit calls finish, so there is no leak or crash.
     }
 
     func testYieldLargeValue() {
@@ -536,7 +535,7 @@ final class TimeoutTests: XCTestCase {
         let stream = SingleValueStream<Int>()
 
         let task = Task {
-            for await _ in stream { /* consume */ }
+            for await _ in stream {}
         }
 
         try? await Task.sleep(for: .milliseconds(100))
@@ -565,7 +564,7 @@ final class TimeoutTests: XCTestCase {
         let stream = SingleValueStream<Int>()
 
         let task = Task {
-            for await _ in stream { /* consume */ }
+            for await _ in stream {}
         }
 
         stream.finish()

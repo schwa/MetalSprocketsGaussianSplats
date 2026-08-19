@@ -19,8 +19,9 @@ final class ARSplatSessionModel: NSObject, ARSessionDelegate {
     var currentFrame: ARFrame?
 
     /// Latest-value stream from the ARKit delegate queue to the main actor.
-    /// A single consumer task drains it, so frames are delivered in order and
-    /// stale frames are dropped instead of queueing unbounded work (#95).
+    ///
+    /// One consumer task drains the stream. Frames arrive in order. The stream
+    /// drops stale frames instead of queueing unbounded work (#95).
     private let frameStream: AsyncStream<ARFrame>
     private let frameContinuation: AsyncStream<ARFrame>.Continuation
 
@@ -59,8 +60,8 @@ final class ARSplatSessionModel: NSObject, ARSessionDelegate {
     }
 }
 
-/// Renders the splat cloud on top of the ARKit camera feed, using ARKit's
-/// per-frame view/projection matrices so the splat stays anchored in the
+/// Renders the splat cloud on top of the ARKit camera feed. The per-frame
+/// view and projection matrices from ARKit keep the splat anchored in the
 /// world (#43).
 struct ARSplatView: View {
     let splatCloud: GPUSplatCloud<SparkSplat>
@@ -83,9 +84,9 @@ struct ARSplatView: View {
             .onDisappear { sessionModel.stop() }
             .arkit(frame: sessionModel.currentFrame, frameData: $frameData)
             .task {
-                // Created here rather than in init so a failure degrades to an
-                // error message instead of crashing, and so no work happens on
-                // every parent body evaluation (#98).
+                // Created here, not in init. A failure then shows an error
+                // message instead of a crash. No work runs on every parent
+                // body evaluation (#98).
                 let manager: AsyncSortManager<SparkSplat>
                 do {
                     guard let device = MTLCreateSystemDefaultDevice() else {
@@ -114,7 +115,7 @@ struct ARSplatView: View {
     @ViewBuilder
     private var content: some View {
         if let textureY = frameData.textureY, let textureCbCr = frameData.textureCbCr {
-            // Capture per-frame values so the render closure doesn't race teardown.
+            // Capture per-frame values so the render closure does not race teardown.
             let textureCoordinates = frameData.textureCoordinates
             let projectionMatrix = frameData.projectionMatrix
             let cameraMatrix = frameData.viewMatrix.inverse

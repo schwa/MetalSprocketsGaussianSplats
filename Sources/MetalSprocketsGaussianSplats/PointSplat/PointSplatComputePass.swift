@@ -13,9 +13,9 @@ import Splats
 ///
 /// Place it in an element tree (a `Runner`, alongside other passes in one
 /// submission) and attach modifiers such as `gpuCounters`. Output at 1 sample
-/// per pixel is noisy by design — accumulate frames (varying `frameSeed`) for
+/// per pixel is noisy by design. Accumulate frames (vary `frameSeed`) for
 /// a converged image. For live rendering with temporal accumulation use
-/// ``PointSplatRenderPipeline``; for one-shot images use
+/// ``PointSplatRenderPipeline``. For one-shot images use
 /// ``OffscreenSplatRenderer``.
 ///
 /// Requires 64-bit atomics: Apple9 (A17/M3+) or Mac2 GPU family.
@@ -72,22 +72,22 @@ public struct PointSplatComputePass: Element {
         )
     }
 
-    /// Renders one stochastic frame from a raw splat buffer, or — when
-    /// `packedBounds` is set — from quantized 18-byte packed splats.
+    /// Renders one stochastic frame from a raw splat buffer. When
+    /// `packedBounds` is set, it renders from quantized 18-byte packed splats.
     ///
     /// - Parameters:
     ///   - splats: `SparkSplat` (or packed) splat data.
     ///   - splatCount: Number of splats in `splats`.
-    ///   - packedBounds: Dequantization bounds; set when `splats` holds
+    ///   - packedBounds: Dequantization bounds. Set when `splats` holds
     ///     18-byte packed splats.
     ///   - modelMatrix: The scene-level model transform.
     ///   - viewMatrix: The world-to-view matrix.
     ///   - projectionMatrix: The camera projection matrix.
     ///   - frameSeed: Varies the stochastic sampling pattern.
     ///   - planKey: Monotonic per-frame key for frame-plan idempotency.
-    ///     Defaults to `frameSeed`; pass an explicit key when seeds can
+    ///     Defaults to `frameSeed`. Pass an explicit key when seeds can
     ///     repeat across frames.
-    ///   - outTexture: Destination texture; its size sets the output size.
+    ///   - outTexture: Destination texture. Its size sets the output size.
     ///   - nearPlane: View-space near distance for depth quantization and the near cull.
     ///   - farPlane: View-space far distance for depth quantization.
     ///   - backgroundColor: Color of pixels no point lands on.
@@ -171,7 +171,7 @@ public struct PointSplatComputePass: Element {
                 // ground-truth accumulation (RFC 0005 §4).
                 reuseFactor: 0
             )
-            // Whole frame in one serial compute pass; the splat dispatches
+            // Whole frame runs in one serial compute pass. The splat dispatches
             // are indirect from the GPU-side totals.
             let plan = resources.framePlan(planKey: planKey, splats: splats)
             return try ComputePass(label: "PointSplat offscreen") {

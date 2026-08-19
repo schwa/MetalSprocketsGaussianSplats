@@ -13,7 +13,7 @@ struct PoolTests {
         #expect(pool.totalAllocatedCount == 3)
 
         let item1 = pool.acquire()
-        #expect(item1 == 20) // Last item (LIFO)
+        #expect(item1 == 20) // LIFO order returns the last item
         #expect(pool.availableCount == 2)
 
         let item2 = pool.acquire()
@@ -33,10 +33,10 @@ struct PoolTests {
 
         #expect(pool.totalAllocatedCount == 1)
 
-        _ = pool.acquire() // Use preallocated
+        _ = pool.acquire() // Uses the preallocated item
         #expect(pool.totalAllocatedCount == 1)
 
-        _ = pool.acquire() // Should allocate new
+        _ = pool.acquire() // Allocates a new item
         #expect(pool.totalAllocatedCount == 2)
     }
 

@@ -11,8 +11,8 @@ import Splats
 /// 8-bit LSD radix over the 16-bit half depth key, then decode into
 /// `IndexedDistance` records the render vertex shader reads.
 ///
-/// Culled splats are dropped before the radix so the sort processes only
-/// survivors; the survivor count lands in the slot's indirect draw args
+/// Culled splats are dropped before the radix, so the sort processes only
+/// survivors. The survivor count lands in the slot's indirect draw args
 /// (`instanceCount`) for the render pass to draw with.
 public struct GPUSplatSortComputePass: Element {
     var splatCloud: GPUSplatCloud<SparkSplat>
@@ -60,7 +60,7 @@ public struct GPUSplatSortComputePass: Element {
     }
 
     /// Full initializer supporting stereo. With two views the cull keeps any
-    /// splat visible to either view; the sort key is the first view's depth.
+    /// splat visible to either view. The sort key is the first view's depth.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrices: [simd_float4x4],
@@ -161,8 +161,8 @@ public struct GPUSplatSortComputePass: Element {
                         .parameter("blockCounts", buffer: slot.blockCounts)
                 }
                 // Two 8-bit radix passes over the 16-bit key. Pass 0 sorts
-                // recordsB -> recordsA; pass 1 (decode) scatters directly into the
-                // IndexedDistance output buffer, folding away the decode kernel.
+                // recordsB -> recordsA. Pass 1 (decode) scatters directly into
+                // the IndexedDistance output buffer, folding away the decode kernel.
                 try radixPass(shift: 0, src: slot.recordsB, dst: slot.recordsA, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
                 try radixPass(shift: 8, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
             }

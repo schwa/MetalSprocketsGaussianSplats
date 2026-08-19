@@ -28,7 +28,8 @@ struct PointSplatWorkloadTests {
         }
         let result = try distributor.build(counts: countsBuffer, count: counts.count, commandQueue: queue)
 
-        // Result indices live in a private buffer; blit to shared for inspection.
+        // The result indices live in a private buffer. Blit them to a shared
+        // buffer for inspection.
         guard let shared = device.makeBuffer(length: MemoryLayout<UInt32>.stride * max(result.totalPoints, 1)), let commandBuffer = queue.makeCommandBuffer(), let blit = commandBuffer.makeBlitCommandEncoder() else {
             throw TestError.bufferAllocationFailed
         }

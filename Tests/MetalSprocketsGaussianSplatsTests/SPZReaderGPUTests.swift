@@ -7,9 +7,10 @@ import simd
 @testable import Splats
 import Testing
 
-/// Parity: the GPU SPZ unpack (`SPZReaderGPU`) must match the CPU reference
-/// (`SPZReader` streaming into `SparkSplat`), which is still the device-free
-/// decoder for SPZ.
+/// The GPU SPZ unpack (`SPZReaderGPU`) must match the CPU reference decoder.
+///
+/// The CPU reference is `SPZReader` streaming into `SparkSplat`. It is the
+/// device-free decoder for SPZ.
 @Suite("SPZReaderGPU")
 struct SPZReaderGPUTests {
     @Test("GPU unpack matches the CPU reference on test-grid.spz")

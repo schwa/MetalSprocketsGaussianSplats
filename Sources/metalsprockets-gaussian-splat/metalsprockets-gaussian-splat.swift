@@ -118,8 +118,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let cameraMatrix = try parseCameraMatrix(from: renderConfig)
         let useSrgbToLinear = renderConfig.srgbToLinear ?? false
 
-        // SOG decodes on the GPU (compute-kernel de-quantize); every other
-        // format streams through the CPU reader. See SplatLoader / #126.
+        // SOG decodes on the GPU with a compute-kernel de-quantize. Every other
+        // format streams through the CPU reader. See SplatLoader and #126.
         let result = try SplatLoader.read(device: device, url: URL(fileURLWithPath: renderConfig.splat))
         let sparkGPUSplatCloud = GPUSplatCloud(result, modelTransform: modelMatrix)
         let effectiveSHDegree = result.shDegree
@@ -170,8 +170,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         #endif
     }
 
-    /// Chatter that isn't the report. In JSON mode it goes to stderr so stdout
-    /// stays a single parseable document.
+    /// Prints chatter that is not the report. In JSON mode it goes to stderr, so
+    /// stdout stays a single parseable document.
     private func note(_ message: String) {
         if statistics == .json {
             FileHandle.standardError.write(Data((message + "\n").utf8))
@@ -426,7 +426,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     }
 
     func parseCameraMatrix(from config: RenderConfig) throws -> simd_float4x4 {
-        // Priority: full matrix > rotation > lookat > position
+        // Priority order: full matrix, then rotation, then lookat, then position.
         if let matrix = config.getCameraMatrix() {
             if config.cameraPosition != nil || config.cameraLookat != nil || config.cameraRotation != nil {
                 throw ValidationError("--camera-matrix is the whole camera; it cannot be combined with --camera-position, --camera-lookat, or --camera-rotation")

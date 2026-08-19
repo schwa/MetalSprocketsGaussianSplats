@@ -6,8 +6,8 @@ import MetalSprocketsGaussianSplatShaders
 
 /// Compute pass that sorts each tile's splat list by depth (front-to-back).
 ///
-/// - Important: This type is part of the **experimental** tile-based renderer
-///   and may have significant changes or be removed in future versions.
+/// - Important: This type is part of the **experimental** tile-based renderer.
+///   It can change or move in a future version.
 struct TileSortingComputePass: Element {
     // MARK: - Properties
 

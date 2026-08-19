@@ -19,7 +19,7 @@ final class PointSplatWorkloadDistributor {
 
     /// Point budget per supersampled pixel. The paper's default budget
     /// (250M points at 1920x1080 with 2x2 supersampling) works out to
-    /// ~30 points per pixel; 32 gives similar headroom. Cost: 4 bytes of
+    /// ~30 points per pixel. 32 gives similar headroom. Cost: 4 bytes of
     /// index storage per point.
     static let pointsPerPixelBudget = 32
 
@@ -32,7 +32,7 @@ final class PointSplatWorkloadDistributor {
     }
 
     struct Result {
-        /// Maps splat-thread index to Gaussian index; valid in `[0, totalPoints)`.
+        /// Maps splat-thread index to Gaussian index. Valid in `[0, totalPoints)`.
         let indices: MTLBuffer
         /// Total number of points to splat this frame (sum of all counts, clamped to capacity).
         let totalPoints: Int
@@ -56,14 +56,14 @@ final class PointSplatWorkloadDistributor {
         Int(totalsBuffer.contents().load(as: UInt32.self))
     }
 
-    /// Raw thread demand of the last completed frame; exceeds `capacity`
+    /// Raw thread demand of the last completed frame. It exceeds `capacity`
     /// when the scene wants more points than the budget allows.
     var lastThreadDemand: Int {
         Int(totalsBuffer.contents().load(fromByteOffset: MemoryLayout<UInt32>.stride, as: UInt32.self))
     }
     /// `MTLDispatchThreadgroupsIndirectArguments` for ceil(total/256)
     /// threadgroups, written on the GPU timeline. Use for any dispatch that
-    /// should cover exactly the active threads (e.g. the splat stage).
+    /// must cover exactly the active threads (for example, the splat stage).
     let dispatchArgsBuffer: MTLBuffer
 
     private let scanCountsBlock: ComputeKernel
@@ -134,7 +134,7 @@ final class PointSplatWorkloadDistributor {
     /// The full distribution pipeline as compute elements for an enclosing
     /// ``ComputePass``. Every stage after the prefix sum dispatches
     /// indirectly from the GPU-side total, so cost scales with actual demand
-    /// rather than capacity; entries past the total are garbage and must not
+    /// rather than capacity. Entries past the total are garbage and must not
     /// be consumed.
     @ElementBuilder
     func elements(counts: MTLBuffer, count: Int, seed: UInt32 = 0) throws -> some Element {
@@ -165,9 +165,10 @@ final class PointSplatWorkloadDistributor {
                     .parameter("totals", buffer: totalsBuffer, offset: uintStride)
                     .parameter("numBlocks", value: numCountBlocks)
             }
-            // Over-budget? Scale all counts down proportionally (stochastic
-            // rounding keeps the expectation right), then re-scan. Turns budget
-            // overflow into uniform noise instead of truncating whole regions.
+            // Over-budget? Reduce all counts proportionally (stochastic
+            // rounding keeps the expectation right), then re-scan. This turns
+            // budget overflow into uniform noise instead of truncating whole
+            // regions.
             try ComputePipeline(computeKernel: scaleCounts) {
                 try ComputeDispatch(threadgroups: countGroups, threadsPerThreadgroup: blockThreads)
                     .parameter("counts", buffer: counts)
@@ -263,7 +264,7 @@ final class PointSplatWorkloadDistributor {
 
         let rawTotal = Int(totalsBuffer.contents().load(as: UInt32.self))
         // Stochastic rounding in the over-budget scaling pass can land a
-        // hair above capacity; consumption is clamped either way.
+        // hair above capacity. Consumption is clamped either way.
         return Result(indices: indicesBuffer, totalPoints: min(rawTotal, capacity))
     }
 }

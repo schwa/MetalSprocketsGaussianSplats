@@ -5,7 +5,7 @@ internal import os
 
 /// A non-blocking async sequence that only keeps the latest value.
 ///
-/// `SingleValueStream` is designed for scenarios where only the most recent value matters,
+/// `SingleValueStream` handles the case where only the most recent value matters,
 /// such as streaming sorted indices where older sorts become stale immediately.
 ///
 /// ## Why Not AsyncChannel?
@@ -20,9 +20,9 @@ internal import os
 /// }
 /// ```
 ///
-/// `SingleValueStream` uses `AsyncStream` with `.bufferingNewest(1)`, making `yield()`
-/// non-blocking. Old values are dropped if not consumed - which is correct for "latest
-/// value only" semantics.
+/// `SingleValueStream` uses `AsyncStream` with `.bufferingNewest(1)`, so `yield()`
+/// is non-blocking. Old values are dropped if not consumed. This is correct for
+/// "latest value only" semantics.
 ///
 /// ## Usage
 ///
@@ -55,7 +55,7 @@ internal import os
 /// - All active iterators share the same underlying `AsyncStream`
 /// - With `.bufferingNewest(1)`, only one value is buffered at a time
 /// - Whichever consumer calls `next()` first gets the value
-/// - Other consumers waiting will get the *next* yielded value (or none if producer is slower)
+/// - Other consumers that wait get the *next* yielded value (or none if the producer is slower)
 ///
 /// In practice, this means:
 /// ```swift
@@ -66,8 +66,8 @@ internal import os
 /// for await value in stream { ... }  // Works fine - picks up where A left off
 /// ```
 ///
-/// This is ideal for SwiftUI's `.task` modifier which cancels and restarts on view cycles.
-/// The new task seamlessly takes over from the cancelled one.
+/// This suits SwiftUI's `.task` modifier, which cancels and restarts on view cycles.
+/// The new task takes over from the cancelled one.
 ///
 /// ## Thread Safety
 ///
@@ -77,12 +77,12 @@ internal import os
 ///
 /// ## When to Call `finish()`
 ///
-/// **Usually you don't need to.** `finish()` is called automatically in `deinit`.
+/// **Usually you do not need to.** `finish()` is called automatically in `deinit`.
 ///
 /// Call `finish()` explicitly when:
 /// - You want to signal "no more values" before the object is deallocated
 /// - You need consumers to exit their `for await` loops immediately
-/// - You're implementing a shutdown sequence
+/// - You are implementing a shutdown sequence
 ///
 /// After `finish()`:
 /// - All active `for await` loops will complete (return `nil`)
@@ -93,7 +93,7 @@ internal import os
 ///
 /// - No fire-and-forget Tasks means no retained references
 /// - Safe for use in SwiftUI views that cycle (appear/disappear)
-/// - When the owning object deinits, stream automatically finishes
+/// - When the owning object deinits, the stream finishes automatically
 ///
 public final class SingleValueStream<Element: Sendable>: AsyncSequence, Sendable {
     public typealias AsyncIterator = AsyncStream<Element>.AsyncIterator
@@ -114,15 +114,15 @@ public final class SingleValueStream<Element: Sendable>: AsyncSequence, Sendable
         self.latestValue = OSAllocatedUnfairLock(initialState: nil)
     }
 
-    /// Send a value to the stream. Non-blocking - returns immediately.
-    /// If a previous value hasn't been consumed, it's dropped.
+    /// Send a value to the stream. Non-blocking, returns immediately.
+    /// If a previous value is not yet consumed, it is dropped.
     /// Updates `currentValue`.
     public func yield(_ value: Element) {
         latestValue.withLock { $0 = value }
         continuation.yield(value)
     }
 
-    /// Finish the stream. All pending iterations will complete.
+    /// Finish the stream. All pending iterations complete.
     /// Also called automatically on deinit as a safety net.
     public func finish() {
         continuation.finish()

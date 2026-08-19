@@ -86,9 +86,8 @@ struct ContentView: View {
     }
 
     #if !os(visionOS)
-    // Toolbar chrome instead of the floating overlay bar. Intentionally also
-    // on macOS despite the MTKView blanking reported in #45 - debugging that
-    // as it comes up.
+    // Toolbar chrome instead of the floating overlay bar. Applied on macOS too,
+    // despite the MTKView blanking in #45.
     private var navigationContent: some View {
         NavigationStack {
             titledSplatSurface
@@ -135,9 +134,9 @@ struct ContentView: View {
     #endif
 
     #if !os(visionOS)
-    /// The shared Metal surface: splat view, camera interaction, drag & drop,
-    /// loading/timing overlays, and the file importer. Platform chrome
-    /// (toolbar on iOS, floating overlay on macOS) wraps this.
+    /// The shared Metal surface: splat view, camera interaction, drag and drop,
+    /// loading and timing overlays, and the file importer. Platform chrome
+    /// wraps this. The toolbar wraps it on iOS, the floating overlay on macOS.
     private var splatSurface: some View {
         SplatView(
             splatCloud: splatCloud,
@@ -174,7 +173,7 @@ struct ContentView: View {
     #endif
 
     private func presentImporter() {
-        // Cycle through false: macOS can leave the binding stuck true
+        // Cycle through false first. On macOS the binding can stay stuck true
         // after dismissal, and true -> true never re-presents.
         isImporting = false
         Task { @MainActor in
@@ -212,23 +211,22 @@ private struct SplatImporter: ViewModifier {
         content
             .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.splatContentTypes) { result in
                 if case .success(let url) = result {
-                    // Parsing happens off the main actor, so the importer's
-                    // dismissal completes instead of wedging behind a
-                    // seconds-long synchronous load (which left it unable
-                    // to present a second time).
+                    // Parse off the main actor so the importer dismissal
+                    // completes. A synchronous multi-second load wedges the
+                    // dialog and stops it from presenting a second time.
                     Task {
                         await demoState.loadCustomSplat(url: url)
                     }
                 }
             }
-            // The alert must sit on a different node than the fileImporter:
-            // two presentation modifiers on one node conflict, and the
-            // importer silently stops presenting after its first use.
+            // Place the alert on a different node than the fileImporter. Two
+            // presentation modifiers on one node conflict, and the importer
+            // then stops presenting after its first use.
             .background {
                 Color.clear
                     .alert("Load Failed", isPresented: Binding(get: { demoState.loadError != nil }, set: { if !$0 { demoState.loadError = nil } })) {
                         Button("OK", role: .cancel) {
-                            // Dismissal only; the binding's setter clears the error.
+                            // Dismissal only. The binding setter clears the error.
                         }
                     } message: {
                         Text(demoState.loadError ?? "")

@@ -12,12 +12,13 @@ import Synchronization
 ///
 /// Holds the splat buffer, an optional spherical-harmonics coefficient buffer,
 /// a per-cloud model transform, and a cloud-level opacity. Equality is by
-/// reference; comparing buffer contents would be too expensive for large clouds.
+/// reference, because a comparison of the buffer contents is too expensive for
+/// large clouds.
 public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: SortableSplatProtocol {
     public let splats: TypedMTLBuffer<Splat>
 
     /// Mutable state shared between the UI (writes) and the sort thread (reads).
-    /// Guarded by a mutex so a 64-byte matrix can't be torn mid-sort (#93).
+    /// A mutex guards it, so a 64-byte matrix cannot tear mid-sort (#93).
     private struct MutableState {
         var modelTransform: simd_float4x4
         var opacity: Float
@@ -25,19 +26,19 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
 
     private let state: Mutex<MutableState>
 
-    /// Per-cloud model transform
+    /// The per-cloud model transform.
     public var modelTransform: simd_float4x4 {
         get { state.withLock { $0.modelTransform } }
         set { state.withLock { $0.modelTransform = newValue } }
     }
 
-    /// Spherical harmonics coefficients buffer (optional, for view-dependent color)
+    /// The spherical harmonics coefficient buffer. Optional, for view-dependent color.
     public let shCoefficients: TypedMTLBuffer<Float>?
 
-    /// Spherical harmonics degree (0 = no SH, 1-3 for increasing detail)
+    /// The spherical harmonics degree. 0 means no SH; 1 to 3 give more detail.
     public let shDegree: UInt8
 
-    /// Cloud-level opacity multiplier (0.0 - 1.0)
+    /// The cloud-level opacity multiplier, from 0.0 to 1.0.
     public var opacity: Float {
         get { state.withLock { $0.opacity } }
         set { state.withLock { $0.opacity = newValue } }
@@ -52,9 +53,9 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
         self.shDegree = shDegree
     }
 
-    /// - Parameter mortonOrdered: When true, reorders the splats along a
-    ///   Morton curve before upload so consecutive splats are spatially
-    ///   coherent, tightening group-culling AABBs (#89).
+    /// - Parameter mortonOrdered: If true, reorders the splats along a Morton
+    ///   curve before upload, so consecutive splats are spatially coherent. This
+    ///   tightens the group-culling AABBs (#89).
     public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, opacity: Float = 1.0, mortonOrdered: Bool = false) throws {
         var splats = splats
         if mortonOrdered {
@@ -64,10 +65,10 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
         self.init(splats: splatsBuffer, modelTransform: modelTransform, opacity: opacity)
     }
 
-    /// - Parameter mortonOrdered: When true, reorders the splats (and their
-    ///   SH coefficients, in lockstep) along a Morton curve before upload so
-    ///   consecutive splats are spatially coherent, tightening group-culling
-    ///   AABBs (#89).
+    /// - Parameter mortonOrdered: If true, reorders the splats and their SH
+    ///   coefficients together along a Morton curve before upload, so
+    ///   consecutive splats are spatially coherent. This tightens the
+    ///   group-culling AABBs (#89).
     public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, shCoefficients: [Float], shDegree: UInt8, opacity: Float = 1.0, mortonOrdered: Bool = false) throws {
         var splats = splats
         var shCoefficients = shCoefficients
@@ -82,11 +83,11 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
     // MARK: -
 
     public static func == (lhs: GPUSplatCloud, rhs: GPUSplatCloud) -> Bool {
-        // Use reference equality - comparing buffer contents is too expensive for large splat clouds
+        // Reference equality. A comparison of the buffer contents is too expensive for large splat clouds.
         lhs === rhs
     }
 
-    /// How many splats are currently in the splat cloud
+    /// The number of splats in the splat cloud.
     public var count: Int {
         splats.count
     }
@@ -98,12 +99,12 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
 public struct SplatIndices: Sendable, Equatable {
     var parameters: SortParameters
     var indices: TypedMTLBuffer<IndexedDistance>
-    /// The pool this buffer was acquired from. Stored so release is independent
-    /// of which pool the sort manager currently holds (pools are swapped on resize).
+    /// The pool this buffer came from. Stored so release does not depend on
+    /// which pool the sort manager currently holds. Pools are swapped on resize.
     private var pool: Pool<TypedMTLBuffer<IndexedDistance>>?
-    /// Indirect draw arguments (`MTLDrawPrimitivesIndirectArguments`) whose
-    /// `instanceCount` is the GPU-cull survivor count. Nil for CPU-sorted
-    /// indices, where every index should be drawn.
+    /// Indirect draw arguments (`MTLDrawPrimitivesIndirectArguments`). The
+    /// `instanceCount` is the number of splats that pass the GPU cull. Nil for
+    /// CPU-sorted indices, where every index is drawn.
     public internal(set) var indirectDrawArgs: MTLBuffer?
 
     internal init(parameters: SortParameters, indices: TypedMTLBuffer<IndexedDistance>, pool: Pool<TypedMTLBuffer<IndexedDistance>>? = nil, indirectDrawArgs: MTLBuffer? = nil) {
@@ -113,7 +114,7 @@ public struct SplatIndices: Sendable, Equatable {
         self.indirectDrawArgs = indirectDrawArgs
     }
 
-    /// Release the index buffer back to the pool it was acquired from.
+    /// Releases the index buffer back to the pool it came from.
     public func release() {
         pool?.release(indices)
     }
@@ -125,7 +126,7 @@ public struct SplatIndices: Sendable, Equatable {
 
 // MARK: -
 
-/// The camera and model state a sort was (or should be) computed for.
+/// The camera and model state that a sort was, or must be, computed for.
 ///
 /// Renderers compare the parameters of the most recent sort against the current
 /// frame to decide whether a re-sort is needed.

@@ -46,7 +46,7 @@ struct AsyncSortManagerSwitchTests {
 
         await sortManager.setSplatCloud(cloudB)
 
-        // The sorter capacity must have grown to fit cloudB
+        // The sorter capacity must grow to fit cloudB.
         let capacity = await sortManager.sorterCapacity
         #expect(capacity >= cloudB.count)
     }
@@ -84,14 +84,14 @@ struct AsyncSortManagerSwitchTests {
 
         let sortManager = try AsyncSortManager<SparkSplat>(device: device, splatCloud: cloudA, capacity: cloudA.count)
 
-        // Perform an initial sort so currentSortedIndices is non-nil
+        // An initial sort makes currentSortedIndices non-nil.
         let params = SortParameters(camera: .identity, model: .identity)
         _ = sortManager.sortNowSync(params)
 
         let indicesBefore = await sortManager.currentSortedIndices
         #expect(indicesBefore != nil, "Expected non-nil indices after initial sort")
 
-        // Switch cloud — indices must NOT be cleared
+        // The cloud switch must not clear the indices.
         await sortManager.setSplatCloud(cloudB)
 
         let indicesAfter = await sortManager.currentSortedIndices

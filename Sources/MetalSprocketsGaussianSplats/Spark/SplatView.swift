@@ -8,11 +8,11 @@ import simd
 import Splats
 import SwiftUI
 
-/// A SwiftUI view that renders a Gaussian splat cloud using the Spark renderer.
+/// A SwiftUI view that renders a Gaussian splat cloud with the Spark renderer.
 ///
-/// `SplatView` encapsulates the full `AsyncSortManager` lifecycle so callers do not need
-/// to manage sorting manually. It owns the sort manager, subscribes to sorted indices,
-/// requests sorts when the camera or model matrix changes, and renders nothing until the
+/// `SplatView` owns the full `AsyncSortManager` lifecycle, so the caller does not
+/// manage sorting. It owns the sort manager, subscribes to sorted indices, requests
+/// a sort when the camera or model matrix changes, and renders nothing until the
 /// first sort completes.
 ///
 /// ## Basic Usage
@@ -38,11 +38,11 @@ import SwiftUI
 ///
 /// ## Known Issues
 ///
-/// On macOS, applying `.toolbar` or wrapping the view in a `NavigationStack`
-/// can leave the underlying `MTKView` with a zero initial size, so nothing
-/// renders until the window is resized. This is a MetalSprockets `RenderView`
-/// bug (MetalSprockets#311). Until it is fixed upstream, place UI controls in
-/// an `.overlay` instead of a toolbar, as the demo app does.
+/// On macOS, `.toolbar` or a `NavigationStack` wrapper can leave the underlying
+/// `MTKView` with a zero initial size. Then nothing renders until the window is
+/// resized. This is a MetalSprockets `RenderView` bug (MetalSprockets#311).
+/// Until the fix lands upstream, put the UI controls in an `.overlay` instead of
+/// a toolbar, like the demo app does.
 public struct SplatView: View {
     private let splatCloud: GPUSplatCloud<SparkSplat>
     private let cameraMatrix: simd_float4x4
@@ -58,16 +58,16 @@ public struct SplatView: View {
     @State private var pointSplatReprojection = true
     @State private var pointSplatSupersamplingSetting = 2
     @State private var pointSplatPointsPerThreadSetting = 16
-    /// Scratch + output buffers for the GPU sorter (``SplatRenderer/gpu``).
+    /// Scratch and output buffers for the GPU sorter (``SplatRenderer/gpu``).
     @State private var sortResources: GPUSortResources
-    /// Seed for the stochastic renderer's noise pattern. Advances once per
-    /// camera/model change, so the pattern varies while moving but freezes
-    /// when the view is stationary, avoiding constant shimmer (#51).
+    /// Seed for the noise pattern of the stochastic renderer. It advances once
+    /// per camera or model change, so the pattern varies during motion but
+    /// freezes when the view is stationary. This removes constant shimmer (#51).
     @State private var stochasticSeed: UInt32 = 0
 
-    /// Superseded index buffers are held for this many results before release so
-    /// the GPU can finish rendering with them. Sized to cover MTKView's typical
-    /// in-flight frame count (3) plus a margin.
+    /// Superseded index buffers are held for this many results before release,
+    /// so the GPU can finish rendering with them. Sized to cover the typical
+    /// in-flight frame count of MTKView (3) plus a margin.
     private static let pendingReleaseDepth = 3
 
     /// Creates a `SplatView` that renders the given splat cloud.
@@ -154,9 +154,9 @@ public struct SplatView: View {
                     descriptor.renderTargetArrayLength = 1
                 }
             case .pointSplat:
-                // PointSplat's fixed-point depth needs a finite range; derive
-                // it from the projection (reversed-infinite-Z gets a finite
-                // far solely for quantization).
+                // PointSplat's fixed-point depth needs a finite range. Derive
+                // it from the projection. Reversed-infinite-Z gets a finite far
+                // value only for quantization.
                 let depthRange: ClosedRange<Float> = switch projection.depthMode {
                 case .standard(let zClip):
                     zClip

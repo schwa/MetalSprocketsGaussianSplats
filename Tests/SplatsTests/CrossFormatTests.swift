@@ -68,7 +68,6 @@ struct CrossFormatTests {
         return splats
     }
 
-    // Sort key for position-based comparison
     func sortKey(_ splat: GenericSplat) -> [Float] {
         [splat.position.x, splat.position.y, splat.position.z]
     }
@@ -95,19 +94,18 @@ struct CrossFormatTests {
             let ply = plySplats[i]
             let csv = csvSplats[i]
 
-            // Position
             #expect(ply.position.isApproximatelyEqual(to: csv.position, absoluteTolerance: 0.0001), "PLY position mismatch at \(i)")
 
-            // Scale (PLY stores exp(log_scale))
+            // PLY stores exp(log_scale).
             let expectedScale = SIMD3<Float>(exp(csv.scale.x), exp(csv.scale.y), exp(csv.scale.z))
             #expect(ply.scale.isApproximatelyEqual(to: expectedScale, absoluteTolerance: 0.0001), "PLY scale mismatch at \(i)")
 
-            // Rotation (quaternion) - compare as SIMD4 for component equality
+            // Compare the quaternion as a SIMD4 for component equality.
             let plyQuat = ply.rotation
             let csvQuat = SIMD4<Float>(csv.rotation.imag.x, csv.rotation.imag.y, csv.rotation.imag.z, csv.rotation.real)
             #expect(plyQuat.isApproximatelyEqual(to: csvQuat, absoluteTolerance: 0.0001), "PLY rotation mismatch at \(i): got \(plyQuat), expected \(csvQuat)")
 
-            // Color (PLY converts from f_dc using SH_C0)
+            // PLY converts color from f_dc with SH_C0.
             let SH_C0: Float = 0.28209479177387814
             let expectedColor = SIMD3<Float>(
                 csv.color.x * SH_C0 + 0.5,

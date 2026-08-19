@@ -32,8 +32,8 @@ namespace PointSplatWorkload {
         threadgroup uint s[WORKLOAD_BLOCK];
         uint count = (gid < numElements) ? counts[gid] : 0u;
 
-        // Hillis-Steele inclusive scan; double barrier avoids the intra-step
-        // read/write hazard. Exclusive = inclusive minus own value.
+        // Hillis-Steele inclusive scan. The double barrier prevents the
+        // intra-step read/write hazard. Exclusive equals inclusive minus own value.
         s[lid] = count;
         threadgroup_barrier(mem_flags::mem_threadgroup);
         for (uint offset = 1; offset < tsize; offset <<= 1) {
@@ -51,8 +51,8 @@ namespace PointSplatWorkload {
         }
     }
 
-    // Phase 2 (single thread): exclusive scan of block sums -> block bases,
-    // grand total (= number of splat threads) into totals[0].
+    // Phase 2 (single thread): exclusive scan of block sums -> block bases.
+    // The grand total (= number of splat threads) goes into totals[0].
     kernel void workloadScanBlockSums(device const uint *blockSums [[buffer(0)]],
                                       device uint       *blockBase [[buffer(1)]],
                                       device uint       *totals    [[buffer(2)]],
@@ -74,11 +74,11 @@ namespace PointSplatWorkload {
         return min(totals[0], capacity);
     }
 
-    // Phase 1.5 (per Gaussian): when raw demand exceeds capacity, scale
-    // every count down proportionally with stochastic rounding. Without
-    // this the prefix-sum tail is truncated, which deletes whole regions
-    // (tail Gaussian indices correlate with spatial position); uniform
-    // scaling degrades to extra noise instead.
+    // Phase 1.5 (per Gaussian): if raw demand is more than the capacity,
+    // decrease every count in proportion with stochastic rounding. If you do
+    // not decrease the counts, the prefix-sum tail truncates, which erases
+    // whole regions. The tail Gaussian indices correlate with spatial
+    // position. Proportional scaling degrades to extra noise instead.
     kernel void workloadScaleCounts(device uint       *counts      [[buffer(0)]],
                                     device const uint *totals      [[buffer(1)]],
                                     constant uint     &capacity    [[buffer(2)]],
@@ -102,7 +102,7 @@ namespace PointSplatWorkload {
     }
 
     // Phase 2.1 (single thread): convert the GPU-side total into indirect
-    // dispatch arguments so later stages launch ceil(total/256) threadgroups
+    // dispatch arguments. Later stages then launch ceil(total/256) threadgroups
     // instead of capacity-sized grids (RFC 0002's indirect-dispatch gap,
     // resolved here with raw encoding).
     kernel void workloadWriteDispatchArgs(device const uint *totals   [[buffer(0)]],
@@ -116,10 +116,10 @@ namespace PointSplatWorkload {
         args[0] = uint3((total + WORKLOAD_BLOCK - 1) / WORKLOAD_BLOCK, 1, 1);
     }
 
-    // Phase 2.5: zero the indices array ahead of the scatter, so the whole
-    // pipeline can run in one compute encoder without a blit fill.
-    // Dispatched indirectly; the last threadgroup may run slightly past the
-    // total, which is harmless (entries past the total are never read).
+    // Phase 2.5: zero the indices array before the scatter, so the whole
+    // pipeline runs in one compute encoder without a blit fill. Dispatched
+    // indirectly. The last threadgroup can run past the total, which is
+    // harmless because entries past the total are never read.
     kernel void workloadClearIndices(device uint       *indices  [[buffer(0)]],
                                      constant uint     &capacity [[buffer(1)]],
                                      uint gid [[thread_position_in_grid]]) {
@@ -128,9 +128,9 @@ namespace PointSplatWorkload {
         }
     }
 
-    // Phase 3: scatter Gaussian index g into indices[t_g] where t_g is the
-    // global exclusive prefix sum. indices must be zero-initialized.
-    // Entries past `capacity` are dropped (points silently missing, per paper).
+    // Phase 3: scatter Gaussian index g into indices[t_g], where t_g is the
+    // global exclusive prefix sum. indices must be zero-initialized. Entries
+    // past `capacity` are dropped, so those points are absent, per the paper.
     kernel void workloadScatterIndices(device const uint *counts      [[buffer(0)]],
                                        device const uint *localPrefix [[buffer(1)]],
                                        device const uint *blockBase   [[buffer(2)]],
@@ -196,7 +196,7 @@ namespace PointSplatWorkload {
         }
     }
 
-    // Phase 6: fold the carry from preceding blocks into each element.
+    // Phase 6: fold the carry from the preceding blocks into each element.
     kernel void workloadApplyBlockMax(device uint       *indices    [[buffer(0)]],
                                       device const uint *blockCarry [[buffer(1)]],
                                       device const uint *totals     [[buffer(2)]],
@@ -209,8 +209,8 @@ namespace PointSplatWorkload {
         indices[gid] = max(indices[gid], blockCarry[groupId]);
     }
 
-    // Copies the two totals words into a stats slot so multi-phase frames
-    // can report per-phase used/demand numbers to the CPU.
+    // Copies the two totals words into a stats slot, so multi-phase frames
+    // can report per-phase used and demand numbers to the CPU.
     kernel void workloadCopyTotals(device const uint *totals [[buffer(0)]],
                                    device uint       *dst    [[buffer(1)]],
                                    constant uint     &offset [[buffer(2)]],

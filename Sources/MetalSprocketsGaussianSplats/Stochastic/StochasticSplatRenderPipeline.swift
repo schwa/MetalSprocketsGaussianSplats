@@ -9,11 +9,11 @@ import MetalSupport
 
 /// A stochastic splat renderer that uses random sampling for transparency.
 ///
-/// - Important: This renderer is **experimental** and may have significant changes
-///   or be removed in future versions. Use ``SparkSplatRenderPipeline`` for production.
+/// - Important: This renderer is **experimental**. It can change or move in a
+///   future version. Use ``SparkSplatRenderPipeline`` for production.
 ///
-/// This renderer uses stochastic (random) sampling to approximate alpha blending,
-/// which can produce noisy results but doesn't require depth sorting.
+/// This renderer uses stochastic sampling to approximate alpha blending. The
+/// result can be noisy, but it needs no depth sort.
 public struct StochasticSplatRenderPipeline: Element {
     var splatCloud: GPUSplatCloud<SparkSplat>
     var projectionMatrices: [simd_float4x4]
@@ -42,11 +42,11 @@ public struct StochasticSplatRenderPipeline: Element {
     ///   - modelMatrix: The scene-level model transform.
     ///   - cameraMatrix: The camera (view-to-world) matrix.
     ///   - drawableSize: The render target size in pixels.
-    ///   - frameTime: A per-frame counter used to vary the stochastic noise pattern.
-    ///   - alphaThreshold: Opacity above which a splat fragment is treated as fully opaque.
-    ///   - convertSRGBToLinear: Whether splat colors are converted from sRGB to linear in the shader.
-    ///   - useBlueNoise: Uses a blue-noise texture for sampling instead of white noise, reducing visible grain.
-    ///   - useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when data is available.
+    ///   - frameTime: A per-frame counter that varies the stochastic noise pattern.
+    ///   - alphaThreshold: Opacity above which a splat fragment is fully opaque.
+    ///   - convertSRGBToLinear: Whether the shader converts splat colors from sRGB to linear.
+    ///   - useBlueNoise: Uses a blue-noise texture for sampling instead of white noise, which reduces visible grain.
+    ///   - useSphericalHarmonics: Overrides SH use. If nil, SH turns on when the data is available.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
@@ -73,19 +73,19 @@ public struct StochasticSplatRenderPipeline: Element {
         )
     }
 
-    /// Full initializer supporting stereo/amplification rendering.
+    /// Full initializer that supports stereo and amplification rendering.
     ///
     /// - Parameters:
     ///   - splatCloud: The splat cloud to render.
     ///   - projectionMatrices: One projection matrix per view (two for stereo).
     ///   - modelMatrix: The scene-level model transform.
-    ///   - cameraMatrices: One camera (view-to-world) matrix per view, matching `projectionMatrices`.
+    ///   - cameraMatrices: One camera (view-to-world) matrix per view, matched to `projectionMatrices`.
     ///   - drawableSize: The render target size in pixels.
-    ///   - frameTime: A per-frame counter used to vary the stochastic noise pattern.
-    ///   - alphaThreshold: Opacity above which a splat fragment is treated as fully opaque.
-    ///   - convertSRGBToLinear: Whether splat colors are converted from sRGB to linear in the shader.
-    ///   - useBlueNoise: Uses a blue-noise texture for sampling instead of white noise, reducing visible grain.
-    ///   - useSphericalHarmonics: Override SH usage. If nil, automatically enables SH when data is available.
+    ///   - frameTime: A per-frame counter that varies the stochastic noise pattern.
+    ///   - alphaThreshold: Opacity above which a splat fragment is fully opaque.
+    ///   - convertSRGBToLinear: Whether the shader converts splat colors from sRGB to linear.
+    ///   - useBlueNoise: Uses a blue-noise texture for sampling instead of white noise, which reduces visible grain.
+    ///   - useSphericalHarmonics: Overrides SH use. If nil, SH turns on when the data is available.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrices: [simd_float4x4],
@@ -109,10 +109,10 @@ public struct StochasticSplatRenderPipeline: Element {
         self.alphaThreshold = alphaThreshold
         self.useBlueNoise = useBlueNoise
 
-        // SH: explicit override, else auto-detect from data.
+        // Use the explicit SH override, else auto-detect from the data.
         let hasSHData = splatCloud.shCoefficients != nil
         let useSH = useSphericalHarmonics ?? hasSHData
-        let effectiveUseSH = useSH && hasSHData // Can only use SH if data exists
+        let effectiveUseSH = useSH && hasSHData // SH needs the data to exist.
         self.useSphericalHarmonics = effectiveUseSH
 
         guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {

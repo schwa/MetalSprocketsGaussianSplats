@@ -9,7 +9,7 @@ import Splats
 ///
 /// Keeps `slotCount` independent sets of scratch + output buffers so several
 /// frames can be in flight without racing. The pipeline advances the slot each
-/// frame; the caller must gate in-flight frames to at most `slotCount`.
+/// frame. The caller must gate in-flight frames to at most `slotCount`.
 public final class GPUSortResources {
     /// One frame's worth of scratch and the output the renderer reads.
     struct Slot {
@@ -31,7 +31,7 @@ public final class GPUSortResources {
     }
 
     /// Elements per compaction block. Must match COMPACT_BLOCK in SplatGPUSort.metal.
-    static let compactBlock = 512   // must match COMPACT_BLOCK in SplatGPUSort.metal
+    static let compactBlock = 512
     /// Elements per radix tile. Must match the histogram/scatter kernel tiling.
     static let elementsPerTile = 1_024
 
@@ -68,10 +68,10 @@ public final class GPUSortResources {
     }
 
     /// Cull survivor count from the most recently sorted slot's indirect draw
-    /// args (`instanceCount`). Approximate: the GPU may still be writing the
+    /// args (`instanceCount`). Approximate: the GPU can still write the
     /// newest slot, so this can lag a frame or two. Intended for stats display.
     public var lastSurvivorCount: Int {
-        // Read the previous slot: the current one may still be in flight.
+        // Read the previous slot: the current one can still be in flight.
         let drawArgs = slots[(slotIndex + slotCount - 1) % slotCount].drawArgs
         let args = drawArgs.contents().bindMemory(to: UInt32.self, capacity: 4)
         return Int(args[1])

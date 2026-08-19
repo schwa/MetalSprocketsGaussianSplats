@@ -40,7 +40,7 @@ enum SplatModel: String, CaseIterable, Identifiable {
 @Observable
 class DemoState {
     var renderer: SplatRenderer = .gpu
-    /// The selected bundled model; nil while a user-loaded file is shown.
+    /// The selected bundled model. nil while a user-loaded file is shown.
     var selectedModel: SplatModel? = .tomatoes {
         didSet {
             if let selectedModel, selectedModel != oldValue {
@@ -49,10 +49,10 @@ class DemoState {
             }
         }
     }
-    /// Display name of a user-loaded splat file; nil when a bundled model is shown.
+    /// Display name of a user-loaded splat file. nil when a bundled model is shown.
     private(set) var customModelName: String?
     var loadError: String?
-    /// True while a user-picked file is being parsed off the main actor.
+    /// True while a user-picked file parses off the main actor.
     private(set) var isLoading = false
 
     private static let logger = Logger(subsystem: "io.schwa.MetalSprocketsGaussianSplatsDemo", category: "loading")
@@ -85,9 +85,10 @@ class DemoState {
         #endif
     }
 
-    /// Loads a user-picked splat file (file importer or drag & drop). The
-    /// URL may be security-scoped. Parsing runs off the main actor so large
-    /// files neither freeze the UI nor wedge the file dialog's dismissal.
+    /// Loads a user-picked splat file from the file importer or drag and drop.
+    ///
+    /// The URL can be security-scoped. The parse runs off the main actor. Large
+    /// files then do not freeze the UI or wedge the file dialog dismissal.
     func loadCustomSplat(url: URL) async {
         let scoped = url.startAccessingSecurityScopedResource()
         defer {
@@ -117,7 +118,7 @@ class DemoState {
     }
 
     /// Generates a sphere-rainbow splat cloud of `count` splats off the main
-    /// actor and swaps it in.
+    /// actor, then swaps it in.
     func generateSplats(count: Int) async {
         isLoading = true
         defer {
@@ -151,21 +152,20 @@ class DemoState {
         return try! readSplatCloud(device: device, url: url)
     }
 
-    /// Off-main wrapper for ``readSplatCloud(device:url:)`` so large files
-    /// don't block the main actor. `@concurrent` keeps the call structured
-    /// (priority escalation and task-locals propagate), unlike Task.detached.
+    /// Off-main wrapper for ``readSplatCloud(device:url:)`` so large files do
+    /// not block the main actor. `@concurrent` keeps the call structured, so
+    /// priority escalation and task-locals propagate, unlike Task.detached.
     @concurrent
     nonisolated private static func readSplatCloudOffMain(device: MTLDevice, url: URL) async throws -> GPUSplatCloud<SparkSplat> {
         try readSplatCloud(device: device, url: url)
     }
 
-    /// Reads a splat file into a GPU cloud, including spherical harmonics
-    /// when present (flattened to the coefficient-major layout the shaders
-    /// expect).
+    /// Reads a splat file into a GPU cloud. Includes spherical harmonics when
+    /// present, flattened to the coefficient-major layout the shaders expect.
     nonisolated private static func readSplatCloud(device: MTLDevice, url: URL) throws -> GPUSplatCloud<SparkSplat> {
-        // SOG decodes on the GPU (compute-kernel de-quantize); every other
-        // format streams through the CPU reader. Morton reorder (#89) is applied
-        // to the CPU paths; the SOG GPU path decodes straight into buffers.
+        // SOG decodes on the GPU with a compute-kernel de-quantize. Every other
+        // format streams through the CPU reader. Morton reorder (#89) applies to
+        // the CPU paths. The SOG GPU path decodes straight into buffers.
         let result = try SplatLoader.read(device: device, url: url, mortonOrdered: true)
         return GPUSplatCloud(result)
     }

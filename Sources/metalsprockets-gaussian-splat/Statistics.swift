@@ -24,14 +24,14 @@ enum RendererKind: String, CaseIterable, ExpressibleByArgument {
 /// Timings for one measured frame.
 struct FrameSample {
     var wallTime: TimeInterval
-    /// CPU radix sort wall time; absent when sorting on the GPU.
+    /// CPU radix sort wall time. Absent when the sort runs on the GPU.
     var sortCPUTime: TimeInterval?
-    /// GPU sort compute pass sample; absent when sorting on the CPU.
+    /// GPU sort compute pass sample. Absent when the sort runs on the CPU.
     var sortGPU: GPUCounterSample?
     var render: GPUCounterSample?
-    /// Frustum-cull survivors; the GPU sort is the only path that culls.
+    /// Frustum-cull survivors. The GPU sort is the only path that culls.
     var visibleSplats: Int?
-    /// Whole-submission GPU time from the command-buffer clock (correlation-free).
+    /// Whole-submission GPU time from the command-buffer clock. This is correlation-free.
     var commandBufferGPUTime: TimeInterval?
 
     init(wallTime: TimeInterval, sortCPUTime: TimeInterval? = nil, sortGPU: GPUCounterSample? = nil, render: GPUCounterSample? = nil, visibleSplats: Int? = nil, commandBufferGPUTime: TimeInterval? = nil) {
@@ -63,12 +63,12 @@ struct StatisticsReport: Codable {
     var frames: Int
     var warmup: Int
     var renderer: String
-    /// Only meaningful for the spark renderer; the others do not sort.
+    /// Meaningful only for the spark renderer. The others do not sort.
     var sortMethod: String
     /// Frustum-cull survivors from the last measured frame (GPU sort only).
     var visibleSplats: Int?
     var culledSplats: Int?
-    /// Sort plus render, per frame, CPU wall clock.
+    /// Sort plus render, per frame, from the CPU wall clock.
     var wall: Stat
     /// CPU radix sort wall time (--sort cpu only).
     var sortCpu: Stat?
@@ -77,15 +77,15 @@ struct StatisticsReport: Codable {
     /// Render pass GPU time from timestamp counters. Absent when the device
     /// does not support stage-boundary sampling.
     var renderGpu: Stat?
-    /// Vertex and fragment stages overlap, so they do not sum to renderGpu.
+    /// The vertex and fragment stages overlap, so they do not sum to renderGpu.
     var vertex: Stat?
     var fragment: Stat?
-    /// GPU sort + render per frame (summarized per frame, not a sum of the two
-    /// summaries). Absent when render GPU timing is unavailable.
+    /// GPU sort plus render, per frame. This is summarized per frame, not a sum
+    /// of the two summaries. Absent when the render GPU timing is unavailable.
     var gpuTotal: Stat?
-    /// Whole-submission GPU time from the command-buffer clock. Correlation-free,
-    /// so a sanity cross-check on the counter-derived numbers (for GPU sort this
-    /// spans sort+render in one submission).
+    /// Whole-submission GPU time from the command-buffer clock. This is
+    /// correlation-free, so it is a sanity cross-check on the counter-derived
+    /// numbers. For the GPU sort this spans sort plus render in one submission.
     var commandBufferGpu: Stat?
 }
 
@@ -96,8 +96,8 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
     let vertexTimes = samples.compactMap { $0.render?.vertex?.duration }
     let fragmentTimes = samples.compactMap { $0.render?.fragment?.duration }
     let commandBufferGPUTimes = samples.compactMap(\.commandBufferGPUTime)
-    // Per-frame GPU total: the fastest sort and fastest render need not occur on
-    // the same frame, so sum per frame then summarize (not a sum of summaries).
+    // The fastest sort and the fastest render need not occur on the same frame.
+    // Sum the two per frame, then summarize, not a sum of summaries.
     let gpuTotalTimes = samples.compactMap { sample -> Double? in
         guard let render = sample.render?.duration else { return nil }
         return (sample.sortGPU?.duration ?? 0) + render

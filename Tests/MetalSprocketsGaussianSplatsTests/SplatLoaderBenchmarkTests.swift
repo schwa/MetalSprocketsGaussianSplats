@@ -6,11 +6,13 @@ import MetalSprocketsGaussianSplatShaders
 @testable import Splats
 import Testing
 
-/// Load-time benchmark for every supported format through the production loader
-/// (`SplatLoader`): PLY, SPZ v3, SPZ v4 (CPU decode -> buffer) and SOG (GPU
-/// compute decode). Reports median/min ms and MB/s per file. CI-skipped
-/// (timing); the table is also written to a temp file since runner stdout is
-/// swallowed. Large clouds come from `just bench` (Tests/SplatsTests/Fixtures/Bench).
+/// Load-time benchmark for every supported format through the production loader.
+///
+/// `SplatLoader` reads PLY, SPZ v3, SPZ v4 (CPU decode to buffer), and SOG (GPU
+/// compute decode). The test reports median and min ms and MB/s per file. CI
+/// skips it because it measures timing. It also writes the table to a temp
+/// file, because the runner swallows stdout. Large clouds come from
+/// `just bench` (Tests/SplatsTests/Fixtures/Bench).
 @Suite("SplatLoaderBenchmark", .disabled(if: ProcessInfo.processInfo.environment["CI"] != nil, "Timing benchmark"))
 struct SplatLoaderBenchmarkTests {
     private let warmup = 1

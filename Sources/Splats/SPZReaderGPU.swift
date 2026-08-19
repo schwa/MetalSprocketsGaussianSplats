@@ -8,14 +8,16 @@ import MetalSprocketsSupport
 
 // MARK: - SPZReaderGPU
 
-/// GPU-accelerated SPZ reader. The container is still decompressed on the CPU
-/// (gzip for v2/v3, parallel ZSTD for v4 — there is no GPU gunzip/zstd), but the
-/// per-splat unpack loop — the bottleneck for multi-million-splat files — runs
-/// on the GPU via the `SPZUnpackShader::unpack` compute kernel, producing a
-/// `SparkSplat` buffer (and flattened higher-order SH floats) directly.
+/// A GPU-accelerated SPZ reader.
 ///
-/// Like ``SOGReaderGPU``, this does not conform to ``SplatReaderProtocol``: it
-/// needs an `MTLDevice` and produces GPU-resident buffers wholesale.
+/// The CPU still decompresses the container (gzip for v2/v3, parallel ZSTD for
+/// v4), because there is no GPU gunzip or zstd. The per-splat unpack loop is the
+/// bottleneck for files with millions of splats. That loop runs on the GPU
+/// through the `SPZUnpackShader::unpack` compute kernel. The kernel produces a
+/// `SparkSplat` buffer and flattened higher-order SH floats directly.
+///
+/// Like ``SOGReaderGPU``, this does not conform to ``SplatReaderProtocol``. It
+/// needs an `MTLDevice` and produces GPU-resident buffers all at once.
 public struct SPZReaderGPU {
     /// Decoded result, GPU-resident.
     public struct Result {
@@ -52,8 +54,9 @@ public struct SPZReaderGPU {
         let shFloatsPerSplat = layout.shCoeffCount * 3
         let cloudName = name ?? "splats"
 
-        // Upload the full decompressed payload; SectionLayout offsets already
-        // account for the (v2/v3) header, so they index the buffer directly.
+        // Upload the full decompressed payload. The SectionLayout offsets
+        // already account for the v2/v3 header, so they index the buffer
+        // directly.
         let payload = reader.decompressedData
         guard let payloadBuffer = payload.withUnsafeBytes({ raw in
             device.makeBuffer(bytes: raw.baseAddress!, length: raw.count, options: [.storageModeShared])

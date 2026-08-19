@@ -7,24 +7,24 @@ import MetalSprocketsSupport
 import simd
 import Splats
 
-/// Debug visualization modes for Gaussian splat rendering
+/// The debug visualization modes for Gaussian splat rendering.
 public enum SplatDebugMode: String, CaseIterable, Sendable {
-    /// Colorize splats by distance from cloud center
+    /// Colors splats by distance from the cloud center.
     case distanceFromCenter
-    /// Colorize splats by their size (max scale)
+    /// Colors splats by size (maximum scale).
     case splatSize
-    /// Colorize splats by depth (distance from camera)
+    /// Colors splats by depth (distance from the camera).
     case depth
-    /// Colorize splats by their opacity/alpha value
+    /// Colors splats by opacity (alpha value).
     case opacity
-    /// Colorize splats by their normal direction
+    /// Colors splats by normal direction.
     case normal
-    /// Colorize splats by their aspect ratio (elongation)
+    /// Colors splats by aspect ratio (elongation).
     case aspectRatio
-    /// Colorize splats by which cloud they belong to
+    /// Colors splats by the cloud they belong to.
     case cloudIndex
 
-    /// Human-readable display name for UI
+    /// The display name for the user interface.
     public var displayName: String {
         switch self {
         case .distanceFromCenter:
@@ -44,7 +44,7 @@ public enum SplatDebugMode: String, CaseIterable, Sendable {
         }
     }
 
-    /// Description of what the colors represent
+    /// A description of what the colors represent.
     public var colorDescription: String {
         switch self {
         case .distanceFromCenter:
@@ -65,26 +65,23 @@ public enum SplatDebugMode: String, CaseIterable, Sendable {
     }
 }
 
-/// A debug render pipeline for Gaussian splats that uses the Spark vertex shader
-/// with alternative fragment shaders for visualization/debugging purposes.
-///
-/// Like ``SparkSplatRenderPipeline``, this pipeline does not manage sorting.
-/// The caller provides pre-sorted ``SplatIndices`` from an ``AsyncSortManager``.
-/// See ``SparkSplatRenderPipeline`` for the full usage pattern.
-///
-/// Parameters for debug visualization modes
+/// The parameters for the debug visualization modes.
 public enum DebugParams: Sendable {
     case distance(DebugDistanceParams)
     case size(DebugSizeParams)
     case depth(DebugDepthParams)
-    case opacity  // No params needed
-    case normal   // No params needed
+    case opacity  // takes no parameters
+    case normal   // takes no parameters
     case aspectRatio(DebugAspectRatioParams)
     case cloudIndex(DebugCloudIndexParams)
 }
 
 /// A variant of ``SparkSplatRenderPipeline`` that renders debug visualizations
 /// such as depth, opacity, normals, aspect ratio, and cloud index.
+///
+/// Like ``SparkSplatRenderPipeline``, this pipeline does not manage sorting.
+/// The caller supplies pre-sorted ``SplatIndices`` from an ``AsyncSortManager``.
+/// See ``SparkSplatRenderPipeline`` for the full usage pattern.
 public struct SparkSplatDebugRenderPipeline: Element {
     var splatClouds: [GPUSplatCloud<SparkSplat>]
     var projectionMatrices: [simd_float4x4]
@@ -100,14 +97,14 @@ public struct SparkSplatDebugRenderPipeline: Element {
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
 
-    /// Total splat count across all clouds
+    /// The total splat count across all clouds.
     var totalSplatCount: Int {
         splatClouds.reduce(0) { $0 + $1.count }
     }
 
     // MARK: - Single Cloud Convenience Initializer
 
-    /// Convenience initializer for single cloud, single-view rendering
+    /// Creates a pipeline for a single cloud with single-view rendering.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrix: simd_float4x4,
@@ -132,7 +129,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
 
     // MARK: - Multi-Cloud Initializer
 
-    /// Full initializer supporting multiple clouds and stereo/amplification rendering
+    /// Creates a pipeline for multiple clouds with stereo (amplification) rendering.
     public init(
         splatClouds: [GPUSplatCloud<SparkSplat>],
         projectionMatrices: [simd_float4x4],
@@ -177,7 +174,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
-        vertexConstants["use_sh"] = .bool(false)  // No SH for debug mode
+        vertexConstants["use_sh"] = .bool(false)  // debug mode uses no spherical harmonics
         vertexConstants["use_bounding_box"] = .bool(boundingBox != nil)
 
         // Same vertex shader as the normal render pipeline.
@@ -244,7 +241,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
             let cloudData = SplatCloudData(
                 splats: cloud.splats.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SparkSplat.self),
                 modelMatrix: combinedModel,
-                shCoefficients: nil,  // No SH for debug mode
+                shCoefficients: nil,  // debug mode uses no spherical harmonics
                 opacity: cloud.opacity
             )
             cloudDataArray.append(cloudData)
@@ -257,7 +254,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
             clouds: cloudDataBuffer.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SplatCloudData.self)
         )
 
-        // Cloud buffers are referenced via GPU addresses, so they must be marked in use.
+        // Cloud buffers are referenced through GPU addresses, so they must be marked in use.
         var resourcesToUse: [MTLResource] = [cloudDataBuffer.unsafeMTLBuffer]
         for cloud in splatClouds {
             resourcesToUse.append(cloud.splats.unsafeMTLBuffer)
@@ -279,12 +276,12 @@ public struct SparkSplatDebugRenderPipeline: Element {
             .parameter("scale", value: Float(2.0))
             .parameter("cameraPositions", values: cameraPositions)
             .parameter("clouds", value: argumentBuffer)
-            // Bounding box for vertex culling. When boundingBox is nil the
-            // use_bounding_box function constant is false, the binding is absent
-            // from reflection, and the placeholder value is silently skipped.
+            // Bounding box for vertex culling. If boundingBox is nil, the
+            // use_bounding_box function constant is false, reflection omits the
+            // binding, and the placeholder value is skipped.
             .parameter("boundingBox", functionType: .vertex, value: boundingBox ?? BoundingBox3D())
 
-            // Fragment shader parameters based on debug mode. The opacity and
+            // Fragment shader parameters for the debug mode. The opacity and
             // normal shaders take no parameters.
             switch debugParams {
             case .distance(let params):

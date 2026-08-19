@@ -13,8 +13,8 @@ namespace SplatGPUSort {
 
 constant uint RADIX = 256;
 
-// Map an IEEE-754 half bit-pattern to a ushort that sorts in ascending order,
-// including negatives. Branchless. Mirrors floatFlip16() on the Swift side.
+// Maps an IEEE-754 half bit-pattern to a ushort that sorts in ascending order,
+// negatives included. Branchless. Mirrors floatFlip16() on the Swift side.
 inline ushort floatFlip16(ushort f) {
     ushort mask = ushort(short(f) >> 15) | 0x8000u;
     return f ^ mask;
@@ -25,9 +25,9 @@ inline ushort floatUnflip16(ushort u) {
 }
 
 // Frustum test in clip space (Metal depth range [0, w]). `guardBand` keeps
-// splats whose center is just outside the edges (their quad may still reach in).
-// The dominant, artifact-free cull is `clip.w <= 0` — splats behind the eye,
-// which for an interior view is ~half of them.
+// splats whose center is just outside the edges, because their quad can still
+// reach in. The dominant, artifact-free cull is `clip.w <= 0`. These are
+// splats behind the eye, which for an interior view are about half of them.
 inline bool splatPassesCull(float4 clip, float guardBand) {
     if (clip.w <= 0.0) return false;                       // behind camera / at eye
     float wx = clip.w * (1.0 + guardBand);
@@ -38,22 +38,22 @@ inline bool splatPassesCull(float4 clip, float guardBand) {
     return true;
 }
 
-// Reset the indirect draw arguments before culling. Layout matches
+// Reset the indirect draw arguments before culling. The layout matches
 // MTLDrawPrimitivesIndirectArguments { vertexCount, instanceCount, vertexStart,
-// baseInstance }. instanceCount is the atomic survivor counter the cull kernel
-// increments and the render pass draws with.
+// baseInstance }. instanceCount is the atomic survivor counter. The cull kernel
+// increments it and the render pass draws with it.
 //
 // Stable pre-sort compaction (3 phases): mark -> scan blocks -> scatter. Culled
-// splats are dropped BEFORE the radix so the sort processes only survivors, and
-// survivors keep their original gid order so equal-key ties stay temporally
+// splats are dropped before the radix, so the sort processes only survivors.
+// Survivors keep their original gid order, so equal-key ties stay temporally
 // stable (no shimmer). Blocks are fixed contiguous ranges of COMPACT_BLOCK
-// elements; block index == threadgroup index, so the dispatch must be uniform.
+// elements. Block index == threadgroup index, so the dispatch must be uniform.
 constant ushort kCulledKey = 0xFFFFu;
 constant ushort kMaxSurvivorKey = 0xFFFEu;
 constant uint COMPACT_BLOCK = 512;
 
-// Phase 1: per-splat cull + distance. Survivors are compacted WITHIN their block
-// as they are produced: a simd-prefix scan of the alive flags ranks each
+// Phase 1: per-splat cull + distance. Survivors are compacted within their block
+// as they are produced. A simd-prefix scan of the alive flags ranks each
 // survivor, which lands at records[block*COMPACT_BLOCK + rank]. Culled splats
 // write nothing (their record slots stay stale and are never read), so this pass
 // and the global scatter after it touch only survivor records instead of the
@@ -78,7 +78,7 @@ kernel void splatCullMark(device const SparkSplat  *splats      [[buffer(0)]],
         float4 viewPos = p.modelView * float4(position, 1.0);
         alive = (p.cullEnabled == 0) || splatPassesCull(p.projection * viewPos, p.guardBand);
         if (!alive && p.viewCount > 1) {
-            // Stereo: keep splats visible to either eye so per-eye visibility
+            // Stereo: keep splats visible to either eye, so per-eye visibility
             // never causes incorrect culling.
             float4 viewPos1 = p.modelView1 * float4(position, 1.0);
             alive = splatPassesCull(p.projection1 * viewPos1, p.guardBand);
@@ -106,9 +106,10 @@ kernel void splatCullMark(device const SparkSplat  *splats      [[buffer(0)]],
 }
 
 // Phase 2 (single thread): exclusive prefix sum of the per-block survivor counts
-// -> blockBase, and the grand total into the indirect draw args. Layout matches
-// MTLDrawPrimitivesIndirectArguments { vertexCount, instanceCount, vertexStart,
-// baseInstance }; instanceCount is the survivor count the render pass draws.
+// -> blockBase, and the grand total into the indirect draw args. The layout
+// matches MTLDrawPrimitivesIndirectArguments { vertexCount, instanceCount,
+// vertexStart, baseInstance }. instanceCount is the survivor count the render
+// pass draws.
 kernel void splatCompactScanBlocks(device const uint *blockCounts [[buffer(0)]],
                                    device uint        *blockBase   [[buffer(1)]],
                                    device uint        *drawArgs    [[buffer(2)]],
@@ -178,9 +179,9 @@ kernel void splatRadixScanOffsets(device const uint *hist     [[buffer(0)]],
                                   device const uint  *drawArgs  [[buffer(4)]],
                                   uint digit [[thread_position_in_grid]]) {
     if (digit >= RADIX) return;
-    // Only tiles covering survivors were histogrammed; scan just those. Tiles
-    // past the survivors are all zero, so `running` (the digit total) is
-    // unaffected and their unused offsets need not be written.
+    // Only tiles that cover survivors were histogrammed, so scan just those.
+    // Tiles past the survivors are all zero, so `running` (the digit total)
+    // stays the same, and their unused offsets need no write.
     uint usedTiles = min((drawArgs[1] + p.elementsPerTile - 1) / p.elementsPerTile, p.numTiles);
     uint running = 0;
     uint base = digit * p.numTiles;
@@ -203,13 +204,13 @@ kernel void splatRadixScanDigitBase(device const uint *total     [[buffer(0)]],
     }
 }
 
-// When set, the scatter writes decoded IndexedDistance records (same 8-byte
-// stride as uint2) instead of raw sort records, so the final radix pass replaces
-// the separate splatDecodeIndices kernel + its full-buffer roundtrip.
+// When set, the scatter writes decoded IndexedDistance records (the same 8-byte
+// stride as uint2) instead of raw sort records. The final radix pass then
+// replaces the separate splatDecodeIndices kernel and its full-buffer roundtrip.
 constant bool decode_output [[function_constant(6)]];
 
-// One SIMD-group per tile: stable scatter into the output buffer. Lane-order +
-// chunk-order == input order => stable.
+// One SIMD-group per tile: stable scatter into the output buffer. Lane order +
+// chunk order == input order => stable.
 kernel void splatRadixScatter(device const uint2 *inRecords  [[buffer(0)]],
                               device uint2        *outRecords [[buffer(1)]],
                               device const uint   *offset     [[buffer(2)]],
@@ -228,9 +229,9 @@ kernel void splatRadixScatter(device const uint2 *inRecords  [[buffer(0)]],
 
     uint start = tile * p.elementsPerTile;
     uint end   = min(start + p.elementsPerTile, numElements);
-    // Guard the unsigned subtraction: when the sort count (survivor count) is
+    // Guard the unsigned subtraction. When the sort count (survivor count) is
     // smaller than the full-count tile grid, tiles past the survivors have
-    // start > numElements and `end - start` would underflow to a huge uint.
+    // start > numElements, and `end - start` can underflow to a huge uint.
     uint n     = end > start ? end - start : 0u;
 
     for (uint chunk = 0; chunk < p.elementsPerTile; chunk += tsize) {

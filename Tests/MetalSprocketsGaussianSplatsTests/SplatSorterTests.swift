@@ -70,7 +70,7 @@ struct SplatSorterTests {
 
     @Test("sort single cloud applies modelTransform")
     func sortSingleCloudAppliesModelTransform() throws {
-        // The sort shouldn't crash when the cloud has a non-identity modelTransform
+        // The sort must not crash when the cloud has a non-identity modelTransform.
         var transform = simd_float4x4.identity
         transform.columns.3 = SIMD4<Float>(10, 0, 0, 1)
         let cloud = try makeCloud(device: device, positions: [0, 1, 2])
@@ -80,8 +80,6 @@ struct SplatSorterTests {
         #expect(indices.indices.count == 3)
     }
 }
-
-// MARK: -
 
 private enum SplatSorterTestError: Error {
     case noMetalDevice

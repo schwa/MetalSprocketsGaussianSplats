@@ -4,9 +4,11 @@ import Metal
 import MetalSprocketsGaussianSplatShaders
 import Testing
 
-/// Regression tests for the per-tile depth sort (#61): tile_sort must order
-/// each tile's entries front-to-back (camera-space z is negative in front of
-/// the camera, so closer = larger value) and be stable for equal depths.
+/// Regression tests for the per-tile depth sort (#61).
+///
+/// tile_sort must order each tile's entries front-to-back. Camera-space z is
+/// negative in front of the camera, so a larger value is closer. The sort must
+/// be stable for equal depths.
 @Suite("TileSplatSort ordering", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct TileSplatSortTests {
     let device: MTLDevice
@@ -24,8 +26,8 @@ struct TileSplatSortTests {
         self.pipeline = try device.makeComputePipelineState(function: function)
     }
 
-    /// Runs tile_sort over the given entries and per-tile offsets, returning
-    /// the sorted entries (result lands back in buffer A after 4 passes).
+    /// Runs tile_sort over the given entries and per-tile offsets, and returns
+    /// the sorted entries. The result lands back in buffer A after 4 passes.
     private func runSort(entries: [TileSplatIndex], tileOffsets: [UInt32]) throws -> [TileSplatIndex] {
         let numTiles = tileOffsets.count - 1
         let byteCount = entries.count * MemoryLayout<TileSplatIndex>.stride
@@ -55,7 +57,7 @@ struct TileSplatSortTests {
 
     @Test("each tile is sorted front-to-back (descending camera-space z)")
     func sortsFrontToBackPerTile() throws {
-        // Two tiles with shuffled negative depths; -0.5 is closest to the camera.
+        // Two tiles with shuffled negative depths. -0.5 is closest to the camera.
         let tile0: [Float] = [-3.0, -0.5, -7.25, -1.5, -100.0]
         let tile1: [Float] = [-2.0, -9.0, -0.75, -4.5]
         let entries = (tile0 + tile1).enumerated().map { TileSplatIndex(splatID: UInt32($0.offset), depth: $0.element) }

@@ -10,9 +10,8 @@ import Splats
 /// Packs each 32-byte ``SparkSplat`` into an 18-byte ``GPSPackedSplat``:
 /// 16-bit fixed-point means inside the cloud AABB, 10-bit log-space
 /// scales, a smallest-three 30-bit quaternion, and 8-bit color + opacity.
-/// The GPU decodes back to `SparkSplat` on load, so quality loss is
-/// limited to quantization error while splat-stage read bandwidth drops
-/// by ~44%.
+/// The GPU decodes back to `SparkSplat` on load. Quality loss is limited to
+/// quantization error. Splat-stage read bandwidth drops by ~44%.
 public struct PackedSplatCloud {
     public let buffer: MTLBuffer
     public let bounds: GPSPackedSplatBounds
@@ -51,7 +50,7 @@ public struct PackedSplatCloud {
             }
         }
         if logScaleMin > logScaleMax {
-            // Every scale was zero; any range works, alpha is zeroed below.
+            // Every scale was zero. Any range works, because the code below zeroes the alpha.
             logScaleMin = 0
             logScaleMax = 0
         }
@@ -96,8 +95,8 @@ public struct PackedSplatCloud {
                 slot += 1
             }
 
-            // The renderer rejects all-zero scales; quantization can't
-            // represent zero, so zero the opacity instead.
+            // The renderer rejects all-zero scales. Quantization cannot represent
+            // zero, so zero the opacity instead.
             let alpha = degenerate ? 0 : splat.color.w
             return GPSPackedSplat(
                 position: (px, py, pz),

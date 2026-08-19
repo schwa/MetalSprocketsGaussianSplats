@@ -10,11 +10,11 @@ import simd
 @testable import Splats
 import Testing
 
-/// RFC 0003 verification: a converged PointSplat render should match the
-/// Spark (sorted alpha-blended) renderer on the same scene. Differences in
-/// aliasing and residual noise are expected, so the PSNR bar is modest —
-/// it catches orientation flips, projection mismatches, and packing bugs,
-/// not subtle shading differences.
+/// RFC 0003 verification. A converged PointSplat render must match the Spark
+/// (sorted alpha-blended) renderer on the same scene. Differences in aliasing
+/// and residual noise are expected, so the PSNR bar is modest. It catches
+/// orientation flips, projection mismatches, and packing bugs, not subtle
+/// shading differences.
 @Suite("PointSplatConvergence", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct PointSplatConvergenceTests {
     enum TestError: Error {
@@ -99,9 +99,9 @@ struct PointSplatConvergenceTests {
         #expect(psnr > 30.0, "PSNR vs Spark: \(psnr) dB")
     }
 
-    /// Extracts RGB float pixels from a rendered CGImage, undoing the sRGB
-    /// encode applied by the render target so values compare against the
-    /// raw splat colors PointSplat resolves.
+    /// Extracts RGB float pixels from a rendered CGImage. It undoes the sRGB
+    /// encode of the render target, so the values compare against the raw splat
+    /// colors that PointSplat resolves.
     private func rgbPixels(from image: CGImage) throws -> [SIMD3<Float>] {
         let width = image.width
         let height = image.height
@@ -114,9 +114,9 @@ struct PointSplatConvergenceTests {
             let scaled = Float(value) / 255.0
             return scaled <= 0.04045 ? scaled / 12.92 : pow((scaled + 0.055) / 1.055, 2.4)
         }
-        // The Spark pipeline writes raw (sRGB-encoded) splat colors into an
-        // sRGB render target, which linearizes on store; decoding the PNG
-        // bytes recovers the raw values.
+        // The Spark pipeline writes raw (sRGB-encoded) splat colors into an sRGB
+        // render target, which linearizes them on store. Decoding the PNG bytes
+        // recovers the raw values.
         return (0..<(width * height)).map { i in
             SIMD3<Float>(decode(bytes[i * 4]), decode(bytes[i * 4 + 1]), decode(bytes[i * 4 + 2]))
         }

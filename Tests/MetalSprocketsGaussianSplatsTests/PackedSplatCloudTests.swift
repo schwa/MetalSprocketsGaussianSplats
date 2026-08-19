@@ -6,7 +6,7 @@ import MetalSprocketsGaussianSplatShaders
 import simd
 import Testing
 
-/// Seeded RNG so test clouds are identical across runs.
+/// Seeded RNG so the test clouds are identical across runs.
 private struct SeededGenerator: RandomNumberGenerator {
     var state: UInt64
 
@@ -102,8 +102,8 @@ struct PackedSplatCloudTests {
         let camera = LookAt(position: SIMD3<Float>(0, 0, 6), target: .zero, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
         let projection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01...100)).projectionMatrix(for: CGSize(width: size, height: size))
 
-        // Accumulate both paths over the same seeds; the converged images
-        // should agree apart from quantization error.
+        // Both paths accumulate over the same seeds. The converged images agree
+        // apart from quantization error.
         let frames = 256
         var unpackedMean = [Float](repeating: 0, count: size * size * 4)
         var packedMean = [Float](repeating: 0, count: size * size * 4)

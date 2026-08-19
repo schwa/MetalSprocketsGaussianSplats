@@ -2,7 +2,7 @@
 import MetalSprocketsGaussianSplatShaders
 import simd
 
-// SparkSplat is imported from C header (32 bytes):
+// SparkSplat comes from a C header (32 bytes):
 //   simd_half3 position
 //   simd_half3 scale
 //   simd_half4 rotation

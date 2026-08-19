@@ -6,11 +6,11 @@ import MetalSprocketsGaussianSplatShaders
 
 /// Complete tile-based splat rendering pipeline that combines binning, sorting, and rendering passes.
 ///
-/// - Important: This renderer is **experimental** and may have significant changes
-///   or be removed in future versions. Use ``SparkSplatRenderPipeline`` for production.
+/// - Important: This renderer is **experimental**. It can change or move in a
+///   future version. Use ``SparkSplatRenderPipeline`` for production.
 ///
-/// This is an Element-based pipeline for use within RenderPass contexts.
-/// For SwiftUI integration, use TileBasedSplatView instead.
+/// This is an Element-based pipeline for RenderPass contexts. For SwiftUI, use
+/// TileBasedSplatView instead.
 public struct TileBasedSplatPipeline: Element {
     // MARK: - Properties
 
@@ -49,7 +49,7 @@ public struct TileBasedSplatPipeline: Element {
 
     public var body: some Element {
         get throws {
-            // Pass 1a: Count splats per tile
+            // Pass 1a: count the splats per tile.
             try TileBinningCountPass(
                 splatCloud: splatCloud,
                 projectionMatrix: projectionMatrix,
@@ -59,12 +59,12 @@ public struct TileBasedSplatPipeline: Element {
                 tileSplatResources: tileSplatResources
             )
 
-            // Pass 1b: Compute prefix sum of tile counts
+            // Pass 1b: compute the prefix sum of the tile counts.
             try TilePrefixSumComputePass(
                 tileSplatResources: tileSplatResources
             )
 
-            // Pass 1c: Write splats to compacted buffer using offsets
+            // Pass 1c: write the splats to the compacted buffer with the offsets.
             try TileBinningWritePass(
                 splatCloud: splatCloud,
                 projectionMatrix: projectionMatrix,
@@ -74,14 +74,13 @@ public struct TileBasedSplatPipeline: Element {
                 tileSplatResources: tileSplatResources
             )
 
-            // Pass 2: Per-Tile Sorting
-            // Sorts each tile's splat list by depth (front-to-back)
+            // Pass 2: sort each tile's splat list by depth (front-to-back).
             try TileSortingComputePass(
                 tileSplatResources: tileSplatResources
             )
 
-            // Pass 3: Tile Rendering (fragment shader with imageblock)
-            // Renders each pixel using sorted splat lists with early alpha termination
+            // Pass 3: render each pixel from the sorted splat lists, with early
+            // alpha termination.
             try RenderPass {
                 try TileSplatRenderPass(
                     splatCloud: splatCloud,
@@ -95,11 +94,11 @@ public struct TileBasedSplatPipeline: Element {
             .renderPassDescriptorModifier { descriptor in
                 descriptor.tileWidth = Int(TILE_SIZE)
                 descriptor.tileHeight = Int(TILE_SIZE)
-                // TileSplatImageblock contains half4 = 4 * 2 bytes = 8 bytes, aligned to 16
+                // TileSplatImageblock holds half4 = 4 * 2 bytes = 8 bytes, aligned to 16.
                 descriptor.imageblockSampleLength = 16
             }
 
-            // Optional: Heatmap overlay showing splat density per tile
+            // Optional heatmap overlay that shows the splat density per tile.
             if showHeatMap {
                 try RenderPass {
                     try TileHeatMapRenderPass(tileSplatResources: tileSplatResources)

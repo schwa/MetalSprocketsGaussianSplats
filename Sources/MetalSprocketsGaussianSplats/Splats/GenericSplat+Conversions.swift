@@ -5,7 +5,7 @@ import simd
 import Splats
 
 public extension SparkSplat {
-    /// Initialize a SparkSplat from a GenericSplat
+    /// Creates a SparkSplat from a GenericSplat. Color is clamped to 0...1 and scaled to 0...255.
     init(_ splat: GenericSplat) {
         self.init()
         self.position = simd_half3(splat.position)

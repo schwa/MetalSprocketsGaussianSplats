@@ -8,8 +8,8 @@ import simd
 import Splats
 import Testing
 
-/// Regression tests for stereo culling in the GPU sort path (#56): a splat
-/// visible to only one eye must survive the cull when both views are provided.
+/// Regression tests for stereo culling in the GPU sort path (#56). A splat that
+/// is visible to only one eye must survive the cull when both views are given.
 @Suite("GPUSplatSort stereo cull", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct GPUSplatSortStereoTests {
     let device: MTLDevice
@@ -39,8 +39,8 @@ struct GPUSplatSortStereoTests {
         .projectionMatrix(for: CGSize(width: 64, height: 64))
     }
 
-    /// Runs the cull + sort for the given views and returns the survivor count
-    /// from the slot's indirect draw args.
+    /// Runs the cull and sort for the given views. Returns the survivor count
+    /// from the indirect draw args of the slot.
     @MainActor
     private func survivorCount(cloud: GPUSplatCloud<SparkSplat>, cameraMatrices: [simd_float4x4]) throws -> Int {
         let resources = try GPUSortResources(device: device, capacity: cloud.count)
@@ -62,8 +62,8 @@ struct GPUSplatSortStereoTests {
     @Test("splat visible only to the second eye survives the stereo cull")
     @MainActor
     func stereoCullKeepsSplatVisibleToEitherEye() throws {
-        // Splat in front of the origin; "seeing" camera at the origin looking
-        // down -z, "blind" camera far off to the side.
+        // The splat is in front of the origin. The seeing camera sits at the
+        // origin and looks down -z. The blind camera is far off to the side.
         let cloud = try makeCloud(position: SIMD3<Float>(0, 0, -2))
         let seeingCamera = simd_float4x4.identity
         let blindCamera = simd_float4x4(translation: SIMD3<Float>(1_000, 0, 0))

@@ -66,12 +66,12 @@ struct PointSplatComputePassTests {
             }
         }
         let center = accumulated[(size / 2) * size + size / 2] / Float(frames)
-        // Full-opacity red Gaussian at the mean: converged center pixel is red.
+        // A full-opacity red Gaussian at the mean. The converged center pixel is red.
         #expect(center.x > 0.9, "center red channel: \(center.x)")
         #expect(center.y < 0.05)
         #expect(center.z < 0.05)
 
-        // Far corner stays background (black).
+        // The far corner stays background (black).
         let corner = accumulated[0] / Float(frames)
         #expect(corner.x < 0.05, "corner should be background, got \(corner)")
     }
@@ -129,14 +129,14 @@ struct PointSplatComputePassTests {
 
     @Test("group culling keeps visible splats across many culled groups")
     func groupCullingPreservesVisibleSplats() throws {
-        // Regression for #75: >4 groups of 256 splats where every group but
-        // one is entirely behind the camera or far outside the frustum. The
-        // group-level cull must drop those wholesale without ever losing
-        // the one visible red splat.
+        // Regression for #75. There are more than 4 groups of 256 splats. Every
+        // group but one is behind the camera or far outside the frustum. The
+        // group-level cull must drop those wholesale and keep the one visible
+        // red splat.
         let size = 64
         var splats = [SparkSplat]()
         for i in 0..<1_200 {
-            // Behind the camera (camera at z=5 looking at origin).
+            // Behind the camera (the camera is at z=5 and looks at the origin).
             let offset = Float(i % 7)
             splats.append(SparkSplat(position: simd_half3(Float16(offset), Float16(offset), 50), scale: simd_half3(repeating: 0.2), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 255, 0, 255)))
         }
@@ -144,7 +144,7 @@ struct PointSplatComputePassTests {
         for i in 0..<300 {
             splats.append(SparkSplat(position: simd_half3(Float16(200 + Float(i % 5)), 0, 0), scale: simd_half3(repeating: 0.2), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 0, 255, 255)))
         }
-        // Single visible splat, in the last (partial) group.
+        // A single visible splat, in the last partial group.
         splats.append(SparkSplat(position: simd_half3(0, 0, 0), scale: simd_half3(repeating: 0.5), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(255, 0, 0, 255)))
 
         let renderer = try PointSplatTestRenderer(device: device, width: size, height: size)
@@ -185,7 +185,7 @@ struct PointSplatComputePassTests {
     @Test("closer splat wins depth resolution")
     func depthOrdering() throws {
         let size = 64
-        // Two overlapping opaque splats; green is closer to the camera.
+        // Two overlapping opaque splats. Green is closer to the camera.
         let red = SparkSplat(position: simd_half3(0, 0, -1), scale: simd_half3(repeating: 0.5), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(255, 0, 0, 255))
         let green = SparkSplat(position: simd_half3(0, 0, 1), scale: simd_half3(repeating: 0.5), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(0, 255, 0, 255))
         let renderer = try PointSplatTestRenderer(device: device, width: size, height: size)
@@ -206,9 +206,9 @@ struct PointSplatComputePassTests {
     @Test("sub-pixel splat renders partial coverage without vanishing")
     func subPixelSplatPartialCoverage() throws {
         let size = 64
-        // At scale 0.009 and z = 5 with a 64-px target, the projected sigma
-        // is ~0.1 px (3-sigma well under half a pixel): exact path (RFC 0005
-        // §5) with integrated mass ~2*pi*sigma^2 ~= 0.06. Full opacity red.
+        // At scale 0.009 and z = 5 with a 64-px target, the projected sigma is
+        // ~0.1 px. 3-sigma stays well under half a pixel. The exact path (RFC
+        // 0005 §5) integrates the mass ~2*pi*sigma^2 ~= 0.06. Full opacity red.
         let splat = SparkSplat(
             position: simd_half3(0, 0, 0),
             scale: simd_half3(repeating: 0.009),
@@ -223,8 +223,7 @@ struct PointSplatComputePassTests {
         let frames = 256
         for frame in 0..<frames {
             let texture = try renderer.render(splats: buffer, splatCount: 1, modelMatrix: .identity, viewMatrix: view, projectionMatrix: projection, frameSeed: UInt32(frame))
-            // Sum over a neighborhood: the mean's subpixel may straddle a
-            // pixel boundary.
+            // Sum over a neighborhood. The mean subpixel can straddle a pixel boundary.
             for y in (size / 2 - 2)...(size / 2 + 2) {
                 for x in (size / 2 - 2)...(size / 2 + 2) {
                     totalRed += readPixels(texture)[y * size + x].x
@@ -232,9 +231,9 @@ struct PointSplatComputePassTests {
             }
         }
         let meanCoverage = totalRed / Float(frames)
-        // The integrated opacity mass of a truly sub-pixel Gaussian is a
-        // proper fraction: it must neither vanish (the pre-#108 floor-dilation
-        // path washed it out entirely at low alpha) nor saturate.
+        // The integrated opacity mass of a truly sub-pixel Gaussian is a proper
+        // fraction. It must not vanish and must not saturate. Before #108, the
+        // floor-dilation path washed it out at low alpha.
         #expect(meanCoverage > 0.01, "sub-pixel splat vanished: \(meanCoverage)")
         #expect(meanCoverage < 1.0, "sub-pixel splat saturated: \(meanCoverage)")
     }
@@ -244,13 +243,13 @@ struct PointSplatComputePassTests {
         let resources = try PointSplatResources(device: device, drawableSize: SIMD2<Float>(8, 8), splatCount: 1, supersampling: 1, pointsPerThread: 1)
         let first = resources.nextAccumulationStep(frameIndex: 0, cameraMatrix: .identity, modelMatrix: .identity, projectionMatrix: .identity)
         #expect(resources.accumulatedFrames == 1)
-        // Re-evaluating body for the same frame must not advance parity or count.
+        // A second call for the same frame must not advance the parity or the count.
         let repeated = resources.nextAccumulationStep(frameIndex: 0, cameraMatrix: .identity, modelMatrix: .identity, projectionMatrix: .identity)
         #expect(resources.accumulatedFrames == 1)
         #expect(repeated.input === first.input)
         #expect(repeated.output === first.output)
         #expect(repeated.blendFactor == first.blendFactor)
-        // A new frame advances: ping-pong swaps and the mean weight drops.
+        // A new frame advances. The ping-pong swaps and the mean weight drops.
         let next = resources.nextAccumulationStep(frameIndex: 1, cameraMatrix: .identity, modelMatrix: .identity, projectionMatrix: .identity)
         #expect(resources.accumulatedFrames == 2)
         #expect(next.input === first.output)
