@@ -196,5 +196,5 @@ MIT License. See LICENSE file for details.
 The two renderers in this project are based on work by the projects below. A
 big thanks to their authors for releasing their code under permissive licenses.
 
-• [antimatter15](https://github.com/antimatter15/splat) (MIT license) — for the original GS renderer and the reference that almost everyone starts from.
-• [sparkjs](http://sparkjs.dev) (MIT License) — for the clean implementation that makes porting sane.
+• [antimatter15](https://github.com/antimatter15/splat) (MIT license)
+• [sparkjs](http://sparkjs.dev) (MIT License)
