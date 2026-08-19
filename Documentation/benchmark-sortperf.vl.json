@@ -1,0 +1,37 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "title": "GPU-sort total time by splats and cull % (M5 Max, 2026-08-19)",
+  "data": {"values": [
+    {"splats": 100000, "cull": "0%", "total_ms": 1.437},
+    {"splats": 100000, "cull": "10%", "total_ms": 1.14},
+    {"splats": 100000, "cull": "20%", "total_ms": 1.005},
+    {"splats": 100000, "cull": "50%", "total_ms": 0.764},
+    {"splats": 100000, "cull": "100%", "total_ms": 0.239},
+    {"splats": 500000, "cull": "0%", "total_ms": 3.292},
+    {"splats": 500000, "cull": "10%", "total_ms": 5.243},
+    {"splats": 500000, "cull": "20%", "total_ms": 4.419},
+    {"splats": 500000, "cull": "50%", "total_ms": 2.893},
+    {"splats": 500000, "cull": "100%", "total_ms": 0.518},
+    {"splats": 1000000, "cull": "0%", "total_ms": 5.942},
+    {"splats": 1000000, "cull": "10%", "total_ms": 5.102},
+    {"splats": 1000000, "cull": "20%", "total_ms": 4.629},
+    {"splats": 1000000, "cull": "50%", "total_ms": 5.548},
+    {"splats": 1000000, "cull": "100%", "total_ms": 0.912},
+    {"splats": 4000000, "cull": "0%", "total_ms": 21.84},
+    {"splats": 4000000, "cull": "10%", "total_ms": 16.688},
+    {"splats": 4000000, "cull": "20%", "total_ms": 15.509},
+    {"splats": 4000000, "cull": "50%", "total_ms": 13.903},
+    {"splats": 4000000, "cull": "100%", "total_ms": 3.166},
+    {"splats": 8000000, "cull": "0%", "total_ms": 64.69},
+    {"splats": 8000000, "cull": "10%", "total_ms": 52.503},
+    {"splats": 8000000, "cull": "20%", "total_ms": 48.159},
+    {"splats": 8000000, "cull": "50%", "total_ms": 19.281},
+    {"splats": 8000000, "cull": "100%", "total_ms": 3.75}
+  ]},
+  "mark": {"type": "line", "point": true},
+  "encoding": {
+    "x": {"field": "splats", "type": "quantitative", "scale": {"type": "log"}, "title": "splats (log)"},
+    "y": {"field": "total_ms", "type": "quantitative", "scale": {"type": "log"}, "title": "total ms (log)"},
+    "color": {"field": "cull", "type": "nominal", "title": "cull %", "sort": ["0%", "10%", "20%", "50%", "100%"]}
+  }
+}

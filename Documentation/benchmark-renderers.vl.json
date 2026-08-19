@@ -1,0 +1,27 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "title": "Median frame time by renderer (M5 Max, 2026-08-19)",
+  "data": {"values": [
+    {"splats": 100000, "renderer": "point", "median_ms": 8.834583},
+    {"splats": 100000, "renderer": "spark", "median_ms": 5.0365},
+    {"splats": 100000, "renderer": "gpu", "median_ms": 6.590792},
+    {"splats": 500000, "renderer": "point", "median_ms": 10.430125},
+    {"splats": 500000, "renderer": "spark", "median_ms": 12.933750},
+    {"splats": 500000, "renderer": "gpu", "median_ms": 8.936459},
+    {"splats": 1000000, "renderer": "point", "median_ms": 11.486667},
+    {"splats": 1000000, "renderer": "spark", "median_ms": 21.761000},
+    {"splats": 1000000, "renderer": "gpu", "median_ms": 8.759875},
+    {"splats": 4000000, "renderer": "point", "median_ms": 15.498417},
+    {"splats": 4000000, "renderer": "spark", "median_ms": 81.742917},
+    {"splats": 4000000, "renderer": "gpu", "median_ms": 28.199500},
+    {"splats": 8000000, "renderer": "point", "median_ms": 26.776458},
+    {"splats": 8000000, "renderer": "spark", "median_ms": 156.539750},
+    {"splats": 8000000, "renderer": "gpu", "median_ms": 81.056833}
+  ]},
+  "mark": {"type": "line", "point": true},
+  "encoding": {
+    "x": {"field": "splats", "type": "quantitative", "scale": {"type": "log"}, "title": "splats (log)"},
+    "y": {"field": "median_ms", "type": "quantitative", "scale": {"type": "log"}, "title": "median ms (log)"},
+    "color": {"field": "renderer", "type": "nominal"}
+  }
+}
