@@ -179,7 +179,7 @@ public struct StochasticSplatRenderPipeline: Element {
                 }
             }
             .vertexDescriptor(vertexDescriptor)
-            .renderPipelineDescriptorModifier { [amplificationCount] descriptor in
+            .renderPipelineDescriptorTransformer { [amplificationCount] descriptor in
                 descriptor.inputPrimitiveTopology = .triangle
                 descriptor.maxVertexAmplificationCount = amplificationCount
             }

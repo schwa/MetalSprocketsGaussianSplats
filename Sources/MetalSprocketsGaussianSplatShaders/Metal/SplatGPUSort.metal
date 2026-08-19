@@ -48,7 +48,6 @@ inline bool splatPassesCull(float4 clip, float guardBand) {
 // Survivors keep their original gid order, so equal-key ties stay temporally
 // stable (no shimmer). Blocks are fixed contiguous ranges of COMPACT_BLOCK
 // elements. Block index == threadgroup index, so the dispatch must be uniform.
-constant ushort kCulledKey = 0xFFFFu;
 constant ushort kMaxSurvivorKey = 0xFFFEu;
 constant uint COMPACT_BLOCK = 512;
 

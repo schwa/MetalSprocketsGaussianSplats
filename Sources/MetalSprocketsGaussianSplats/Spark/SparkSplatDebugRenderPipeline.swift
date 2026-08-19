@@ -302,7 +302,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         .renderPassDescriptorModifier { descriptor in
             descriptor.renderTargetArrayLength = 1
         }
-        .renderPipelineDescriptorModifier { [amplificationCount] renderPipelineDescriptor in
+        .renderPipelineDescriptorTransformer { [amplificationCount] renderPipelineDescriptor in
             renderPipelineDescriptor.inputPrimitiveTopology = .triangle
             renderPipelineDescriptor.maxVertexAmplificationCount = amplificationCount
             renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true

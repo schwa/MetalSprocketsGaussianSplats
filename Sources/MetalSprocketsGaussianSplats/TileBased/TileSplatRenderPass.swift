@@ -120,7 +120,7 @@ public struct TileSplatRenderPass: Element {
                     commandEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
                 }
             }
-            .renderPipelineDescriptorModifier { descriptor in
+            .renderPipelineDescriptorTransformer { descriptor in
                 descriptor.colorAttachments[0].isBlendingEnabled = true
                 descriptor.colorAttachments[0].rgbBlendOperation = .add
                 descriptor.colorAttachments[0].alphaBlendOperation = .add

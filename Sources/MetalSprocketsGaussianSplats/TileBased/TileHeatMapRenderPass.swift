@@ -79,7 +79,7 @@ struct TileHeatMapRenderPass: Element {
                 .parameter("drawableSize", value: tileSplatResources.drawableSize)
             }
             .vertexDescriptor(vertexDescriptor)
-            .renderPipelineDescriptorModifier { renderPipelineDescriptor in
+            .renderPipelineDescriptorTransformer { renderPipelineDescriptor in
                 renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
                 renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
                 renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add

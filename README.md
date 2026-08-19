@@ -173,8 +173,6 @@ PointSplat stays nearly flat as the splat count grows. Spark and GPU-sort grow
 with the splat count. See the full tables, charts, and per-pass timings in
 [Documentation/Benchmark.md](Documentation/Benchmark.md).
 
-![Renderer scaling: PointSplat stays nearly flat while Spark and GPU-sort grow with splat count](Documentation/benchmark-scaling.png)
-
 ## Usage
 
 Rendering Gaussian splats needs two steps: sorting and rendering. The sort
