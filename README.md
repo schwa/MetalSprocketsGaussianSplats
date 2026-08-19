@@ -169,46 +169,11 @@ try PointSplatRenderPipeline(
 
 ## Benchmarks
 
-Measured with the CLI's `bench` subcommand: synthetic seeded clouds,
-1024×1024, median of 20 frames, Release build, Apple Silicon. Spark
-re-sorts every frame (this represents interactive camera motion). PointSplat
-runs 2×2 supersampling with K=4.
+PointSplat stays nearly flat as the splat count grows. Spark and GPU-sort grow
+with the splat count. See the full tables, charts, and per-pass timings in
+[Documentation/Benchmark.md](Documentation/Benchmark.md).
 
 ![Renderer scaling: PointSplat stays nearly flat while Spark and GPU-sort grow with splat count](Documentation/benchmark-scaling.png)
-
-| splats | point | spark | gpu |
-|-------:|------:|------:|----:|
-| 100k | 1.4 ms | 2.9 ms | 2.9 ms |
-| 1M | 10.7 ms | 14.2 ms | 6.7 ms |
-| 4M | 14.7 ms | 53.0 ms | 20.5 ms |
-| 8M | 18.2 ms | 115.7 ms | 39.8 ms |
-
-Takeaways:
-
-- **PointSplat stays flat.** The cost is bounded by the points per pixel, not
-  the splat count. 8M splats costs only about 1.2× the 4M time. PointSplat
-  wins clearly at 4M and more, and it is competitive even at 100k.
-- **Spark is CPU-sort-bound** and scales linearly. It is fine for the
-  hundreds-of-k scenes it targets, but slow past a few million.
-- **GPU-sort wins the middle** (about 1M), where the radix sort is cheap and
-  PointSplat's fixed per-pixel cost dominates.
-
-**What is measured:** the per-frame GPU cost at interactive settings, not
-equal quality. Spark, GPU, and Tile frames are converged and deterministic.
-Point and Stochastic frames are single 1-SPP stochastic samples that need
-temporal accumulation for a finished image. This is fine interactively, but
-flattering for offline single-shot renders. The `point` numbers also exclude
-the interactive pipeline's occlusion-culling and accumulation stages.
-
-Reproduce with:
-
-```sh
-xcb run --target metalsprockets-gaussian-splat -c Release -- \
-    bench --counts 100000,1000000,4000000,8000000 --frames 20 --size 1024
-```
-
-Add `--renderers point,spark,gpu,tile,stochastic` for all five. To
-benchmark a real file, use `bench --splat path/to/scene.sog`.
 
 ## Usage
 

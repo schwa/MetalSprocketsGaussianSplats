@@ -30,7 +30,7 @@ just sort-perf counts="100000,1000000" cull="0,50,100" iterations="240"
 Median / p10 / p90 frame time per renderer across cloud sizes.
 Lower is better; `label` == `splats` here.
 
-![Median frame time by renderer](Documentation/benchmark-renderers.svg)
+![Median frame time by renderer](benchmark-renderers.svg)
 
 Device: MacBook Pro | Apple M5 Max | 128 GB
 Date:   2026-08-19 11:53
@@ -60,7 +60,7 @@ percentages. `target_cull` is the requested cull %, `actual_cull` what the
 GPU culler produced. `sort_ms` + `render_ms` roughly sum to `total_ms`;
 `submit_ms` is the full command-buffer time.
 
-![GPU-sort total time by cull %](Documentation/benchmark-sortperf.svg)
+![GPU-sort total time by cull %](benchmark-sortperf.svg)
 
 Device: MacBook Pro | Apple M5 Max | 128 GB
 Date:   2026-08-19 11:54
