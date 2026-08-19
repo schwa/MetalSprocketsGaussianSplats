@@ -58,8 +58,11 @@ public struct SPZReaderGPU {
         // already account for the v2/v3 header, so they index the buffer
         // directly.
         let payload = reader.decompressedData
-        guard let payloadBuffer = payload.withUnsafeBytes({ raw in
-            device.makeBuffer(bytes: raw.baseAddress!, length: raw.count, options: [.storageModeShared])
+        guard let payloadBuffer = payload.withUnsafeBytes({ raw -> MTLBuffer? in
+            guard let base = raw.baseAddress else {
+                return nil
+            }
+            return device.makeBuffer(bytes: base, length: raw.count, options: [.storageModeShared])
         }) else {
             throw SplatsError.resourceCreationFailure("SPZ payload buffer")
         }

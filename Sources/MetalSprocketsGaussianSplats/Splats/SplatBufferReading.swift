@@ -3,8 +3,8 @@ import Foundation
 import GeometryLite3D
 @preconcurrency import Metal
 import MetalSprocketsGaussianSplatShaders
-import Splats
 import simd
+import Splats
 
 // MARK: - SplatBufferResult
 
@@ -56,7 +56,7 @@ public extension SplatReaderProtocol {
         }
 
         if mortonOrdered {
-            if degree > 0, !splats.isEmpty, sh.count % splats.count == 0 {
+            if degree > 0, !splats.isEmpty, sh.count.isMultiple(of: splats.count) {
                 SplatMortonReorder.reorder(splats: &splats, shCoefficients: &sh)
             } else {
                 SplatMortonReorder.reorder(splats: &splats)

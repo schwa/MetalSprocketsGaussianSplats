@@ -20,7 +20,7 @@ struct SOGReaderGPUTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
 
         let result = try SOGReaderGPU(device: device).read(url: url)
-        #expect(result.count > 0)
+        #expect(result.count > 0) // swiftlint:disable:this empty_count
         #expect(result.splats.count == result.count)
 
         let splats = Array(result.splats)

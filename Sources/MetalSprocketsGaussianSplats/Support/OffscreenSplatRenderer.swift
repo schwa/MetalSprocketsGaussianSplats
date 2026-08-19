@@ -374,9 +374,8 @@ public final class OffscreenSplatRenderer {
         if configuration.collectGPUCounters {
             let box = renderSampleBox
             return try offscreenRenderer.render(pass.gpuCounters(label: "splat render") { box.set($0) }).gpuTime
-        } else {
-            return try offscreenRenderer.render(pass).gpuTime
         }
+        return try offscreenRenderer.render(pass).gpuTime
     }
 
     // MARK: - Point image conversion

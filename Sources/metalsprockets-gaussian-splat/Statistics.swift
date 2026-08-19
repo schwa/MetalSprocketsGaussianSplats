@@ -99,7 +99,9 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
     // The fastest sort and the fastest render need not occur on the same frame.
     // Sum the two per frame, then summarize, not a sum of summaries.
     let gpuTotalTimes = samples.compactMap { sample -> Double? in
-        guard let render = sample.render?.duration else { return nil }
+        guard let render = sample.render?.duration else {
+            return nil
+        }
         return (sample.sortGPU?.duration ?? 0) + render
     }
     let visible = samples.last?.visibleSplats

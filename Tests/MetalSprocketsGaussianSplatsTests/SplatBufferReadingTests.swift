@@ -40,7 +40,7 @@ struct SplatBufferReadingTests {
 
         #expect(viaLoader.count == viaGPU.count)
         #expect(viaLoader.shDegree == viaGPU.shDegree)
-        #expect(viaLoader.count > 0)
+        #expect(viaLoader.count > 0) // swiftlint:disable:this empty_count
     }
 }
 #endif

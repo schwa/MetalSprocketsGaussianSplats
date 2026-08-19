@@ -1,6 +1,6 @@
 import Compression
-import libzstd
 import Foundation
+import libzstd
 import simd
 import UniformTypeIdentifiers
 
@@ -54,11 +54,16 @@ public struct SPZReader: SplatReaderProtocol {
             throw SplatsError.insufficientData
         }
         return SectionLayout(
-            count: count, shCoeffCount: shCoeffCount, rotationBytes: rotationBytes,
+            count: count,
+            shCoeffCount: shCoeffCount,
+            rotationBytes: rotationBytes,
             fractionalBits: Int(fractionalBits),
-            positionsOffset: positionsOffset, alphasOffset: alphasOffset,
-            colorsOffset: colorsOffset, scalesOffset: scalesOffset,
-            rotationsOffset: rotationsOffset, shOffset: shOffset
+            positionsOffset: positionsOffset,
+            alphasOffset: alphasOffset,
+            colorsOffset: colorsOffset,
+            scalesOffset: scalesOffset,
+            rotationsOffset: rotationsOffset,
+            shOffset: shOffset
         )
     }
 
@@ -170,12 +175,16 @@ public struct SPZReader: SplatReaderProtocol {
 
         payload.withUnsafeMutableBytes { (dstRaw: UnsafeMutableRawBufferPointer) in
             data.withUnsafeBytes { (srcRaw: UnsafeRawBufferPointer) in
-                guard let dstBaseRaw = dstRaw.baseAddress, let srcBaseRaw = srcRaw.baseAddress else { return }
+                guard let dstBaseRaw = dstRaw.baseAddress, let srcBaseRaw = srcRaw.baseAddress else {
+                    return
+                }
                 nonisolated(unsafe) let dstBase = dstBaseRaw
                 nonisolated(unsafe) let srcBase = srcBaseRaw
                 DispatchQueue.concurrentPerform(iterations: numStreams) { i in
                     let s = streamList[i]
-                    if s.uncompressedSize == 0 { return }
+                    if s.uncompressedSize == 0 {
+                        return
+                    }
                     let ret = ZSTD_decompress(dstBase + s.dstOffset, s.uncompressedSize, srcBase + s.srcOffset, s.compressedSize)
                     results[i] = ZSTD_isError(ret) == 0 && ret == s.uncompressedSize
                 }
@@ -492,7 +501,7 @@ public struct SPZReader: SplatReaderProtocol {
                 } else {
                     break
                 }
-            } while outputSize < (isize > 0 ? isize * 2 : compressedData.count * 100) + 4096
+            } while outputSize < (isize > 0 ? isize * 2 : compressedData.count * 100) + 4_096
 
             guard decompressedSize > 0 else {
                 throw SplatsError.decompressionFailed

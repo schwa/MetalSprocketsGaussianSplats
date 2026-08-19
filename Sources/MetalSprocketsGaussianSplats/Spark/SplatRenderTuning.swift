@@ -22,6 +22,6 @@ public struct SplatRenderTuning: Equatable, Sendable {
     }
 
     /// Tuned defaults from the blur-reduction experiments (sharp, cheaper).
-    public static let `default` = SplatRenderTuning()
+    public static let `default` = Self()
 }
 #endif

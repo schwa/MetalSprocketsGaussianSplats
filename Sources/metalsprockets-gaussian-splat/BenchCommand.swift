@@ -488,7 +488,9 @@ struct BenchRunner {
     @MainActor
     private func probeCull(cloud: GPUSplatCloud<SparkSplat>, count: Int, theta: Float) throws -> Double {
         let report = try makeSortRenderer(cloud: cloud, camera: cullCamera(theta: theta)).renderFrame()
-        guard let visible = report.visibleSplats, count > 0 else { return 0 }
+        guard let visible = report.visibleSplats, count > 0 else {
+            return 0
+        }
         return (1 - Double(visible) / Double(count)) * 100
     }
 
@@ -533,11 +535,19 @@ struct BenchRunner {
         func s(_ values: [Double]) -> Stat? { values.isEmpty ? nil : stat(values) }
         let actualCull = lastVisible.map { count > 0 ? (1 - Double($0) / Double(count)) * 100 : 0 }
         return SortDetailRow(
-            label: label, splats: count, targetCullPercent: targetCull, actualCullPercent: actualCull,
-            visibleSplats: lastVisible, culledSplats: lastVisible.map { max(0, count - $0) },
+            label: label,
+            splats: count,
+            targetCullPercent: targetCull,
+            actualCullPercent: actualCull,
+            visibleSplats: lastVisible,
+            culledSplats: lastVisible.map { max(0, count - $0) },
             wall: stat(wall),
-            sortGpu: s(sortGpu), renderGpu: s(renderGpu), vertex: s(vertex), fragment: s(fragment),
-            gpuTotal: s(total), commandBufferGpu: s(submit)
+            sortGpu: s(sortGpu),
+            renderGpu: s(renderGpu),
+            vertex: s(vertex),
+            fragment: s(fragment),
+            gpuTotal: s(total),
+            commandBufferGpu: s(submit)
         )
     }
 
@@ -546,7 +556,7 @@ struct BenchRunner {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(Report(size: size, frames: frames, rows: rows))
-        print(String(decoding: data, as: UTF8.self))
+        print(String(bytes: data, encoding: .utf8) ?? "")
     }
 
     // MARK: - Output
