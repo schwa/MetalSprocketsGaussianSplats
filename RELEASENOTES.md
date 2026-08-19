@@ -1,6 +1,6 @@
 # Release Notes
 
-## Unreleased
+## 0.1.9
 
 ### Features
 
@@ -26,6 +26,16 @@
   stochastic); README benchmark results section with scaling graph
 - Added DocC documentation catalogs and doc comments across the package
 - Splats: human-readable error descriptions
+- SPZ v4 format support, with parallel ZSTD stream decompression; GPU renderer is now the default
+- SOG and SPZ now decode on the GPU: `SPZReaderGPU` compute-shader unpack and a buffer-producing loader API route both formats through the GPU
+- ARKit camera passthrough mode in the iOS demo
+- Added lion and tomatoes sample splats (with licenses); dropped the bundled butterfly sample
+- Demo: `Generate` menu for procedural sphere-rainbow splat clouds
+- `OffscreenSplatRenderer`: unified offscreen splat rendering API, backed by the composable `PointSplatComputePass`
+- CLI: `render` command gains `--statistics`, `--warmup`/`--frames`, `--sort cpu|gpu`, `--camera-matrix`, and point/tile/stochastic renderer support
+- CLI: `bench --sort-detail` reports per-pass GPU-sort timings and a cull sweep; `just sort-perf` renders it as a table. CLI stats add GPU totals and a command-buffer GPU-clock cross-check
+- PointSplat: quantized 18-byte packed splat storage, point-size LoD under budget pressure, visibility-weighted point budget, and an exact sub-pixel Bernoulli sampling path
+- `Tools/`: `spark-screenshot` and `gsplat-golden` helpers
 
 ### API
 
@@ -37,6 +47,9 @@
   `PointSplatRenderPipeline` initializers
 - `SOGReaderGPU.load(url:)` renamed to `read(url:)` for reader consistency
 - `SplatImmersiveRenderState.init` now throws instead of crashing via `try!`
+- Removed the `SplatReader` facade; `SplatLoader` is the single loading path
+- Removed `SOGReaderCPU` (SOG decodes on the GPU only) and `PointSplatRenderer` (`PointSplatComputePass` is the offscreen unit)
+- Pinned the MetalSprockets dependency to stable 0.1.11
 
 ### Fixes
 
@@ -58,6 +71,7 @@
 
 - Tile renderer precomputes per-splat conic data: ~3.5x faster
 - PointSplat occlusion culling and temporal reprojection (RFC 0005)
+- GPU-sort pipeline optimisations (A1–A6): ballot-based peer ranking in the radix scatter, larger compaction blocks, decode folded into the final scatter, `scanOffsets` limited to survivor-covering tiles, block-compacted cull marks with barrier-free scatter, and runtime-tunable blur reduction via function constants
 
 ### Other
 
@@ -70,7 +84,36 @@
 - Documented macOS toolbar/NavigationStack blank-render limitation on `SplatView`
 - New RFCs: 0002 (TileAlt), 0003 (PointSplat), 0004 (point budget thinning),
   0005 (PointSplat improvements beyond the paper)
-- README: per-renderer sections
+- README rewritten in Simplified Technical English and restructured around file formats and usage cases; benchmark writeup moved to `Documentation/Benchmark.md` with charts
+- Code comments rewritten in Simplified Technical English
+- Demo: unified NavigationStack toolbar chrome across iOS and macOS
+
+## 0.1.8
+
+### Features
+
+- visionOS immersive splat rendering: `SplatImmersiveElement`, an immersive-space toggle, placeholder content while immersive, and the stochastic renderer running in immersive mode
+- Renderer picker in the demo via a `SplatRenderer` enum and `.splatRenderer()` modifier (Spark / Stochastic)
+- Stereo/amplification support in `StochasticSplatRenderPipeline` for visionOS
+- Immersive FPS display through MetalSprockets `.onFrameTimingChange`, plus a `FrameTimingView` overlay in the windowed demo
+- SpaceMouse support for camera control
+- Model picker to switch between Butterfly and Helmet splats
+
+### Fixes
+
+- Fixed buffer-pool races and an off-by-one preallocation that caused visual glitches when rotating splat clouds
+- Fixed washed-out colors in immersive mode (sRGB-to-linear conversion)
+- Averaged eye position for the immersive sort camera
+- `SplatIndices.init` made internal to prevent a silent release no-op
+- Skip sorting when the renderer does not need it
+- Fixed `renderTargetArrayLength` for visionOS windowed mode
+
+### Other
+
+- Removed all Antimatter15 code from the library, shaders, CLI, and tests
+- Renamed the CLI from `gsplat-render` to `metalsprockets-gaussian-splat`
+- Added the `MSGS_SORT_LOG` env var for per-frame sort timing logs
+- New app icons; RFC 0001 (adaptive splat sort, rejected)
 
 ## 0.1.7
 
