@@ -45,7 +45,7 @@ per-frame construction.
 The preferred renderer. Spark's shading with a GPU sort front-end.
 
 - **Technique:** frustum cull, stable compaction, and an 8-bit LSD radix sort,
-  all on the GPU, feeding the quad renderer through an indirect draw.
+  all on the GPU. It feeds the quad renderer through an indirect draw.
 - **Performance:** wins under constant camera motion or heavy culling. A fixed
   per-frame sort cost makes Spark cheaper for small static scenes.
 
@@ -63,9 +63,9 @@ Sorted splatting with a CPU radix sort. Ported from [sparkjs](http://sparkjs.dev
 
 ### Tile (`.tile`) — experimental
 
-- **Apple Silicon:** built for the tile-based deferred GPU. Keeps each tile in
-  on-chip tile memory and composites in an imageblock, avoiding device-memory
-  round trips.
+- **Apple Silicon:** built for the tile-based deferred GPU. It keeps each tile
+  in on-chip tile memory and composites in an imageblock. This avoids
+  device-memory round trips.
 - **Technique:** bins splats per tile, sorts each tile by depth, and composites
   front-to-back in an imageblock fragment shader.
 - **Performance:** work in progress. Tiles with heavy overlap dominate the frame
@@ -74,9 +74,10 @@ Sorted splatting with a CPU radix sort. Ported from [sparkjs](http://sparkjs.dev
 ### Stochastic (`.stochastic`) — experimental
 
 - **Technique:** sort-free. Each quad passes a probabilistic alpha test with
-  blue-noise sampling, giving correct expected transparency with no depth order.
-- **Performance:** no sort cost, but fragment cost grows with overdraw. Noisy at
-  1 sample per pixel; built for temporal accumulation.
+  blue-noise sampling. This gives correct expected transparency with no depth
+  order.
+- **Performance:** no sort cost, but fragment cost grows with overdraw. The
+  result is noisy at 1 sample per pixel. Built for temporal accumulation.
 
 ### PointSplat (`.point`) — experimental
 
@@ -89,8 +90,8 @@ An implementation of [*Gaussian Point Splatting*](https://momentsingraphics.de/S
   the closest point wins. Needs 64-bit atomics: Apple9 (A17/M3) or later, or
   Mac2.
 - **Performance:** cost scales with points splatted, not sort size or overdraw,
-  so frame times stay flat into the millions of splats. Noisy per frame;
-  converges within tens of frames.
+  so frame times stay flat into the millions of splats. Each frame is noisy.
+  The image converges within tens of frames.
 
 ## Benchmarks
 
