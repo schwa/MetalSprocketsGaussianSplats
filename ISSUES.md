@@ -2760,11 +2760,13 @@ Medium (dispatch topology change). See ~/Desktop/RFC-port-gpu-sort-render-optimi
 ## 135: GPU sort A5: fold decode into splatRadixScatter (decode_output function constant)
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: gpu, sorting, performance
 created: 2026-08-18T23:17:38Z
+updated: 2026-08-19T15:26:27Z
+closed: 2026-08-19T15:26:27Z
 +++
 
 Add constant bool decode_output [[function_constant(0)]]. On the final radix pass, the scatter writes decoded IndexedDistance records directly (same 8-byte stride as uint2), deleting the splatDecodeIndices kernel and a full-buffer roundtrip. Compile two scatter variants; Swift dispatch drops the decode stage and selects the decoding variant for the last pass; adjust output buffer stride.

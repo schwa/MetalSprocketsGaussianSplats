@@ -31,8 +31,8 @@ public struct GPUSplatSortComputePass: Element {
     @MSState var histogram: ComputeKernel
     @MSState var scanOffsets: ComputeKernel
     @MSState var scanDigitBase: ComputeKernel
-    @MSState var scatter: ComputeKernel
-    @MSState var decode: ComputeKernel
+    @MSState var scatter: ComputeKernel        // decode_output = false
+    @MSState var scatterDecode: ComputeKernel  // decode_output = true (final pass)
 
     /// Convenience initializer for mono (single-view) sorting.
     public init(
@@ -92,8 +92,12 @@ public struct GPUSplatSortComputePass: Element {
         self.histogram = try shaderLibrary.function(named: "splatRadixHistogram", type: ComputeKernel.self)
         self.scanOffsets = try shaderLibrary.function(named: "splatRadixScanOffsets", type: ComputeKernel.self)
         self.scanDigitBase = try shaderLibrary.function(named: "splatRadixScanDigitBase", type: ComputeKernel.self)
-        self.scatter = try shaderLibrary.function(named: "splatRadixScatter", type: ComputeKernel.self)
-        self.decode = try shaderLibrary.function(named: "splatDecodeIndices", type: ComputeKernel.self)
+        var scatterOff = FunctionConstants()
+        scatterOff["decode_output"] = .bool(false)
+        self.scatter = try shaderLibrary.function(named: "splatRadixScatter", type: ComputeKernel.self, constants: scatterOff)
+        var scatterOn = FunctionConstants()
+        scatterOn["decode_output"] = .bool(true)
+        self.scatterDecode = try shaderLibrary.function(named: "splatRadixScatter", type: ComputeKernel.self, constants: scatterOn)
     }
 
     public var body: some Element {
@@ -157,26 +161,15 @@ public struct GPUSplatSortComputePass: Element {
                         .parameter("numElements", value: UInt32(count))
                 }
                 // Two 8-bit radix passes over the 16-bit key. Pass 0 sorts
-                // recordsB -> recordsA, pass 1 recordsA -> recordsB, so the
-                // final sorted records land in recordsB for the decode.
-                try radixPass(shift: 0, src: slot.recordsB, dst: slot.recordsA, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
-                try radixPass(shift: 8, src: slot.recordsA, dst: slot.recordsB, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
-                // Unpack sorted records into IndexedDistance for the renderer.
-                try ComputePipeline(computeKernel: decode) {
-                    try ComputeDispatch(
-                        threadsPerGrid: MTLSize(width: max(count, 1), height: 1, depth: 1),
-                        threadsPerThreadgroup: MTLSize(width: 64, height: 1, depth: 1)
-                    )
-                    .parameter("records", buffer: slot.recordsB)
-                    .parameter("indices", buffer: slot.output.unsafeMTLBuffer)
-                    .parameter("p", value: SplatSortParams(numElements: UInt32(count), numTiles: UInt32(numTiles), elementsPerTile: UInt32(elementsPerTile), shift: 0))
-                    .parameter("drawArgs", buffer: slot.drawArgs)
-                }
+                // recordsB -> recordsA; pass 1 (decode) scatters directly into the
+                // IndexedDistance output buffer, folding away the decode kernel.
+                try radixPass(shift: 0, src: slot.recordsB, dst: slot.recordsA, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                try radixPass(shift: 8, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
             }
         }
     }
 
-    private func radixPass(shift: UInt32, src: MTLBuffer, dst: MTLBuffer, slot: GPUSortResources.Slot, count: Int, numTiles: Int, tileGroups: MTLSize, tileThreads: MTLSize, single: MTLSize) throws -> some Element {
+    private func radixPass(shift: UInt32, src: MTLBuffer, dst: MTLBuffer, decode: Bool, slot: GPUSortResources.Slot, count: Int, numTiles: Int, tileGroups: MTLSize, tileThreads: MTLSize, single: MTLSize) throws -> some Element {
         let params = SplatSortParams(
             numElements: UInt32(count),
             numTiles: UInt32(numTiles),
@@ -207,7 +200,7 @@ public struct GPUSplatSortComputePass: Element {
                     .parameter("total", buffer: slot.total)
                     .parameter("digitBase", buffer: slot.digitBase)
             }
-            try ComputePipeline(computeKernel: scatter) {
+            try ComputePipeline(computeKernel: decode ? scatterDecode : scatter) {
                 try ComputeDispatch(threadgroups: tileGroups, threadsPerThreadgroup: tileThreads)
                     .parameter("inRecords", buffer: src)
                     .parameter("outRecords", buffer: dst)

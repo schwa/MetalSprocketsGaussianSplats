@@ -207,6 +207,11 @@ kernel void splatRadixScanDigitBase(device const uint *total     [[buffer(0)]],
     }
 }
 
+// When set, the scatter writes decoded IndexedDistance records (same 8-byte
+// stride as uint2) instead of raw sort records, so the final radix pass replaces
+// the separate splatDecodeIndices kernel + its full-buffer roundtrip.
+constant bool decode_output [[function_constant(6)]];
+
 // One SIMD-group per tile: stable scatter into the output buffer. Lane-order +
 // chunk-order == input order => stable.
 kernel void splatRadixScatter(device const uint2 *inRecords  [[buffer(0)]],
@@ -253,26 +258,21 @@ kernel void splatRadixScatter(device const uint2 *inRecords  [[buffer(0)]],
 
         threadgroup_barrier(mem_flags::mem_threadgroup);
         uint base = active ? cursor[digit] : 0u;
-        if (active) outRecords[base + rank] = rec;
+        if (active) {
+            if (decode_output) {
+                IndexedDistance out;
+                out.splatIndex = rec.y;
+                out.cloudIndex = ushort(rec.x >> 16);
+                out.distanceToCamera = as_type<half>(floatUnflip16(ushort(rec.x & 0xFFFFu)));
+                ((device IndexedDistance *)outRecords)[base + rank] = out;
+            } else {
+                outRecords[base + rank] = rec;
+            }
+        }
         threadgroup_barrier(mem_flags::mem_threadgroup);
         if (active && rank == 0) cursor[digit] += total;
         threadgroup_barrier(mem_flags::mem_threadgroup);
     }
-}
-
-// Unpack sorted records into IndexedDistance for the render vertex shader.
-kernel void splatDecodeIndices(device const uint2      *records [[buffer(0)]],
-                               device IndexedDistance   *indices [[buffer(1)]],
-                               constant SplatSortParams &p        [[buffer(2)]],
-                               device const uint        *drawArgs [[buffer(3)]],
-                               uint gid [[thread_position_in_grid]]) {
-    if (gid >= drawArgs[1]) return;   // survivor count (compacted to the front)
-    uint2 rec = records[gid];
-    IndexedDistance out;
-    out.splatIndex = rec.y;
-    out.cloudIndex = ushort(rec.x >> 16);
-    out.distanceToCamera = as_type<half>(floatUnflip16(ushort(rec.x & 0xFFFFu)));
-    indices[gid] = out;
 }
 
 } // namespace SplatGPUSort
