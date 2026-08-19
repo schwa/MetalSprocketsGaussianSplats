@@ -2,6 +2,8 @@
 
 Gaussian Splat rendering built on [MetalSprockets](https://metalsprockets/com) ([Github](https://github.com/schwa/MetalSprockets)).
 
+Read the [announcement post](https://blog.schwa.io/posts/metalsprockets-gaussian-splats/) for background.
+
 This repository has a standalone renderer and a Swift framework. You can add the framework to your own project.
 
 There is also a CLI target for offline rendering. See the Justfile for how to use it.
@@ -17,155 +19,78 @@ The Wikipedia article is a good summary of the technique: [Wikipedia](https://en
   rendering shows nothing in the iOS/visionOS simulators. Run on a real
   device, or run natively on macOS.
 
+## File Formats
+
+The framework loads these Gaussian splat formats:
+
+- **PLY** (`.ply`) — the common point-cloud format that most tools export. PLY
+  files are uncompressed, so they are large.
+- **SPZ** (`.spz`) — the compressed [Niantic format](https://github.com/nianticlabs/spz).
+  Supports versions 2, 3, and 4. SH4 is not supported for version 4. The
+  decoder is GPU-accelerated.
+- **SOG** (`.sog`) — the [Spatially Ordered Gaussians format](https://developer.playcanvas.com/user-manual/gaussian-splatting/formats/sog/)
+  from PlayCanvas. The decoder is GPU-accelerated. SOG usually produces the
+  smallest files.
+
 ## Renderers
 
-The framework has five renderers that you can exchange. Select one in the demo
-app's picker, or with the `.splatRenderer(_:)` modifier on `SplatView`:
+The framework has five renderers that you can exchange. Pick one with the
+`.splatRenderer(_:)` modifier on `SplatView`, or in the demo app's picker. See
+[Usage](#usage) for the three ways to drive them. Each renderer is also a
+MetalSprockets element that you can use directly. See [Usage](#usage) for the
+per-frame construction.
 
-```swift
-SplatView(splatCloud: cloud, cameraMatrix: cameraMatrix)
-    .splatRenderer(.spark)   // or .gpu, .tile, .stochastic, .point
-```
+### Spark (GPU Sort) (`.gpu`)
 
-You can also use each renderer directly as a MetalSprockets element. The
-snippets below show the minimum per-frame construction. See `SplatView.swift`
-for the complete wiring.
+The preferred renderer. Spark's shading with a GPU sort front-end.
+
+- **Technique:** frustum cull, stable compaction, and an 8-bit LSD radix sort,
+  all on the GPU, feeding the quad renderer through an indirect draw.
+- **Performance:** wins under constant camera motion or heavy culling. A fixed
+  per-frame sort cost makes Spark cheaper for small static scenes.
 
 ### Spark (`.spark`)
 
-The default production renderer. It is ported from [sparkjs](http://sparkjs.dev).
+Sorted splatting with a CPU radix sort. Ported from [sparkjs](http://sparkjs.dev).
 
-- **Technique:** classic sorted splatting. A CPU radix sort orders the splats
-  back-to-front each time the camera moves. Each splat rasterizes as an
-  alpha-blended quad. The projected 2D covariance sets the quad size. Spark
-  supports spherical harmonics and multiple clouds.
-- **Requirements:** any Apple Silicon Mac or current iOS device.
-- **Performance:** best quality-per-watt for small and medium scenes (hundreds
-  of k splats). The CPU sort runs async, so frames never block on it. But
-  the sort latency shows as slight popping during fast camera motion, and the
-  sort time grows with the splat count.
-- **Debug vs Release:** the CPU radix sort is much slower in Debug
-  builds, because the Swift is unoptimized. This shows as slow resorting and
-  strong popping during orbit. Benchmark and demo in Release. A slow
-  sort (more than 16 ms) logs a warning in both builds.
-
-```swift
-try RenderPass {
-    try SparkSplatRenderPipeline(
-        splatCloud: cloud,
-        projectionMatrix: projectionMatrix,
-        modelMatrix: .identity,
-        cameraMatrix: cameraMatrix,
-        drawableSize: size,
-        sortedIndices: sortedIndices   // from AsyncSortManager
-    )
-}
-```
-
-### GPU (`.gpu`)
-
-Spark's shading with a GPU sort front-end.
-
-- **Technique:** frustum cull, then stable compaction, then an 8-bit LSD radix
-  sort. All of these run on the GPU timeline. They feed the same quad renderer
-  with an indirect draw. There is no CPU sort latency, and culled splats never
-  rasterize.
-- **Requirements:** same as Spark.
-- **Performance:** this renderer wins when the camera moves constantly, because
-  the sort is never stale. It also wins when culling discards a large part of
-  the cloud. It adds a fixed GPU cost per frame for the sort. So Spark is
-  cheaper for static views of small scenes.
-
-```swift
-let resources = try GPUSortResources(device: device, capacity: cloud.count)  // once
-
-try GPUSortedSplatRenderPipeline(
-    splatCloud: cloud,
-    projectionMatrix: projectionMatrix,
-    modelMatrix: .identity,
-    cameraMatrix: cameraMatrix,
-    drawableSize: size,
-    resources: resources
-)
-```
+- **Technique:** a CPU radix sort orders splats back-to-front each frame. Each
+  splat draws as an alpha-blended quad sized by its 2D covariance. Supports
+  spherical harmonics and multiple clouds.
+- **Performance:** best quality-per-watt for small and medium scenes. The async
+  sort can pop during fast motion, and sort time grows with splat count.
+- **Debug vs Release:** the CPU sort is much slower in Debug. Benchmark in
+  Release. A slow sort (more than 16 ms) logs a warning.
 
 ### Tile (`.tile`) — experimental
 
-- **Technique:** the screen is divided into tiles. The splats are binned per
-  tile, then sorted per tile by depth, then composited front-to-back in an
-  imageblock fragment shader. This follows the original 3DGS rasterizer.
-- **Requirements:** Apple Silicon (imageblocks / tile shaders).
-- **Performance:** work in progress. Tiles with many overlapping splats
-  dominate the frame time, because the load balancing is poor. This is the
-  known weakness of tile-based splatting at scale.
-
-```swift
-try TileBasedSplatPass(
-    splatCloud: cloud,
-    projection: projection,
-    drawableSize: size,
-    cameraMatrix: cameraMatrix
-)
-```
+- **Apple Silicon:** built for the tile-based deferred GPU. Keeps each tile in
+  on-chip tile memory and composites in an imageblock, avoiding device-memory
+  round trips.
+- **Technique:** bins splats per tile, sorts each tile by depth, and composites
+  front-to-back in an imageblock fragment shader.
+- **Performance:** work in progress. Tiles with heavy overlap dominate the frame
+  time from poor load balancing.
 
 ### Stochastic (`.stochastic`) — experimental
 
-- **Technique:** sort-free. Each splat rasterizes as an opaque quad. Each
-  fragment passes a probabilistic alpha test (stochastic transparency), with
-  blue-noise or hash sampling. This gives correct expected transparency
-  without any depth order. The noise averages out over frames.
-- **Requirements:** same as Spark.
-- **Performance:** there is no sort cost. But the fragment cost grows with
-  screen-space overdraw, because every quad still rasterizes fully. The result
-  is visibly noisy at 1 sample per pixel. This renderer is for temporal
-  accumulation.
-
-```swift
-try RenderPass {
-    try StochasticSplatRenderPipeline(
-        splatCloud: cloud,
-        projectionMatrix: projectionMatrix,
-        modelMatrix: .identity,
-        cameraMatrix: cameraMatrix,
-        drawableSize: size,
-        frameTime: frameIndex
-    )
-    .depthCompare(function: .less, enabled: true)
-}
-```
+- **Technique:** sort-free. Each quad passes a probabilistic alpha test with
+  blue-noise sampling, giving correct expected transparency with no depth order.
+- **Performance:** no sort cost, but fragment cost grows with overdraw. Noisy at
+  1 sample per pixel; built for temporal accumulation.
 
 ### PointSplat (`.point`) — experimental
 
-An implementation of *Gaussian Point Splatting* (Rijsdijk et al., SIGGRAPH
-2026). See `RFCs/0003-gaussian-point-splatting.md`.
+An implementation of [*Gaussian Point Splatting*](https://momentsingraphics.de/Siggraph2026.html)
+(Rijsdijk et al., SIGGRAPH 2026). See also the authors'
+[reference implementation](https://github.com/JorisAR/gaussian-point-splatting).
 
-- **Technique:** sort-free and rasterization-free. Each Gaussian
-  stochastically emits pixel-sized opaque points. The point count is
-  proportional to the screen area times the opacity, with an exact
-  collision-compensating correction. The points are splatted into a 64-bit
-  depth-and-color buffer with `atomic_min`, so the closest point wins per
-  pixel. 2×2 supersampling, a box-filter resolve, and temporal accumulation
-  converge the result to the sorted output.
-- **Requirements:** 64-bit atomics. This needs the Apple9 GPU family (A17/M3)
-  or later, or Mac2.
-- **Performance:** the cost grows with the number of points splatted, not with
-  the sort size or the overdraw. The points are bounded per frame and evenly
-  distributed across the threads. So the frame times stay flat as the splat
-  count grows into the millions, where the sorted pipelines degrade. Single
-  frames are noisy. Static views converge within tens of frames through
-  accumulation. The per-frame point budget is derived automatically (32 points
-  per supersampled pixel).
-
-```swift
-try PointSplatRenderPipeline(
-    splatCloud: cloud,
-    projectionMatrix: projectionMatrix,
-    modelMatrix: .identity,
-    cameraMatrix: cameraMatrix,
-    drawableSize: size,
-    frameIndex: frameIndex
-)
-```
+- **Technique:** sort-free and rasterization-free. Each Gaussian emits
+  pixel-sized points into a 64-bit depth-and-color buffer with `atomic_min`, so
+  the closest point wins. Needs 64-bit atomics: Apple9 (A17/M3) or later, or
+  Mac2.
+- **Performance:** cost scales with points splatted, not sort size or overdraw,
+  so frame times stay flat into the millions of splats. Noisy per frame;
+  converges within tens of frames.
 
 ## Benchmarks
 
@@ -175,11 +100,24 @@ with the splat count. See the full tables, charts, and per-pass timings in
 
 ## Usage
 
-Rendering Gaussian splats needs two steps: sorting and rendering. The sort
-manager runs on a background thread. It produces sorted indices that you pass
-to a render pipeline.
+There are three ways to drive the framework, from simplest to lowest-level.
 
-### Interactive Rendering (SwiftUI)
+### Simple: SplatView
+
+`SplatView` is a SwiftUI view that renders a splat cloud. It owns the sort
+manager and the render loop. Pick a renderer with `.splatRenderer(_:)`.
+
+```swift
+SplatView(splatCloud: cloud, cameraMatrix: cameraMatrix)
+    .splatRenderer(.spark)   // or .gpu, .tile, .stochastic, .point
+```
+
+### MetalSprockets pipeline (interactive)
+
+To own the render loop, drive a render pipeline directly as a MetalSprockets
+element. Rendering needs two steps: sorting and rendering. The sort manager
+runs on a background thread. It produces sorted indices that you pass to the
+pipeline.
 
 ```swift
 @State private var sortedIndices: SplatIndices?
@@ -210,7 +148,7 @@ var body: some View {
 }
 ```
 
-### Offline / Single-Frame Rendering
+### Offline renderer
 
 ```swift
 let sortManager = try AsyncSortManager(device: device, splatCloud: cloud, capacity: cloud.count)
