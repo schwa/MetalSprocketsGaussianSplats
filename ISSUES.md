@@ -2720,32 +2720,40 @@ Trivial. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shar
 ## 133: GPU sort A3: parallel splatCompactScanBlocks
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: gpu, sorting, performance
 created: 2026-08-18T23:17:38Z
+updated: 2026-08-19T00:03:37Z
+closed: 2026-08-19T00:03:37Z
 +++
 
 Replace the single-thread serial prefix sum over all blocks in splatCompactScanBlocks with a 256-wide scan (simd-prefix chunks + cross-simd combine + a carry across chunks). Dispatch as one 256-thread threadgroup instead of a single thread.
 
 Low-medium effort; pure reduction, output identical. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
 
+- `2026-08-19T00:03:37Z`: Evaluated on M5 Max, NOT adopted (reverted). The parallel single-threadgroup scan (simd-prefix chunks) helps at 1M (-45 to -50% sort) but REGRESSES at the demanding sizes: 4M -8 to -41%, 8M -15 to -18%, with both 256- and 1024-thread groups. A single threadgroup only occupies one GPU core, so at ~15600 blocks (8M / COMPACT_BLOCK 512) the chunked scan + per-chunk barriers lose to the trivial serial single-thread scan. The sibling saw a win on its hardware; we don't on M5 Max. Cull/survivor counts stayed exact throughout (correctness fine) — this is purely a perf regression. Kept the serial scanBlocks from A2.
+
 ---
 
 ## 134: GPU sort A4: fold digit-base scan into splatRadixScanOffsets
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: gpu, sorting, performance
 created: 2026-08-18T23:17:38Z
+updated: 2026-08-19T00:10:38Z
+closed: 2026-08-19T00:10:38Z
 +++
 
 Fold the per-digit-base exclusive scan into splatRadixScanOffsets (one RADIX-thread group, simd-prefix across digits). Deletes the splatRadixScanDigitBase kernel and its serializing dispatch. Dispatch scanOffsets as a RADIX-thread group.
 
 Medium (dispatch topology change). See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/Projects/gaussiansplats-ios (sibling project; our SplatGPUSort.metal is its pre-optimization ancestor). All source commits claim bit-identical output, so no golden-image churn expected (except where the stereo path is touched).
+
+- `2026-08-19T00:10:38Z`: Partial adoption. The folding itself (single 256-thread group scanOffsets writing digitBase) forces a single-threadgroup dispatch — same M5-Max pathology as A3 (#133) — and the separate serial scanDigitBase is cheap, so folding gave no clear benefit amid ~12% run-to-run thermal noise at 8M. What DID pay off is the usedTiles optimization from the sibling's kernel: scanOffsets now scans only tiles that cover survivors (drawArgs[1]) instead of all numTiles. Using min_ms (thermal-noise-resistant): neutral at 0% cull (identical code: 1M/0% 0.0%, 4M/0% -1%), and a large win when culling: 1M/50% -36%, 4M/50% -30%, 8M/50% -31%. Cull/survivor counts exact throughout. Kept scanOffsets multi-threadgroup + serial scanDigitBase; added usedTiles only.
 
 ---
 

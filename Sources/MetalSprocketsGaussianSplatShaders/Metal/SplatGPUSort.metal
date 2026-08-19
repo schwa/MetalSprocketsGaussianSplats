@@ -175,15 +175,20 @@ kernel void splatRadixHistogram(device const uint2 *records [[buffer(0)]],
 
 // One thread per digit: exclusive prefix sum of that digit's counts across tiles,
 // and the per-digit total.
-kernel void splatRadixScanOffsets(device const uint *hist   [[buffer(0)]],
-                                  device uint        *offset [[buffer(1)]],
-                                  device uint        *total  [[buffer(2)]],
-                                  constant SplatSortParams &p [[buffer(3)]],
+kernel void splatRadixScanOffsets(device const uint *hist     [[buffer(0)]],
+                                  device uint        *offset   [[buffer(1)]],
+                                  device uint        *total    [[buffer(2)]],
+                                  constant SplatSortParams &p    [[buffer(3)]],
+                                  device const uint  *drawArgs  [[buffer(4)]],
                                   uint digit [[thread_position_in_grid]]) {
     if (digit >= RADIX) return;
+    // Only tiles covering survivors were histogrammed; scan just those. Tiles
+    // past the survivors are all zero, so `running` (the digit total) is
+    // unaffected and their unused offsets need not be written.
+    uint usedTiles = min((drawArgs[1] + p.elementsPerTile - 1) / p.elementsPerTile, p.numTiles);
     uint running = 0;
     uint base = digit * p.numTiles;
-    for (uint t = 0; t < p.numTiles; t++) {
+    for (uint t = 0; t < usedTiles; t++) {
         offset[base + t] = running;
         running += hist[base + t];
     }

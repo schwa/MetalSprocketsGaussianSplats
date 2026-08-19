@@ -200,6 +200,7 @@ public struct GPUSplatSortComputePass: Element {
                 .parameter("offset", buffer: slot.offset)
                 .parameter("total", buffer: slot.total)
                 .parameter("p", value: params)
+                .parameter("drawArgs", buffer: slot.drawArgs)
             }
             try ComputePipeline(computeKernel: scanDigitBase) {
                 try ComputeDispatch(threadsPerGrid: single, threadsPerThreadgroup: single)
