@@ -115,6 +115,7 @@ public struct SparkSplatRenderPipeline: Element {
     }
     var vertexDescriptor: MTLVertexDescriptor
     var convertSRGBToLinear: Bool
+    var tuning: SplatRenderTuning = .default
     /// Optional vertex amplification view mappings, applied when setting the
     /// amplification count. Use ``viewMappings(_:)`` for per-eye rendering into
     /// specific layers of a layered render target.
@@ -133,11 +134,14 @@ public struct SparkSplatRenderPipeline: Element {
         public var useSphericalHarmonics: Bool?
         /// Optional world-space bounding box. Splats outside this box are culled.
         public var boundingBox: BoundingBox3D?
+        /// Render-quality tuning (Gaussian cutoff, alpha cutoff, AA blur).
+        public var tuning: SplatRenderTuning
 
-        public init(convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil) {
+        public init(convertSRGBToLinear: Bool = true, useSphericalHarmonics: Bool? = nil, boundingBox: BoundingBox3D? = nil, tuning: SplatRenderTuning = .default) {
             self.convertSRGBToLinear = convertSRGBToLinear
             self.useSphericalHarmonics = useSphericalHarmonics
             self.boundingBox = boundingBox
+            self.tuning = tuning
         }
     }
 
@@ -196,6 +200,7 @@ public struct SparkSplatRenderPipeline: Element {
         self.drawableSize = drawableSize
         self.boundingBox = boundingBox
         self.convertSRGBToLinear = convertSRGBToLinear
+        self.tuning = configuration.tuning
         self.sortedIndices = sortedIndices
 
         // SH: explicit override, else auto-detect from any cloud having SH data.
@@ -212,6 +217,7 @@ public struct SparkSplatRenderPipeline: Element {
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
+        Self.applyTuning(configuration.tuning, vertex: &vertexConstants, fragment: &fragmentConstants)
 
         self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
         self.fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
@@ -248,11 +254,22 @@ public struct SparkSplatRenderPipeline: Element {
 
             var fragmentConstants = FunctionConstants()
             fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
+            Self.applyTuning(tuning, vertex: &vertexConstants, fragment: &fragmentConstants)
 
             vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
             fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
         }
         return (vertexShader, fragmentShader)
+    }
+
+    /// Sets the render-tuning function constants. maxStdDev and minAlpha are used
+    /// by both stages; blurAmount only by the vertex stage.
+    private static func applyTuning(_ tuning: SplatRenderTuning, vertex: inout FunctionConstants, fragment: inout FunctionConstants) {
+        vertex["fc_max_std_dev"] = .float(tuning.maxStdDev)
+        vertex["fc_min_alpha"] = .float(tuning.minAlpha)
+        vertex["fc_blur_amount"] = .float(tuning.blurAmount)
+        fragment["fc_max_std_dev"] = .float(tuning.maxStdDev)
+        fragment["fc_min_alpha"] = .float(tuning.minAlpha)
     }
 
     // MARK: - Render Pipeline

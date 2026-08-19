@@ -28,8 +28,7 @@ namespace SparkSplatRenderShader {
     typedef VertexOut FragmentIn;
 
     // Constants
-    constant float MAX_STD_DEV = 2.8284271247;  // sqrt(8)
-    constant float MIN_ALPHA = 0.5 / 255.0;
+    // MAX_STD_DEV / MIN_ALPHA are derived from function constants below.
     constant float CLIP_XY = 1.4;
     constant float MAX_PIXEL_RADIUS = 512.0;
 
@@ -37,6 +36,16 @@ namespace SparkSplatRenderShader {
     constant bool convert_srgb_to_linear [[function_constant(0)]];
     constant bool use_sh [[function_constant(1)]];
     constant bool use_bounding_box [[function_constant(2)]];
+
+    // Render tuning (blur-reduction). Specialized at pipeline build via
+    // SplatRenderTuning; when not provided, defaults to the tuned values so any
+    // pipeline gets the sharper, cheaper look without extra wiring.
+    constant float fc_max_std_dev [[function_constant(3)]];
+    constant float fc_min_alpha   [[function_constant(4)]];
+    constant float fc_blur_amount [[function_constant(5)]];
+    constant float MAX_STD_DEV = is_function_constant_defined(fc_max_std_dev) ? fc_max_std_dev : 2.5;
+    constant float MIN_ALPHA   = is_function_constant_defined(fc_min_alpha)   ? fc_min_alpha   : (2.0 / 255.0);
+    constant float BLUR_AMOUNT = is_function_constant_defined(fc_blur_amount) ? fc_blur_amount : 0.05;
 
     // MARK: - Vertex Shader
 
@@ -186,11 +195,10 @@ namespace SparkSplatRenderShader {
         float3x3 J = computeProjectionJacobian(viewCenter, focal);
         Covariance2D cov2D = projectCovarianceTo2D(cov3D, J);
 
-        // Add small blur for anti-aliasing
-        float blurAmount = 0.3;
+        // Anti-aliasing covariance dilation (BLUR_AMOUNT px^2; from render tuning).
         float detOrig = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
-        cov2D.a += blurAmount;
-        cov2D.d += blurAmount;
+        cov2D.a += BLUR_AMOUNT;
+        cov2D.d += BLUR_AMOUNT;
         float det = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
 
         // Compute anti-aliasing intensity scaling

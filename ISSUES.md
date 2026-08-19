@@ -2855,3 +2855,38 @@ BLOCKER / caveat to resolve first: the GPU sort uses 64-bit atomics and needs Ap
 Motivation data: see just sort-perf / bench output.
 
 ---
+
+## 140: Adopt blur-reduction render tuning; make it runtime-configurable
+
++++
+status: closed
+priority: medium
+kind: enhancement
+labels: rendering, quality, performance
+created: 2026-08-19T00:23:34Z
+updated: 2026-08-19T00:37:14Z
+closed: 2026-08-19T00:37:14Z
++++
+
+Port the render-quality tuning from the sibling gaussiansplats-ios (its BlurReduction experiments). Our Spark fragment/vertex shader hardcodes softer, larger splat defaults than theirs; matching their tuned values makes the image sharper AND cuts fragment cost (smaller splat footprints = less overdraw), which is the dominant cost at ~1M splats.
+
+Current (Sources/MetalSprocketsGaussianSplatShaders/Metal/SparkSplatRenderShader.metal) vs sibling tuned:
+- MAX_STD_DEV: 2.8284 (sqrt 8) -> 2.5   (Gaussian cutoff radius; smaller = tighter splats, ~22% fewer fragments/splat)
+- MIN_ALPHA:  0.5/255 -> 2.0/255        (skip more near-transparent splats)
+- blurAmount: 0.3 -> 0.05               (AA covariance dilation in px^2; ours is 6x blurrier and inflates every splat) — the big one
+
+Work:
+1. Update the three defaults to the tuned values. Low effort (constants), but regenerate the golden images (this is an intentional visual change) after eyeballing on real content.
+2. Make them runtime-configurable rather than compile-time constants: add a SplatRenderTuning struct { maxStdDev, minAlpha, blurAmount } passed to the render pipeline (vertex + fragment), mirroring the sibling. Lets callers trade sharpness/perf without recompiling shaders. Wire an optional tuning through SplatView / OffscreenSplatRenderer / the CLI.
+3. Measure fragment_ms before/after with `just sort-perf` (reports vertex/fragment split) to quantify the fragment savings.
+
+Other non-perf items from the sibling worth considering later (noted here so they are not lost; file separately if pursued):
+- On-demand rendering in the live view (redraw only on change; report redraws skipped).
+- Two-buffer cross-fade when switching splat clouds (crossfade shader).
+- GPU fault detection after command-buffer completion; label Metal resources + GPU-capture debug groups.
+- Reference 3DGS renderer + SparkJS screenshot CLI for quality comparison.
+- RFC 0004 stable splat sort order.
+
+Source: ~/Shared/Work/Projects/gaussiansplats-ios (SplatRenderTuning in Sources/GaussianSplatShaders/include/SparkSplatRenderShader.h; defaults in Sources/GaussianSplatMetal/Render/SparkSplatRenderer.swift; BlurReduction/ folder).
+
+---
