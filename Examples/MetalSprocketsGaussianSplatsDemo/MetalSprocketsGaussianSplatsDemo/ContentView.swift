@@ -205,7 +205,7 @@ private struct SplatImporter: ViewModifier {
     @Binding var isImporting: Bool
     let demoState: DemoState
 
-    private static let splatContentTypes: [UTType] = [.ply, .spz, .sog]
+    private static let splatContentTypes: [UTType] = [.ply, .antimatter15Splat, .spz, .sog]
 
     func body(content: Content) -> some View {
         content

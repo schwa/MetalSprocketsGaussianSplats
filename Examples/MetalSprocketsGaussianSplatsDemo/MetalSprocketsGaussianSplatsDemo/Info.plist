@@ -57,6 +57,23 @@
 				</array>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.antimatter15.splat</string>
+			<key>UTTypeDescription</key>
+			<string>Antimatter15 Splat</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>splat</string>
+				</array>
+			</dict>
+		</dict>
 	</array>
 </dict>
 </plist>

@@ -93,11 +93,9 @@ public extension SPZReaderGPU.Result {
 // MARK: - Unified loader
 
 /// Loads any supported splat file into GPU buffers. It routes `.sog` and `.spz`
-/// through their compute-shader decoders (`SOGReaderGPU` and `SPZReaderGPU`),
-/// and `.ply` through the CPU reader's ``SplatReaderProtocol/read(device:name:)``.
+/// through their compute-shader decoders, and `.ply` and `.splat` through CPU readers.
 public enum SplatLoader {
-    /// - Parameter mortonOrdered: Applies to the CPU decode path (`.ply`) only.
-    ///   The GPU decoders write straight into buffers in source order.
+    /// - Parameter mortonOrdered: Applies to the CPU decode paths (`.ply` and `.splat`) only.
     public static func read(device: MTLDevice, url: URL, name: String? = nil, mortonOrdered: Bool = false) throws -> SplatBufferResult {
         switch url.pathExtension.lowercased() {
         case "sog":
@@ -105,8 +103,9 @@ public enum SplatLoader {
         case "spz":
             return try SPZReaderGPU(device: device).read(url: url, name: name).bufferResult
         case "ply":
-            // PLY has no GPU decoder. Decode on the CPU and pack into a buffer.
             return try PLYSplatReader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
+        case "splat":
+            return try Antimatter15Reader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
         default:
             throw SplatLoaderError.unsupportedFormat(url.pathExtension)
         }
@@ -115,7 +114,7 @@ public enum SplatLoader {
 
 /// Errors from ``SplatLoader``.
 public enum SplatLoaderError: Error, Equatable {
-    /// The file extension has no loader. Only ply, spz, and sog are supported.
+    /// The file extension has no loader.
     case unsupportedFormat(String)
 }
 

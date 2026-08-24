@@ -25,6 +25,7 @@ The framework loads these Gaussian splat formats:
 
 - **PLY** (`.ply`) — the common point-cloud format that most tools export. PLY
   files are uncompressed, so they are large.
+- **SPLAT** (`.splat`) — the uncompressed Antimatter15 Gaussian splat format.
 - **SPZ** (`.spz`) — the compressed [Niantic format](https://github.com/nianticlabs/spz).
   Supports versions 2, 3, and 4. SH4 is not supported for version 4. The
   decoder is GPU-accelerated.
