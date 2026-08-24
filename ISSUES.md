@@ -2998,3 +2998,78 @@ Expected: Spark debug visualizations are available with GPU-sorted rendering, wi
 - `2026-08-24T20:02:42Z`: GPU-sorted Spark rendering now accepts debug parameters and renders debug modes from GPU-generated indices.
 
 ---
+
+## 146: Support loading LCC splat datasets
+
++++
+status: new
+priority: medium
+kind: feature
+labels: splats, effort:l
+created: 2026-08-24T21:15:41Z
++++
+
+Lixel CyberColor (LCC) datasets are not currently supported by `SplatLoader`. An LCC dataset uses a `.lcc` JSON metadata file with companion `index.bin` and `data.bin` files, plus optional spherical-harmonic and environment data.
+
+LCC supports spatial partitioning and multiple LOD levels, so loading requires an explicit LOD policy. The current loader materializes a complete `SplatBufferResult` and does not expose spatial streaming or a separate environment cloud.
+
+References:
+- LCC specification: https://github.com/xgrids/LCCWhitepaper
+- PlayCanvas LCC reader: https://github.com/playcanvas/splat-transform/blob/main/src/lib/readers/read-lcc.ts
+- Minimal LCC decoder: https://github.com/wallabyway/lcc-decoder
+- PLY-to-LCC encoder: https://github.com/Deep-In-Sight/ply2lcc
+- LCC2 specification: https://github.com/xgrids/LCC2Whitepaper
+- Related LCC2 issue: #87
+
+---
+
+## 147: Color splats by classification ID in the debug renderer
+
++++
+status: new
+priority: medium
+kind: enhancement
+created: 2026-08-25T01:58:54Z
++++
+
+The debug renderer can color splats by properties such as size, depth, opacity, and cloud index, but it cannot consume a per-splat classification ID and assign a categorical color.
+
+This prevents visual inspection of externally generated classifications, including k-means cluster assignments. Classification IDs must remain associated with the correct splats when clouds use Morton ordering or sorted render indices.
+
+---
+
+## 148: SplatView owns debug rendering concerns
+
++++
+status: new
+priority: medium
+kind: enhancement
+created: 2026-08-25T01:59:44Z
+updated: 2026-08-25T02:00:54Z
++++
+
+SplatView reads splatDebugParams from the SwiftUI environment and conditionally selects SparkSplatDebugRenderPipeline through GPUSortedSplatRenderPipeline. This couples the general-purpose view to debug-only configuration and rendering behavior.
+
+SplatView should remain focused on normal renderer selection and presentation. Debug rendering should be available independently, without adding debug state or behavior to SplatView.
+
+- `2026-08-25T02:00:54Z`: Debug rendering is an unusual, uncommon workflow and is not part of the normal rendering flow. SplatView must not use debug views or surface any debug functionality.
+
+---
+
+## 149: Debug rendering ships in the main library target
+
++++
+status: new
+priority: medium
+kind: enhancement
+created: 2026-08-25T01:59:53Z
+updated: 2026-08-25T02:00:54Z
++++
+
+Debug rendering types, shaders, and APIs currently ship with the main MetalSprocketsGaussianSplats library and shader targets. Applications that only need production rendering still compile and distribute this debug-only surface.
+
+Debug rendering should be available as a separate Swift Package Manager product and target so clients opt into it explicitly.
+
+- `2026-08-25T02:00:54Z`: Debug rendering is an unusual, uncommon workflow and is not part of the normal rendering flow. SplatView must not use debug views or surface any debug functionality.
+
+---
