@@ -8,7 +8,7 @@ import simd
 import Splats
 
 /// The debug visualization modes for Gaussian splat rendering.
-public enum SplatDebugMode: String, CaseIterable, Sendable {
+public enum SplatDebugMode: String, CaseIterable, Hashable, Sendable {
     /// Colors splats by distance from the cloud center.
     case distanceFromCenter
     /// Colors splats by size (maximum scale).
@@ -176,8 +176,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         vertexConstants["use_sh"] = .bool(false)  // debug mode uses no spherical harmonics
         vertexConstants["use_bounding_box"] = .bool(boundingBox != nil)
 
-        // Same vertex shader as the normal render pipeline.
-        self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
+        self.vertexShader = try shaderLibrary.function(named: "vertex_debug", type: VertexShader.self, constants: vertexConstants)
 
         var fragmentConstants = FunctionConstants()
         fragmentConstants["fc_max_std_dev"] = .float(SplatRenderTuning.default.maxStdDev)

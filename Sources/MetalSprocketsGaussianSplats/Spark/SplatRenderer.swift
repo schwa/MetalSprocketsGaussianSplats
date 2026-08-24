@@ -31,11 +31,20 @@ private struct SplatRendererKey: EnvironmentKey {
     static let defaultValue: SplatRenderer = .sparkGPU
 }
 
+private struct SplatDebugParamsKey: EnvironmentKey {
+    static let defaultValue: DebugParams? = nil
+}
+
 public extension EnvironmentValues {
     /// The splat rendering algorithm to use.
     var splatRenderer: SplatRenderer {
         get { self[SplatRendererKey.self] }
         set { self[SplatRendererKey.self] = newValue }
+    }
+
+    var splatDebugParams: DebugParams? {
+        get { self[SplatDebugParamsKey.self] }
+        set { self[SplatDebugParamsKey.self] = newValue }
     }
 }
 
@@ -48,6 +57,10 @@ public extension View {
     /// ```
     func splatRenderer(_ renderer: SplatRenderer) -> some View {
         environment(\.splatRenderer, renderer)
+    }
+
+    func splatDebugParams(_ params: DebugParams?) -> some View {
+        environment(\.splatDebugParams, params)
     }
 }
 #endif

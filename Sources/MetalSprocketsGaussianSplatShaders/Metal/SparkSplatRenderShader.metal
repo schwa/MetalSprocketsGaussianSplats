@@ -14,18 +14,26 @@ namespace SparkSplatRenderShader {
 
     struct VertexOut {
         float4 position [[position]];
-        float2 splatUv;          // Relative position on splat ellipse
+        float2 splatUv;
         float4 rgba;
-        float3 worldPosition;    // World-space position of the splat center (for debug shaders)
-        float splatSize;         // Maximum scale of the splat (for debug shaders)
-        float depth;             // View-space depth (for debug shaders)
-        float3 normal;           // World-space normal direction (for debug shaders)
-        float aspectRatio;       // Ratio of max to min scale (for debug shaders)
-        uint cloudIndex;         // Which cloud this splat belongs to (for debug shaders)
+        ushort renderTargetArrayIndex [[render_target_array_index]];
+    };
+
+    struct DebugVertexOut {
+        float4 position [[position]];
+        float2 splatUv;
+        float4 rgba;
+        float3 worldPosition;
+        float splatSize;
+        float depth;
+        float3 normal;
+        float aspectRatio;
+        uint cloudIndex;
         ushort renderTargetArrayIndex [[render_target_array_index]];
     };
 
     typedef VertexOut FragmentIn;
+    typedef DebugVertexOut DebugFragmentIn;
 
     // MAX_STD_DEV and MIN_ALPHA come from the function constants below.
     constant float CLIP_XY = 1.4;
@@ -48,20 +56,19 @@ namespace SparkSplatRenderShader {
 
     // MARK: - Vertex Shader
 
-    [[vertex]] VertexOut vertex_main(
-        VertexIn in [[stage_in]],
-        uint instance_id [[instance_id]],
-        ushort amplification_id [[amplification_id]],
-        ushort amplification_count [[amplification_count]],
-        constant IndexedDistance *indexedDistances [[buffer(3)]],
-        constant float4x4 *viewMatrices [[buffer(5)]],
-        constant float4x4 *projectionMatrices [[buffer(6)]],
-        constant float2 &drawableSize [[buffer(8)]],
-        constant float &scale [[buffer(9)]],
-        constant float3 *cameraPositions [[buffer(10)]],
-        constant uint &shDegree [[buffer(11), function_constant(use_sh)]],
-        constant BoundingBox3D &boundingBox [[buffer(12), function_constant(use_bounding_box)]],
-        constant MultiCloudArgumentBuffer &clouds [[buffer(14)]]
+    __attribute__((always_inline)) inline VertexOut vertex_common(
+        VertexIn in,
+        uint instance_id,
+        ushort amplification_id,
+        constant IndexedDistance *indexedDistances,
+        constant float4x4 *viewMatrices,
+        constant float4x4 *projectionMatrices,
+        constant float2 &drawableSize,
+        constant float &scale,
+        constant float3 *cameraPositions,
+        constant uint &shDegree,
+        constant BoundingBox3D &boundingBox,
+        constant MultiCloudArgumentBuffer &clouds
     ) {
         // amplification_id selects the matrices: 0 for mono, 0 or 1 for stereo.
         float4x4 viewMatrix = viewMatrices[amplification_id];
@@ -72,12 +79,6 @@ namespace SparkSplatRenderShader {
         out.position = float4(0.0, 0.0, 2.0, 1.0);
         out.splatUv = float2(0.0);
         out.rgba = float4(0.0);
-        out.worldPosition = float3(0.0);
-        out.splatSize = 0.0;
-        out.depth = 0.0;
-        out.normal = float3(0.0);
-        out.aspectRatio = 1.0;
-        out.cloudIndex = 0;
         out.renderTargetArrayIndex = amplification_id;
 
         IndexedDistance indexedDistance = indexedDistances[instance_id];
@@ -88,7 +89,6 @@ namespace SparkSplatRenderShader {
             return out;
         }
 
-        out.cloudIndex = cloudIndex;
 
         SplatCloudData cloudData = clouds.clouds[cloudIndex];
         device const SparkSplat* splats = cloudData.splats;
@@ -112,16 +112,6 @@ namespace SparkSplatRenderShader {
             return out;
         }
 
-        float maxScale = max(scales.x, max(scales.y, scales.z));
-        float minScale = min(scales.x, min(scales.y, scales.z));
-        out.splatSize = maxScale;
-        out.aspectRatio = (minScale > 0.0) ? (maxScale / minScale) : 1.0;
-        
-        // Normal from the quaternion: the local Z axis transformed to world space.
-        float3 localNormal = float3(0.0, 0.0, 1.0);
-        float3 modelNormal = quatVec(quaternion, localNormal);
-        out.normal = normalize((modelMatrix * float4(modelNormal, 0.0)).xyz);
-
         // Cull by the bounding box in model space, before any transforms.
         if (use_bounding_box) {
             if (center.x < boundingBox.minBounds.x || center.x > boundingBox.maxBounds.x ||
@@ -132,8 +122,6 @@ namespace SparkSplatRenderShader {
         }
 
         float4 worldCenter = modelMatrix * float4(center, 1.0);
-
-        out.worldPosition = worldCenter.xyz;
 
         // Evaluate the spherical harmonics for view-dependent color.
         if (use_sh && shDegree > 0) {
@@ -147,9 +135,6 @@ namespace SparkSplatRenderShader {
 
         float4 viewCenter4 = viewMatrix * worldCenter;
         float3 viewCenter = viewCenter4.xyz;
-
-        // Negative view-space z equals positive depth.
-        out.depth = -viewCenter.z;
 
         // Cull splats behind the camera.
         if (viewCenter.z >= 0.0) {
@@ -202,6 +187,71 @@ namespace SparkSplatRenderShader {
         return out;
     }
 
+    [[vertex]] VertexOut vertex_main(
+        VertexIn in [[stage_in]],
+        uint instance_id [[instance_id]],
+        ushort amplification_id [[amplification_id]],
+        constant IndexedDistance *indexedDistances [[buffer(3)]],
+        constant float4x4 *viewMatrices [[buffer(5)]],
+        constant float4x4 *projectionMatrices [[buffer(6)]],
+        constant float2 &drawableSize [[buffer(8)]],
+        constant float &scale [[buffer(9)]],
+        constant float3 *cameraPositions [[buffer(10)]],
+        constant uint &shDegree [[buffer(11), function_constant(use_sh)]],
+        constant BoundingBox3D &boundingBox [[buffer(12), function_constant(use_bounding_box)]],
+        constant MultiCloudArgumentBuffer &clouds [[buffer(14)]]
+    ) {
+        return vertex_common(in, instance_id, amplification_id, indexedDistances, viewMatrices, projectionMatrices, drawableSize, scale, cameraPositions, shDegree, boundingBox, clouds);
+    }
+
+    [[vertex]] DebugVertexOut vertex_debug(
+        VertexIn in [[stage_in]],
+        uint instance_id [[instance_id]],
+        ushort amplification_id [[amplification_id]],
+        constant IndexedDistance *indexedDistances [[buffer(3)]],
+        constant float4x4 *viewMatrices [[buffer(5)]],
+        constant float4x4 *projectionMatrices [[buffer(6)]],
+        constant float2 &drawableSize [[buffer(8)]],
+        constant float &scale [[buffer(9)]],
+        constant float3 *cameraPositions [[buffer(10)]],
+        constant uint &shDegree [[buffer(11), function_constant(use_sh)]],
+        constant BoundingBox3D &boundingBox [[buffer(12), function_constant(use_bounding_box)]],
+        constant MultiCloudArgumentBuffer &clouds [[buffer(14)]]
+    ) {
+        VertexOut base = vertex_common(in, instance_id, amplification_id, indexedDistances, viewMatrices, projectionMatrices, drawableSize, scale, cameraPositions, shDegree, boundingBox, clouds);
+        DebugVertexOut out;
+        out.position = base.position;
+        out.splatUv = base.splatUv;
+        out.rgba = base.rgba;
+        out.renderTargetArrayIndex = base.renderTargetArrayIndex;
+        out.worldPosition = float3(0.0);
+        out.splatSize = 0.0;
+        out.depth = 0.0;
+        out.normal = float3(0.0);
+        out.aspectRatio = 1.0;
+        out.cloudIndex = 0;
+
+        IndexedDistance indexedDistance = indexedDistances[instance_id];
+        if (indexedDistance.cloudIndex >= clouds.cloudCount) {
+            return out;
+        }
+        SplatCloudData cloudData = clouds.clouds[indexedDistance.cloudIndex];
+        SparkSplat splat = cloudData.splats[indexedDistance.splatIndex];
+        float3 scales = float3(splat.scale);
+        float4 quaternion = float4(splat.rotation);
+        float4 worldCenter = cloudData.modelMatrix * float4(float3(splat.position), 1.0);
+        float maxScale = max(scales.x, max(scales.y, scales.z));
+        float minScale = min(scales.x, min(scales.y, scales.z));
+
+        out.worldPosition = worldCenter.xyz;
+        out.splatSize = maxScale;
+        out.depth = -(viewMatrices[amplification_id] * worldCenter).z;
+        out.normal = normalize((cloudData.modelMatrix * float4(quatVec(quaternion, float3(0.0, 0.0, 1.0)), 0.0)).xyz);
+        out.aspectRatio = minScale > 0.0 ? maxScale / minScale : 1.0;
+        out.cloudIndex = indexedDistance.cloudIndex;
+        return out;
+    }
+
     // MARK: - Fragment Shader
 
     [[fragment]] float4 fragment_main(FragmentIn in [[stage_in]]) {
@@ -250,7 +300,7 @@ namespace SparkSplatRenderShader {
 
     /// Colorizes splats by their distance from the cloud center.
     [[fragment]] float4 fragment_debug_distance(
-        FragmentIn in [[stage_in]],
+        DebugFragmentIn in [[stage_in]],
         constant DebugDistanceParams &params [[buffer(0)]]
     ) {
         float z = dot(in.splatUv, in.splatUv);
@@ -274,7 +324,7 @@ namespace SparkSplatRenderShader {
 
     /// Colorizes splats by their size (max scale).
     [[fragment]] float4 fragment_debug_size(
-        FragmentIn in [[stage_in]],
+        DebugFragmentIn in [[stage_in]],
         constant DebugSizeParams &params [[buffer(0)]]
     ) {
         if (in.position.x < 1 && in.position.y < 1) {
@@ -303,7 +353,7 @@ namespace SparkSplatRenderShader {
 
     /// Colorizes splats by their depth (distance from the camera).
     [[fragment]] float4 fragment_debug_depth(
-        FragmentIn in [[stage_in]],
+        DebugFragmentIn in [[stage_in]],
         constant DebugDepthParams &params [[buffer(0)]]
     ) {
         float z = dot(in.splatUv, in.splatUv);
@@ -327,7 +377,7 @@ namespace SparkSplatRenderShader {
 
     /// Colorizes splats by their opacity value.
     [[fragment]] float4 fragment_debug_opacity(
-        FragmentIn in [[stage_in]]
+        DebugFragmentIn in [[stage_in]]
     ) {
         float z = dot(in.splatUv, in.splatUv);
         if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
@@ -350,7 +400,7 @@ namespace SparkSplatRenderShader {
 
     /// Colorizes splats by their normal direction.
     [[fragment]] float4 fragment_debug_normal(
-        FragmentIn in [[stage_in]]
+        DebugFragmentIn in [[stage_in]]
     ) {
         float z = dot(in.splatUv, in.splatUv);
         if (z > (MAX_STD_DEV * MAX_STD_DEV)) {
@@ -372,7 +422,7 @@ namespace SparkSplatRenderShader {
 
     /// Colorizes splats by their aspect ratio (elongation).
     [[fragment]] float4 fragment_debug_aspect_ratio(
-        FragmentIn in [[stage_in]],
+        DebugFragmentIn in [[stage_in]],
         constant DebugAspectRatioParams &params [[buffer(0)]]
     ) {
         float z = dot(in.splatUv, in.splatUv);
@@ -428,7 +478,7 @@ namespace SparkSplatRenderShader {
 
     /// Colorizes splats by the cloud they belong to.
     [[fragment]] float4 fragment_debug_cloud_index(
-        FragmentIn in [[stage_in]],
+        DebugFragmentIn in [[stage_in]],
         constant DebugCloudIndexParams &params [[buffer(0)]]
     ) {
         float z = dot(in.splatUv, in.splatUv);

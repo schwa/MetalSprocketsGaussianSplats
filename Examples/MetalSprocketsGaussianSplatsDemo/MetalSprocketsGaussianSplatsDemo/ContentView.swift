@@ -29,6 +29,7 @@ struct ContentView: View {
                     cameraMatrix: cameraMatrix
                 )
                 .splatRenderer(demoState.renderer)
+                .splatDebugParams(demoState.debugParams)
                 .onFrameTimingChange { frameTimingStatistics = $0 }
                 // swiftlint:disable:next trailing_closure
                 .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
@@ -54,6 +55,13 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 200)
+                Picker("Debug", selection: $demoState.debugMode) {
+                    Text("Off").tag(nil as SplatDebugMode?)
+                    ForEach(SplatDebugMode.allCases.filter { $0 != .cloudIndex }, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode as SplatDebugMode?)
+                    }
+                }
+                .pickerStyle(.menu)
                 loadButton
                 generateMenu
                 ImmersiveToggle(demoState: demoState)
@@ -109,6 +117,13 @@ struct ContentView: View {
                             }
                         }
                         .pickerStyle(.menu)
+                        Picker("Debug", systemImage: "ladybug", selection: $demoState.debugMode) {
+                            Text("Off").tag(nil as SplatDebugMode?)
+                            ForEach(SplatDebugMode.allCases.filter { $0 != .cloudIndex }, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode as SplatDebugMode?)
+                            }
+                        }
+                        .pickerStyle(.menu)
                         #if os(iOS)
                         Button("AR", systemImage: "arkit") {
                             isARMode = true
@@ -143,6 +158,7 @@ struct ContentView: View {
             cameraMatrix: cameraMatrix
         )
         .splatRenderer(demoState.renderer)
+        .splatDebugParams(demoState.debugParams)
         .onFrameTimingChange { frameTimingStatistics = $0 }
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
         .dropDestination(for: URL.self) { urls, _ in

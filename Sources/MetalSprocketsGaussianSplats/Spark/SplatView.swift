@@ -50,6 +50,7 @@ public struct SplatView: View {
     private let projection: PerspectiveProjection
 
     @Environment(\.splatRenderer) private var renderer
+    @Environment(\.splatDebugParams) private var debugParams
     @Environment(\.displayScale) private var displayScale
 
     @State private var sortedIndices: SplatIndices?
@@ -128,6 +129,7 @@ public struct SplatView: View {
                     modelMatrix: modelMatrix,
                     cameraMatrix: cameraMatrix,
                     drawableSize: size,
+                    debugParams: debugParams,
                     resources: sortResources
                 )
             case .tileBased:

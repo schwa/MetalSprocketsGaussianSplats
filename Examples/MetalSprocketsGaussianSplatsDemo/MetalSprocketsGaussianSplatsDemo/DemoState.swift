@@ -39,7 +39,53 @@ enum SplatModel: String, CaseIterable, Identifiable {
 
 @Observable
 class DemoState {
-    var renderer: SplatRenderer = .sparkGPU
+    var renderer: SplatRenderer = .sparkGPU {
+        didSet {
+            if renderer != .sparkGPU {
+                debugMode = nil
+            }
+        }
+    }
+    var debugMode: SplatDebugMode? {
+        didSet {
+            if debugMode != nil {
+                renderer = .sparkGPU
+            }
+        }
+    }
+
+    var debugParams: DebugParams? {
+        switch debugMode {
+        case .distanceFromCenter:
+            var params = DebugDistanceParams()
+            params.center = .zero
+            params.maxDistance = 5
+            return .distance(params)
+        case .splatSize:
+            var params = DebugSizeParams()
+            params.minSize = 0
+            params.maxSize = 1
+            return .size(params)
+        case .depth:
+            var params = DebugDepthParams()
+            params.minDepth = 0
+            params.maxDepth = 20
+            return .depth(params)
+        case .opacity:
+            return .opacity
+        case .normal:
+            return .normal
+        case .aspectRatio:
+            var params = DebugAspectRatioParams()
+            params.minRatio = 1
+            params.maxRatio = 10
+            return .aspectRatio(params)
+        case .cloudIndex:
+            return nil
+        case nil:
+            return nil
+        }
+    }
     /// The selected bundled model. nil while a user-loaded file is shown.
     var selectedModel: SplatModel? = .tomatoes {
         didSet {
