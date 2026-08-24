@@ -79,5 +79,26 @@ struct GPUSplatSortStereoTests {
         let cloud = try makeCloud(position: SIMD3<Float>(0, 0, -2))
         #expect(try survivorCount(cloud: cloud, cameraMatrices: [.identity]) == 1)
     }
+
+    @Test("GPU-sorted pipeline renders debug modes")
+    @MainActor
+    func gpuSortedPipelineRendersDebugMode() throws {
+        let cloud = try makeCloud(position: SIMD3<Float>(0, 0, -2))
+        let resources = try GPUSortResources(device: device, capacity: cloud.count)
+        let pipeline = try GPUSortedSplatRenderPipeline(
+            splatCloud: cloud,
+            projectionMatrix: projectionMatrix,
+            modelMatrix: .identity,
+            cameraMatrix: .identity,
+            drawableSize: SIMD2<Float>(64, 64),
+            debugParams: .opacity,
+            resources: resources
+        )
+        let renderer = try OffscreenRenderer(size: CGSize(width: 64, height: 64))
+
+        #expect(throws: Never.self) {
+            try renderer.render(pipeline)
+        }
+    }
 }
 #endif

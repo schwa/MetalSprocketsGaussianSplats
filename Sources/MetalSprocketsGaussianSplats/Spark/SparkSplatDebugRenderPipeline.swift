@@ -79,9 +79,8 @@ public enum DebugParams: Sendable {
 /// A variant of ``SparkSplatRenderPipeline`` that renders debug visualizations
 /// such as depth, opacity, normals, aspect ratio, and cloud index.
 ///
-/// Like ``SparkSplatRenderPipeline``, this pipeline does not manage sorting.
-/// The caller supplies pre-sorted ``SplatIndices`` from an ``AsyncSortManager``.
-/// See ``SparkSplatRenderPipeline`` for the full usage pattern.
+/// This pipeline renders supplied ``SplatIndices``. For GPU sorting and culling,
+/// pass `debugParams` to ``GPUSortedSplatRenderPipeline``.
 public struct SparkSplatDebugRenderPipeline: Element {
     var splatClouds: [GPUSplatCloud<SparkSplat>]
     var projectionMatrices: [simd_float4x4]
@@ -180,6 +179,10 @@ public struct SparkSplatDebugRenderPipeline: Element {
         // Same vertex shader as the normal render pipeline.
         self.vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
 
+        var fragmentConstants = FunctionConstants()
+        fragmentConstants["fc_max_std_dev"] = .float(SplatRenderTuning.default.maxStdDev)
+        fragmentConstants["fc_min_alpha"] = .float(SplatRenderTuning.default.minAlpha)
+
         let fragmentName: String
         switch debugMode {
         case .distanceFromCenter:
@@ -197,7 +200,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         case .cloudIndex:
             fragmentName = "fragment_debug_cloud_index"
         }
-        self.fragmentShader = try shaderLibrary.function(named: fragmentName, type: FragmentShader.self)
+        self.fragmentShader = try shaderLibrary.function(named: fragmentName, type: FragmentShader.self, constants: fragmentConstants)
 
         let vertexDescriptor = MTLVertexDescriptor()
         vertexDescriptor.attributes[0].format = .float2
