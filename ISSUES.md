@@ -67,12 +67,13 @@ Test may have pre-existing golden image mismatch. Needs investigation.
 ## 4: Investigate splat rendering lag vs bounding boxes
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: effort:m, punted
 created: 2026-02-19T00:00:00Z
-updated: 2026-07-21T22:48:16Z
+updated: 2026-08-24T17:54:36Z
+closed: 2026-08-24T17:54:36Z
 +++
 
 When camera moves, bounding box overlays move immediately but splats lag behind.
@@ -92,6 +93,7 @@ Possible fixes:
 3. Handle at MetalSprockets level - RenderView should observe state changes
 
 - `2026-07-21T21:32:44Z`: Investigated in current codebase: the SwiftUI bounding-box overlay described here no longer exists (only SparkSplatDebugRenderPipeline remains, which draws bounds inside the same Metal pass, so it cannot lag relative to the splats). The underlying mechanism (RenderView content closure sampling cameraMatrix at render time, potentially behind gesture-rate SwiftUI updates) still exists but has no visible artifact without the overlay, and all three proposed fixes live in MetalSprockets' RenderView (setNeedsDisplay on state change / observing state). Unblocker: either close as obsolete, or re-file against MetalSprockets so RenderView redraws (or re-samples state) when observed content state changes.
+- `2026-08-24T17:54:36Z`: Closing as obsolete: the SwiftUI bounding-box overlay no longer exists, and Metal-pass bounds cannot lag relative to splats. Any remaining RenderView state-sampling problem belongs upstream in MetalSprockets.
 
 ---
 
@@ -908,12 +910,12 @@ Currently SplatImmersiveElement sorts once using the left eye's camera matrix an
 ## 36: Investigate constant minor flicker in visionOS immersive rendering
 
 +++
-status: open
+status: blocked
 priority: medium
 kind: bug
-labels: effort:s, visionOS, sorting, not-testable, punted
+labels: effort:s, visionOS, sorting, not-testable, punted, blocked
 created: 2026-04-09T17:40:54Z
-updated: 2026-07-21T22:48:16Z
+updated: 2026-08-24T17:54:37Z
 +++
 
 Distant splats flicker during immersive rendering. Likely cause: the pending release depth (3 buffers) is too shallow for visionOS stereo rendering, which has more in-flight GPU work. A pool buffer may be returned and overwritten by a new sort while the GPU is still reading it. To diagnose: disable pool release entirely (just allocate fresh buffers) and see if flicker disappears. If confirmed, either increase the pending release depth for visionOS or make it configurable.
@@ -927,6 +929,7 @@ The flicker is constant and minor, present even when head is relatively stationa
 - `2026-04-09T17:52:31Z`: Pool reuse ruled out — disabling pool release did not fix the flicker. Remaining theories:
 - `2026-04-09T17:57:50Z`: Pool reuse confirmed not the cause. Re-enabled pool release. Also tried averaged eye position (#39) — no change. Flicker remains open for further investigation.
 - `2026-07-21T21:37:32Z`: Per-eye sorting is now implemented (#35): each eye gets its own sort order and draw call, removing theory 3 (eye-0-only sort / averaged-eye sort) as a variable. Cannot verify on-device from this environment — needs a Vision Pro test. If flicker persists after #35, remaining theories are (1) Float16 sort-key quantization: distanceToCamera is Float16, so head micro-movements push splats across quantization boundaries, reordering them within blend order (try widening the sort key to Float32/UInt32 in IndexedDistance), and (2) rgba16Float linear blending differences. Unblocker: on-device retest with per-eye sorting, then try a 32-bit sort key if still flickering.
+- `2026-08-24T17:54:37Z`: Blocked on an on-device Vision Pro retest after per-eye sorting landed.
 
 ---
 
@@ -1153,17 +1156,18 @@ The demo only supports turntable drag rotation via .interactiveCamera(). Add pin
 ## 49: Metal GPU performance HUD disappears during drag/pan gestures
 
 +++
-status: open
+status: blocked
 priority: low
 kind: bug
-labels: effort:xs, macOS, punted
+labels: effort:xs, macOS, punted, blocked
 created: 2026-04-09T20:13:18Z
-updated: 2026-07-21T22:48:16Z
+updated: 2026-08-24T17:54:36Z
 +++
 
 The Metal GPU performance overlay disappears while dragging/panning the camera. Reappears when gesture ends. Same issue as MetalSprockets#34/#312. Flickering is reduced when shader validation is enabled (slower frame rate). Likely a SwiftUI overlay/z-ordering issue during gesture handling in RenderView.
 
 - `2026-07-21T22:35:44Z`: Investigated: RenderView is defined in the upstream MetalSprockets package, not this repo, and this repo contains no HUD-related code to patch. The HUD flicker during drags is the same defect tracked upstream as MetalSprockets#34/#312 (RenderView overlay/z-ordering during gestures). Unblocker: fix in MetalSprockets' RenderView and bump the dependency here; nothing actionable in this repo until then.
+- `2026-08-24T17:54:37Z`: Blocked on the upstream MetalSprockets RenderView fix (#34/#312); this repository has no HUD implementation to change.
 
 ---
 
@@ -2221,35 +2225,38 @@ RFC 0005 proposal 5: for Gaussians with sub-pixel footprints, splat a single exa
 ## 109: PointSplat: full stratified sampling re-derivation (RFC 0005 §1, full)
 
 +++
-status: open
+status: blocked
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:l, impact:high, punted
+labels: pointsplat, performance, effort:l, impact:high, punted, blocked
 depends: 104
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:45:14Z
+updated: 2026-08-24T17:54:37Z
 +++
 
 RFC 0005 proposal 1, full version: re-derive the collision correction with the Poisson model replaced by a binomial-of-strata model for K stratified per-thread samples; tabulate if no closed form. Expected ~40% fewer points for high-opacity Gaussians at equal quality. Depends on #104 landing first as the cheap baseline. Part of RFCs/0005.
 
 - `2026-07-22T02:45:14Z`: Landed the prerequisite #104 (angle stratification). Punting the full re-derivation: replacing the Poisson collision model with a binomial-of-strata correction is open math per the RFC (may need tabulation), and a subtly wrong density would pass the PSNR test while biasing renders. Unblocker: a worked derivation (or a decision to tabulate numerically against Monte Carlo ground truth, with an agreed validation protocol beyond the existing convergence test).
+- `2026-08-24T17:54:37Z`: Blocked on a worked binomial-of-strata derivation or an agreed Monte Carlo validation protocol.
 
 ---
 
 ## 110: PointSplat: convergence-weighted accumulation (RFC 0005 §2b)
 
 +++
-status: open
+status: blocked
 priority: low
 kind: enhancement
-labels: pointsplat, effort:m, impact:medium, punted
+labels: pointsplat, effort:m, impact:medium, punted, blocked
+depends: 112
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:54:55Z
+updated: 2026-08-24T17:54:37Z
 +++
 
 RFC 0005 proposal 2b: track per-region variance and weight the temporal accumulation (or budget) toward unconverged regions. Part of RFCs/0005.
 
 - `2026-07-22T02:54:55Z`: Deferring: convergence weighting adds another temporal feedback loop (per-region variance of the accumulation buffer feeding the budget) while #112 (flashback artifacts during rotation) implicates the existing temporal machinery. Unblocker: resolve #112 first so a new history-dependent weighting isn't layered on an unresolved temporal artifact.
+- `2026-08-24T17:54:37Z`: Blocked by #112; adding another temporal feedback loop before resolving stale-frame artifacts would confound diagnosis.
 
 ---
 
@@ -2473,17 +2480,20 @@ Scope note: v4 read support first. Encode/write is separate. Spec: https://githu
 ## 122: CLI stats: report combined gpu total (sort+render)
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: cli, metrics, effort:s
 created: 2026-08-18T18:58:01Z
-updated: 2026-08-24T17:44:45Z
+updated: 2026-08-24T17:53:10Z
+closed: 2026-08-24T17:53:10Z
 +++
 
 The splat-render CLI in the sibling project (gaussiansplats-ios) reports a `gpuTotal` stat: sort GPU time + render GPU time summarized per frame (the fastest sort and fastest render need not be on the same frame, so it sums per-frame then takes the median/min, not a sum of summaries).
 
 Our CLI (Sources/metalsprockets-gaussian-splat/Statistics.swift) reports `sortGpu` and `renderGpu` separately but no combined total. Add a `gpuTotal: Stat` computed per-frame as sortGPU.duration + render.duration, then summarized, to both text and JSON output.
+
+- `2026-08-24T17:53:10Z`: Already implemented: gpuTotal is calculated per frame, emitted in text and JSON, and verified with a two-frame GPU-sort render.
 
 ---
 
@@ -2911,12 +2921,14 @@ Source: ~/Shared/Work/Projects/gaussiansplats-ios (SplatRenderTuning in Sources/
 status: open
 priority: low
 kind: enhancement
-labels: cli, rendering, effort:m
+labels: cli, rendering, effort:l
 created: 2026-08-24T17:30:49Z
-updated: 2026-08-24T17:44:46Z
+updated: 2026-08-24T17:54:37Z
 +++
 
 The offline renderer only supports perspective projection. It cannot render a 360°×180° equirectangular panorama from a camera position.
+
+- `2026-08-24T17:54:37Z`: Resized to effort:l: equirectangular projection is nonlinear and requires render/shader, culling, seam-handling, and golden-image work rather than only a CLI option.
 
 ---
 
