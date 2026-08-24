@@ -2271,11 +2271,12 @@ RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit
 ## 112: PointSplat: flashback/stale-frame artifacts during camera rotation
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
 labels: pointsplat, not-testable, effort:m
 created: 2026-07-22T02:48:17Z
+updated: 2026-08-24T17:44:45Z
 +++
 
 Rotating the camera shows content that looks a frame or several old, as if rendering lags the camera. Reproduces with temporal point reuse disabled (reuseFactor = 0, #107 reverted), so seeding is not (or not the only) cause.
@@ -2310,14 +2311,18 @@ The reference splat-render CLI (gaussiansplats-ios) reports render statistics vi
 ## 114: CLI: no MetalFX spatial upscaling option
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
 labels: cli, performance
 created: 2026-08-11T05:32:16Z
+updated: 2026-08-24T17:44:45Z
+closed: 2026-08-24T17:44:45Z
 +++
 
 splat-render (gaussiansplats-ios) offers --metalfx <factor>: it renders at a reduced resolution (factor 2 renders a quarter of the fragments) and upscales back to the requested --width/--height using MetalFX spatial upscaling, with a clear error on unsupported devices. Our CLI always renders at full resolution; there is no way to trade fragment work for upscaling quality, which also makes cross-tool performance comparisons at matching settings impossible.
+
+- `2026-08-24T17:44:45Z`: Duplicate of #124, whose scope includes the CLI MetalFX option.
 
 ---
 
@@ -2468,11 +2473,12 @@ Scope note: v4 read support first. Encode/write is separate. Spec: https://githu
 ## 122: CLI stats: report combined gpu total (sort+render)
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: cli, metrics
+labels: cli, metrics, effort:s
 created: 2026-08-18T18:58:01Z
+updated: 2026-08-24T17:44:45Z
 +++
 
 The splat-render CLI in the sibling project (gaussiansplats-ios) reports a `gpuTotal` stat: sort GPU time + render GPU time summarized per frame (the fastest sort and fastest render need not be on the same frame, so it sums per-frame then takes the median/min, not a sum of summaries).
@@ -2504,11 +2510,12 @@ Our CLI only reports counter-derived GPU times (GPUCounterSample). Add the comma
 ## 124: SplatView: support MetalFX spatial upscaling
 
 +++
-status: new
+status: open
 priority: medium
 kind: feature
-labels: rendering, performance, cli
+labels: rendering, performance, cli, effort:l
 created: 2026-08-18T19:00:23Z
+updated: 2026-08-24T17:44:46Z
 +++
 
 Add optional MetalFX spatial upscaling to SplatView (Sources/MetalSprocketsGaussianSplats/Spark/SplatView.swift): render the splats at a reduced resolution (e.g. factor 2 = quarter the fragments) and upscale to the final drawable size. A large fragment-cost lever for the Spark/GPU renderers.
@@ -2655,11 +2662,12 @@ See SPZReader.parseV4 and the SplatLoaderBenchmark numbers.
 ## 130: SPZ v4 decode slower than v3: libzstd vs hardware zlib
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: spz, performance, io
+labels: spz, performance, io, effort:m
 created: 2026-08-18T22:38:12Z
+updated: 2026-08-24T17:44:46Z
 +++
 
 After parallelizing the v4 ZSTD streams (#129), SPZ v4 load is still much slower than v3 at 1M splats (~82ms vs ~18ms). The gap is NOT serialization (streams now decompress concurrently) — it is decompressor throughput:
@@ -2798,11 +2806,12 @@ Medium. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Share
 ## 137: GPU sort A7: dense packed_half3 position stream for cullMark
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
-labels: gpu, sorting, performance, memory
+labels: gpu, sorting, performance, memory, effort:m
 created: 2026-08-18T23:17:38Z
+updated: 2026-08-24T17:44:46Z
 +++
 
 cullMark reads position from a dense packed_half3 buffer (6 bytes/splat) built once at load, instead of the 32-byte SparkSplat record. This pass touches every splat so fetch traffic dominates. Add a packed_half3 positions buffer on GPUSplatCloud (built at load), a positions arg + usePositions flag on cullMark, and populate it in the loader/builder.
@@ -2837,11 +2846,12 @@ Context: options in Sources/metalsprockets-gaussian-splat/BenchCommand.swift (`-
 ## 139: Remove CPU sort; GPU sort is the only sort path
 
 +++
-status: new
+status: open
 priority: low
 kind: task
-labels: sorting, performance, cleanup, refactor
+labels: sorting, performance, cleanup, refactor, effort:l
 created: 2026-08-18T23:38:25Z
+updated: 2026-08-24T17:44:46Z
 +++
 
 The CPU radix sort is the worst renderer path by a wide margin at scale (bench: spark/CPU-sort 169ms vs gpu 81ms at 8M splats; it also scales far worse below that). The GPU sort (cull + radix compute pass) supersedes it. Remove the CPU sort entirely and make GPU sort the only sort.
@@ -2892,5 +2902,65 @@ Other non-perf items from the sibling worth considering later (noted here so the
 - RFC 0004 stable splat sort order.
 
 Source: ~/Shared/Work/Projects/gaussiansplats-ios (SplatRenderTuning in Sources/GaussianSplatShaders/include/SparkSplatRenderShader.h; defaults in Sources/GaussianSplatMetal/Render/SparkSplatRenderer.swift; BlurReduction/ folder).
+
+---
+
+## 141: CLI renderer lacks equirectangular projection
+
++++
+status: open
+priority: low
+kind: enhancement
+labels: cli, rendering, effort:m
+created: 2026-08-24T17:30:49Z
+updated: 2026-08-24T17:44:46Z
++++
+
+The offline renderer only supports perspective projection. It cannot render a 360°×180° equirectangular panorama from a camera position.
+
+---
+
+## 142: CLI renderer lacks an explicit camera up vector
+
++++
+status: open
+priority: low
+kind: enhancement
+labels: cli, rendering, effort:s
+created: 2026-08-24T17:30:49Z
+updated: 2026-08-24T17:44:46Z
++++
+
+The offline renderer accepts camera position and look-at target, but has no direct camera-up option. Users cannot define camera roll or resolve look-at orientation without supplying a rotation or full camera matrix.
+
+---
+
+## 143: CLI renderer lacks depth-of-field controls
+
++++
+status: open
+priority: low
+kind: enhancement
+labels: cli, rendering, effort:l
+created: 2026-08-24T17:30:49Z
+updated: 2026-08-24T17:44:46Z
++++
+
+The offline renderer cannot simulate depth of field. It has no aperture, focus-distance, or sensor-size controls, so every rendered depth remains equally sharp.
+
+---
+
+## 144: CLI renderer lacks camera motion blur
+
++++
+status: open
+priority: low
+kind: enhancement
+labels: cli, rendering, effort:l
+created: 2026-08-24T17:30:50Z
+updated: 2026-08-24T17:44:46Z
++++
+
+The offline renderer cannot accumulate samples along a camera movement. It has no end camera position, target, or up vector, shutter fraction, or motion-sample count.
 
 ---
