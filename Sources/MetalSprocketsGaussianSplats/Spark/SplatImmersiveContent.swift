@@ -38,7 +38,7 @@ public struct SplatImmersiveContent: ImmersiveSpaceContent {
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         modelMatrix: simd_float4x4 = .identity,
-        renderer: SplatRenderer = .spark
+        renderer: SplatRenderer = .sparkCPU
     ) throws {
         self.splatCloud = splatCloud
         self.modelMatrix = modelMatrix
@@ -48,7 +48,7 @@ public struct SplatImmersiveContent: ImmersiveSpaceContent {
 
     public var body: some ImmersiveSpaceContent {
         ImmersiveRenderContent { [splatCloud, modelMatrix, renderer, renderState] context in
-            if renderer == .gpu {
+            if renderer == .sparkGPU {
                 // The GPU sort is a compute pass. Encode it before the render
                 // pass, outside it.
                 try SplatImmersiveGPUSortElement(
@@ -113,7 +113,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
         context: ImmersiveContext,
         splatCloud: GPUSplatCloud<SparkSplat>,
         modelMatrix: simd_float4x4 = .identity,
-        renderer: SplatRenderer = .spark,
+        renderer: SplatRenderer = .sparkCPU,
         renderState: SplatImmersiveRenderState
     ) throws {
         self.context = context
@@ -122,7 +122,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
         self.renderer = renderer
         self.frameCount = renderState.nextFrameCount()
 
-        if renderer == .spark {
+        if renderer == .sparkCPU {
             // Sort once per eye. CPU sorts are cheap, and a separate sort per
             // eye removes any depth-order disagreement between the eyes for
             // distant splats.
@@ -130,7 +130,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
             renderState.requestSort(cameraMatrices: cameraMatrices, modelMatrix: modelMatrix)
             self.sortedIndicesPerEye = (0 ..< context.viewCount).map { renderState.currentSortedIndices(eye: $0) }
             self.gpuSortedIndices = nil
-        } else if renderer == .gpu {
+        } else if renderer == .sparkGPU {
             self.sortedIndicesPerEye = []
             self.gpuSortedIndices = renderState.currentGPUSortIndices()
         } else {
@@ -151,7 +151,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
             )
 
             switch renderer {
-            case .spark:
+            case .sparkCPU:
                 // Per-eye rendering. Each eye gets its own draw with its own
                 // sort order, and targets its render target layer through a
                 // view mapping.
@@ -185,7 +185,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                     descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
                     descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
                 }
-            case .gpu:
+            case .sparkGPU:
                 // GPU-sorted path. It needs a ``SplatImmersiveGPUSortElement``
                 // encoded before this render pass. ``SplatImmersiveContent``
                 // does this automatically. It renders both eyes in one draw
@@ -278,7 +278,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
 ///         renderState: renderState
 ///     )
 ///     try ImmersiveRenderPass(context: context) {
-///         try SplatImmersiveElement(..., renderer: .gpu, renderState: renderState)
+///         try SplatImmersiveElement(..., renderer: .sparkGPU, renderState: renderState)
 ///     }
 /// }
 /// ```

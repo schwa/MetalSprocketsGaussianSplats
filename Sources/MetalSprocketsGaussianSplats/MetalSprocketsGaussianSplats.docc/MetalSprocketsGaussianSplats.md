@@ -12,7 +12,7 @@ algorithms with the ``SwiftUICore/View/splatRenderer(_:)`` modifier:
 
 ```swift
 SplatView(splatCloud: cloud, cameraMatrix: cameraMatrix)
-    .splatRenderer(.spark)   // or .gpu, .tile, .stochastic, .point
+    .splatRenderer(.sparkCPU)   // or .sparkGPU, .tileBased, .stochastic, .pointSplat
 ```
 
 Each renderer is also usable directly as a MetalSprockets element for custom

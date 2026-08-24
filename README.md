@@ -111,7 +111,7 @@ manager and the render loop. Pick a renderer with `.splatRenderer(_:)`.
 
 ```swift
 SplatView(splatCloud: cloud, cameraMatrix: cameraMatrix)
-    .splatRenderer(.spark)   // or .gpu, .tile, .stochastic, .point
+    .splatRenderer(.sparkCPU)   // or .sparkGPU, .tileBased, .stochastic, .pointSplat
 ```
 
 ### MetalSprockets pipeline (interactive)

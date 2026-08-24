@@ -17,7 +17,7 @@ struct SplatImmersiveScene: Scene {
                 let renderState = demoState.renderState
                 let modelMatrix = simd_float4x4(translation: SIMD3<Float>(0, 1.5, -2))
                     * simd_float4x4(xRotation: .radians(.pi))
-                if demoState.renderer == .gpu {
+                if demoState.renderer == .sparkGPU {
                     try SplatImmersiveGPUSortElement(
                         context: context,
                         splatCloud: splatCloud,

@@ -58,7 +58,7 @@ public struct SplatView: View {
     @State private var pointSplatReprojection = true
     @State private var pointSplatSupersamplingSetting = 2
     @State private var pointSplatPointsPerThreadSetting = 16
-    /// Scratch and output buffers for the GPU sorter (``SplatRenderer/gpu``).
+    /// Scratch and output buffers for the GPU sorter (``SplatRenderer/sparkGPU``).
     @State private var sortResources: GPUSortResources
     /// Seed for the noise pattern of the stochastic renderer. It advances once
     /// per camera or model change, so the pattern varies during motion but
@@ -105,7 +105,7 @@ public struct SplatView: View {
             let projectionMatrix = projection.projectionMatrix(for: drawableSize)
             let size = SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
             switch renderer {
-            case .spark:
+            case .sparkCPU:
                 if let sortedIndices {
                     try RenderPass {
                         try SparkSplatRenderPipeline(
@@ -121,7 +121,7 @@ public struct SplatView: View {
                         descriptor.renderTargetArrayLength = 1
                     }
                 }
-            case .gpu:
+            case .sparkGPU:
                 try GPUSortedSplatRenderPipeline(
                     splatCloud: splatCloud,
                     projectionMatrix: projectionMatrix,
@@ -192,7 +192,7 @@ public struct SplatView: View {
             if renderer == .pointSplat {
                 pointSplatStats
             }
-            if renderer == .gpu {
+            if renderer == .sparkGPU {
                 TimelineView(.periodic(from: .now, by: 0.25)) { _ in
                     let total = splatCloud.count
                     let survivors = min(sortResources.lastSurvivorCount, total)
@@ -222,7 +222,7 @@ public struct SplatView: View {
         .metalColorPixelFormat(.bgra8Unorm_srgb)
         .metalDepthStencilPixelFormat(renderer == .stochastic ? .depth32Float : .invalid)
         .task {
-            if renderer == .spark {
+            if renderer == .sparkCPU {
                 sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             }
             for await indices in sortManager.managedSortedIndicesStream(pendingReleaseDepth: Self.pendingReleaseDepth) {
@@ -232,25 +232,25 @@ public struct SplatView: View {
         .onChange(of: splatCloud, initial: false) { _, newCloud in
             Task {
                 await sortManager.setSplatCloud(newCloud)
-                if renderer == .spark {
+                if renderer == .sparkCPU {
                     sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
                 }
             }
         }
         .onChange(of: cameraMatrix) {
             stochasticSeed &+= 1
-            if renderer == .spark {
+            if renderer == .sparkCPU {
                 sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             }
         }
         .onChange(of: modelMatrix) {
             stochasticSeed &+= 1
-            if renderer == .spark {
+            if renderer == .sparkCPU {
                 sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             }
         }
         .onChange(of: renderer) {
-            if renderer == .spark {
+            if renderer == .sparkCPU {
                 sortManager.requestSort(SortParameters(camera: cameraMatrix, model: modelMatrix))
             }
         }

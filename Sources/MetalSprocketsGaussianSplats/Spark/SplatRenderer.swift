@@ -4,12 +4,12 @@ import SwiftUI
 /// The rendering algorithm used by ``SplatView``.
 public enum SplatRenderer: String, CaseIterable, Sendable {
     /// CPU-sorted alpha-blended renderer.
-    case spark
+    case sparkCPU
 
     /// The default renderer. It is Spark with a GPU-side sort and frustum
     /// culling. It sorts in the same GPU workload as the render, so there is no
     /// CPU sort latency.
-    case gpu
+    case sparkGPU
 
     /// Experimental tile-based renderer. It bins and sorts splats per screen
     /// tile, then composites with an imageblock fragment shader.
@@ -28,7 +28,7 @@ public enum SplatRenderer: String, CaseIterable, Sendable {
 // MARK: - Environment
 
 private struct SplatRendererKey: EnvironmentKey {
-    static let defaultValue: SplatRenderer = .gpu
+    static let defaultValue: SplatRenderer = .sparkGPU
 }
 
 public extension EnvironmentValues {

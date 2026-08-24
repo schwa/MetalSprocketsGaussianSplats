@@ -39,7 +39,7 @@ enum SplatModel: String, CaseIterable, Identifiable {
 
 @Observable
 class DemoState {
-    var renderer: SplatRenderer = .gpu
+    var renderer: SplatRenderer = .sparkGPU
     /// The selected bundled model. nil while a user-loaded file is shown.
     var selectedModel: SplatModel? = .tomatoes {
         didSet {
