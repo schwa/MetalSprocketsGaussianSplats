@@ -2923,15 +2923,18 @@ The offline renderer only supports perspective projection. It cannot render a 36
 ## 142: CLI renderer lacks an explicit camera up vector
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: cli, rendering, effort:s
 created: 2026-08-24T17:30:49Z
-updated: 2026-08-24T17:44:46Z
+updated: 2026-08-24T17:50:00Z
+closed: 2026-08-24T17:50:00Z
 +++
 
 The offline renderer accepts camera position and look-at target, but has no direct camera-up option. Users cannot define camera roll or resolve look-at orientation without supplying a rotation or full camera matrix.
+
+- `2026-08-24T17:50:00Z`: Added --camera-up and JSON cameraUp support with validation for zero, parallel, matrix, and rotation conflicts.
 
 ---
 

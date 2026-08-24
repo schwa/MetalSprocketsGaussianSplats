@@ -24,6 +24,8 @@ struct RenderConfig: Codable {
     /// Camera look-at target in x,y,z format.
     var cameraLookat: [Float]?
 
+    /// Camera up direction in x,y,z format.
+    var cameraUp: [Float]?
     /// Camera rotation as a quaternion [x,y,z,w] or a 3x3 matrix (9 values).
     var cameraRotation: [Float]?
 
@@ -77,6 +79,13 @@ struct RenderConfig: Codable {
             return nil
         }
         return SIMD3<Float>(lookat[0], lookat[1], lookat[2])
+    }
+
+    func getCameraUp() -> SIMD3<Float>? {
+        guard let up = cameraUp, up.count == 3 else {
+            return nil
+        }
+        return SIMD3<Float>(up[0], up[1], up[2])
     }
 
     func getCameraRotation() -> [Float]? {

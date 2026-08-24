@@ -42,6 +42,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Option(help: "Camera look-at target in x,y,z format (e.g., 0,0,0)")
     var cameraLookat: String?
 
+    @Option(help: "Camera up direction in x,y,z format (e.g., 0,1,0)")
+    var cameraUp: String?
     @Option(help: "Camera rotation as quaternion (x,y,z,w) or 3x3 matrix (9 values comma-separated)")
     var cameraRotation: String?
 
@@ -222,6 +224,10 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             let v = try parseXYZ(lookat)
             renderConfig.cameraLookat = [v.x, v.y, v.z]
         }
+        if let up = cameraUp {
+            let vector = try parseXYZ(up)
+            renderConfig.cameraUp = [vector.x, vector.y, vector.z]
+        }
         if let rot = cameraRotation {
             renderConfig.cameraRotation = rot.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
         }
@@ -245,7 +251,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
             output: output ?? "output.png",
             modelPosition: try modelPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
             cameraPosition: try cameraPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
-            cameraLookat: try cameraLookat.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
+            cameraLookat: try cameraLookat.map { let vector = try parseXYZ($0); return [vector.x, vector.y, vector.z] },
+            cameraUp: try cameraUp.map { let vector = try parseXYZ($0); return [vector.x, vector.y, vector.z] },
             cameraRotation: cameraRotation?.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) },
             cameraMatrix: try cameraMatrix.map { try parseFloatList($0, count: 16, label: "Camera matrix") },
             projectionFov: projectionFov,
@@ -428,18 +435,29 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     func parseCameraMatrix(from config: RenderConfig) throws -> simd_float4x4 {
         // Priority order: full matrix, then rotation, then lookat, then position.
         if let matrix = config.getCameraMatrix() {
-            if config.cameraPosition != nil || config.cameraLookat != nil || config.cameraRotation != nil {
-                throw ValidationError("--camera-matrix is the whole camera; it cannot be combined with --camera-position, --camera-lookat, or --camera-rotation")
+            if config.cameraPosition != nil || config.cameraLookat != nil || config.cameraUp != nil || config.cameraRotation != nil {
+                throw ValidationError("--camera-matrix is the whole camera; it cannot be combined with other camera flags")
             }
             return matrix
         }
         if let rotation = config.getCameraRotation() {
+            guard config.cameraUp == nil else {
+                throw ValidationError("--camera-up cannot be combined with --camera-rotation")
+            }
             return try parseCameraRotationMatrix(rotation, config: config)
         }
 
-        if let target = config.getCameraLookat() {
+        if config.cameraLookat != nil || config.cameraUp != nil {
             let position = config.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
-            return LookAt(position: position, target: target, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
+            let target = config.getCameraLookat() ?? .zero
+            let up = config.getCameraUp() ?? SIMD3<Float>(0, 1, 0)
+            guard simd_length_squared(up) > 0 else {
+                throw ValidationError("--camera-up must not be zero")
+            }
+            guard simd_length_squared(simd_cross(target - position, up)) > 0 else {
+                throw ValidationError("--camera-up must not be parallel to the viewing direction")
+            }
+            return LookAt(position: position, target: target, up: up).cameraMatrix
         }
 
         if let position = config.getCameraPosition() {
