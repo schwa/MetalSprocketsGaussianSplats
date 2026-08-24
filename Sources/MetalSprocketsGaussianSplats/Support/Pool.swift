@@ -78,7 +78,7 @@ final class Pool<T: Sendable>: @unchecked Sendable {
             let id = state.nextID
             state.nextID += 1
             if !releaseDisabled {
-                logger?.warning("Pool exhausted, allocating new object (id: \(id))")
+                logger?.debug("Pool exhausted, allocating new object (id: \(id))")
             }
             return allocator(id)
         }
