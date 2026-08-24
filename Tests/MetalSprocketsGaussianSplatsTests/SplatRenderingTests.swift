@@ -46,6 +46,17 @@ struct GoldenImageRenderingTests {
         try compareGoldenImage(image, named: "SparkTestGridAlternateAngle")
     }
 
+    @Test @MainActor
+    func testSparkRenderTomatoesV4() throws {
+        let image = try renderSplatsWithSpark(
+            fixture: "tomatoes.v4",
+            extension: "spz",
+            cameraPosition: [0, 3, -12],
+            size: CGSize(width: 512, height: 512)
+        )
+        try compareGoldenImage(image, named: "SparkTomatoesV4")
+    }
+
     // MARK: - Helpers
 
     private func loadSplats(fixture: String, extension ext: String) throws -> [GenericSplat] {
