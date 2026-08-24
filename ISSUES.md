@@ -2979,3 +2979,18 @@ updated: 2026-08-24T17:44:46Z
 The offline renderer cannot accumulate samples along a camera movement. It has no end camera position, target, or up vector, shutter fraction, or motion-sample count.
 
 ---
+
+## 145: Debug visualizations only support CPU-sorted Spark rendering
+
++++
+status: new
+priority: medium
+kind: enhancement
+created: 2026-08-24T19:50:05Z
++++
+
+`SparkSplatDebugRenderPipeline` requires caller-provided `SplatIndices` from the CPU sort path. The debug modes cannot use the `sparkGPU` renderer's GPU sorting and frustum culling.
+
+Expected: Spark debug visualizations are available with GPU-sorted rendering, without requiring CPU-sorted indices.
+
+---
