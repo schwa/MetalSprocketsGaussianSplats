@@ -3077,3 +3077,20 @@ Debug rendering should be available as a separate Swift Package Manager product 
 - `2026-08-25T02:24:14Z`: Implemented: debug rendering is removed from SplatView and the normal rendering flow, moved into its own SPM product and shader target, and integrated into the example through a separate DebugSplatView/RenderView.
 
 ---
+
+## 150: Big-endian binary PLY files bypass GPU decoding
+
++++
+status: new
+priority: medium
+kind: none
+created: 2026-08-25T17:59:31Z
++++
+
+Binary little-endian PLY files use the GPU decoder, but binary big-endian files fall back to CPU decoding. This makes loading large big-endian PLY files substantially slower than equivalent little-endian files.
+
+Expected: Binary PLY files can use the accelerated loading path regardless of byte order.
+
+Actual: Only binary little-endian PLY files use GPU decoding.
+
+---
