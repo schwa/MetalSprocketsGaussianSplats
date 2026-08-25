@@ -1,5 +1,5 @@
 {
-  "originHash" : "ff6621407399b2d6e6465ef505562e24ed5251775268b7cb2ce4dd6ee94fd1b1",
+  "originHash" : "02d33cd0552d9d2e41beef02b845fe8f04b051cf14548e20941ecfd1ae9c1fef",
   "pins" : [
     {
       "identity" : "geometrylite3d",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalCompilerPlugin",
       "state" : {
-        "revision" : "9c11db3648fa4e4f02bd4918c4b7db3472a73c64",
-        "version" : "0.1.6"
+        "revision" : "5c8b7550d7e3e677d221273d55bc9a7bcb2856d5",
+        "version" : "0.1.7"
       }
     },
     {
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
-        "revision" : "7bacba139278a979c54aced6ba7c0f113bf74ba4",
-        "version" : "0.1.12"
+        "revision" : "a2da5cdf636cab07e90e492aeb5021508352e8be",
+        "version" : "0.1.13"
       }
     },
     {
