@@ -299,8 +299,8 @@ public struct PLYReader {
         var rowValues: [PropertyValue?] = []
         rowValues.reserveCapacity(element.properties.count)
 
-        try data.withUnsafeBytes { buffer in
-            let bytes = RawSpan(_unsafeBytes: buffer)
+        try data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+            let bytes = buffer
         for _ in 0..<element.count {
             rowValues.removeAll(keepingCapacity: true)
 
@@ -394,8 +394,8 @@ public struct PLYReader {
         // Property structs, to avoid retain traffic per scalar in Debug.
         if !element.properties.contains(where: \.isList) {
             let types = element.properties.map(\.type)
-            try data.withUnsafeBytes { buffer in
-                let bytes = RawSpan(_unsafeBytes: buffer)
+            try data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+                let bytes = buffer
                 for _ in 0..<element.count {
                     rowValues.removeAll(keepingCapacity: true)
                     for type in types {
@@ -409,8 +409,8 @@ public struct PLYReader {
             return
         }
 
-        try data.withUnsafeBytes { buffer in
-            let bytes = RawSpan(_unsafeBytes: buffer)
+        try data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+            let bytes = buffer
             for _ in 0..<element.count {
                 rowValues.removeAll(keepingCapacity: true)
 
@@ -421,7 +421,7 @@ public struct PLYReader {
                         offset += countSize
                         let itemType = property.listItemType ?? property.type
                         let itemCount = Int(countValue)
-                        guard itemCount >= 0, offset + itemCount * itemType.size <= bytes.byteCount else {
+                        guard itemCount >= 0, offset + itemCount * itemType.size <= bytes.count else {
                             throw SplatsError.invalidData
                         }
                         offset += itemCount * itemType.size
@@ -438,8 +438,8 @@ public struct PLYReader {
         }
     }
 
-    private func readBinaryFloat(from bytes: borrowing RawSpan, at offset: Int, type: PropertyType, littleEndian: Bool) throws -> (Float, Int) {
-        guard offset + type.size <= bytes.byteCount else {
+    private func readBinaryFloat(from bytes: UnsafeRawBufferPointer, at offset: Int, type: PropertyType, littleEndian: Bool) throws -> (Float, Int) {
+        guard offset + type.size <= bytes.count else {
             throw SplatsError.invalidData
         }
 
@@ -451,33 +451,33 @@ public struct PLYReader {
             return (Float(bytes[offset]), 1)
 
         case .short:
-            let value = bytes.load(fromByteOffset: offset, as: Int16.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: Int16.self)
             return (Float(littleEndian ? value : value.byteSwapped), 2)
 
         case .ushort:
-            let value = bytes.load(fromByteOffset: offset, as: UInt16.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
             return (Float(littleEndian ? value : value.byteSwapped), 2)
 
         case .int:
-            let value = bytes.load(fromByteOffset: offset, as: Int32.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: Int32.self)
             return (Float(littleEndian ? value : value.byteSwapped), 4)
 
         case .uint:
-            let value = bytes.load(fromByteOffset: offset, as: UInt32.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
             return (Float(littleEndian ? value : value.byteSwapped), 4)
 
         case .float:
-            let value = bytes.load(fromByteOffset: offset, as: UInt32.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
             return (Float(bitPattern: littleEndian ? value : value.byteSwapped), 4)
 
         case .double:
-            let value = bytes.load(fromByteOffset: offset, as: UInt64.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: UInt64.self)
             return (Float(Double(bitPattern: littleEndian ? value : value.byteSwapped)), 8)
         }
     }
 
-    private func readBinaryValue(from bytes: borrowing RawSpan, at offset: Int, type: PropertyType, littleEndian: Bool) throws -> (PropertyValue, Int) {
-        guard offset + type.size <= bytes.byteCount else {
+    private func readBinaryValue(from bytes: UnsafeRawBufferPointer, at offset: Int, type: PropertyType, littleEndian: Bool) throws -> (PropertyValue, Int) {
+        guard offset + type.size <= bytes.count else {
             throw SplatsError.invalidData
         }
 
@@ -489,28 +489,28 @@ public struct PLYReader {
             return (.uchar(bytes[offset]), 1)
 
         case .short:
-            let value = bytes.load(fromByteOffset: offset, as: Int16.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: Int16.self)
             return (.short(littleEndian ? value : value.byteSwapped), 2)
 
         case .ushort:
-            let value = bytes.load(fromByteOffset: offset, as: UInt16.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
             return (.ushort(littleEndian ? value : value.byteSwapped), 2)
 
         case .int:
-            let value = bytes.load(fromByteOffset: offset, as: Int32.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: Int32.self)
             return (.int(littleEndian ? value : value.byteSwapped), 4)
 
         case .uint:
-            let value = bytes.load(fromByteOffset: offset, as: UInt32.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
             return (.uint(littleEndian ? value : value.byteSwapped), 4)
 
         case .float:
-            let value = bytes.load(fromByteOffset: offset, as: UInt32.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
             let swapped = littleEndian ? value : value.byteSwapped
             return (.float(Float(bitPattern: swapped)), 4)
 
         case .double:
-            let value = bytes.load(fromByteOffset: offset, as: UInt64.self)
+            let value = bytes.loadUnaligned(fromByteOffset: offset, as: UInt64.self)
             let swapped = littleEndian ? value : value.byteSwapped
             return (.double(Double(bitPattern: swapped)), 8)
         }

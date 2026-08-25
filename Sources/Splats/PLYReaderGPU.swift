@@ -128,14 +128,22 @@ public struct PLYReaderGPU {
 private extension PLYReader.PropertyType {
     var gpuCode: UInt32 {
         switch self {
-        case .char: 0
-        case .uchar: 1
-        case .short: 2
-        case .ushort: 3
-        case .int: 4
-        case .uint: 5
-        case .float: 6
-        case .double: 7
+        case .char:
+            0
+        case .uchar:
+            1
+        case .short:
+            2
+        case .ushort:
+            3
+        case .int:
+            4
+        case .uint:
+            5
+        case .float:
+            6
+        case .double:
+            7
         }
     }
 }
