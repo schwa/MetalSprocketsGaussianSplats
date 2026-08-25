@@ -197,10 +197,7 @@ class DemoState {
     /// Reads a splat file into a GPU cloud. Includes spherical harmonics when
     /// present, flattened to the coefficient-major layout the shaders expect.
     nonisolated private static func readSplatCloud(device: MTLDevice, url: URL) throws -> GPUSplatCloud<SparkSplat> {
-        // SOG decodes on the GPU with a compute-kernel de-quantize. Every other
-        // format streams through the CPU reader. Morton reorder (#89) applies to
-        // the CPU paths. The SOG GPU path decodes straight into buffers.
-        let result = try SplatLoader.read(device: device, url: url, mortonOrdered: true)
+        let result = try SplatLoader.read(device: device, url: url)
         return GPUSplatCloud(result)
     }
 }
