@@ -3101,8 +3101,9 @@ Actual: Only binary little-endian PLY files use GPU decoding.
 status: new
 priority: high
 kind: bug
-labels: metal,release-builds
+labels: metal, release-builds
 created: 2026-08-25T22:10:25Z
+updated: 2026-08-25T22:23:37Z
 +++
 
 The MetalCompilerPlugin is attached to the MetalSprocketsGaussianSplatShaders and MetalSprocketsGaussianSplatsDebugShaders targets, but the manifest does not provide a configuration-dependent compilation condition to the plugin. MetalCompilerPlugin cannot read SwiftPM's active debug or release configuration directly. As a result, its debug metallib behavior cannot differ safely between configurations, and release products can contain development-only embedded Metal shader source. App Store validation reports ITMS-91306 for affected archives.
@@ -3110,5 +3111,15 @@ The MetalCompilerPlugin is attached to the MetalSprocketsGaussianSplatShaders an
 Expected: Debug builds retain shader debugging support. Release builds produce metallibs without embedded development-only shader source.
 
 Actual: The plugin invocation has no target build-setting signal that distinguishes debug from release.
+
+## Proposed fix (per user)
+
+Update MetalCompilerPlugin to a version that supports configuration conditions. Then add this setting to every target that uses the plugin:
+
+```swift
+cSettings: [
+    .define("METAL_COMPILER_PLUGIN_DEBUG", .when(configuration: .debug))
+],
+```
 
 ---
