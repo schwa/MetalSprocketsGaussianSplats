@@ -1,6 +1,8 @@
 #if !arch(x86_64)
 import Metal
 import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatsDebug
+import MetalSprocketsGaussianSplatsDebugShaders
 import MetalSprocketsGaussianSplatShaders
 import Splats
 #if os(visionOS)
@@ -39,20 +41,8 @@ enum SplatModel: String, CaseIterable, Identifiable {
 
 @Observable
 class DemoState {
-    var renderer: SplatRenderer = .sparkGPU {
-        didSet {
-            if renderer != .sparkGPU {
-                debugMode = nil
-            }
-        }
-    }
-    var debugMode: SplatDebugMode? {
-        didSet {
-            if debugMode != nil {
-                renderer = .sparkGPU
-            }
-        }
-    }
+    var renderer: SplatRenderer = .sparkGPU
+    var debugMode: SplatDebugMode?
 
     var debugParams: DebugParams? {
         switch debugMode {
@@ -80,9 +70,7 @@ class DemoState {
             params.minRatio = 1
             params.maxRatio = 10
             return .aspectRatio(params)
-        case .cloudIndex:
-            return nil
-        case nil:
+        case .cloudIndex, nil:
             return nil
         }
     }

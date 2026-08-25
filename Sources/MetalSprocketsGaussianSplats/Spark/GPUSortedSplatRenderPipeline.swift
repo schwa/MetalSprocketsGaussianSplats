@@ -40,7 +40,6 @@ public struct GPUSortedSplatRenderPipeline: Element {
     var drawableSize: SIMD2<Float>
     var convertSRGBToLinear: Bool
     var useSphericalHarmonics: Bool?
-    var debugParams: DebugParams?
     var cullEnabled: Bool
     var guardBand: Float
     var resources: GPUSortResources
@@ -54,7 +53,6 @@ public struct GPUSortedSplatRenderPipeline: Element {
         drawableSize: SIMD2<Float>,
         convertSRGBToLinear: Bool = true,
         useSphericalHarmonics: Bool? = nil,
-        debugParams: DebugParams? = nil,
         cullEnabled: Bool = true,
         guardBand: Float = 0.2,
         resources: GPUSortResources
@@ -67,7 +65,6 @@ public struct GPUSortedSplatRenderPipeline: Element {
             drawableSize: drawableSize,
             convertSRGBToLinear: convertSRGBToLinear,
             useSphericalHarmonics: useSphericalHarmonics,
-            debugParams: debugParams,
             cullEnabled: cullEnabled,
             guardBand: guardBand,
             resources: resources
@@ -85,7 +82,6 @@ public struct GPUSortedSplatRenderPipeline: Element {
         drawableSize: SIMD2<Float>,
         convertSRGBToLinear: Bool = true,
         useSphericalHarmonics: Bool? = nil,
-        debugParams: DebugParams? = nil,
         cullEnabled: Bool = true,
         guardBand: Float = 0.2,
         resources: GPUSortResources
@@ -99,7 +95,6 @@ public struct GPUSortedSplatRenderPipeline: Element {
         self.drawableSize = drawableSize
         self.convertSRGBToLinear = convertSRGBToLinear
         self.useSphericalHarmonics = useSphericalHarmonics
-        self.debugParams = debugParams
         self.cullEnabled = cullEnabled
         self.guardBand = guardBand
         self.resources = resources
@@ -133,27 +128,15 @@ public struct GPUSortedSplatRenderPipeline: Element {
             )
 
             try RenderPass {
-                if let debugParams {
-                    try SparkSplatDebugRenderPipeline(
-                        splatClouds: [splatCloud],
-                        projectionMatrices: projectionMatrices,
-                        modelMatrix: modelMatrix,
-                        cameraMatrices: cameraMatrices,
-                        drawableSize: drawableSize,
-                        debugParams: debugParams,
-                        sortedIndices: sortedIndices
-                    )
-                } else {
-                    try SparkSplatRenderPipeline(
-                        splatCloud: splatCloud,
-                        projectionMatrices: projectionMatrices,
-                        modelMatrix: modelMatrix,
-                        cameraMatrices: cameraMatrices,
-                        drawableSize: drawableSize,
-                        configuration: .init(convertSRGBToLinear: convertSRGBToLinear, useSphericalHarmonics: useSphericalHarmonics),
-                        sortedIndices: sortedIndices
-                    )
-                }
+                try SparkSplatRenderPipeline(
+                    splatCloud: splatCloud,
+                    projectionMatrices: projectionMatrices,
+                    modelMatrix: modelMatrix,
+                    cameraMatrices: cameraMatrices,
+                    drawableSize: drawableSize,
+                    configuration: .init(convertSRGBToLinear: convertSRGBToLinear, useSphericalHarmonics: useSphericalHarmonics),
+                    sortedIndices: sortedIndices
+                )
             }
             .renderPassDescriptorModifier { descriptor in
                 descriptor.renderTargetArrayLength = viewCount

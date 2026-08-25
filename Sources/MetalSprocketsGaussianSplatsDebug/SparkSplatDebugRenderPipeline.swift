@@ -2,6 +2,8 @@
 import Foundation
 import Metal
 import MetalSprockets
+import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatsDebugShaders
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import simd
@@ -170,7 +172,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         }
 
         // Same shader namespace as SparkSplatRenderPipeline.
-        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
+        let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatsDebugShaders).namespaced("SparkSplatRenderShader")
 
         var vertexConstants = FunctionConstants()
         vertexConstants["use_sh"] = .bool(false)  // debug mode uses no spherical harmonics
@@ -235,7 +237,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         cameraPositions: [SIMD3<Float>],
         amplificationCount: Int
     ) throws -> some Element {
-        let device = MTLCreateSystemDefaultDevice()!
+        let device = splatClouds[0].splats.unsafeMTLBuffer.device
 
         var cloudDataArray: [SplatCloudData] = []
         for cloud in splatClouds {

@@ -98,7 +98,7 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
 /// Sorted splat indices produced by a CPU or GPU sort, ready for indexed drawing.
 public struct SplatIndices: Sendable, Equatable {
     var parameters: SortParameters
-    var indices: TypedMTLBuffer<IndexedDistance>
+    public internal(set) var indices: TypedMTLBuffer<IndexedDistance>
     /// The pool this buffer came from. Stored so release does not depend on
     /// which pool the sort manager currently holds. Pools are swapped on resize.
     private var pool: Pool<TypedMTLBuffer<IndexedDistance>>?

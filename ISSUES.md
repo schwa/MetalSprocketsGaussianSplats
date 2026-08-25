@@ -3041,11 +3041,12 @@ This prevents visual inspection of externally generated classifications, includi
 ## 148: SplatView owns debug rendering concerns
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 created: 2026-08-25T01:59:44Z
-updated: 2026-08-25T02:00:54Z
+updated: 2026-08-25T02:24:14Z
+closed: 2026-08-25T02:24:14Z
 +++
 
 SplatView reads splatDebugParams from the SwiftUI environment and conditionally selects SparkSplatDebugRenderPipeline through GPUSortedSplatRenderPipeline. This couples the general-purpose view to debug-only configuration and rendering behavior.
@@ -3053,17 +3054,19 @@ SplatView reads splatDebugParams from the SwiftUI environment and conditionally 
 SplatView should remain focused on normal renderer selection and presentation. Debug rendering should be available independently, without adding debug state or behavior to SplatView.
 
 - `2026-08-25T02:00:54Z`: Debug rendering is an unusual, uncommon workflow and is not part of the normal rendering flow. SplatView must not use debug views or surface any debug functionality.
+- `2026-08-25T02:24:14Z`: Implemented: debug rendering is removed from SplatView and the normal rendering flow, moved into its own SPM product and shader target, and integrated into the example through a separate DebugSplatView/RenderView.
 
 ---
 
 ## 149: Debug rendering ships in the main library target
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 created: 2026-08-25T01:59:53Z
-updated: 2026-08-25T02:00:54Z
+updated: 2026-08-25T02:24:14Z
+closed: 2026-08-25T02:24:14Z
 +++
 
 Debug rendering types, shaders, and APIs currently ship with the main MetalSprocketsGaussianSplats library and shader targets. Applications that only need production rendering still compile and distribute this debug-only surface.
@@ -3071,5 +3074,6 @@ Debug rendering types, shaders, and APIs currently ship with the main MetalSproc
 Debug rendering should be available as a separate Swift Package Manager product and target so clients opt into it explicitly.
 
 - `2026-08-25T02:00:54Z`: Debug rendering is an unusual, uncommon workflow and is not part of the normal rendering flow. SplatView must not use debug views or surface any debug functionality.
+- `2026-08-25T02:24:14Z`: Implemented: debug rendering is removed from SplatView and the normal rendering flow, moved into its own SPM product and shader target, and integrated into the example through a separate DebugSplatView/RenderView.
 
 ---

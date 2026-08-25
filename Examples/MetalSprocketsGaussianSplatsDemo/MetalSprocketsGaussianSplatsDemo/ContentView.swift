@@ -3,6 +3,7 @@ import GeometryLite3D
 import Interaction3D
 import Metal
 import MetalSprocketsGaussianSplats
+import MetalSprocketsGaussianSplatsDebug
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsUI
 import Splats
@@ -24,12 +25,8 @@ struct ContentView: View {
         #if os(visionOS)
         Group {
             if !demoState.isImmersive {
-                SplatView(
-                    splatCloud: splatCloud,
-                    cameraMatrix: cameraMatrix
-                )
-                .splatRenderer(demoState.renderer)
-                .splatDebugParams(demoState.debugParams)
+                splatRenderView
+                    .splatRenderer(demoState.renderer)
                 .onFrameTimingChange { frameTimingStatistics = $0 }
                 // swiftlint:disable:next trailing_closure
                 .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
@@ -55,13 +52,7 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 200)
-                Picker("Debug", selection: $demoState.debugMode) {
-                    Text("Off").tag(nil as SplatDebugMode?)
-                    ForEach(SplatDebugMode.allCases.filter { $0 != .cloudIndex }, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode as SplatDebugMode?)
-                    }
-                }
-                .pickerStyle(.menu)
+                debugPicker
                 loadButton
                 generateMenu
                 ImmersiveToggle(demoState: demoState)
@@ -93,6 +84,25 @@ struct ContentView: View {
         #endif
     }
 
+    @ViewBuilder
+    private var splatRenderView: some View {
+        if let debugParams = demoState.debugParams {
+            DebugSplatView(splatCloud: splatCloud, cameraMatrix: cameraMatrix, debugParams: debugParams)
+        } else {
+            SplatView(splatCloud: splatCloud, cameraMatrix: cameraMatrix)
+        }
+    }
+
+    private var debugPicker: some View {
+        Picker("Debug", systemImage: "ladybug", selection: $demoState.debugMode) {
+            Text("Off").tag(nil as SplatDebugMode?)
+            ForEach(SplatDebugMode.allCases.filter { $0 != .cloudIndex }, id: \.self) { mode in
+                Text(mode.displayName).tag(mode as SplatDebugMode?)
+            }
+        }
+        .pickerStyle(.menu)
+    }
+
     #if !os(visionOS)
     // Toolbar chrome instead of the floating overlay bar. Applied on macOS too,
     // despite the MTKView blanking in #45.
@@ -117,13 +127,7 @@ struct ContentView: View {
                             }
                         }
                         .pickerStyle(.menu)
-                        Picker("Debug", systemImage: "ladybug", selection: $demoState.debugMode) {
-                            Text("Off").tag(nil as SplatDebugMode?)
-                            ForEach(SplatDebugMode.allCases.filter { $0 != .cloudIndex }, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode as SplatDebugMode?)
-                            }
-                        }
-                        .pickerStyle(.menu)
+                        debugPicker
                         #if os(iOS)
                         Button("AR", systemImage: "arkit") {
                             isARMode = true
@@ -153,12 +157,8 @@ struct ContentView: View {
     /// loading and timing overlays, and the file importer. Platform chrome
     /// wraps this. The toolbar wraps it on iOS, the floating overlay on macOS.
     private var splatSurface: some View {
-        SplatView(
-            splatCloud: splatCloud,
-            cameraMatrix: cameraMatrix
-        )
-        .splatRenderer(demoState.renderer)
-        .splatDebugParams(demoState.debugParams)
+        splatRenderView
+            .splatRenderer(demoState.renderer)
         .onFrameTimingChange { frameTimingStatistics = $0 }
         .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
         .dropDestination(for: URL.self) { urls, _ in

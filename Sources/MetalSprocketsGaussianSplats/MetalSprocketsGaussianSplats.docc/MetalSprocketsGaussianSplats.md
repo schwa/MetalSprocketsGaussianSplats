@@ -51,9 +51,6 @@ The framework ships five interchangeable renderers, selected via
 
 - ``SparkSplatRenderPipeline``
 - ``GPUSortedSplatRenderPipeline``
-- ``SparkSplatDebugRenderPipeline``
-- ``SplatDebugMode``
-- ``DebugParams``
 
 ### Tile-Based Renderer
 

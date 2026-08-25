@@ -18,6 +18,10 @@ let package = Package(
             name: "MetalSprocketsGaussianSplats",
             targets: ["MetalSprocketsGaussianSplats"]
         ),
+        .library(
+            name: "MetalSprocketsGaussianSplatsDebug",
+            targets: ["MetalSprocketsGaussianSplatsDebug"]
+        ),
         .executable(
             name: "metalsprockets-gaussian-splat",
             targets: ["metalsprockets-gaussian-splat"]
@@ -68,8 +72,32 @@ let package = Package(
             ]
         ),
         .target(
+            name: "MetalSprocketsGaussianSplatsDebug",
+            dependencies: [
+                "MetalSprocketsGaussianSplats",
+                "MetalSprocketsGaussianSplatShaders",
+                "Splats",
+                "MetalSprocketsGaussianSplatsDebugShaders",
+                .product(name: "MetalSprockets", package: "MetalSprockets"),
+                .product(name: "MetalSprocketsSupport", package: "MetalSprockets"),
+                .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin")
+            ],
+            resources: [.copy("Empty.txt")]
+        ),
+        .target(
             name: "MetalSprocketsGaussianSplatShaders",
             dependencies: [
+                .product(name: "MetalSprocketsShaders", package: "MetalSprockets")
+            ],
+            exclude: ["Metal"],
+            plugins: [
+                .plugin(name: "MetalCompilerPlugin", package: "MetalCompilerPlugin")
+            ]
+        ),
+        .target(
+            name: "MetalSprocketsGaussianSplatsDebugShaders",
+            dependencies: [
+                "MetalSprocketsGaussianSplatShaders",
                 .product(name: "MetalSprocketsShaders", package: "MetalSprockets")
             ],
             exclude: ["Metal"],
