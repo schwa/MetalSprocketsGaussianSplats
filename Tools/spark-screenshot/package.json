@@ -22,10 +22,10 @@
   "dependencies": {
     "@sparkjsdev/spark": "0.1.10",
     "commander": "12.1.0",
-    "puppeteer": "23.11.1",
+    "puppeteer": "25.9.0",
     "three": "0.170.0"
   },
   "allowScripts": {
-    "puppeteer@23.11.1": true
+    "puppeteer@25.9.0": true
   }
 }
