@@ -193,6 +193,23 @@ public struct PLYReader {
     }
 
     public func read(element: Element, callback: (Record) throws -> Void) throws {
+        let properties = element.properties
+        try readValues(element: element) { values in
+            var record = Record(minimumCapacity: properties.count)
+            for (index, value) in values.enumerated() {
+                if let value {
+                    record[properties[index].name] = value
+                }
+            }
+            try callback(record)
+        }
+    }
+
+    /// Streams each record as property values in header declaration order.
+    ///
+    /// The array is reused between callbacks. An entry is nil when an ASCII
+    /// scalar fails to parse.
+    public func readValues(element: Element, callback: ([PropertyValue?]) throws -> Void) throws {
         guard let format else {
             throw SplatsError.formatNotSet
         }
@@ -209,7 +226,7 @@ public struct PLYReader {
         }
     }
 
-    private func readASCII(element: Element, callback: (Record) throws -> Void) throws {
+    private func readASCII(element: Element, callback: ([PropertyValue?]) throws -> Void) throws {
         guard let content = String(data: data, encoding: .utf8) else {
             throw SplatsError.invalidEncoding
         }
@@ -237,7 +254,8 @@ public struct PLYReader {
 
             let values = line.split(separator: " ").map(String.init)
             var valueIndex = 0
-            var record: Record = [:]
+            var rowValues: [PropertyValue?] = []
+            rowValues.reserveCapacity(element.properties.count)
 
             for property in element.properties {
                 if property.isList {
@@ -254,21 +272,19 @@ public struct PLYReader {
                         }
                         valueIndex += 1
                     }
-                    record[property.name] = .list(listValues)
+                    rowValues.append(.list(listValues))
                 } else {
                     guard valueIndex < values.count else { throw SplatsError.invalidData }
-                    if let value = PropertyValue(string: values[valueIndex], type: property.type) {
-                        record[property.name] = value
-                    }
+                    rowValues.append(PropertyValue(string: values[valueIndex], type: property.type))
                     valueIndex += 1
                 }
             }
 
-            try callback(record)
+            try callback(rowValues)
         }
     }
 
-    private func readBinary(element: Element, littleEndian: Bool, callback: (Record) throws -> Void) throws {
+    private func readBinary(element: Element, littleEndian: Bool, callback: ([PropertyValue?]) throws -> Void) throws {
         let data = self.data
 
         var offset = headerEndOffset
@@ -281,13 +297,18 @@ public struct PLYReader {
             }
         }
 
+        var rowValues: [PropertyValue?] = []
+        rowValues.reserveCapacity(element.properties.count)
+
+        try data.withUnsafeBytes { buffer in
+            let bytes = RawSpan(_unsafeBytes: buffer)
         for _ in 0..<element.count {
-            var record: Record = [:]
+            rowValues.removeAll(keepingCapacity: true)
 
             for property in element.properties {
                 if property.isList {
                     guard let countType = property.listCountType else { throw SplatsError.invalidData }
-                    let (listCount, countSize) = try readBinaryValue(from: data, at: offset, type: countType, littleEndian: littleEndian)
+                    let (listCount, countSize) = try readBinaryValue(from: bytes, at: offset, type: countType, littleEndian: littleEndian)
                     offset += countSize
 
                     let count: Int = switch listCount {
@@ -309,28 +330,157 @@ public struct PLYReader {
                     var listValues: [PropertyValue] = []
 
                     for _ in 0..<count {
-                        let (value, size) = try readBinaryValue(from: data, at: offset, type: property.listItemType ?? property.type, littleEndian: littleEndian)
+                        let (value, size) = try readBinaryValue(from: bytes, at: offset, type: property.listItemType ?? property.type, littleEndian: littleEndian)
                         listValues.append(value)
                         offset += size
                     }
-                    record[property.name] = .list(listValues)
+                    rowValues.append(.list(listValues))
                 } else {
-                    let (value, size) = try readBinaryValue(from: data, at: offset, type: property.type, littleEndian: littleEndian)
-                    record[property.name] = value
+                    let (value, size) = try readBinaryValue(from: bytes, at: offset, type: property.type, littleEndian: littleEndian)
+                    rowValues.append(value)
                     offset += size
                 }
             }
 
-            try callback(record)
+            try callback(rowValues)
+        }
         }
     }
 
-    private func readBinaryValue(from data: Data, at offset: Int, type: PropertyType, littleEndian: Bool) throws -> (PropertyValue, Int) {
-        guard offset + type.size <= data.count else {
+    /// Streams each record as Floats in header declaration order.
+    ///
+    /// List properties and unparsable ASCII scalars yield nil, matching
+    /// ``PropertyValue/floatValue``. Avoids per-scalar enum allocation for
+    /// numeric decoding.
+    public func readFloatValues(element: Element, callback: ([Float?]) throws -> Void) throws {
+        guard let format else {
+            throw SplatsError.formatNotSet
+        }
+
+        switch format {
+        case .ascii:
+            try readASCIIFloats(element: element, callback: callback)
+
+        case .binaryLittleEndian:
+            try readBinaryFloats(element: element, littleEndian: true, callback: callback)
+
+        case .binaryBigEndian:
+            try readBinaryFloats(element: element, littleEndian: false, callback: callback)
+        }
+    }
+
+    private func readASCIIFloats(element: Element, callback: ([Float?]) throws -> Void) throws {
+        try readASCII(element: element) { values in
+            try callback(values.map { $0?.floatValue })
+        }
+    }
+
+    private func readBinaryFloats(element: Element, littleEndian: Bool, callback: ([Float?]) throws -> Void) throws {
+        let data = self.data
+
+        var offset = headerEndOffset
+        for el in elements {
+            if el.name == element.name {
+                break
+            }
+            offset += el.count * el.properties.reduce(0) { sum, prop in
+                sum + (prop.isList ? 0 : prop.type.size)
+            }
+        }
+
+        var rowValues: [Float?] = []
+        rowValues.reserveCapacity(element.properties.count)
+
+        // The hot scalar loop iterates plain enums, not String-bearing
+        // Property structs, to avoid retain traffic per scalar in Debug.
+        if !element.properties.contains(where: \.isList) {
+            let types = element.properties.map(\.type)
+            try data.withUnsafeBytes { buffer in
+                let bytes = RawSpan(_unsafeBytes: buffer)
+                for _ in 0..<element.count {
+                    rowValues.removeAll(keepingCapacity: true)
+                    for type in types {
+                        let (value, size) = try readBinaryFloat(from: bytes, at: offset, type: type, littleEndian: littleEndian)
+                        rowValues.append(value)
+                        offset += size
+                    }
+                    try callback(rowValues)
+                }
+            }
+            return
+        }
+
+        try data.withUnsafeBytes { buffer in
+            let bytes = RawSpan(_unsafeBytes: buffer)
+            for _ in 0..<element.count {
+                rowValues.removeAll(keepingCapacity: true)
+
+                for property in element.properties {
+                    if property.isList {
+                        guard let countType = property.listCountType else { throw SplatsError.invalidData }
+                        let (countValue, countSize) = try readBinaryFloat(from: bytes, at: offset, type: countType, littleEndian: littleEndian)
+                        offset += countSize
+                        let itemType = property.listItemType ?? property.type
+                        let itemCount = Int(countValue)
+                        guard itemCount >= 0, offset + itemCount * itemType.size <= bytes.byteCount else {
+                            throw SplatsError.invalidData
+                        }
+                        offset += itemCount * itemType.size
+                        rowValues.append(nil)
+                    } else {
+                        let (value, size) = try readBinaryFloat(from: bytes, at: offset, type: property.type, littleEndian: littleEndian)
+                        rowValues.append(value)
+                        offset += size
+                    }
+                }
+
+                try callback(rowValues)
+            }
+        }
+    }
+
+    private func readBinaryFloat(from bytes: borrowing RawSpan, at offset: Int, type: PropertyType, littleEndian: Bool) throws -> (Float, Int) {
+        guard offset + type.size <= bytes.byteCount else {
             throw SplatsError.invalidData
         }
 
-        let bytes = data[offset..<(offset + type.size)]
+        switch type {
+        case .char:
+            return (Float(Int8(bitPattern: bytes[offset])), 1)
+
+        case .uchar:
+            return (Float(bytes[offset]), 1)
+
+        case .short:
+            let value = bytes.load(fromByteOffset: offset, as: Int16.self)
+            return (Float(littleEndian ? value : value.byteSwapped), 2)
+
+        case .ushort:
+            let value = bytes.load(fromByteOffset: offset, as: UInt16.self)
+            return (Float(littleEndian ? value : value.byteSwapped), 2)
+
+        case .int:
+            let value = bytes.load(fromByteOffset: offset, as: Int32.self)
+            return (Float(littleEndian ? value : value.byteSwapped), 4)
+
+        case .uint:
+            let value = bytes.load(fromByteOffset: offset, as: UInt32.self)
+            return (Float(littleEndian ? value : value.byteSwapped), 4)
+
+        case .float:
+            let value = bytes.load(fromByteOffset: offset, as: UInt32.self)
+            return (Float(bitPattern: littleEndian ? value : value.byteSwapped), 4)
+
+        case .double:
+            let value = bytes.load(fromByteOffset: offset, as: UInt64.self)
+            return (Float(Double(bitPattern: littleEndian ? value : value.byteSwapped)), 8)
+        }
+    }
+
+    private func readBinaryValue(from bytes: borrowing RawSpan, at offset: Int, type: PropertyType, littleEndian: Bool) throws -> (PropertyValue, Int) {
+        guard offset + type.size <= bytes.byteCount else {
+            throw SplatsError.invalidData
+        }
 
         switch type {
         case .char:
@@ -340,28 +490,28 @@ public struct PLYReader {
             return (.uchar(bytes[offset]), 1)
 
         case .short:
-            let value: Int16 = bytes.withUnsafeBytes { $0.loadUnaligned(as: Int16.self) }
+            let value = bytes.load(fromByteOffset: offset, as: Int16.self)
             return (.short(littleEndian ? value : value.byteSwapped), 2)
 
         case .ushort:
-            let value: UInt16 = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt16.self) }
+            let value = bytes.load(fromByteOffset: offset, as: UInt16.self)
             return (.ushort(littleEndian ? value : value.byteSwapped), 2)
 
         case .int:
-            let value: Int32 = bytes.withUnsafeBytes { $0.loadUnaligned(as: Int32.self) }
+            let value = bytes.load(fromByteOffset: offset, as: Int32.self)
             return (.int(littleEndian ? value : value.byteSwapped), 4)
 
         case .uint:
-            let value: UInt32 = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let value = bytes.load(fromByteOffset: offset, as: UInt32.self)
             return (.uint(littleEndian ? value : value.byteSwapped), 4)
 
         case .float:
-            let value: UInt32 = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let value = bytes.load(fromByteOffset: offset, as: UInt32.self)
             let swapped = littleEndian ? value : value.byteSwapped
             return (.float(Float(bitPattern: swapped)), 4)
 
         case .double:
-            let value: UInt64 = bytes.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }
+            let value = bytes.load(fromByteOffset: offset, as: UInt64.self)
             let swapped = littleEndian ? value : value.byteSwapped
             return (.double(Double(bitPattern: swapped)), 8)
         }

@@ -25,15 +25,146 @@ public struct PLYSplatReader: SplatReaderProtocol {
     }
 
     public func read(_ handler: (Int, ExtendedSplat) throws -> Void) throws {
+        guard let element = plyReader.primaryElement else {
+            throw SplatsError.noElements
+        }
+        let layout = Layout(properties: element.properties, degree: shDegree)
         var index = 0
-        let degree = shDegree
-        try plyReader.read { record in
-            guard let splat = GenericSplat(plyRecord: record) else {
+        let numCoeffs = layout.fRest.count / 3
+        // Scratch reused across records; COW protects handlers that retain it.
+        var shScratch: [[Float]] = Array(repeating: [0, 0, 0], count: numCoeffs)
+        try plyReader.readFloatValues(element: element) { values in
+            guard let splat = layout.genericSplat(from: values) else {
                 throw SplatsError.invalidRecord(index)
             }
-            let sh = Self.extractSphericalHarmonics(from: record, degree: degree)
+            let sh: [[Float]]? = numCoeffs > 0 && layout.fillSphericalHarmonics(from: values, into: &shScratch) ? shScratch : nil
             try handler(index, ExtendedSplat(genericSplat: splat, sphericalHarmonics: sh))
             index += 1
+        }
+    }
+
+    /// Property indices resolved once so per-record decoding avoids dictionaries.
+    private struct Layout {
+        var x: Int?
+        var y: Int?
+        var z: Int?
+        var scale: [Int?]
+        var fdc: [Int?]
+        var rgb: [Int?]
+        var opacity: Int?
+        var alpha: Int?
+        var rot: [Int?]
+        var fRest: [Int?]
+
+        init(properties: [PLYReader.Property], degree: UInt8) {
+            var indices: [String: Int] = [:]
+            indices.reserveCapacity(properties.count)
+            for (index, property) in properties.enumerated() {
+                indices[property.name] = index
+            }
+            x = indices["x"]
+            y = indices["y"]
+            z = indices["z"]
+            scale = [indices["scale_0"] ?? indices["sx"], indices["scale_1"] ?? indices["sy"], indices["scale_2"] ?? indices["sz"]]
+            fdc = [indices["f_dc_0"], indices["f_dc_1"], indices["f_dc_2"]]
+            rgb = [indices["red"], indices["green"], indices["blue"]]
+            opacity = indices["opacity"]
+            alpha = indices["alpha"]
+            rot = [indices["rot_0"], indices["rot_1"], indices["rot_2"], indices["rot_3"]]
+
+            let numCoeffs: Int
+            switch degree {
+            case 1:
+                numCoeffs = 3
+            case 2:
+                numCoeffs = 8
+            case 3:
+                numCoeffs = 15
+            default:
+                numCoeffs = 0
+            }
+            fRest = (0..<(numCoeffs * 3)).map { indices["f_rest_\($0)"] }
+        }
+
+        private func float(_ values: [Float?], _ index: Int?) -> Float? {
+            guard let index else {
+                return nil
+            }
+            return values[index]
+        }
+
+        func genericSplat(from values: [Float?]) -> GenericSplat? {
+            guard let x = float(values, x), let y = float(values, y), let z = float(values, z) else {
+                return nil
+            }
+
+            let scaleX = float(values, scale[0]) ?? 0.0
+            let scaleY = float(values, scale[1]) ?? 0.0
+            let scaleZ = float(values, scale[2]) ?? 0.0
+
+            let colorR: Float
+            let colorG: Float
+            let colorB: Float
+
+            if let fdc0 = float(values, fdc[0]), let fdc1 = float(values, fdc[1]), let fdc2 = float(values, fdc[2]) {
+                // Convert the SH DC coefficient to color with the C0 basis constant.
+                let SH_C0: Float = 0.28209479177387814
+                colorR = (fdc0 * SH_C0 + 0.5).clamped(to: 0...1)
+                colorG = (fdc1 * SH_C0 + 0.5).clamped(to: 0...1)
+                colorB = (fdc2 * SH_C0 + 0.5).clamped(to: 0...1)
+            } else if let red = float(values, rgb[0]), let green = float(values, rgb[1]), let blue = float(values, rgb[2]) {
+                // Normalize when the values are in the 0-255 range.
+                if red > 1.0 || green > 1.0 || blue > 1.0 {
+                    colorR = (red / 255.0).clamped(to: 0...1)
+                    colorG = (green / 255.0).clamped(to: 0...1)
+                    colorB = (blue / 255.0).clamped(to: 0...1)
+                } else {
+                    colorR = red.clamped(to: 0...1)
+                    colorG = green.clamped(to: 0...1)
+                    colorB = blue.clamped(to: 0...1)
+                }
+            } else {
+                colorR = 1.0
+                colorG = 1.0
+                colorB = 1.0
+            }
+
+            let opacityValue: Float
+            if let rawOpacity = float(values, opacity) {
+                // Sigmoid converts from logit space.
+                opacityValue = 1.0 / (1.0 + exp(-rawOpacity))
+            } else {
+                opacityValue = float(values, alpha) ?? 1.0
+            }
+
+            // Quaternion in the standard 3DGS PLY order (w, x, y, z).
+            let rotW = float(values, rot[0]) ?? 1.0
+            let rotX = float(values, rot[1]) ?? 0.0
+            let rotY = float(values, rot[2]) ?? 0.0
+            let rotZ = float(values, rot[3]) ?? 0.0
+
+            let rotation = simd_quatf(ix: rotX, iy: rotY, iz: rotZ, r: rotW).normalized
+
+            return GenericSplat(
+                position: SIMD3<Float>(x, y, z),
+                scale: SIMD3<Float>(exp(scaleX), exp(scaleY), exp(scaleZ)),
+                color: SIMD4<Float>(colorR, colorG, colorB, opacityValue.clamped(to: 0...1)),
+                rotation: rotation
+            )
+        }
+
+        func fillSphericalHarmonics(from values: [Float?], into coefficients: inout [[Float]]) -> Bool {
+            let numCoeffs = fRest.count / 3
+            // PLY f_rest is planar (all R, then all G, then all B). The output is interleaved [[R,G,B], ...].
+            for i in 0..<numCoeffs {
+                guard let r = float(values, fRest[i]), let g = float(values, fRest[i + numCoeffs]), let b = float(values, fRest[i + numCoeffs * 2]) else {
+                    return false
+                }
+                coefficients[i][0] = r
+                coefficients[i][1] = g
+                coefficients[i][2] = b
+            }
+            return true
         }
     }
 
@@ -63,46 +194,6 @@ public struct PLYSplatReader: SplatReaderProtocol {
         }
 
         return 0
-    }
-
-    /// Extracts the SH coefficients from a PLY record.
-    ///
-    /// Returns an array of `[R, G, B]` for each basis function above the DC term.
-    private static func extractSphericalHarmonics(from record: PLYReader.Record, degree: UInt8) -> [[Float]]? {
-        guard degree > 0 else {
-            return nil
-        }
-
-        // Basis functions above DC per degree: 3 (l=1), +5 (l=2), +7 (l=3).
-        let numCoeffs: Int
-        switch degree {
-        case 1:
-            numCoeffs = 3
-        case 2:
-            numCoeffs = 8
-        case 3:
-            numCoeffs = 15
-        default:
-            return nil
-        }
-
-        // PLY f_rest is planar (all R, then all G, then all B). The output is interleaved [[R,G,B], ...].
-        var coefficients: [[Float]] = []
-        coefficients.reserveCapacity(numCoeffs)
-
-        for i in 0..<numCoeffs {
-            let rIndex = i
-            let gIndex = i + numCoeffs
-            let bIndex = i + numCoeffs * 2
-
-            guard let r = record["f_rest_\(rIndex)"]?.floatValue, let g = record["f_rest_\(gIndex)"]?.floatValue, let b = record["f_rest_\(bIndex)"]?.floatValue else {
-                return nil
-            }
-
-            coefficients.append([r, g, b])
-        }
-
-        return coefficients
     }
 }
 

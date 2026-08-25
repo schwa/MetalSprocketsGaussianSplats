@@ -16,7 +16,7 @@ import Testing
 @Suite("SplatLoaderBenchmark", .disabled(if: ProcessInfo.processInfo.environment["CI"] != nil, "Timing benchmark"))
 struct SplatLoaderBenchmarkTests {
     private let warmup = 1
-    private let iterations = 5
+    private let iterations = Int(ProcessInfo.processInfo.environment["SPLAT_BENCHMARK_ITERATIONS"] ?? "5") ?? 5
 
     @Test(.enabled(if: MetalTestSupport.supports64BitAtomics))
     func benchmarkAllFormats() throws {
@@ -55,6 +55,9 @@ struct SplatLoaderBenchmarkTests {
     /// Bundled small fixtures plus the large synthetic clouds from `just bench`
     /// (in the SplatsTests fixtures dir). Missing files are skipped.
     private func benchmarkFiles() -> [URL] {
+        if let paths = ProcessInfo.processInfo.environment["SPLAT_BENCHMARK_FILES"] {
+            return paths.split(separator: ":").map { URL(fileURLWithPath: String($0)) }
+        }
         var urls: [URL] = []
         for (name, ext) in [("test-grid", "ply"), ("test-grid", "spz")] {
             if let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Fixtures") {
