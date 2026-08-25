@@ -61,8 +61,7 @@ public struct PLYReader {
         primaryElement?.count ?? 0
     }
 
-    private var headerEndOffset: Int = 0
-
+    package private(set) var bodyOffset: Int = 0
     public init(data: Data) throws {
         self.data = data
         try parseHeader()
@@ -89,9 +88,9 @@ public struct PLYReader {
             }
         }
 
-        headerEndOffset = offset
+        bodyOffset = offset
 
-        let headerBytes = data[0..<headerEndOffset]
+        let headerBytes = data[0..<bodyOffset]
         guard let headerString = String(data: headerBytes, encoding: .ascii) else {
             throw SplatsError.invalidEncoding
         }
@@ -287,7 +286,7 @@ public struct PLYReader {
     private func readBinary(element: Element, littleEndian: Bool, callback: ([PropertyValue?]) throws -> Void) throws {
         let data = self.data
 
-        var offset = headerEndOffset
+        var offset = bodyOffset
         for el in elements {
             if el.name == element.name {
                 break
@@ -378,7 +377,7 @@ public struct PLYReader {
     private func readBinaryFloats(element: Element, littleEndian: Bool, callback: ([Float?]) throws -> Void) throws {
         let data = self.data
 
-        var offset = headerEndOffset
+        var offset = bodyOffset
         for el in elements {
             if el.name == element.name {
                 break

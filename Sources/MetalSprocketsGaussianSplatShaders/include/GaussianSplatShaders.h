@@ -6,3 +6,4 @@
 #import "PointSplatShaders.h"
 #import "SOGDecodeShader.h"
 #import "SPZUnpackShader.h"
+#import "PLYDecodeShader.h"

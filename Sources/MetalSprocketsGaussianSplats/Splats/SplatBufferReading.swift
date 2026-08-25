@@ -90,12 +90,17 @@ public extension SPZReaderGPU.Result {
     }
 }
 
+public extension PLYReaderGPU.Result {
+    var bufferResult: SplatBufferResult {
+        SplatBufferResult(splats: splats, shCoefficients: shCoefficients, shDegree: shDegree, count: count)
+    }
+}
 // MARK: - Unified loader
 
-/// Loads any supported splat file into GPU buffers. It routes `.sog` and `.spz`
-/// through their compute-shader decoders, and `.ply` and `.splat` through CPU readers.
+/// Loads any supported splat file into GPU buffers. It routes `.sog`, `.spz`,
+/// and binary little-endian `.ply` files through compute-shader decoders.
 public enum SplatLoader {
-    /// - Parameter mortonOrdered: Applies to the CPU decode paths (`.ply` and `.splat`) only.
+    /// - Parameter mortonOrdered: Uses CPU decoding for `.ply` when enabled.
     public static func read(device: MTLDevice, url: URL, name: String? = nil, mortonOrdered: Bool = false) throws -> SplatBufferResult {
         switch url.pathExtension.lowercased() {
         case "sog":
@@ -103,7 +108,11 @@ public enum SplatLoader {
         case "spz":
             return try SPZReaderGPU(device: device).read(url: url, name: name).bufferResult
         case "ply":
-            return try PLYSplatReader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
+            let data = try Data(contentsOf: url)
+            if !mortonOrdered, try PLYReader(data: data).format == .binaryLittleEndian {
+                return try PLYReaderGPU(device: device).read(data: data, name: name ?? url.deletingPathExtension().lastPathComponent).bufferResult
+            }
+            return try PLYSplatReader(data: data).read(device: device, name: name, mortonOrdered: mortonOrdered)
         case "splat":
             return try Antimatter15Reader(url: url).read(device: device, name: name, mortonOrdered: mortonOrdered)
         default:
