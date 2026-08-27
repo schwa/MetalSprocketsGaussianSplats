@@ -218,6 +218,7 @@ public struct PointSplatRenderPipeline: Element {
                     }
                     .parameter("texture", texture: accumulation.output)
                 }
+                .depthCompare(function: .always, enabled: false)
             }
         }
     }

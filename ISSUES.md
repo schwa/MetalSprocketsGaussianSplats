@@ -3261,10 +3261,12 @@ Expected behavior: render a new frame when a render-affecting input changes or a
 ## 160: Spark renderer inherits depth state from preceding render pipelines
 
 +++
-status: new
+status: closed
 priority: medium
 kind: none
 created: 2026-08-27T13:43:28Z
+updated: 2026-08-27T13:46:06Z
+closed: 2026-08-27T13:46:06Z
 +++
 
 When SparkSplatRenderPipeline is encoded after a pipeline that binds a depth-stencil state, such as MetalSprocketsAddOns GridShader, Spark unintentionally renders with that previously bound state.
@@ -3282,5 +3284,8 @@ Reproduction:
 4. Observe splats behind the grid plane being rejected.
 
 Spark should explicitly bind a depth-disabled state, or otherwise guarantee that its required depth behavior is independent of encoder state left by preceding elements.
+
+- `2026-08-27T13:46:06Z`: Spark now binds a depth-disabled state before drawing, preventing inherited encoder depth state.
+- `2026-08-27T13:48:05Z`: Extended the fix to every depth-free render pipeline: Spark debug, point-splat blit, tile splat passes, and tile heat map. Stochastic rendering keeps its explicit caller-selected depth state because depth testing is required.
 
 ---
