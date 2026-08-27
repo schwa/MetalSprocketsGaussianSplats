@@ -3126,3 +3126,18 @@ cSettings: [
 - `2026-08-25T22:53:27Z`: Updated MetalSprockets to 0.1.13 and added debug-only METAL_COMPILER_PLUGIN_DEBUG settings to both shader targets. Debug and release builds plus the full test suite pass.
 
 ---
+
+## 152: SOG loading copies stored ZIP entries into Data
+
++++
+status: new
+priority: medium
+kind: none
+created: 2026-08-27T03:01:37Z
++++
+
+SOGReaderGPU loads every archive entry through ZipArchive.data(for:), allocating and copying each complete entry into Data before image decoding and Metal upload. SOG bundles use stored ZIP entries, and SwiftZipReader exposes span-based access for those entries.
+
+Expected: stored SOG payloads can flow from the memory-mapped archive into decoding and upload without an intermediate full-entry Data copy. Preserve checksum validation and existing extraction error behavior.
+
+---
