@@ -1880,6 +1880,7 @@ The LCC2 format (from XGRIDS) is a Gaussian splat container format that is not c
 Whitepaper/spec: https://github.com/xgrids/LCC2Whitepaper
 
 - `2026-07-21T22:58:34Z`: Closing: LCC2 is a container format wrapping compressed splat payloads; not planning a reader for it right now.
+- `2026-08-27T03:14:52Z`: Related: #146 covers loading original LCC datasets.
 
 ---
 
@@ -2853,7 +2854,7 @@ Context: options in Sources/metalsprockets-gaussian-splat/BenchCommand.swift (`-
 
 ---
 
-## 139: Remove CPU sort; GPU sort is the only sort path
+## 139: Remove CPU sorting and AsyncSortManager APIs
 
 +++
 status: open
@@ -2861,22 +2862,22 @@ priority: low
 kind: task
 labels: sorting, performance, cleanup, refactor, effort:l
 created: 2026-08-18T23:38:25Z
-updated: 2026-08-24T17:44:46Z
+updated: 2026-08-27T06:05:24Z
 +++
 
-The CPU radix sort is the worst renderer path by a wide margin at scale (bench: spark/CPU-sort 169ms vs gpu 81ms at 8M splats; it also scales far worse below that). The GPU sort (cull + radix compute pass) supersedes it. Remove the CPU sort entirely and make GPU sort the only sort.
+The library still contains the obsolete CPU sorting path and AsyncSortManager-based API even though rendering now owns GPU sorting directly. This duplicates sorting infrastructure, exposes obsolete choices to clients, and retains code that is no longer needed.
 
-Surface to remove/collapse:
-- Sources/MetalSprocketsGaussianSplats/Sorting: CPURadixSort.swift, CPUSplatRadixSorter.swift, and SplatSorter.sort (the CPU entry). Keep GPUSplatSortComputePass / GPUSortResources / AsyncSortManager (GPU path).
-- SortMethod enum (library) .cpu case and the OffscreenSplatRenderer .spark(sort:) CPU branch (renderSparkFrame CPU-sort path).
-- SplatRenderer enum: the .spark (CPU-sorted) case vs .gpu (GPU-sorted) — collapse to a single GPU-sorted spark renderer (gpu is already the default).
-- CLI: --sort cpu|gpu option, Statistics SortMethod, sortCpu stat, and BenchCommand.benchmarkSpark (CPU) — leave only the GPU-sort path.
-- Tests: SplatSorterTests, and any CPU-sort references in PointSplatConvergenceTests.
-- Docc references.
+Remove all CPU sort code and all AsyncSortManager code and API. No CPU fallback remains. Rendering must use the directly integrated GPU sort path.
 
-BLOCKER / caveat to resolve first: the GPU sort uses 64-bit atomics and needs Apple9/Mac2 (MetalTestSupport.supports64BitAtomics gates the GPU sort tests). If any supported target device lacks 64-bit image/buffer atomics, removing CPU sort drops rendering support for it. Confirm the minimum supported GPU families all support the GPU sort before deleting; otherwise keep CPU sort as a narrow fallback (feature-detected) rather than a user-selectable mode.
+Affected surface includes:
+- CPURadixSort, CPUSplatRadixSorter, SplatSorter, and every other CPU sorting implementation or adapter.
+- AsyncSortManager and manager-based public API.
+- CPU/GPU sort selection enums, renderer cases, CLI options, statistics, benchmarks, tests, and documentation.
+- Dead buffer pooling, streams, and support types used only by CPU sorting or AsyncSortManager.
 
-Motivation data: see just sort-perf / bench output.
+The GPU sort requires 64-bit atomics. Supported deployment targets must therefore require compatible GPU families rather than retaining a CPU fallback.
+
+Motivation data: spark/CPU-sort takes 169 ms versus 81 ms for GPU sorting at 8M splats and scales worse below that.
 
 ---
 
@@ -3002,11 +3003,12 @@ Expected: Spark debug visualizations are available with GPU-sorted rendering, wi
 ## 146: Support loading LCC splat datasets
 
 +++
-status: new
+status: open
 priority: medium
 kind: feature
 labels: splats, effort:l
 created: 2026-08-24T21:15:41Z
+updated: 2026-08-27T03:14:51Z
 +++
 
 Lixel CyberColor (LCC) datasets are not currently supported by `SplatLoader`. An LCC dataset uses a `.lcc` JSON metadata file with companion `index.bin` and `data.bin` files, plus optional spherical-harmonic and environment data.
@@ -3021,15 +3023,19 @@ References:
 - LCC2 specification: https://github.com/xgrids/LCC2Whitepaper
 - Related LCC2 issue: #87
 
+- `2026-08-27T03:14:52Z`: Related: #87 covers the distinct LCC2 container format.
+
 ---
 
 ## 147: Color splats by classification ID in the debug renderer
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
+labels: effort:m
 created: 2026-08-25T01:58:54Z
+updated: 2026-08-27T03:14:52Z
 +++
 
 The debug renderer can color splats by properties such as size, depth, opacity, and cloud index, but it cannot consume a per-splat classification ID and assign a categorical color.
@@ -3081,10 +3087,12 @@ Debug rendering should be available as a separate Swift Package Manager product 
 ## 150: Big-endian binary PLY files bypass GPU decoding
 
 +++
-status: new
+status: open
 priority: medium
-kind: none
+kind: enhancement
+labels: effort:s
 created: 2026-08-25T17:59:31Z
+updated: 2026-08-27T03:14:52Z
 +++
 
 Binary little-endian PLY files use the GPU decoder, but binary big-endian files fall back to CPU decoding. This makes loading large big-endian PLY files substantially slower than equivalent little-endian files.
@@ -3130,14 +3138,149 @@ cSettings: [
 ## 152: SOG loading copies stored ZIP entries into Data
 
 +++
-status: new
+status: open
 priority: medium
-kind: none
+kind: enhancement
+labels: effort:s
 created: 2026-08-27T03:01:37Z
+updated: 2026-08-27T03:14:52Z
 +++
 
 SOGReaderGPU loads every archive entry through ZipArchive.data(for:), allocating and copying each complete entry into Data before image decoding and Metal upload. SOG bundles use stored ZIP entries, and SwiftZipReader exposes span-based access for those entries.
 
 Expected: stored SOG payloads can flow from the memory-mapped archive into decoding and upload without an intermediate full-entry Data copy. Preserve checksum validation and existing extraction error behavior.
+
+---
+
+## 153: Add unified writers for every readable splat format
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:xl
+created: 2026-08-27T03:59:48Z
+updated: 2026-08-27T05:43:52Z
++++
+
+Provide a shared writer API for every splat format the library can read, including PLY, SPZ, and SOG. Writers must support Data and file URL output, preserve spherical harmonics where the destination format permits it, and report lossy or unsupported conversions.
+
+---
+
+## 154: Add editable splat cloud storage
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:xl
+created: 2026-08-27T03:59:49Z
+updated: 2026-08-27T05:43:52Z
++++
+
+Provide an editable splat-cloud representation that supports inserting, updating, and deleting splats while preserving stable identities. It must support rebuilding or updating the GPU buffers after edits and recovering editable data from loaded clouds.
+
+---
+
+## 155: Add GPU-assisted splat picking and region selection
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:xl
+created: 2026-08-27T03:59:49Z
+updated: 2026-08-27T05:43:52Z
++++
+
+Support point picking, screen-space marquee selection, and 3D bounding-box selection. Selection results must use stable splat identities rather than transient sorted or render-buffer indices.
+
+---
+
+## 156: Support custom per-splat attributes
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:l
+created: 2026-08-27T03:59:49Z
+updated: 2026-08-27T05:43:52Z
++++
+
+Add typed custom attribute storage and mutation for individual splats. Preserve attributes through edits and compatible file formats, and report when a destination format cannot encode them.
+
+---
+
+## 157: Provide a complete public splat-cloud initializer
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:m
+created: 2026-08-27T03:59:50Z
+updated: 2026-08-27T05:43:52Z
++++
+
+Provide a clear public initializer for constructing a splat cloud from application-generated splat data, including spherical harmonics and other supported attributes. The initializer must produce a cloud ready for rendering without requiring file-format round trips or access to internal APIs.
+
+---
+
+## 158: Support the SGS file format
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:l
+created: 2026-08-27T04:03:21Z
+updated: 2026-08-27T05:43:52Z
++++
+
+Add SGS file-format support, including format detection, decoding into the library’s splat representation, and encoding when SGS supports writing.
+
+---
+
+## 159: Avoid rendering unchanged splat scenes
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: rendering, performance, power, effort:m
+created: 2026-08-27T06:05:48Z
++++
+
+Splat rendering currently produces frames continuously even when the visible scene is unchanged. This wastes GPU time and power when splat data, transforms, camera state, viewport, renderer configuration, and other render inputs remain stable.
+
+Expected behavior: render a new frame when a render-affecting input changes or an animation requires it. Reuse the existing frame while the scene is unchanged. Changes to transforms, splat data, camera state, viewport size, renderer configuration, and other visible inputs must invalidate the frame.
+
+---
+
+## 160: Spark renderer inherits depth state from preceding render pipelines
+
++++
+status: new
+priority: medium
+kind: none
+created: 2026-08-27T13:43:28Z
++++
+
+When SparkSplatRenderPipeline is encoded after a pipeline that binds a depth-stencil state, such as MetalSprocketsAddOns GridShader, Spark unintentionally renders with that previously bound state.
+
+Metal command encoders retain the last depth-stencil state. Spark does not request depth testing, but its pipeline does not explicitly bind a disabled depth state, so the prior pipeline's depth comparison and writes remain active. This causes splats behind the previously rendered grid plane to be clipped.
+
+Expected: SparkSplatRenderPipeline renders without depth testing regardless of pipelines encoded before it.
+
+Actual: Spark inherits the preceding pipeline's bound depth-stencil state.
+
+Reproduction:
+1. Create one RenderPass.
+2. Encode GridShader, which uses .less depth comparison with writes enabled.
+3. Encode SparkSplatRenderPipeline.
+4. Observe splats behind the grid plane being rejected.
+
+Spark should explicitly bind a depth-disabled state, or otherwise guarantee that its required depth behavior is independent of encoder state left by preceding elements.
 
 ---
