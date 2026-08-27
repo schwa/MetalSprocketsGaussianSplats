@@ -33,7 +33,7 @@ let package = Package(
         .package(url: "https://github.com/schwa/MetalCompilerPlugin", from: "0.1.4"),
         .package(url: "https://github.com/schwa/MetalSprockets", from: "0.1.13"),
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
-        .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
+        .package(url: "https://github.com/schwa/SwiftZipReader", from: "0.0.2"),
         .package(url: "https://github.com/schwa/GoldenImage", from: "0.1.2"),
         .package(url: "https://github.com/schwa/MetalSupport", from: "1.0.5"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.1.0"),
@@ -46,7 +46,7 @@ let package = Package(
                 "MetalSprocketsGaussianSplatShaders",
                 .product(name: "MetalSprockets", package: "MetalSprockets"),
                 .product(name: "GeometryLite3D", package: "GeometryLite3D"),
-                .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+                "SwiftZipReader",
                 .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
                 .product(name: "libzstd", package: "zstd")
             ],

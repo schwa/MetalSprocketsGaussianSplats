@@ -9,7 +9,7 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import simd
-import ZIPFoundation
+import SwiftZipReader
 
 // MARK: - SOGReaderGPU
 
@@ -61,9 +61,9 @@ public struct SOGReaderGPU {
     ///   - url: The `.sog` archive to read.
     ///   - name: Overrides the buffer label. The default is the file name.
     public func read(url: URL, name: String? = nil) throws -> Result {
-        let archive: Archive
+        let archive: ZipArchive
         do {
-            archive = try Archive(url: url, accessMode: .read)
+            archive = try ZipArchive(contentsOf: url)
         } catch {
             throw SplatsError.failedToExtractZIP
         }
@@ -177,7 +177,7 @@ public struct SOGReaderGPU {
     ///
     /// WebP decode is the dominant cost, and each image is independent. This
     /// parallelizes the bottleneck.
-    private func loadTextures(from archive: Archive, filenames: [String]) throws -> [MTLTexture] {
+    private func loadTextures(from archive: ZipArchive, filenames: [String]) throws -> [MTLTexture] {
         let blobs = try filenames.map { try Self.extractData(from: archive, filename: $0) }
 
         let device = self.device
@@ -241,19 +241,15 @@ public struct SOGReaderGPU {
         return texture
     }
 
-    private static func extractData(from archive: Archive, filename: String) throws -> Data {
-        guard let entry = archive[filename] else {
+    private static func extractData(from archive: ZipArchive, filename: String) throws -> Data {
+        guard let entry = archive.entry(named: filename) else {
             throw SplatsError.missingTexture(filename)
         }
-        var data = Data()
         do {
-            _ = try archive.extract(entry) { chunk in
-                data.append(chunk)
-            }
+            return try archive.data(for: entry)
         } catch {
             throw SplatsError.failedToExtractZIP
         }
-        return data
     }
 }
 
