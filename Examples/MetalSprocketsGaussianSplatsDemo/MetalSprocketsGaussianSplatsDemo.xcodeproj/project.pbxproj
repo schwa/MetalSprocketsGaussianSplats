@@ -8,9 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		45104CF22F5A319600C49BCE /* MetalSprocketsGaussianSplats in Frameworks */ = {isa = PBXBuildFile; productRef = 45104CF12F5A319600C49BCE /* MetalSprocketsGaussianSplats */; };
-		A10000012F5A319600C49BCE /* MetalSprocketsGaussianSplatsDebug in Frameworks */ = {isa = PBXBuildFile; productRef = A10000022F5A319600C49BCE /* MetalSprocketsGaussianSplatsDebug */; };
 		45104CF42F5A319600C49BCE /* Interaction3D in Frameworks */ = {isa = PBXBuildFile; productRef = 45104CF32F5A319600C49BCE /* Interaction3D */; };
 		45104CF62F5A319600C49BCE /* Splats in Frameworks */ = {isa = PBXBuildFile; productRef = 45104CF52F5A319600C49BCE /* Splats */; };
+		A10000012F5A319600C49BCE /* MetalSprocketsGaussianSplatsDebug in Frameworks */ = {isa = PBXBuildFile; productRef = A10000022F5A319600C49BCE /* MetalSprocketsGaussianSplatsDebug */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -287,6 +287,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MetalSprocketsGaussianSplatsDemo/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "The camera is used for the AR splat viewing mode.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xros*]" = YES;
@@ -336,6 +337,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MetalSprocketsGaussianSplatsDemo/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "The camera is used for the AR splat viewing mode.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xros*]" = YES;
@@ -418,11 +420,6 @@
 			package = 45104CFA2F5A319600C49BCE /* XCLocalSwiftPackageReference "../../" */;
 			productName = MetalSprocketsGaussianSplats;
 		};
-		A10000022F5A319600C49BCE /* MetalSprocketsGaussianSplatsDebug */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 45104CFA2F5A319600C49BCE /* XCLocalSwiftPackageReference "../../" */;
-			productName = MetalSprocketsGaussianSplatsDebug;
-		};
 		45104CF32F5A319600C49BCE /* Interaction3D */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 45104CF02F5A319600C49BCE /* XCRemoteSwiftPackageReference "Interaction3D" */;
@@ -432,6 +429,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 45104CFA2F5A319600C49BCE /* XCLocalSwiftPackageReference "../../" */;
 			productName = Splats;
+		};
+		A10000022F5A319600C49BCE /* MetalSprocketsGaussianSplatsDebug */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 45104CFA2F5A319600C49BCE /* XCLocalSwiftPackageReference "../../" */;
+			productName = MetalSprocketsGaussianSplatsDebug;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
