@@ -39,7 +39,10 @@ namespace BlitShader {
         constexpr sampler s(filter::linear);
         float4 color = texture.sample(s, in.texCoord);
         if (convert_srgb_to_linear) {
-            color.rgb = pow(color.rgb, float3(2.2));
+            // Color is premultiplied by coverage; unpremultiply before the
+            // sRGB decode, then restore (#162).
+            float alpha = max(color.a, 1e-5);
+            color.rgb = pow(color.rgb / alpha, float3(2.2)) * alpha;
         }
         return color;
     }

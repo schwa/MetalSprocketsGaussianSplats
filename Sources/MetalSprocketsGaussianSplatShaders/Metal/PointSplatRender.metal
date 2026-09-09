@@ -749,13 +749,22 @@ namespace PointSplatRender {
         uint s = max(uniforms.supersampling, 1u);
         uint stride = uint(uniforms.drawableSize.x);
         float3 color = float3(0.0);
+        uint covered = 0;
         for (uint dy = 0; dy < s; dy++) {
             for (uint dx = 0; dx < s; dx++) {
                 ulong value = framebuffer[(gid.y * s + dy) * stride + (gid.x * s + dx)];
+                // Subsamples still at the clear depth received no splat;
+                // exclude them so background never tints covered pixels,
+                // and expose coverage in alpha for compositing (#162).
+                if ((value >> GPS_DEPTH_SHIFT) == GPS_DEPTH_MAX) {
+                    continue;
+                }
                 color += float3(gps_unpack_channel(value, 24), gps_unpack_channel(value, 12), gps_unpack_channel(value, 0));
+                covered += 1;
             }
         }
-        outTexture.write(float4(color / float(s * s), 1.0), gid);
+        float alpha = float(covered) / float(s * s);
+        outTexture.write(float4(color / float(max(covered, 1u)) * alpha, alpha), gid);
     }
 
 } // namespace PointSplatRender

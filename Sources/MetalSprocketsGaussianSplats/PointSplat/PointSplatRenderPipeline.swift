@@ -225,6 +225,17 @@ public struct PointSplatRenderPipeline: Element {
                     .parameter("texture", texture: accumulation.output)
                 }
                 .depthCompare(function: .always, enabled: false)
+                // Premultiplied source-over: uncovered pixels (alpha 0) keep
+                // whatever earlier passes drew, e.g. scene guides (#162).
+                .renderPipelineDescriptorTransformer { descriptor in
+                    descriptor.colorAttachments[0].isBlendingEnabled = true
+                    descriptor.colorAttachments[0].rgbBlendOperation = .add
+                    descriptor.colorAttachments[0].alphaBlendOperation = .add
+                    descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
+                    descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+                    descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+                    descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+                }
             }
             .renderPassDescriptorModifier { descriptor in
                 if let colorLoadAction {

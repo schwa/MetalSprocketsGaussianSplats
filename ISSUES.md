@@ -3307,3 +3307,20 @@ Both passes unconditionally clear the drawable's color attachment. Callers that 
 - `2026-09-09T20:29:55Z`: TileBasedSplatPass gained a colorLoadAction init parameter, PointSplatRenderPipeline.Configuration gained colorLoadAction, and the tile heat-map overlay now always loads instead of re-clearing.
 
 ---
+
+## 162: Point splat blit overwrites content drawn by earlier passes
+
++++
+status: closed
+priority: medium
+kind: bug
+created: 2026-09-09T20:36:44Z
+updated: 2026-09-09T20:37:00Z
+closed: 2026-09-09T20:37:00Z
++++
+
+pointSplatResolve writes alpha 1 for every pixel and the fullscreen blit draws without blending, so the point renderer owns the entire framebuffer. Content drawn by earlier passes in the same frame (for example a scene-guides/grid pass that the splat pass composites over via loadAction .load) is overwritten even where no splat covers the pixel.
+
+- `2026-09-09T20:37:00Z`: pointSplatResolve now excludes clear-depth subsamples and writes coverage as premultiplied alpha; the blit blends source-over and unpremultiplies around the sRGB decode.
+
+---
