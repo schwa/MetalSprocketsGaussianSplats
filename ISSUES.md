@@ -3293,13 +3293,17 @@ Spark should explicitly bind a depth-disabled state, or otherwise guarantee that
 ## 161: TileBasedSplatPass and PointSplatRenderPipeline offer no load-action control over the color attachment
 
 +++
-status: new
+status: closed
 priority: medium
 kind: none
 labels: api
 created: 2026-09-09T20:23:10Z
+updated: 2026-09-09T20:29:55Z
+closed: 2026-09-09T20:29:55Z
 +++
 
 Both passes unconditionally clear the drawable's color attachment. Callers that draw content before the splat pass (for example a background or scene-guides pass) lose it, and cannot opt into loadAction .load. Radiance works around this by drawing its guides in a separate trailing pass with a renderPassDescriptorModifier, which forces guides to composite on top of splats instead of behind them.
+
+- `2026-09-09T20:29:55Z`: TileBasedSplatPass gained a colorLoadAction init parameter, PointSplatRenderPipeline.Configuration gained colorLoadAction, and the tile heat-map overlay now always loads instead of re-clearing.
 
 ---

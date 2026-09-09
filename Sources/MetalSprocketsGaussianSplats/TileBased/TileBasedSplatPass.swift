@@ -20,6 +20,7 @@ public struct TileBasedSplatPass: Element {
     private var modelMatrix: simd_float4x4
     private var debugTileBorders: Bool
     private var showHeatMap: Bool
+    private var colorLoadAction: MTLLoadAction?
     var onFrameCompleted: (@Sendable (TileSplatResources) -> Void)?
     private var drawableSize: SIMD2<Float>
 
@@ -32,7 +33,8 @@ public struct TileBasedSplatPass: Element {
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,
         debugTileBorders: Bool = false,
-        showHeatMap: Bool = false
+        showHeatMap: Bool = false,
+        colorLoadAction: MTLLoadAction? = nil
     ) throws {
         self.splatCloud = splatCloud
         self.projection = projection
@@ -41,6 +43,7 @@ public struct TileBasedSplatPass: Element {
         self.modelMatrix = modelMatrix
         self.debugTileBorders = debugTileBorders
         self.showHeatMap = showHeatMap
+        self.colorLoadAction = colorLoadAction
         self.resources = try Self.makeResources(drawableSize: drawableSize)
     }
 
@@ -97,12 +100,19 @@ public struct TileBasedSplatPass: Element {
                 descriptor.tileHeight = Int(TILE_SIZE)
                 // half4 = 8 bytes, aligned to 16 bytes.
                 descriptor.imageblockSampleLength = 16
+                if let colorLoadAction {
+                    descriptor.colorAttachments[0].loadAction = colorLoadAction
+                }
             }
 
             // Optional heatmap overlay that shows the splat density per tile.
             if showHeatMap {
                 try RenderPass {
                     try TileHeatMapRenderPass(tileSplatResources: resources, showTileBorders: debugTileBorders)
+                }
+                // Composite over the splat pass instead of re-clearing the attachment.
+                .renderPassDescriptorModifier { descriptor in
+                    descriptor.colorAttachments[0].loadAction = .load
                 }
             }
 

@@ -42,6 +42,7 @@ public struct PointSplatRenderPipeline: Element {
     private var statistics: PointSplatStatistics?
     private var reprojection: Bool
     private var depthRange: ClosedRange<Float>
+    private var colorLoadAction: MTLLoadAction?
 
     /// Rendering options for ``PointSplatRenderPipeline`` (#101).
     public struct Configuration {
@@ -62,13 +63,17 @@ public struct PointSplatRenderPipeline: Element {
         public var reprojection: Bool
         /// Optional collector for per-frame render statistics.
         public var statistics: PointSplatStatistics?
+        /// Load action for the color attachment of the final blit pass. nil
+        /// keeps the inherited descriptor's action (typically clear).
+        public var colorLoadAction: MTLLoadAction?
 
-        public init(depthRange: ClosedRange<Float> = 0.2...200.0, supersampling: Int = 2, pointsPerThread: Int = 16, reprojection: Bool = true, statistics: PointSplatStatistics? = nil) {
+        public init(depthRange: ClosedRange<Float> = 0.2...200.0, supersampling: Int = 2, pointsPerThread: Int = 16, reprojection: Bool = true, statistics: PointSplatStatistics? = nil, colorLoadAction: MTLLoadAction? = nil) {
             self.depthRange = depthRange
             self.supersampling = supersampling
             self.pointsPerThread = pointsPerThread
             self.reprojection = reprojection
             self.statistics = statistics
+            self.colorLoadAction = colorLoadAction
         }
     }
 
@@ -88,6 +93,7 @@ public struct PointSplatRenderPipeline: Element {
         self.pointsPerThread = max(configuration.pointsPerThread, 1)
         self.reprojection = configuration.reprojection
         self.statistics = configuration.statistics
+        self.colorLoadAction = configuration.colorLoadAction
         self.splatCloud = splatCloud
         self.projectionMatrix = projectionMatrix
         self.modelMatrix = modelMatrix
@@ -219,6 +225,11 @@ public struct PointSplatRenderPipeline: Element {
                     .parameter("texture", texture: accumulation.output)
                 }
                 .depthCompare(function: .always, enabled: false)
+            }
+            .renderPassDescriptorModifier { descriptor in
+                if let colorLoadAction {
+                    descriptor.colorAttachments[0].loadAction = colorLoadAction
+                }
             }
         }
     }
