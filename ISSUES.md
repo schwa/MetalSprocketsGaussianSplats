@@ -3289,3 +3289,17 @@ Spark should explicitly bind a depth-disabled state, or otherwise guarantee that
 - `2026-08-27T13:48:05Z`: Extended the fix to every depth-free render pipeline: Spark debug, point-splat blit, tile splat passes, and tile heat map. Stochastic rendering keeps its explicit caller-selected depth state because depth testing is required.
 
 ---
+
+## 161: TileBasedSplatPass and PointSplatRenderPipeline offer no load-action control over the color attachment
+
++++
+status: new
+priority: medium
+kind: none
+labels: api
+created: 2026-09-09T20:23:10Z
++++
+
+Both passes unconditionally clear the drawable's color attachment. Callers that draw content before the splat pass (for example a background or scene-guides pass) lose it, and cannot opt into loadAction .load. Radiance works around this by drawing its guides in a separate trailing pass with a renderPassDescriptorModifier, which forces guides to composite on top of splats instead of behind them.
+
+---
