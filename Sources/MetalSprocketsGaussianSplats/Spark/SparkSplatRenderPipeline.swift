@@ -100,6 +100,10 @@ public struct SparkSplatRenderPipeline: Element {
     /// errors instead of crashing.
     @MSState
     private var lastUseBoundingBox: Bool?
+    /// `use_sh` value baked into the current shaders; same recompile-on-drift
+    /// pattern as `lastUseBoundingBox`.
+    @MSState
+    private var lastUseSH: Bool?
     /// Cached per-cloud argument data, rebuilt only when the clouds or model
     /// matrix change. Body can be evaluated many times per frame, so
     /// allocating here per evaluation was churning a fresh MTLBuffer each
@@ -238,13 +242,14 @@ public struct SparkSplatRenderPipeline: Element {
         }
     }
 
-    /// Returns shaders matching the current bounding-box presence, recompiling
-    /// them when the `use_bounding_box` function constant changed. Errors
-    /// propagate to the caller instead of crashing.
+    /// Returns shaders matching the current bounding-box and spherical-harmonics
+    /// state, recompiling them when either baked function constant changed.
+    /// Errors propagate to the caller instead of crashing.
     private func updatedShaders() throws -> (vertex: VertexShader, fragment: FragmentShader) {
         let useBoundingBox = boundingBox != nil
-        if lastUseBoundingBox != useBoundingBox {
+        if lastUseBoundingBox != useBoundingBox || lastUseSH != useSphericalHarmonics {
             lastUseBoundingBox = useBoundingBox
+            lastUseSH = useSphericalHarmonics
 
             let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SparkSplatRenderShader")
 

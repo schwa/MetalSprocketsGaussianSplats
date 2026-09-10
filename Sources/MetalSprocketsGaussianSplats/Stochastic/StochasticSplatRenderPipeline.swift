@@ -23,8 +23,14 @@ public struct StochasticSplatRenderPipeline: Element {
     var frameTime: UInt32
     var alphaThreshold: Float
     var useSphericalHarmonics: Bool
+    var convertSRGBToLinear: Bool
 
     var useBlueNoise: Bool
+
+    /// `use_sh` value baked into the current shaders; body recompiles them
+    /// when this drifts from `useSphericalHarmonics`.
+    @MSState
+    private var lastUseSH: Bool?
 
     @MSState
     var blueNoiseTexture: MTLTexture
@@ -108,6 +114,7 @@ public struct StochasticSplatRenderPipeline: Element {
         self.frameTime = frameTime
         self.alphaThreshold = alphaThreshold
         self.useBlueNoise = useBlueNoise
+        self.convertSRGBToLinear = convertSRGBToLinear
 
         // Use the explicit SH override, else auto-detect from the data.
         let hasSHData = splatCloud.shCoefficients != nil
@@ -144,14 +151,37 @@ public struct StochasticSplatRenderPipeline: Element {
         self.vertexDescriptor = vertexDescriptor
     }
 
+    /// Returns shaders matching the current spherical-harmonics state,
+    /// recompiling them when the baked `use_sh` constant drifts. Same pattern
+    /// as SparkSplatRenderPipeline.updatedShaders().
+    private func updatedShaders() throws -> (vertex: VertexShader, fragment: FragmentShader) {
+        if lastUseSH != useSphericalHarmonics {
+            lastUseSH = useSphericalHarmonics
+
+            let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("StochasticSplatRenderShader")
+
+            var vertexConstants = FunctionConstants()
+            vertexConstants["use_sh"] = .bool(useSphericalHarmonics)
+
+            var fragmentConstants = FunctionConstants()
+            fragmentConstants["convert_srgb_to_linear"] = .bool(convertSRGBToLinear)
+            fragmentConstants["use_blue_noise"] = .bool(useBlueNoise)
+
+            vertexShader = try shaderLibrary.function(named: "vertex_main", type: VertexShader.self, constants: vertexConstants)
+            fragmentShader = try shaderLibrary.function(named: "fragment_main", type: FragmentShader.self, constants: fragmentConstants)
+        }
+        return (vertexShader, fragmentShader)
+    }
+
     public var body: some Element {
         get throws {
+            let shaders = try updatedShaders()
             let shBuffer = useSphericalHarmonics ? splatCloud.shCoefficients : nil
             let degree = useSphericalHarmonics ? splatCloud.shDegree : 0
             let viewMatrices = cameraMatrices.map(\.inverse)
             let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
             let amplificationCount = cameraMatrices.count
-            try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
+            try RenderPipeline(vertexShader: shaders.vertex, fragmentShader: shaders.fragment) {
                 let draw = Draw { commandEncoder in
                     let vertices: [SIMD2<Float>] = [
                         [-1, -1], [-1, 1], [1, -1], [1, 1]
