@@ -3324,3 +3324,33 @@ pointSplatResolve writes alpha 1 for every pixel and the fullscreen blit draws w
 - `2026-09-09T20:37:00Z`: pointSplatResolve now excludes clear-depth subsamples and writes coverage as premultiplied alpha; the blit blends source-over and unpremultiplies around the sRGB decode.
 
 ---
+
+## 163: SH storage is duplicated per splat instead of preserving indexed palettes
+
++++
+status: new
+priority: high
+kind: enhancement
+labels: performance,memory,rendering,io,effort:xl,impact:high
+created: 2026-09-10T05:07:58Z
++++
+
+Spherical-harmonics coefficients are currently expanded into a dense row for every splat, and render shaders derive the SH row from the splat index. Formats such as SOG can encode a shared SH palette plus a per-splat palette index, but loading expands that palette and loses the indirection.
+
+This materially increases resident memory and memory bandwidth. The indexed approach in `~/Shared/Work/Projects/gaussiansplats-ios/` preserves the palette, stores `shIndex` in the otherwise padded 32-byte `SparkSplat`, and uses that index during SH evaluation. In that project, this also improved vertex-shader performance by about 15%.
+
+Multi-file rendering makes this difficult: each cloud may have its own SH buffer, palette/index space, coefficient count, and degree. The mapping must remain cloud-local and correct through loading, Morton reordering, sorting, and every renderer that evaluates SH. Dense formats still need an identity mapping or equivalent representation without regressing their load paths.
+
+## Proposed fix (per user)
+Preserve indexed SH data through loading and evaluate SH using a per-splat index, following the approach in `gaussiansplats-ios`, while supporting multiple simultaneously rendered files/clouds.
+
+## Acceptance criteria
+- Indexed source formats retain one SH palette plus a per-splat index instead of expanding coefficients per splat.
+- Multi-file rendering resolves every splat against the correct cloud-local SH buffer and index space.
+- Reordering and sorting preserve the splat-to-SH mapping.
+- Spark, stochastic, PointSplat, and debug SH paths either support the representation or explicitly use a verified compatible fallback.
+- Dense PLY/SPZ and non-SH inputs continue to load and render correctly.
+- Tests cover shared palette rows, multiple clouds with overlapping local indices, and reorder/sort correctness.
+- Benchmarks report GPU memory and vertex-stage timing before and after the change.
+
+---
