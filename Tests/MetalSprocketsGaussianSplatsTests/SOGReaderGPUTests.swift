@@ -32,10 +32,17 @@ struct SOGReaderGPUTests {
             #expect(s.x >= 0 && s.y >= 0 && s.z >= 0, "negative scale")
         }
 
-        // The SH buffer size must match the reported degree.
+        // Indexed SH: the buffer holds a shared palette, not one row per splat.
         let floatsPerSplat = [0, 9, 24, 45][min(Int(result.shDegree), 3)]
         let sh = Array(result.shCoefficients)
-        #expect(sh.count == result.count * floatsPerSplat)
+        if result.shDegree > 0 {
+            #expect(floatsPerSplat > 0 && sh.count.isMultiple(of: floatsPerSplat))
+            let paletteRows = sh.count / floatsPerSplat
+            #expect(paletteRows > 0)
+            #expect(splats.allSatisfy { Int($0.shIndex) < paletteRows }, "shIndex out of palette range")
+        } else {
+            #expect(sh.isEmpty)
+        }
         for value in sh {
             #expect(value.isFinite, "non-finite SH coefficient")
         }

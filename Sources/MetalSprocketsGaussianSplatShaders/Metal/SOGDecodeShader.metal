@@ -101,24 +101,36 @@ namespace SOGDecodeShader {
             uchar(clamp(b, 0.0, 1.0) * 255.0),
             uchar(clamp(a, 0.0, 1.0) * 255.0)
         );
-        splat.shIndex = gid;
-        splatsOut[gid] = splat;
-
-        // Higher-order SH.
+        // Indexed SH: store the palette row index; the palette is decoded once
+        // by decodePalette instead of being expanded per splat.
         if (params.shDegree > 0) {
             uint4 lbl = shLabels.read(c);
-            uint paletteIndex = lbl.x + (lbl.y << 8);
-            uint paletteU = (paletteIndex % params.shEntriesPerRow) * params.shNumCoeffs;
-            uint paletteV = paletteIndex / params.shEntriesPerRow;
+            splat.shIndex = lbl.x + (lbl.y << 8);
+        } else {
+            splat.shIndex = gid;
+        }
+        splatsOut[gid] = splat;
+    }
 
-            uint base = gid * params.shFloatsPerSplat;
-            for (uint k = 0; k < params.shNumCoeffs; k++) {
-                uint2 pc = uint2(paletteU + k, paletteV);
-                uint4 texel = shCentroids.read(pc);
-                shOut[base + k * 3 + 0] = shNCodebook[texel.x];
-                shOut[base + k * 3 + 1] = shNCodebook[texel.y];
-                shOut[base + k * 3 + 2] = shNCodebook[texel.z];
-            }
+    // Decodes the shared SH palette once: one thread per palette entry.
+    [[kernel]] void decodePalette(
+        uint gid [[thread_position_in_grid]],
+        constant SOGDecodeParams &params [[buffer(0)]],
+        device float *shOut [[buffer(2)]],
+        constant float *shNCodebook [[buffer(5)]],
+        texture2d<uint, access::read> shCentroids [[texture(5)]]
+    ) {
+        if (gid >= params.shPaletteCount || params.shDegree == 0) {
+            return;
+        }
+        uint paletteU = (gid % params.shEntriesPerRow) * params.shNumCoeffs;
+        uint paletteV = gid / params.shEntriesPerRow;
+        uint base = gid * params.shFloatsPerSplat;
+        for (uint k = 0; k < params.shNumCoeffs; k++) {
+            uint4 texel = shCentroids.read(uint2(paletteU + k, paletteV));
+            shOut[base + k * 3 + 0] = shNCodebook[texel.x];
+            shOut[base + k * 3 + 1] = shNCodebook[texel.y];
+            shOut[base + k * 3 + 2] = shNCodebook[texel.z];
         }
     }
 

@@ -48,11 +48,11 @@ public struct SOGReaderGPU {
     // cache, each read recompiles the compute function.
     private static let runnerCache = RunnerCache()
 
-    private func decodeKernel() throws -> ComputeKernel {
+    private func kernel(named name: String) throws -> ComputeKernel {
         guard let bundle = Bundle.module.peerBundle(withSuffix: "MetalSprocketsGaussianSplatShaders") else {
             throw SplatsError.resourceCreationFailure("MetalSprocketsGaussianSplatShaders bundle")
         }
-        return try ShaderLibrary(bundle: bundle).namespaced("SOGDecodeShader").function(named: "decode", type: ComputeKernel.self)
+        return try ShaderLibrary(bundle: bundle).namespaced("SOGDecodeShader").function(named: name, type: ComputeKernel.self)
     }
 
     /// Reads a SOG archive and decodes its splat textures on the GPU.
@@ -117,7 +117,10 @@ public struct SOGReaderGPU {
         let cloudName = name ?? url.deletingPathExtension().lastPathComponent
         let count = metadata.count
         let splatsOut = try device.makeTypedBuffer(element: SparkSplat.self, capacity: count, options: [.storageModeShared]).labeled("Splats (\(cloudName))")
-        let shFloatCount = max(1, count * shFloatsPerSplat)
+        // Indexed SH: keep the shared palette instead of expanding per splat.
+        // The centroids texture packs `shEntriesPerRow` palette entries per row.
+        let shPaletteCount = hasSH ? (shCentroidsTex?.height ?? 0) * 64 : 0
+        let shFloatCount = max(1, shPaletteCount * shFloatsPerSplat)
         let shOut = try device.makeTypedBuffer(element: Float.self, capacity: shFloatCount, options: [.storageModeShared]).labeled("SHCoefficients (\(cloudName))")
 
         let params = SOGDecodeParams(
@@ -129,13 +132,15 @@ public struct SOGReaderGPU {
             shFloatsPerSplat: UInt32(shFloatsPerSplat),
             shCentroidsWidth: UInt32(shCentroidsTex?.width ?? 0),
             shEntriesPerRow: 64,
-            splatTexWidth: UInt32(splatTexWidth)
+            splatTexWidth: UInt32(splatTexWidth),
+            shPaletteCount: UInt32(shPaletteCount)
         )
 
-        let kernel = try decodeKernel()
+        let decodeK = try kernel(named: "decode")
+        let paletteK = try kernel(named: "decodePalette")
         try Self.runnerCache.run(device: device) {
             try ComputePass(label: "SOGDecode") {
-                try ComputePipeline(computeKernel: kernel) {
+                try ComputePipeline(computeKernel: decodeK) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: count, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
                         .parameter("params", value: params)
                         .parameter("splatsOut", buffer: splatsOut.unsafeMTLBuffer)
@@ -151,13 +156,22 @@ public struct SOGReaderGPU {
                         .parameter("shCentroids", texture: shCentroidsTex ?? sh0)
                         .parameter("shLabels", texture: shLabelsTex ?? sh0)
                 }
+                if shPaletteCount > 0 {
+                    try ComputePipeline(computeKernel: paletteK) {
+                        try ComputeDispatch(threadsPerGrid: MTLSize(width: shPaletteCount, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+                            .parameter("params", value: params)
+                            .parameter("shOut", buffer: shOut.unsafeMTLBuffer)
+                            .parameter("shNCodebook", buffer: shNCodebook)
+                            .parameter("shCentroids", texture: shCentroidsTex ?? sh0)
+                    }
+                }
             }
         }
 
         var splatsResult = splatsOut
         splatsResult.count = count
         var shResult = shOut
-        shResult.count = shDegree > 0 ? count * shFloatsPerSplat : 0
+        shResult.count = shDegree > 0 ? shPaletteCount * shFloatsPerSplat : 0
 
         return Result(splats: splatsResult, shCoefficients: shResult, shDegree: UInt8(clamping: shDegree), count: count)
     }

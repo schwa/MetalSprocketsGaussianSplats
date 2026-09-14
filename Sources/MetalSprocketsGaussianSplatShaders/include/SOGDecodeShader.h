@@ -17,6 +17,7 @@ struct SOGDecodeParams {
     unsigned int shCentroidsWidth; // width (in texels) of the centroids texture
     unsigned int shEntriesPerRow;  // palette entries per centroids row (64)
     unsigned int splatTexWidth;    // width (in texels) of the per-splat textures
+    unsigned int shPaletteCount;   // number of SH palette entries (indexed decode)
 };
 
 #endif /* SOGDecodeShader_h */
