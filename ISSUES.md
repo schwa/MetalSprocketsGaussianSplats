@@ -3387,12 +3387,13 @@ Introduced by the CPU-sort removal in #139.
 ## 165: PointSplat 'empty scene renders background' test fails: all pixels wrong
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: tests, pointsplat, effort:s
 created: 2026-09-14T16:34:09Z
-updated: 2026-09-14T16:38:00Z
+updated: 2026-09-14T17:36:29Z
+closed: 2026-09-14T17:36:29Z
 +++
 
 The test `PointSplatComputePass › emptyScene` (`empty scene renders background`) fails locally with all 768 channel expectations (16×16×3) failing, so the entire output texture is wrong, not just a few pixels.
@@ -3402,6 +3403,8 @@ The test renders a single fully-transparent splat (color alpha 0) over a backgro
 Unrelated to the CPU-sort removal (#139) — the PointSplat compute path was not modified. Appears pre-existing and possibly GPU/driver dependent (other GPU-dependent tests in this suite behave similarly). Needs investigation to determine whether it is a background-fill bug in the point renderer or a test-environment issue.
 
 Location: Tests/MetalSprocketsGaussianSplatsTests/PointSplatComputePassTests.swift, `emptyScene()`.
+
+- `2026-09-14T17:36:29Z`: Stale test, not a renderer bug. Since #162 pointSplatResolve emits premultiplied color with coverage alpha (uncovered subsamples are transparent; background is composited downstream via source-over). The emptyScene test still asserted the old opaque-background contract. Updated it to verify an empty scene resolves to fully transparent.
 
 ---
 

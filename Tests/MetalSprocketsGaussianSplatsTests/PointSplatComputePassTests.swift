@@ -165,9 +165,13 @@ struct PointSplatComputePassTests {
         #expect(center.z < 0.05, "culled blue splats leaked: \(center.z)")
     }
 
-    @Test("empty scene renders background")
+    @Test("empty scene resolves to transparent, not the background color")
     func emptyScene() throws {
         let size = 16
+        // Since #162 the resolve emits premultiplied color with coverage alpha
+        // and leaves the background to a source-over composite downstream. An
+        // uncovered scene must therefore resolve to transparent, never bake in
+        // the background color, whatever background is configured.
         let background = SIMD3<Float>(0.25, 0.5, 0.75)
         let renderer = try PointSplatTestRenderer(device: device, width: size, height: size, backgroundColor: background)
         let splat = SparkSplat(position: simd_half3(0, 0, 0), scale: simd_half3(repeating: 0.1), rotation: simd_half4(0, 0, 0, 1), color: simd_uchar4(255, 255, 255, 0))
@@ -176,9 +180,7 @@ struct PointSplatComputePassTests {
 
         let texture = try renderer.render(splats: buffer, splatCount: 1, modelMatrix: .identity, viewMatrix: view, projectionMatrix: projection, frameSeed: 1)
         for pixel in readPixels(texture) {
-            #expect(abs(pixel.x - background.x) < 0.01)
-            #expect(abs(pixel.y - background.y) < 0.01)
-            #expect(abs(pixel.z - background.z) < 0.01)
+            #expect(pixel == .zero)
         }
     }
 
