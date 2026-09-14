@@ -26,7 +26,7 @@ struct ContentView: View {
             if !demoState.isImmersive {
                 splatRenderView
                     .splatRenderer(demoState.renderer)
-                .onFrameTimingChange { frameTimingStatistics = $0 }
+                .modifier(FrameTimingOverlay())
                 // swiftlint:disable:next trailing_closure
                 .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable(), transforms: .init(zoom: { -$0 * 5.0 }))
             } else {
