@@ -173,7 +173,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                         var viewMappings = (0 ..< context.viewCount).map {
                             MTLVertexAmplificationViewMapping(
                                 viewportArrayIndexOffset: UInt32($0),
-                                renderTargetArrayIndexOffset: UInt32($0)
+                                renderTargetArrayIndexOffset: 0
                             )
                         }
                         encoder.setVertexAmplificationCount(context.viewCount, viewMappings: &viewMappings)
@@ -191,7 +191,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                     .viewMappings((0 ..< context.viewCount).map {
                         MTLVertexAmplificationViewMapping(
                             viewportArrayIndexOffset: UInt32($0),
-                            renderTargetArrayIndexOffset: UInt32($0)
+                            renderTargetArrayIndexOffset: 0
                         )
                     })
                     .depthCompare(function: .greater, enabled: true)

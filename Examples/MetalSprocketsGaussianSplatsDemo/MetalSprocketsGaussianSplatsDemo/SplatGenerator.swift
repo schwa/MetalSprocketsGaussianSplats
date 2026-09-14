@@ -7,10 +7,14 @@ import simd
 /// a sphere, maps hue to height, and adds a subtle lat/long checkerboard.
 enum SplatGenerator {
     /// Preset counts that match the pre-generated sphere-NN.sog test files.
+    #if os(visionOS)
+    static let presetCounts: [Int] = [100_000, 500_000, 1_000_000]
+    #else
     static let presetCounts: [Int] = [
         100_000, 500_000, 1_000_000, 2_000_000, 4_000_000,
         8_000_000, 16_000_000, 32_000_000, 48_000_000
     ]
+    #endif
 
     static func label(for count: Int) -> String {
         count >= 1_000_000 ? "\(count / 1_000_000)M" : "\(count / 1_000)K"

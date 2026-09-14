@@ -75,7 +75,7 @@ class DemoState {
         }
     }
     /// The selected bundled model. nil while a user-loaded file is shown.
-    var selectedModel: SplatModel? = .tomatoes {
+    var selectedModel: SplatModel? = .helmet {
         didSet {
             if let selectedModel, selectedModel != oldValue {
                 customModelName = nil
@@ -103,7 +103,7 @@ class DemoState {
     init() {
         let device = MTLCreateSystemDefaultDevice()!
         self.device = device
-        let cloud = Self.loadSplatCloud(device: device, model: .tomatoes)
+        let cloud = Self.loadSplatCloud(device: device, model: .helmet)
         self.splatCloud = cloud
         #if os(visionOS)
         // Demo-only: a missing Metal device is unrecoverable here.
