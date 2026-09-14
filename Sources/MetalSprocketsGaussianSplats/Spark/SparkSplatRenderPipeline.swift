@@ -317,7 +317,9 @@ public struct SparkSplatRenderPipeline: Element {
             renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
             renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
+        #if !os(visionOS)
         .depthCompare(function: .always, enabled: false)
+        #endif
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
     }
 }

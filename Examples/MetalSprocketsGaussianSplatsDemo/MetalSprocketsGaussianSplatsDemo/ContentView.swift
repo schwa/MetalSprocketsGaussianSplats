@@ -35,22 +35,18 @@ struct ContentView: View {
         }
         .ornament(attachmentAnchor: .scene(.bottom)) {
             HStack {
-                Picker("Model", selection: $demoState.selectedModel) {
+                Picker("Model", systemImage: "cube", selection: $demoState.selectedModel) {
                     ForEach(SplatModel.allCases) { model in
                         Text(model.rawValue).tag(model as SplatModel?)
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 200)
-                Picker("Renderer", selection: $demoState.renderer) {
-                    ForEach(SplatRenderer.allCases, id: \.self) { r in
+                .pickerStyle(.menu)
+                Picker("Renderer", systemImage: "paintbrush", selection: $demoState.renderer) {
+                    ForEach(SplatRenderer.allCases.filter { $0 != .pointSplat }, id: \.self) { r in
                         Text(r.rawValue.capitalized).tag(r)
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 200)
+                .pickerStyle(.menu)
                 debugPicker
                 loadButton
                 generateMenu
