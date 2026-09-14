@@ -3435,18 +3435,22 @@ This is primarily a readability/maintainability and reuse refactor, not a functi
 ## 167: Pinch to zoom does not work on iPad
 
 +++
-status: new
+status: closed
 priority: medium
 kind: bug
 labels: ipad, input
 created: 2026-09-14T16:50:39Z
+updated: 2026-09-14T17:02:22Z
+closed: 2026-09-14T17:02:22Z
 +++
 
 Reported on iPad: pinch-to-zoom does not work. Expected: pinching changes the zoom. Actual: the gesture does not zoom the view. Device model and OS version were not specified.
 
+- `2026-09-14T17:02:22Z`: User verified that updating dependencies fixed pinch-to-zoom on iPad. Dependency update committed as 291d97d3 (Interaction3D 0.1.12).
+
 ---
 
-## 168: Generate appears to require multiple taps on iPad
+## 168: Selecting a sphere size in Generate does nothing on iPad
 
 +++
 status: new
@@ -3454,8 +3458,32 @@ priority: medium
 kind: bug
 labels: ipad, ui
 created: 2026-09-14T16:50:39Z
+updated: 2026-09-14T17:02:46Z
 +++
 
-Reported on iPad: Generate works, but appears to require multiple taps before taking effect. Expected: a single tap starts generation. Actual: the user appears to need repeated taps. It is not yet confirmed whether taps are missed or generation starts without visible feedback. Device model and OS version were not specified.
+Confirmed on iPad: the Generate menu opens, but tapping a sphere size does nothing.
+
+Reproduction:
+1. Open the Generate menu on iPad.
+2. Tap a sphere size.
+
+Expected: generate and display a sphere of the selected size.
+Actual: selecting the size has no visible effect.
+
+This clarifies the earlier report that Generate seemed to require multiple taps. The menu opens successfully; the failure occurs when selecting a sphere size.
+
+---
+
+## 169: FPS meter flashes at 60 FPS on iPad
+
++++
+status: new
+priority: medium
+kind: bug
+labels: ipad, ui
+created: 2026-09-14T17:00:15Z
++++
+
+Reported on iPad: the FPS meter visibly flashes while showing 60 FPS. Expected: the meter remains visually stable while the frame rate is steady. Device model and iPadOS version were not specified.
 
 ---
