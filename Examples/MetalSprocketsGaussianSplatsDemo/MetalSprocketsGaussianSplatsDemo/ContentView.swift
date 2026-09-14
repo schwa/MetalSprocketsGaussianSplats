@@ -42,7 +42,7 @@ struct ContentView: View {
                 }
                 .pickerStyle(.menu)
                 Picker("Renderer", systemImage: "paintbrush", selection: $demoState.renderer) {
-                    ForEach(SplatRenderer.allCases.filter { $0 != .pointSplat }, id: \.self) { r in
+                    ForEach(SplatRenderer.allCases.filter { $0 != .pointSplat && $0 != .tileBased }, id: \.self) { r in
                         Text(r.rawValue.capitalized).tag(r)
                     }
                 }
