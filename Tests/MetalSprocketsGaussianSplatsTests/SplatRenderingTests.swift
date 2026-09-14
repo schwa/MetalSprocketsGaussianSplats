@@ -73,7 +73,6 @@ struct GoldenImageRenderingTests {
         LookAt(position: position, target: target, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
     }
 
-
     @MainActor
     private func renderSplatsWithSpark(fixture: String, extension ext: String, cameraPosition: SIMD3<Float>, size: CGSize) throws -> CGImage {
         let genericSplats = try loadSplats(fixture: fixture, extension: ext)
@@ -83,7 +82,7 @@ struct GoldenImageRenderingTests {
     }
 
     @MainActor
-    private func renderSparkCloud(cloud: GPUSplatCloud<SparkSplat>, cameraPosition: SIMD3<Float>, size: CGSize, useSphericalHarmonics: Bool? = nil) throws -> CGImage {
+    private func renderSparkCloud(cloud: GPUSplatCloud<SparkSplat>, cameraPosition: SIMD3<Float>, size: CGSize, useSphericalHarmonics _: Bool? = nil) throws -> CGImage {
         let cameraMatrix = makeCameraMatrix(position: cameraPosition)
         let projection = PerspectiveProjection(
             verticalAngleOfView: .degrees(60),

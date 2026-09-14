@@ -284,7 +284,6 @@ struct BenchRunner {
         }
     }
 
-
     private func benchmarkGPUSort(splats: [SparkSplat], cameraMatrix: simd_float4x4, projectionMatrix: simd_float4x4) throws -> [Double] {
         let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
         let resources = try GPUSortResources(device: device, capacity: cloud.count, precision: sortPrecision)

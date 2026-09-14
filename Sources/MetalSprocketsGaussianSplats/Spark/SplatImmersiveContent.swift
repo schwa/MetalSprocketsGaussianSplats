@@ -208,7 +208,6 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
             }
         }
     }
-
 }
 
 // MARK: - GPU Sort Element

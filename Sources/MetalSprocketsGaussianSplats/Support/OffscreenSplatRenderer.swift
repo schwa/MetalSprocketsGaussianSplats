@@ -50,7 +50,6 @@ public final class OffscreenSplatRenderer {
         case point
     }
 
-
     public struct Configuration {
         public var width: Int
         public var height: Int
