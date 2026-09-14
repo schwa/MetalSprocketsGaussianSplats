@@ -65,6 +65,7 @@ final class ARSplatSessionModel: NSObject, ARSessionDelegate {
 /// world (#43).
 struct ARSplatView: View {
     let splatCloud: GPUSplatCloud<SparkSplat>
+    let sortPrecision: SplatSortPrecision
 
     /// Splat placed 1m in front of the session origin (the initial camera
     /// pose), scaled down to tabletop size.
@@ -88,7 +89,7 @@ struct ARSplatView: View {
                     guard let device = MTLCreateSystemDefaultDevice() else {
                         throw ARSplatViewError.noMetalDevice
                     }
-                    sortResources = try GPUSortResources(device: device, capacity: splatCloud.count)
+                    sortResources = try GPUSortResources(device: device, capacity: splatCloud.count, precision: sortPrecision)
                 } catch {
                     sortResourcesError = error
                 }

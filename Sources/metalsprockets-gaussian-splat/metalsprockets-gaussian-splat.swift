@@ -68,6 +68,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Enable Metal frame capture for debugging in Xcode")
     var capture: Bool = false
 
+    @Option(help: "GPU sort depth-key precision: 16 or 32 bits")
+    var sortPrecision: SplatSortPrecision = .float16
+
     @Option(help: "Renderer to use (spark, point, tile, stochastic)")
     var renderer: RendererKind = .spark
 
@@ -305,7 +308,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 farPlane: far,
                 pointSupersampling: supersampling,
                 pointPointsPerThread: pointsPerThread,
-                collectGPUCounters: statistics != nil
+                collectGPUCounters: statistics != nil,
+                sortPrecision: sortPrecision
             )
         )
 

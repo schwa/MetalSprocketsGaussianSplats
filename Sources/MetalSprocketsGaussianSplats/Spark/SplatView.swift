@@ -72,6 +72,7 @@ public struct SplatView: View {
         splatCloud: GPUSplatCloud<SparkSplat>,
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,
+        sortPrecision: SplatSortPrecision = .float16,
         projection: PerspectiveProjection = PerspectiveProjection(
             verticalAngleOfView: .degrees(60),
             depthMode: .standard(zClip: 0.01 ... 1_000)
@@ -82,7 +83,7 @@ public struct SplatView: View {
         self.modelMatrix = modelMatrix
         self.projection = projection
         let device = MTLCreateSystemDefaultDevice()!
-        _sortResources = State(initialValue: try! GPUSortResources(device: device, capacity: splatCloud.count))
+        _sortResources = State(initialValue: try! GPUSortResources(device: device, capacity: splatCloud.count, precision: sortPrecision))
     }
 
     public var body: some View {

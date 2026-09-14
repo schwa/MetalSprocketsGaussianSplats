@@ -7,8 +7,8 @@ import MetalSprocketsSupport
 import Splats
 
 /// Compute pass encoding the full GPU splat sort for one cloud into one slot of
-/// a ``GPUSortResources``: frustum cull + stable compaction, then a two-pass
-/// 8-bit LSD radix over the 16-bit half depth key, then decode into
+/// a ``GPUSortResources``: frustum cull + stable compaction, then a two- or four-pass
+/// 8-bit LSD radix over the selected depth-key precision, then decode into
 /// `IndexedDistance` records the render vertex shader reads.
 ///
 /// Culled splats are dropped before the radix, so the sort processes only
@@ -25,14 +25,14 @@ public struct GPUSplatSortComputePass: Element {
     var resources: GPUSortResources
     var slotIndex: Int
 
-    @MSState var cullMark: ComputeKernel
+    let cullMark: ComputeKernel
     @MSState var compactScanBlocks: ComputeKernel
     @MSState var compactScatter: ComputeKernel
     @MSState var histogram: ComputeKernel
     @MSState var scanOffsets: ComputeKernel
     @MSState var scanDigitBase: ComputeKernel
-    @MSState var scatter: ComputeKernel        // decode_output = false
-    @MSState var scatterDecode: ComputeKernel  // decode_output = true (final pass)
+    let scatter: ComputeKernel        // decode_output = false
+    let scatterDecode: ComputeKernel  // decode_output = true (final pass)
 
     /// Convenience initializer for mono (single-view) sorting.
     public init(
@@ -86,16 +86,18 @@ public struct GPUSplatSortComputePass: Element {
         self.slotIndex = slotIndex
 
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("SplatGPUSort")
-        self.cullMark = try shaderLibrary.function(named: "splatCullMark", type: ComputeKernel.self)
+        var keyConstants = FunctionConstants()
+        keyConstants["use_float32_keys"] = .bool(resources.precision == .float32)
+        self.cullMark = try shaderLibrary.function(named: "splatCullMark", type: ComputeKernel.self, constants: keyConstants)
         self.compactScanBlocks = try shaderLibrary.function(named: "splatCompactScanBlocks", type: ComputeKernel.self)
         self.compactScatter = try shaderLibrary.function(named: "splatCompactScatter", type: ComputeKernel.self)
         self.histogram = try shaderLibrary.function(named: "splatRadixHistogram", type: ComputeKernel.self)
         self.scanOffsets = try shaderLibrary.function(named: "splatRadixScanOffsets", type: ComputeKernel.self)
         self.scanDigitBase = try shaderLibrary.function(named: "splatRadixScanDigitBase", type: ComputeKernel.self)
-        var scatterOff = FunctionConstants()
+        var scatterOff = keyConstants
         scatterOff["decode_output"] = .bool(false)
         self.scatter = try shaderLibrary.function(named: "splatRadixScatter", type: ComputeKernel.self, constants: scatterOff)
-        var scatterOn = FunctionConstants()
+        var scatterOn = keyConstants
         scatterOn["decode_output"] = .bool(true)
         self.scatterDecode = try shaderLibrary.function(named: "splatRadixScatter", type: ComputeKernel.self, constants: scatterOn)
     }
@@ -160,11 +162,15 @@ public struct GPUSplatSortComputePass: Element {
                         .parameter("blockBase", buffer: slot.blockBase)
                         .parameter("blockCounts", buffer: slot.blockCounts)
                 }
-                // Two 8-bit radix passes over the 16-bit key. Pass 0 sorts
-                // recordsB -> recordsA. Pass 1 (decode) scatters directly into
-                // the IndexedDistance output buffer, folding away the decode kernel.
+                // Only the final pass decodes into the IndexedDistance output.
                 try radixPass(shift: 0, src: slot.recordsB, dst: slot.recordsA, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
-                try radixPass(shift: 8, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                if resources.precision == .float32 {
+                    try radixPass(shift: 8, src: slot.recordsA, dst: slot.recordsB, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                    try radixPass(shift: 16, src: slot.recordsB, dst: slot.recordsA, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                    try radixPass(shift: 24, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                } else {
+                    try radixPass(shift: 8, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                }
             }
         }
     }

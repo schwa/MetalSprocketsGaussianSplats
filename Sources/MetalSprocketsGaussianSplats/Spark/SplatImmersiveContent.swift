@@ -38,12 +38,13 @@ public struct SplatImmersiveContent: ImmersiveSpaceContent {
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         modelMatrix: simd_float4x4 = .identity,
-        renderer: SplatRenderer = .sparkGPU
+        renderer: SplatRenderer = .sparkGPU,
+        sortPrecision: SplatSortPrecision = .float32
     ) throws {
         self.splatCloud = splatCloud
         self.modelMatrix = modelMatrix
         self.renderer = renderer
-        self.renderState = try SplatImmersiveRenderState(splatCloud: splatCloud)
+        self.renderState = try SplatImmersiveRenderState(splatCloud: splatCloud, sortPrecision: sortPrecision)
     }
 
     public var body: some ImmersiveSpaceContent {
@@ -309,12 +310,12 @@ public final class SplatImmersiveRenderState: Sendable {
 
     private let gpuSortState: OSAllocatedUnfairLock<GPUSortState>
     private let frameCounter: OSAllocatedUnfairLock<UInt32>
-    public init(splatCloud: GPUSplatCloud<SparkSplat>) throws {
+    public init(splatCloud: GPUSplatCloud<SparkSplat>, sortPrecision: SplatSortPrecision = .float32) throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw Error.noMetalDevice
         }
         self.frameCounter = OSAllocatedUnfairLock(initialState: UInt32(0))
-        let resources = try GPUSortResources(device: device, capacity: splatCloud.count)
+        let resources = try GPUSortResources(device: device, capacity: splatCloud.count, precision: sortPrecision)
         self.gpuSortState = OSAllocatedUnfairLock(uncheckedState: GPUSortState(resources: resources))
     }
 

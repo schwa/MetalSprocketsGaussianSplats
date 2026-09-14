@@ -4,14 +4,23 @@
 
 using namespace metal;
 
-// GPU splat sort: an 8-bit LSD radix over the 16-bit `half` distance key.
-// Two passes (shift 0, 8) sort a 16-bit key. Ported from the GPUSort benchmark
+// GPU splat sort: an 8-bit LSD radix over a 16-bit or 32-bit depth key.
+// Two or four passes sort the key. Ported from the GPUSort benchmark
 // project's 8-bit radix (the steady iOS winner), specialized to build and carry
 // `IndexedDistance` payloads. Intermediate records are `uint2` (see SplatGPUSort.h).
 
 namespace SplatGPUSort {
 
 constant uint RADIX = 256;
+constant bool use_float32_keys [[function_constant(7)]];
+
+inline uint floatFlip32(uint bits) {
+    return bits ^ ((bits & 0x80000000u) ? 0xFFFFFFFFu : 0x80000000u);
+}
+
+inline uint floatUnflip32(uint bits) {
+    return (bits & 0x80000000u) ? (bits ^ 0x80000000u) : ~bits;
+}
 
 // Maps an IEEE-754 half bit-pattern to a ushort that sorts in ascending order,
 // negatives included. Branchless. Mirrors floatFlip16() on the Swift side.
@@ -83,8 +92,10 @@ kernel void splatCullMark(device const SparkSplat  *splats      [[buffer(0)]],
             alive = splatPassesCull(p.projection1 * viewPos1, p.guardBand);
         }
         float distance = viewPos.z * (p.reversed ? -1.0 : 1.0);
-        ushort key = min(floatFlip16(as_type<ushort>(half(distance))), kMaxSurvivorKey);
-        rec = uint2(uint(key) | (p.cloudIndex << 16), gid);
+        uint key = use_float32_keys
+            ? floatFlip32(as_type<uint>(distance))
+            : uint(min(floatFlip16(as_type<ushort>(half(distance))), kMaxSurvivorKey)) | (p.cloudIndex << 16);
+        rec = uint2(key, gid);
     }
 
     // Exclusive scan of alive flags -> stable in-block rank (gid order).
@@ -258,8 +269,10 @@ kernel void splatRadixScatter(device const uint2 *inRecords  [[buffer(0)]],
             if (decode_output) {
                 IndexedDistance out;
                 out.splatIndex = rec.y;
-                out.cloudIndex = ushort(rec.x >> 16);
-                out.distanceToCamera = as_type<half>(floatUnflip16(ushort(rec.x & 0xFFFFu)));
+                out.cloudIndex = use_float32_keys ? 0 : ushort(rec.x >> 16);
+                out.distanceToCamera = use_float32_keys
+                    ? half(as_type<float>(floatUnflip32(rec.x)))
+                    : as_type<half>(floatUnflip16(ushort(rec.x & 0xFFFFu)));
                 ((device IndexedDistance *)outRecords)[base + rank] = out;
             } else {
                 outRecords[base + rank] = rec;

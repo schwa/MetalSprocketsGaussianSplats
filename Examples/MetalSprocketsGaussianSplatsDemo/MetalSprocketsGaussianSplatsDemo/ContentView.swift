@@ -48,6 +48,7 @@ struct ContentView: View {
                 }
                 .pickerStyle(.menu)
                 debugPicker
+                sortPrecisionPicker
                 loadButton
                 generateMenu
                 ImmersiveToggle(demoState: demoState)
@@ -61,7 +62,8 @@ struct ContentView: View {
         .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
         #elseif os(iOS)
         if isARMode {
-            ARSplatView(splatCloud: splatCloud)
+            ARSplatView(splatCloud: splatCloud, sortPrecision: demoState.sortPrecision)
+                .id(demoState.sortPrecision)
                 .ignoresSafeArea()
                 .overlay(alignment: .top) {
                     Button("Exit AR", systemImage: "arkit") {
@@ -82,9 +84,11 @@ struct ContentView: View {
     @ViewBuilder
     private var splatRenderView: some View {
         if let debugParams = demoState.debugParams {
-            DebugSplatView(splatCloud: splatCloud, cameraMatrix: cameraMatrix, debugParams: debugParams)
+            DebugSplatView(splatCloud: splatCloud, cameraMatrix: cameraMatrix, debugParams: debugParams, sortPrecision: demoState.sortPrecision)
+                .id(demoState.sortPrecision)
         } else {
-            SplatView(splatCloud: splatCloud, cameraMatrix: cameraMatrix)
+            SplatView(splatCloud: splatCloud, cameraMatrix: cameraMatrix, sortPrecision: demoState.sortPrecision)
+                .id(demoState.sortPrecision)
         }
     }
 
@@ -123,6 +127,7 @@ struct ContentView: View {
                         }
                         .pickerStyle(.menu)
                         debugPicker
+                        sortPrecisionPicker
                         #if os(iOS)
                         Button("AR", systemImage: "arkit") {
                             isARMode = true
@@ -184,6 +189,20 @@ struct ContentView: View {
         Task { @MainActor in
             isImporting = true
         }
+    }
+
+    private var sortPrecisionPicker: some View {
+        #if os(visionOS)
+        let selection = demoState.isImmersive ? $demoState.immersiveSortPrecision : $demoState.sortPrecision
+        #else
+        let selection = $demoState.sortPrecision
+        #endif
+        return Picker("Sort precision", selection: selection) {
+            ForEach(SplatSortPrecision.allCases, id: \.self) { precision in
+                Text("\(precision.rawValue)-bit").tag(precision)
+            }
+        }
+        .pickerStyle(.menu)
     }
 
     private var generateMenu: some View {

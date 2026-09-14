@@ -17,12 +17,12 @@ struct DebugSplatView: View {
 
     @State private var resources: GPUSortResources
 
-    init(splatCloud: GPUSplatCloud<SparkSplat>, cameraMatrix: simd_float4x4, debugParams: DebugParams) {
+    init(splatCloud: GPUSplatCloud<SparkSplat>, cameraMatrix: simd_float4x4, debugParams: DebugParams, sortPrecision: SplatSortPrecision) {
         self.splatCloud = splatCloud
         self.cameraMatrix = cameraMatrix
         self.debugParams = debugParams
         let device = splatCloud.splats.unsafeMTLBuffer.device
-        _resources = State(initialValue: try! GPUSortResources(device: device, capacity: splatCloud.count))
+        _resources = State(initialValue: try! GPUSortResources(device: device, capacity: splatCloud.count, precision: sortPrecision))
     }
 
     var body: some View {

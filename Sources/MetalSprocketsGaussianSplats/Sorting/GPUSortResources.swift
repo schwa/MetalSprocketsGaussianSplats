@@ -36,13 +36,15 @@ public final class GPUSortResources {
     static let elementsPerTile = 1_024
 
     public let device: MTLDevice
+    public let precision: SplatSortPrecision
     public let slotCount: Int
     public private(set) var capacity: Int
     private(set) var slots: [Slot]
     private var slotIndex = 0
 
-    public init(device: MTLDevice, capacity: Int, slotCount: Int = 3) throws {
+    public init(device: MTLDevice, capacity: Int, slotCount: Int = 3, precision: SplatSortPrecision = .float16) throws {
         self.device = device
+        self.precision = precision
         self.slotCount = slotCount
         self.capacity = max(capacity, 1)
         slots = []

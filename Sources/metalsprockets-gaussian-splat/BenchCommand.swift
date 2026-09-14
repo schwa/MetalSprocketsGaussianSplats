@@ -45,6 +45,9 @@ struct BenchCommand: AsyncParsableCommand {
     @Option(help: "Render size (square)")
     var size: Int = 1_024
 
+    @Option(help: "GPU sort depth-key precision: 16 or 32 bits")
+    var sortPrecision: SplatSortPrecision = .float16
+
     @Option(help: "Benchmark a splat file instead of synthetic clouds")
     var splat: String?
 
@@ -89,7 +92,7 @@ struct BenchCommand: AsyncParsableCommand {
         let pointsPerThread = self.pointsPerThread
         let packed = self.packed
         try await MainActor.run {
-            var runner = try BenchRunner(size: size, frames: frames, supersampling: supersampling, pointsPerThread: pointsPerThread, packed: packed)
+            var runner = try BenchRunner(size: size, frames: frames, supersampling: supersampling, pointsPerThread: pointsPerThread, packed: packed, sortPrecision: sortPrecision)
             var rows: [BenchRunner.Row] = []
             #if DEBUG
             FileHandle.standardError.write(Data("warning: Debug build; numbers will not be representative\n".utf8))
@@ -167,9 +170,11 @@ struct BenchRunner {
     let device: MTLDevice
     let runner: Runner
     let packed: Bool
+    let sortPrecision: SplatSortPrecision
 
-    init(size: Int, frames: Int, supersampling: Int = 2, pointsPerThread: Int = 4, packed: Bool = false) throws {
+    init(size: Int, frames: Int, supersampling: Int = 2, pointsPerThread: Int = 4, packed: Bool = false, sortPrecision: SplatSortPrecision = .float16) throws {
         self.packed = packed
+        self.sortPrecision = sortPrecision
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw BenchCommand.BenchError(message: "No Metal device")
         }
@@ -282,7 +287,7 @@ struct BenchRunner {
 
     private func benchmarkGPUSort(splats: [SparkSplat], cameraMatrix: simd_float4x4, projectionMatrix: simd_float4x4) throws -> [Double] {
         let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
-        let resources = try GPUSortResources(device: device, capacity: cloud.count)
+        let resources = try GPUSortResources(device: device, capacity: cloud.count, precision: sortPrecision)
         let offscreen = try OffscreenRenderer(size: CGSize(width: size, height: size))
         let drawableSize = SIMD2<Float>(Float(size), Float(size))
         return try measure { _ in
@@ -458,7 +463,7 @@ struct BenchRunner {
             splatCloud: cloud,
             projection: Self.sortDetailProjection,
             cameraMatrix: camera,
-            configuration: .init(width: size, height: size, collectGPUCounters: true)
+            configuration: .init(width: size, height: size, collectGPUCounters: true, sortPrecision: sortPrecision)
         )
     }
 

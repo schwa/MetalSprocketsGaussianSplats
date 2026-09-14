@@ -42,6 +42,14 @@ enum SplatModel: String, CaseIterable, Identifiable {
 @Observable
 class DemoState {
     var renderer: SplatRenderer = .sparkGPU
+    var sortPrecision: SplatSortPrecision = .float16
+    #if os(visionOS)
+    var immersiveSortPrecision: SplatSortPrecision = .float32 {
+        didSet {
+            renderState = try! SplatImmersiveRenderState(splatCloud: splatCloud, sortPrecision: immersiveSortPrecision)
+        }
+    }
+    #endif
     var debugMode: SplatDebugMode?
 
     var debugParams: DebugParams? {
@@ -115,7 +123,7 @@ class DemoState {
         let cloud = Self.loadSplatCloud(device: device, model: model)
         splatCloud = cloud
         #if os(visionOS)
-        renderState = try! SplatImmersiveRenderState(splatCloud: cloud)
+        renderState = try! SplatImmersiveRenderState(splatCloud: cloud, sortPrecision: immersiveSortPrecision)
         #endif
     }
 
@@ -143,7 +151,7 @@ class DemoState {
             customModelName = url.lastPathComponent
             selectedModel = nil
             #if os(visionOS)
-            renderState = try SplatImmersiveRenderState(splatCloud: cloud)
+            renderState = try SplatImmersiveRenderState(splatCloud: cloud, sortPrecision: immersiveSortPrecision)
             #endif
         } catch {
             Self.logger.error("Load failed for \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
@@ -167,7 +175,7 @@ class DemoState {
             customModelName = "Sphere \(SplatGenerator.label(for: count)) (generated)"
             selectedModel = nil
             #if os(visionOS)
-            renderState = try SplatImmersiveRenderState(splatCloud: cloud)
+            renderState = try SplatImmersiveRenderState(splatCloud: cloud, sortPrecision: immersiveSortPrecision)
             #endif
         } catch {
             Self.logger.error("Generation failed: \(error, privacy: .public)")

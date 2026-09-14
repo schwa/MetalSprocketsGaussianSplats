@@ -66,6 +66,7 @@ public final class OffscreenSplatRenderer {
         public var pointPointsPerThread: Int
         /// Sample GPU timestamps each frame and report them in ``FrameReport``.
         public var collectGPUCounters: Bool
+        public var sortPrecision: SplatSortPrecision
 
         public init(
             width: Int,
@@ -76,7 +77,8 @@ public final class OffscreenSplatRenderer {
             farPlane: Float = 100.0,
             pointSupersampling: Int = 2,
             pointPointsPerThread: Int = 4,
-            collectGPUCounters: Bool = false
+            collectGPUCounters: Bool = false,
+            sortPrecision: SplatSortPrecision = .float16
         ) {
             self.width = width
             self.height = height
@@ -87,6 +89,7 @@ public final class OffscreenSplatRenderer {
             self.pointSupersampling = pointSupersampling
             self.pointPointsPerThread = pointPointsPerThread
             self.collectGPUCounters = collectGPUCounters
+            self.sortPrecision = sortPrecision
         }
     }
 
@@ -176,7 +179,7 @@ public final class OffscreenSplatRenderer {
         case .spark:
             let offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: configuration)
             self.offscreenRenderer = offscreenRenderer
-            self.gpuSortResources = try GPUSortResources(device: offscreenRenderer.device, capacity: splatCloud.count, slotCount: 1)
+            self.gpuSortResources = try GPUSortResources(device: offscreenRenderer.device, capacity: splatCloud.count, slotCount: 1, precision: configuration.sortPrecision)
             self.pointRunner = nil
             self.pointTexture = nil
 
