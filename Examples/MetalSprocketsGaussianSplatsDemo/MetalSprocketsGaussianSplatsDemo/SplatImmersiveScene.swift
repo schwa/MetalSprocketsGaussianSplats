@@ -15,7 +15,7 @@ struct SplatImmersiveScene: Scene {
             ImmersiveRenderContent { [demoState] context in
                 let splatCloud = demoState.splatCloud
                 let renderState = demoState.renderState
-                let modelScale: SIMD3<Float> = demoState.selectedModel == .tomatoes ? [0.5, -0.5, 0.5] : [1, 1, 1]
+                let modelScale: SIMD3<Float> = demoState.selectedModel == .tomatoes ? [0.125, -0.125, 0.125] : [1, 1, 1]
                 let modelMatrix = simd_float4x4(translation: SIMD3<Float>(0, 1.5, -2))
                     * simd_float4x4(xRotation: .radians(.pi))
                     * simd_float4x4(scale: modelScale)
