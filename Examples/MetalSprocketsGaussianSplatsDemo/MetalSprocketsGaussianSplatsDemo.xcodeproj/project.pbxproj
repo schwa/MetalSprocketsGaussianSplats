@@ -409,7 +409,7 @@
 			repositoryURL = "https://github.com/schwa/Interaction3D";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.3;
+				minimumVersion = 0.1.12;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
