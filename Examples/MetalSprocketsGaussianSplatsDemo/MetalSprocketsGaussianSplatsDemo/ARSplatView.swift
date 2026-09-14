@@ -72,11 +72,8 @@ struct ARSplatView: View {
 
     @State private var sessionModel = ARSplatSessionModel()
     @State private var frameData = ARFrameData()
-    @State private var sortManager: AsyncSortManager<SparkSplat>?
-    @State private var sortManagerError: Error?
-    @State private var sortedIndices: SplatIndices?
-
-    private static let pendingReleaseDepth = 3
+    @State private var sortResources: GPUSortResources?
+    @State private var sortResourcesError: Error?
 
     var body: some View {
         content
@@ -87,28 +84,14 @@ struct ARSplatView: View {
                 // Created here, not in init. A failure then shows an error
                 // message instead of a crash. No work runs on every parent
                 // body evaluation (#98).
-                let manager: AsyncSortManager<SparkSplat>
                 do {
                     guard let device = MTLCreateSystemDefaultDevice() else {
                         throw ARSplatViewError.noMetalDevice
                     }
-                    manager = try AsyncSortManager<SparkSplat>(
-                        device: device,
-                        splatCloud: splatCloud,
-                        capacity: splatCloud.count,
-                        preallocatedBufferCount: Self.pendingReleaseDepth + 3
-                    )
+                    sortResources = try GPUSortResources(device: device, capacity: splatCloud.count)
                 } catch {
-                    sortManagerError = error
-                    return
+                    sortResourcesError = error
                 }
-                sortManager = manager
-                for await indices in manager.managedSortedIndicesStream(pendingReleaseDepth: Self.pendingReleaseDepth) {
-                    sortedIndices = indices
-                }
-            }
-            .onChange(of: frameData.viewMatrix) {
-                sortManager?.requestSort(SortParameters(camera: frameData.viewMatrix.inverse, model: Self.modelMatrix))
             }
     }
 
@@ -119,13 +102,23 @@ struct ARSplatView: View {
             let textureCoordinates = frameData.textureCoordinates
             let projectionMatrix = frameData.projectionMatrix
             let cameraMatrix = frameData.viewMatrix.inverse
-            let sortedIndices = sortedIndices
+            let sortResources = sortResources
 
             RenderView { _, drawableSize in
                 let size = SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
-                try RenderPass {
-                    YCbCrBillboardRenderPass(textureY: textureY, textureCbCr: textureCbCr, textureCoordinates: textureCoordinates)
-                    if let sortedIndices {
+                if let sortResources {
+                    let slot = sortResources.advance()
+                    let sortedIndices = sortResources.makeIndices(slot: slot, count: splatCloud.count, parameters: SortParameters(camera: cameraMatrix, model: Self.modelMatrix))
+                    try GPUSplatSortComputePass(
+                        splatCloud: splatCloud,
+                        projectionMatrix: projectionMatrix,
+                        modelMatrix: Self.modelMatrix,
+                        cameraMatrix: cameraMatrix,
+                        resources: sortResources,
+                        slotIndex: slot
+                    )
+                    try RenderPass {
+                        YCbCrBillboardRenderPass(textureY: textureY, textureCbCr: textureCbCr, textureCoordinates: textureCoordinates)
                         try SparkSplatRenderPipeline(
                             splatCloud: splatCloud,
                             projectionMatrix: projectionMatrix,
@@ -135,18 +128,18 @@ struct ARSplatView: View {
                             sortedIndices: sortedIndices
                         )
                     }
-                }
-                .renderPassDescriptorModifier { descriptor in
-                    descriptor.renderTargetArrayLength = 1
+                    .renderPassDescriptorModifier { descriptor in
+                        descriptor.renderTargetArrayLength = 1
+                    }
                 }
             }
             .metalDepthStencilPixelFormat(.depth32Float)
             .metalClearColor(.init(red: 0, green: 0, blue: 0, alpha: 0))
-        } else if let sortManagerError {
+        } else if let sortResourcesError {
             ContentUnavailableView(
                 "AR unavailable",
                 systemImage: "exclamationmark.triangle",
-                description: Text(sortManagerError.localizedDescription)
+                description: Text(sortResourcesError.localizedDescription)
             )
         } else {
             ProgressView("Starting AR\u{2026}")

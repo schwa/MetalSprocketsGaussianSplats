@@ -3,9 +3,6 @@ import SwiftUI
 
 /// The rendering algorithm used by ``SplatView``.
 public enum SplatRenderer: String, CaseIterable, Sendable {
-    /// CPU-sorted alpha-blended renderer.
-    case sparkCPU
-
     /// The default renderer. It is Spark with a GPU-side sort and frustum
     /// culling. It sorts in the same GPU workload as the render, so there is no
     /// CPU sort latency.

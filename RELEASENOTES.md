@@ -8,6 +8,11 @@
   cull + stable compaction + two-pass radix sort encoded in the same GPU workload as
   rendering, drawing survivors via indirect draw. New `gpu` renderer mode in `SplatView`
   with a splat count / cull percentage stats overlay. Stereo/visionOS rendering supported.
+- Removed the CPU sort path and `AsyncSortManager` API. Spark now sorts, culls, and
+  renders entirely on the GPU (`GPUSortedSplatRenderPipeline`), which requires GPU
+  families with 64-bit atomics. `CPURadixSort`, `CPUSplatRadixSorter`, `SplatSorter`,
+  `AsyncSortManager`, `SortEvent`, `SingleValueStream`, the `.sparkCPU` renderer, and
+  the CLI `--sort` option are gone.
 - New PointSplat renderer: sort-free stochastic Gaussian point splatting (RFC 0003),
   with GPU work distribution, 2x2 supersampling and K points per thread, spherical
   harmonics, occlusion culling, temporal reprojection during camera motion (with

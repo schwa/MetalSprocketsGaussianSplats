@@ -9,11 +9,6 @@ enum StatisticsFormat: String, CaseIterable, ExpressibleByArgument {
     case json
 }
 
-enum SortMethod: String, CaseIterable, ExpressibleByArgument {
-    case cpu
-    case gpu
-}
-
 enum RendererKind: String, CaseIterable, ExpressibleByArgument {
     case spark
     case point
@@ -24,9 +19,7 @@ enum RendererKind: String, CaseIterable, ExpressibleByArgument {
 /// Timings for one measured frame.
 struct FrameSample {
     var wallTime: TimeInterval
-    /// CPU radix sort wall time. Absent when the sort runs on the GPU.
-    var sortCPUTime: TimeInterval?
-    /// GPU sort compute pass sample. Absent when the sort runs on the CPU.
+    /// GPU sort compute pass sample.
     var sortGPU: GPUCounterSample?
     var render: GPUCounterSample?
     /// Frustum-cull survivors. The GPU sort is the only path that culls.
@@ -34,9 +27,8 @@ struct FrameSample {
     /// Whole-submission GPU time from the command-buffer clock. This is correlation-free.
     var commandBufferGPUTime: TimeInterval?
 
-    init(wallTime: TimeInterval, sortCPUTime: TimeInterval? = nil, sortGPU: GPUCounterSample? = nil, render: GPUCounterSample? = nil, visibleSplats: Int? = nil, commandBufferGPUTime: TimeInterval? = nil) {
+    init(wallTime: TimeInterval, sortGPU: GPUCounterSample? = nil, render: GPUCounterSample? = nil, visibleSplats: Int? = nil, commandBufferGPUTime: TimeInterval? = nil) {
         self.wallTime = wallTime
-        self.sortCPUTime = sortCPUTime
         self.sortGPU = sortGPU
         self.render = render
         self.visibleSplats = visibleSplats
@@ -63,16 +55,12 @@ struct StatisticsReport: Codable {
     var frames: Int
     var warmup: Int
     var renderer: String
-    /// Meaningful only for the spark renderer. The others do not sort.
-    var sortMethod: String
     /// Frustum-cull survivors from the last measured frame (GPU sort only).
     var visibleSplats: Int?
     var culledSplats: Int?
     /// Sort plus render, per frame, from the CPU wall clock.
     var wall: Stat
-    /// CPU radix sort wall time (--sort cpu only).
-    var sortCpu: Stat?
-    /// GPU sort compute pass time from timestamp counters (--sort gpu only).
+    /// GPU sort compute pass time from timestamp counters.
     var sortGpu: Stat?
     /// Render pass GPU time from timestamp counters. Absent when the device
     /// does not support stage-boundary sampling.
@@ -89,8 +77,7 @@ struct StatisticsReport: Codable {
     var commandBufferGpu: Stat?
 }
 
-func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, height: Int, warmup: Int, renderer: RendererKind, sortMethod: SortMethod) -> StatisticsReport {
-    let sortCPUTimes = samples.compactMap(\.sortCPUTime)
+func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, height: Int, warmup: Int, renderer: RendererKind) -> StatisticsReport {
     let sortGPUTimes = samples.compactMap { $0.sortGPU?.duration }
     let gpuTimes = samples.compactMap { $0.render?.duration }
     let vertexTimes = samples.compactMap { $0.render?.vertex?.duration }
@@ -113,11 +100,9 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
         frames: samples.count,
         warmup: warmup,
         renderer: renderer.rawValue,
-        sortMethod: sortMethod.rawValue,
         visibleSplats: visible,
         culledSplats: visible.map { max(0, splats - $0) },
         wall: stat(samples.map(\.wallTime)),
-        sortCpu: sortCPUTimes.isEmpty ? nil : stat(sortCPUTimes),
         sortGpu: sortGPUTimes.isEmpty ? nil : stat(sortGPUTimes),
         renderGpu: gpuTimes.isEmpty ? nil : stat(gpuTimes),
         vertex: vertexTimes.isEmpty ? nil : stat(vertexTimes),
@@ -143,17 +128,13 @@ private func printTextReport(_ report: StatisticsReport) {
     print("")
     print("Statistics — median of \(report.frames) frame(s), \(report.warmup) warm-up")
     print("  scene       \(report.splats) splats, SH degree \(report.shDegree)")
-    let sortSuffix = report.renderer == RendererKind.spark.rawValue ? " (\(report.sortMethod) sort)" : ""
-    print("  renderer    \(report.renderer)\(sortSuffix)")
+    print("  renderer    \(report.renderer)")
     print("  size        \(report.width)x\(report.height)")
     if let visible = report.visibleSplats, let culled = report.culledSplats {
         let percent = report.splats > 0 ? Double(culled) / Double(report.splats) * 100 : 0
         print(String(format: "  culling     %d visible, %d culled (%.1f%%)", visible, culled, percent))
     }
     line("wall", report.wall)
-    if let sortCpu = report.sortCpu {
-        line("cpu sort", sortCpu)
-    }
     if let sortGpu = report.sortGpu {
         line("gpu sort", sortGpu)
     }

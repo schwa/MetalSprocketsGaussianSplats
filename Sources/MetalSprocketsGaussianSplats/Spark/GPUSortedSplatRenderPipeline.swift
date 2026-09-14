@@ -8,7 +8,7 @@ import MetalSprocketsSupport
 import Splats
 
 /// A self-contained splat pipeline. It sorts on the GPU, culls the frustum, and
-/// renders in the same GPU workload. It does no CPU sort and needs no ``AsyncSortManager``.
+/// renders in the same GPU workload. It does no CPU sort.
 ///
 /// Each frame encodes a ``GPUSplatSortComputePass`` into one slot of a shared
 /// ``GPUSortResources``. It then renders through ``SparkSplatRenderPipeline`` with an

@@ -73,13 +73,6 @@ struct GoldenImageRenderingTests {
         LookAt(position: position, target: target, up: SIMD3<Float>(0, 1, 0)).cameraMatrix
     }
 
-    private func makeProjectionMatrix(size: CGSize) -> simd_float4x4 {
-        let projection = PerspectiveProjection(
-            verticalAngleOfView: .degrees(60),
-            depthMode: .standard(zClip: 0.01 ... 100)
-        )
-        return projection.projectionMatrix(for: size)
-    }
 
     @MainActor
     private func renderSplatsWithSpark(fixture: String, extension ext: String, cameraPosition: SIMD3<Float>, size: CGSize) throws -> CGImage {
@@ -91,30 +84,20 @@ struct GoldenImageRenderingTests {
 
     @MainActor
     private func renderSparkCloud(cloud: GPUSplatCloud<SparkSplat>, cameraPosition: SIMD3<Float>, size: CGSize, useSphericalHarmonics: Bool? = nil) throws -> CGImage {
-        let sortManager = try AsyncSortManager<SparkSplat>(device: device, splatCloud: cloud, capacity: cloud.count)
-
         let cameraMatrix = makeCameraMatrix(position: cameraPosition)
-        let projectionMatrix = makeProjectionMatrix(size: size)
-        let sortParameters = SortParameters(camera: cameraMatrix, model: .identity)
-        let sortedIndices = sortManager.sortNowSync(sortParameters)
-
-        let renderer = try OffscreenRenderer(size: size)
-        let renderPass = try RenderPass {
-            try SparkSplatRenderPipeline(
-                splatCloud: cloud,
-                projectionMatrix: projectionMatrix,
-                modelMatrix: .identity,
-                cameraMatrix: cameraMatrix,
-                drawableSize: SIMD2<Float>(Float(size.width), Float(size.height)),
-                configuration: .init(convertSRGBToLinear: false, useSphericalHarmonics: useSphericalHarmonics),
-                sortedIndices: sortedIndices
-            )
-        }
-        .renderPassDescriptorModifier { descriptor in
-            descriptor.renderTargetArrayLength = 1
-        }
-        let rendering = try renderer.render(renderPass)
-        return try rendering.cgImage
+        let projection = PerspectiveProjection(
+            verticalAngleOfView: .degrees(60),
+            depthMode: .standard(zClip: 0.01 ... 100)
+        )
+        let renderer = try OffscreenSplatRenderer(
+            renderer: .spark,
+            splatCloud: cloud,
+            projection: projection,
+            cameraMatrix: cameraMatrix,
+            configuration: .init(width: Int(size.width), height: Int(size.height), convertSRGBToLinear: false)
+        )
+        try renderer.renderFrame()
+        return try renderer.makeImage()
     }
 
     private func compareGoldenImage(_ image: CGImage, named name: String) throws {

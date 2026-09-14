@@ -102,91 +102,62 @@ with the splat count. See the full tables, charts, and per-pass timings in
 
 ## Usage
 
-There are three ways to drive the framework, from simplest to lowest-level.
+There are two ways to drive the framework, from simplest to lowest-level.
 
 ### Simple: SplatView
 
-`SplatView` is a SwiftUI view that renders a splat cloud. It owns the sort
-manager and the render loop. Pick a renderer with `.splatRenderer(_:)`.
+`SplatView` is a SwiftUI view that renders a splat cloud. It sorts, culls, and
+renders on the GPU each frame. Pick a renderer with `.splatRenderer(_:)`.
 
 ```swift
 SplatView(splatCloud: cloud, cameraMatrix: cameraMatrix)
-    .splatRenderer(.sparkCPU)   // or .sparkGPU, .tileBased, .stochastic, .pointSplat
+    .splatRenderer(.sparkGPU)   // or .tileBased, .stochastic, .pointSplat
 ```
 
-### MetalSprockets pipeline (interactive)
+### MetalSprockets pipeline
 
-To own the render loop, drive a render pipeline directly as a MetalSprockets
-element. Rendering needs two steps: sorting and rendering. The sort manager
-runs on a background thread. It produces sorted indices that you pass to the
-pipeline.
+To own the render loop, drive `GPUSortedSplatRenderPipeline` directly as a
+MetalSprockets element. It sorts, frustum-culls, and renders in one GPU
+workload, so there is no CPU sort and no async state to manage.
 
 ```swift
-@State private var sortedIndices: SplatIndices?
+@State private var sortResources: GPUSortResources   // create once
 
 var body: some View {
     RenderView { _, drawableSize in
-        if let sortedIndices {
-            try RenderPass {
-                try SparkSplatRenderPipeline(
-                    splatCloud: cloud,
-                    projectionMatrix: projectionMatrix,
-                    modelMatrix: .identity,
-                    cameraMatrix: cameraMatrix,
-                    drawableSize: SIMD2<Float>(drawableSize),
-                    sortedIndices: sortedIndices
-                )
-            }
-        }
-    }
-    .task {
-        for await indices in sortManager.sortedIndicesStream {
-            sortedIndices = indices
-        }
-    }
-    .onChange(of: cameraMatrix, initial: true) {
-        sortManager.requestSort(SortParameters(camera: cameraMatrix, model: .identity))
+        try GPUSortedSplatRenderPipeline(
+            splatCloud: cloud,
+            projectionMatrix: projectionMatrix,
+            modelMatrix: .identity,
+            cameraMatrix: cameraMatrix,
+            drawableSize: SIMD2<Float>(drawableSize),
+            resources: sortResources
+        )
     }
 }
 ```
 
-### Offline renderer
+`GPUSortedSplatRenderPipeline` encodes a `GPUSplatSortComputePass` into a slot
+of the shared `GPUSortResources` and then renders through
+`SparkSplatRenderPipeline` with an indirect draw. To compose the render with
+other passes, encode the sort compute pass yourself and hand the resulting
+`SplatIndices` to `SparkSplatRenderPipeline`.
+
+### Offline rendering
+
+`OffscreenSplatRenderer` renders single frames to an image with any renderer:
 
 ```swift
-let sortManager = try AsyncSortManager(device: device, splatCloud: cloud, capacity: cloud.count)
-let sortedIndices = try sortManager.sortNowSync(SortParameters(camera: cameraMatrix, model: .identity))
-
-let renderPass = try RenderPass {
-    try SparkSplatRenderPipeline(
-        splatCloud: cloud,
-        projectionMatrix: projectionMatrix,
-        modelMatrix: .identity,
-        cameraMatrix: cameraMatrix,
-        drawableSize: drawableSize,
-        sortedIndices: sortedIndices
-    )
-}
+let renderer = try OffscreenSplatRenderer(
+    renderer: .spark,
+    splatCloud: cloud,
+    projection: PerspectiveProjection(),
+    cameraMatrix: cameraMatrix,
+    configuration: .init(width: 1_024, height: 768)
+)
+try renderer.renderFrame()
+let image = try renderer.makeImage()
 ```
-
-The render pipelines are pure rendering elements. They do not manage the
-sorting or the async state. The caller owns the `AsyncSortManager`. The caller
-subscribes to its `sortedIndicesStream`, requests a sort when the camera moves,
-and passes the results in.
-
-## Environment Variables
-
-- `MSGS_SORT_LOG` — set this to `1`, `true`, `yes`, or `on`. Then the CPU
-  splat sorter emits a per-frame info-level log line with the sort duration and
-  the splat count. The default is off, because the logs are noisy at frame
-  rate. Slow-sort warnings (more than 16 ms) are always emitted, whatever this
-  setting is.
-
-  The logs go to the unified logging system under the subsystem
-  `MetalSprocketsGaussianSplats`. Read them in a terminal with:
-
-  ```sh
-  log stream --level info --predicate 'subsystem == "MetalSprocketsGaussianSplats"'
-  ```
 
 ## License
 

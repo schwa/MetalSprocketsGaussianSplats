@@ -9,76 +9,13 @@ import Splats
 
 /// A MetalSprockets render pipeline for Gaussian splats using the Spark renderer.
 ///
-/// This pipeline is a pure rendering element — it does not manage sorting. The caller
-/// is responsible for creating an ``AsyncSortManager``, subscribing to its
-/// ``AsyncSortManager/managedSortedIndicesStream(pendingReleaseDepth:)``, requesting sorts when the camera or model
-/// changes, and passing the resulting ``SplatIndices`` into the pipeline.
+/// This pipeline is a pure rendering element — it does not manage sorting. Pass it
+/// pre-sorted ``SplatIndices`` from a ``GPUSplatSortComputePass`` (see
+/// ``GPUSortedSplatRenderPipeline``, which owns the sort and the render together).
 ///
-/// ## Interactive Rendering (SwiftUI)
-///
-/// ```swift
-/// @State private var sortedIndices: SplatIndices?
-///
-/// var body: some View {
-///     RenderView { _, drawableSize in
-///         if let sortedIndices {
-///             try RenderPass {
-///                 try SparkSplatRenderPipeline(
-///                     splatCloud: cloud,
-///                     projectionMatrix: projectionMatrix,
-///                     modelMatrix: .identity,
-///                     cameraMatrix: cameraMatrix,
-///                     drawableSize: SIMD2<Float>(drawableSize),
-///                     sortedIndices: sortedIndices
-///                 )
-///             }
-
-///         }
-///     }
-///     .task {
-///         for await indices in sortManager.managedSortedIndicesStream() {
-///             sortedIndices = indices
-///         }
-///     }
-///     .onChange(of: cameraMatrix, initial: true) {
-///         sortManager.requestSort(SortParameters(camera: cameraMatrix, model: .identity))
-///     }
-/// }
-/// ```
-///
-/// ## Buffer Pooling
-///
-/// The ``AsyncSortManager`` uses an internal buffer pool for index buffers.
-/// ``AsyncSortManager/managedSortedIndicesStream(pendingReleaseDepth:)`` releases
-/// superseded buffers back to the pool automatically. For manual control, use
-/// ``AsyncSortManager/sortedIndicesStream`` and release old indices yourself:
-///
-/// ```swift
-/// for await indices in sortManager.sortedIndicesStream {
-///     if let old = sortedIndices {
-///         sortManager.release(old)
-///     }
-///     sortedIndices = indices
-/// }
-/// ```
-///
-/// ## Offline / Single-Frame Rendering
-///
-/// ```swift
-/// let sortedIndices = sortManager.sortNowSync(sortParameters)
-/// let renderPass = try RenderPass {
-///     try SparkSplatRenderPipeline(
-///         splatCloud: cloud,
-///         projectionMatrix: projectionMatrix,
-///         modelMatrix: .identity,
-///         cameraMatrix: cameraMatrix,
-///         drawableSize: drawableSize,
-///         sortedIndices: sortedIndices
-///     )
-/// }
-/// // For offline rendering, release after render:
-/// sortManager.release(sortedIndices)
-/// ```
+/// For a self-contained pipeline that sorts, culls, and renders in one GPU
+/// workload, use ``GPUSortedSplatRenderPipeline`` instead of driving this element
+/// directly.
 ///
 /// Supports single or multiple splat clouds, mono and stereo rendering,
 /// optional spherical harmonics, and bounding box culling.
@@ -188,7 +125,7 @@ public struct SparkSplatRenderPipeline: Element {
     ///   - cameraMatrices: One camera (view-to-world) matrix per view, matching `projectionMatrices`.
     ///   - drawableSize: The render target size in pixels.
     ///   - configuration: Rendering options (sRGB conversion, SH override, bounding-box culling).
-    ///   - sortedIndices: Pre-sorted splat indices from an ``AsyncSortManager``.
+    ///   - sortedIndices: Pre-sorted splat indices from a ``GPUSplatSortComputePass``.
     public init(splatClouds: [GPUSplatCloud<SparkSplat>], projectionMatrices: [simd_float4x4], modelMatrix: simd_float4x4, cameraMatrices: [simd_float4x4], drawableSize: SIMD2<Float>, configuration: Configuration = Configuration(), sortedIndices: SplatIndices) throws {
         let convertSRGBToLinear = configuration.convertSRGBToLinear
         let useSphericalHarmonics = configuration.useSphericalHarmonics

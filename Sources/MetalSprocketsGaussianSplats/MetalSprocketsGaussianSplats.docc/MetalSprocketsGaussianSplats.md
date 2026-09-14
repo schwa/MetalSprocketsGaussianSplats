@@ -12,7 +12,7 @@ algorithms with the ``SwiftUICore/View/splatRenderer(_:)`` modifier:
 
 ```swift
 SplatView(splatCloud: cloud, cameraMatrix: cameraMatrix)
-    .splatRenderer(.sparkCPU)   // or .sparkGPU, .tileBased, .stochastic, .pointSplat
+    .splatRenderer(.sparkGPU)   // or .tileBased, .stochastic, .pointSplat
 ```
 
 Each renderer is also usable directly as a MetalSprockets element for custom
@@ -21,15 +21,15 @@ an immersive space with per-eye vertex amplification.
 
 ### Renderers
 
-The framework ships five interchangeable renderers, selected via
+The framework ships four interchangeable renderers, selected via
 ``SplatRenderer``:
 
-- **Spark** (``SparkSplatRenderPipeline``) — the default production renderer,
-  ported from sparkjs. A CPU radix sort orders splats back-to-front; each
-  splat rasterizes as an alpha-blended quad. Supports spherical harmonics and
-  multiple clouds.
-- **GPU-sorted** (``GPUSortedSplatRenderPipeline``) — Spark's shading with a
-  GPU bitonic sort and frustum culling in the same workload as rendering.
+- **Spark** (``GPUSortedSplatRenderPipeline``) — the default production
+  renderer, ported from sparkjs. A GPU sort orders splats back-to-front and
+  frustum-culls in the same workload as rendering; each splat rasterizes as an
+  alpha-blended quad. Supports spherical harmonics and multiple clouds.
+  ``SparkSplatRenderPipeline`` is the underlying render element; pass it
+  pre-sorted indices to compose the render with other passes.
 - **Tile-based** (``TileBasedSplatPipeline``) — experimental; bins and sorts
   splats per screen tile and composites with an imageblock fragment shader.
 - **Stochastic** (``StochasticSplatRenderPipeline``) — experimental;
@@ -70,14 +70,8 @@ The framework ships five interchangeable renderers, selected via
 
 ### Sorting
 
-- ``SplatSorter``
-- ``AsyncSortManager``
-- ``SortEvent``
 - ``SortParameters``
 - ``SplatIndices``
 - ``GPUSplatSortComputePass``
 - ``GPUSortResources``
 
-### Support
-
-- ``SingleValueStream``

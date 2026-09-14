@@ -48,25 +48,17 @@ struct PointSplatConvergenceTests {
         let projection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01...100))
         let projectionMatrix = projection.projectionMatrix(for: CGSize(width: size, height: size))
 
-        // Reference: Spark renderer.
+        // Reference: Spark renderer (GPU sort).
         let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
-        let sortedIndices = try SplatSorter.sort(device: device, splatCloud: cloud, parameters: SortParameters(camera: cameraMatrix, model: .identity))
-        let offscreen = try OffscreenRenderer(size: CGSize(width: size, height: size))
-        let renderPass = try RenderPass {
-            try SparkSplatRenderPipeline(
-                splatCloud: cloud,
-                projectionMatrix: projectionMatrix,
-                modelMatrix: .identity,
-                cameraMatrix: cameraMatrix,
-                drawableSize: SIMD2<Float>(Float(size), Float(size)),
-                configuration: .init(convertSRGBToLinear: false),
-                sortedIndices: sortedIndices
-            )
-        }
-        .renderPassDescriptorModifier { descriptor in
-            descriptor.renderTargetArrayLength = 1
-        }
-        let sparkImage = try offscreen.render(renderPass).cgImage
+        let sparkRenderer = try OffscreenSplatRenderer(
+            renderer: .spark,
+            splatCloud: cloud,
+            projection: projection,
+            cameraMatrix: cameraMatrix,
+            configuration: .init(width: size, height: size, convertSRGBToLinear: false)
+        )
+        try sparkRenderer.renderFrame()
+        let sparkImage = try sparkRenderer.makeImage()
         let sparkPixels = try rgbPixels(from: sparkImage)
 
         // Candidate: PointSplat accumulated over many stochastic frames.

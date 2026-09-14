@@ -23,7 +23,6 @@ struct BenchCommand: AsyncParsableCommand {
 
     enum BenchRenderer: String, ExpressibleByArgument, CaseIterable {
         case point
-        case spark
         case gpu
         case tile
         case stochastic
@@ -35,8 +34,8 @@ struct BenchCommand: AsyncParsableCommand {
     @Option(help: "Comma-separated target cull percentages for --sort-detail; the camera is rotated to frustum-cull ~that fraction (e.g. 0,25,50,75)")
     var cull: String = "0,10,20,50,100"
 
-    @Option(help: "Renderers to benchmark (point, spark, gpu, tile, stochastic)")
-    var renderers: [BenchRenderer] = [.point, .spark, .gpu]
+    @Option(help: "Renderers to benchmark (point, gpu, tile, stochastic)")
+    var renderers: [BenchRenderer] = [.point, .gpu]
 
     // Named --iterations, not --frames, so it does not collide with the root
     // command's --frames option.
@@ -234,9 +233,6 @@ struct BenchRunner {
                 case .point:
                     times = try benchmarkPointSplat(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
 
-                case .spark:
-                    times = try benchmarkSpark(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
-
                 case .gpu:
                     times = try benchmarkGPUSort(splats: splats, cameraMatrix: cameraMatrix, projectionMatrix: projectionMatrix)
 
@@ -283,23 +279,6 @@ struct BenchRunner {
         }
     }
 
-    private func benchmarkSpark(splats: [SparkSplat], cameraMatrix: simd_float4x4, projectionMatrix: simd_float4x4) throws -> [Double] {
-        let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
-        let offscreen = try OffscreenRenderer(size: CGSize(width: size, height: size))
-        let drawableSize = SIMD2<Float>(Float(size), Float(size))
-        // The sort runs every frame. Interactive use resorts on camera motion,
-        // and that cost is the point of the comparison.
-        return try measure { _ in
-            let sortedIndices = try SplatSorter.sort(device: device, splatCloud: cloud, parameters: SortParameters(camera: cameraMatrix, model: .identity))
-            let renderPass = try RenderPass {
-                try SparkSplatRenderPipeline(splatCloud: cloud, projectionMatrix: projectionMatrix, modelMatrix: .identity, cameraMatrix: cameraMatrix, drawableSize: drawableSize, sortedIndices: sortedIndices)
-            }
-            .renderPassDescriptorModifier { descriptor in
-                descriptor.renderTargetArrayLength = 1
-            }
-            _ = try offscreen.render(renderPass)
-        }
-    }
 
     private func benchmarkGPUSort(splats: [SparkSplat], cameraMatrix: simd_float4x4, projectionMatrix: simd_float4x4) throws -> [Double] {
         let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: splats)
@@ -475,7 +454,7 @@ struct BenchRunner {
     @MainActor
     private func makeSortRenderer(cloud: GPUSplatCloud<SparkSplat>, camera: simd_float4x4) throws -> OffscreenSplatRenderer {
         try OffscreenSplatRenderer(
-            renderer: .spark(sort: .gpu),
+            renderer: .spark,
             splatCloud: cloud,
             projection: Self.sortDetailProjection,
             cameraMatrix: camera,

@@ -86,9 +86,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Flag(help: "Reveal output file in Finder after rendering")
     var reveal: Bool = false
 
-    @Option(help: "Sort splats on the cpu (radix sort) or gpu (cull + radix sort compute pass)")
-    var sort: SortMethod = .cpu
-
     @Option(name: [.customLong("statistics"), .customLong("stats")], help: "Report frame timings (wall, CPU sort, GPU render with vertex/fragment breakdown) as text or json")
     var statistics: StatisticsFormat?
 
@@ -134,9 +131,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         guard let rendererKind = RendererKind(rawValue: renderConfig.renderer ?? "spark") else {
             throw ValidationError("Unknown renderer: \(renderConfig.renderer ?? ""). Supported: \(RendererKind.allCases.map(\.rawValue).joined(separator: ", "))")
         }
-        if sort == .gpu, rendererKind != .spark {
-            throw ValidationError("--sort gpu only applies to the spark renderer")
-        }
 
         // A statistics run with no explicit destination is measurement-only.
         let needsImage = statistics == nil || output != nil || config != nil
@@ -156,7 +150,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         )
 
         if let statistics {
-            let report = makeReport(samples: samples, splats: splatCount, shDegree: Int(effectiveSHDegree), width: renderConfig.width, height: renderConfig.height, warmup: warmup, renderer: rendererKind, sortMethod: sort)
+            let report = makeReport(samples: samples, splats: splatCount, shDegree: Int(effectiveSHDegree), width: renderConfig.width, height: renderConfig.height, warmup: warmup, renderer: rendererKind)
             try emitReport(report, format: statistics)
         }
 
@@ -284,7 +278,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         let libraryRenderer: OffscreenSplatRenderer.Renderer
         switch rendererKind {
         case .spark:
-            libraryRenderer = .spark(sort: sort == .gpu ? .gpu : .cpu)
+            libraryRenderer = .spark
 
         case .point:
             libraryRenderer = .point
@@ -325,7 +319,6 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 let report = try renderer.renderFrame()
                 samples.append(FrameSample(
                     wallTime: elapsedSeconds(since: start),
-                    sortCPUTime: report.sortCPUTime,
                     sortGPU: report.sortGPU,
                     render: report.render,
                     visibleSplats: report.visibleSplats,

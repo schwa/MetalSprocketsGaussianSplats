@@ -15,13 +15,13 @@ import Splats
 /// behind one interface.
 ///
 /// This type hides the per-renderer differences in pass shape, sorting, and
-/// output format. Spark needs sorted indices from a CPU or GPU sort. Tile and
+/// output format. Spark sorts on the GPU. Tile and
 /// stochastic are self-contained passes. Point is compute-only and writes a
 /// float output texture.
 ///
 /// ```swift
 /// let renderer = try OffscreenSplatRenderer(
-///     renderer: .spark(sort: .gpu),
+///     renderer: .spark,
 ///     splatCloud: cloud,
 ///     projection: PerspectiveProjection(),
 ///     cameraMatrix: cameraMatrix,
@@ -41,7 +41,7 @@ public final class OffscreenSplatRenderer {
     /// Which splat renderer draws the frame.
     public enum Renderer: Equatable, Sendable {
         /// Sorted alpha-blended splats; the production renderer.
-        case spark(sort: SortMethod)
+        case spark
         /// Tile-based binning renderer (experimental).
         case tile
         /// Stochastic transparency, one unaccumulated (noisy) frame per call.
@@ -50,13 +50,6 @@ public final class OffscreenSplatRenderer {
         case point
     }
 
-    /// How the spark renderer sorts splats each frame.
-    public enum SortMethod: String, CaseIterable, Sendable {
-        /// Blocking CPU radix sort.
-        case cpu
-        /// Cull and radix sort compute pass in the same submission as the render.
-        case gpu
-    }
 
     public struct Configuration {
         public var width: Int
@@ -100,15 +93,12 @@ public final class OffscreenSplatRenderer {
     /// Timings and stats for one rendered frame. A field is `nil` when the
     /// renderer or configuration does not produce it.
     public struct FrameReport: Sendable {
-        /// Blocking CPU radix sort time (spark with ``SortMethod/cpu``).
-        public var sortCPUTime: TimeInterval?
-        /// GPU sort compute pass sample (spark with ``SortMethod/gpu``).
+        /// GPU sort compute pass sample.
         public var sortGPU: GPUCounterSample?
         /// Main pass sample: the render pass time with vertex and fragment
         /// intervals, or the whole-encoder compute time for the point renderer.
         public var render: GPUCounterSample?
-        /// Frustum-cull survivors (spark with ``SortMethod/gpu``; the GPU sort
-        /// is the only path that culls).
+        /// Frustum-cull survivors.
         public var visibleSplats: Int?
         /// Whole-submission GPU time from the command-buffer clock
         /// (`gpuEndTime - gpuStartTime`), correlation-free. `nil` if unavailable.
@@ -183,10 +173,10 @@ public final class OffscreenSplatRenderer {
             self.offscreenRenderer = nil
             self.gpuSortResources = nil
 
-        case .spark(let sort):
+        case .spark:
             let offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: configuration)
             self.offscreenRenderer = offscreenRenderer
-            self.gpuSortResources = sort == .gpu ? try GPUSortResources(device: offscreenRenderer.device, capacity: splatCloud.count, slotCount: 1) : nil
+            self.gpuSortResources = try GPUSortResources(device: offscreenRenderer.device, capacity: splatCloud.count, slotCount: 1)
             self.pointRunner = nil
             self.pointTexture = nil
 
@@ -216,8 +206,8 @@ public final class OffscreenSplatRenderer {
             frameIndex += 1
         }
         switch renderer {
-        case .spark(let sort):
-            return try renderSparkFrame(sort: sort)
+        case .spark:
+            return try renderSparkFrame()
 
         case .tile:
             return try renderTileFrame()
@@ -245,12 +235,12 @@ public final class OffscreenSplatRenderer {
 
     // MARK: - Per-renderer frames
 
-    private func renderSparkFrame(sort _: SortMethod) throws -> FrameReport {
-        guard let offscreenRenderer else {
+    private func renderSparkFrame() throws -> FrameReport {
+        guard let offscreenRenderer, let gpuSortResources else {
             throw MetalSprocketsError.generic("Renderer not configured")
         }
         var report = FrameReport()
-        if let gpuSortResources {
+        do {
             // Sort and render in one submission, like GPUSortedSplatRenderPipeline
             // but with counters on each pass.
             let slot = gpuSortResources.advance()
@@ -278,12 +268,6 @@ public final class OffscreenSplatRenderer {
                 }).gpuTime
             }
             report.visibleSplats = gpuSortResources.lastSurvivorCount
-        } else {
-            let start = ContinuousClock.now
-            let sortedIndices = try SplatSorter.sort(device: offscreenRenderer.device, splatCloud: splatCloud, parameters: sortParameters)
-            let elapsed = ContinuousClock.now - start
-            report.sortCPUTime = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) * 1e-18
-            report.commandBufferGPUTime = try render(pass: makeSparkRenderPass(sortedIndices: sortedIndices), in: offscreenRenderer)
         }
         report.sortGPU = sortSampleBox.take()
         report.render = renderSampleBox.take()

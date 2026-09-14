@@ -124,6 +124,17 @@ public struct SplatIndices: Sendable, Equatable {
     }
 }
 
+extension IndexedDistance: @retroactive Equatable {
+    public static func == (lhs: IndexedDistance, rhs: IndexedDistance) -> Bool {
+        lhs.distanceToCamera == rhs.distanceToCamera
+            && lhs.splatIndex == rhs.splatIndex
+            && lhs.cloudIndex == rhs.cloudIndex
+    }
+}
+
+extension IndexedDistance: @unchecked @retroactive Sendable {
+}
+
 // MARK: -
 
 /// The camera and model state that a sort was, or must be, computed for.
