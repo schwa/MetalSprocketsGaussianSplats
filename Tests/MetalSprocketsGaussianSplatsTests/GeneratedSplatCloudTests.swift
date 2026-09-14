@@ -1,4 +1,5 @@
 #if !arch(x86_64)
+import CoreGraphics
 import GeometryLite3D
 import Metal
 import MetalSprocketsGaussianSplats
@@ -73,6 +74,58 @@ struct GeneratedSplatCloudTests {
             let position = Float(cloud.splats[index].position.x)
             #expect(Array(coefficients[(index * 9)..<((index + 1) * 9)]) == Array(repeating: position, count: 9))
         }
+    }
+
+    @Test
+    @MainActor
+    func indexedPaletteRendersLikeDense() throws {
+        // Two palette rows shared by four splats (indices 0,1,1,0).
+        let rowA: [Float] = [0.4, 0.1, 0.1, 0.4, 0.1, 0.1, 0.4, 0.1, 0.1]
+        let rowB: [Float] = [0.1, 0.1, 0.4, 0.1, 0.1, 0.4, 0.1, 0.1, 0.4]
+        let palette = rowA + rowB
+        let indices: [UInt32] = [0, 1, 1, 0]
+        let positions: [SIMD3<Float>] = [[-0.3, 0.3, 0], [0.3, 0.3, 0], [-0.3, -0.3, 0], [0.3, -0.3, 0]]
+        let splats = positions.map { ExtendedSplat(genericSplat: GenericSplat(position: $0, scale: [0.3, 0.3, 0.3], color: [0.5, 0.5, 0.5, 1])) }
+
+        let indexed = try GPUSplatCloud<SparkSplat>(device: device, splats: splats, shPalette: palette, shIndices: indices, shDegree: 1)
+        let indexedCoefficients = try #require(indexed.shCoefficients)
+        #expect(indexedCoefficients.count == palette.count) // palette-sized, not count-sized
+        #expect(indexed.splats.map { $0.shIndex } == indices) // swiftlint:disable:this prefer_key_path
+
+        // Dense equivalent: each splat carries its palette row expanded.
+        let denseSplats = zip(splats, indices).map { splat, index in
+            let rows: [[Float]] = index == 0 ? [[0.4, 0.1, 0.1], [0.4, 0.1, 0.1], [0.4, 0.1, 0.1]] : [[0.1, 0.1, 0.4], [0.1, 0.1, 0.4], [0.1, 0.1, 0.4]]
+            return ExtendedSplat(genericSplat: splat.genericSplat, sphericalHarmonics: rows)
+        }
+        let dense = try GPUSplatCloud<SparkSplat>(device: device, splats: denseSplats, shDegree: 1)
+        #expect(try #require(dense.shCoefficients).count == splats.count * 9)
+
+        let camera = simd_float4x4(translation: [0, 0, 2])
+        let projection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01 ... 100))
+        let indexedImage = try render(indexed, camera: camera, projection: projection)
+        let denseImage = try render(dense, camera: camera, projection: projection)
+        #expect(indexedImage == denseImage)
+    }
+
+    @Test
+    func indexedPaletteRejectsBadInput() throws {
+        let splats = [ExtendedSplat(genericSplat: GenericSplat())]
+        #expect(throws: GPUSplatCloudError.self) {
+            try GPUSplatCloud<SparkSplat>(device: device, splats: splats, shPalette: [0, 0, 0], shIndices: [5], shDegree: 1)
+        }
+    }
+
+    @MainActor
+    private func render(_ cloud: GPUSplatCloud<SparkSplat>, camera: simd_float4x4, projection: PerspectiveProjection) throws -> [UInt8] {
+        let renderer = try OffscreenSplatRenderer(renderer: .spark, splatCloud: cloud, projection: projection, cameraMatrix: camera, configuration: .init(width: 64, height: 64))
+        try renderer.renderFrame()
+        let image = try renderer.makeImage()
+        let width = image.width, height = image.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        let space = CGColorSpaceCreateDeviceRGB()
+        let context = try #require(CGContext(data: &bytes, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return bytes
     }
 }
 #endif

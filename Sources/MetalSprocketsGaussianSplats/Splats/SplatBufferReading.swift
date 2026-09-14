@@ -232,6 +232,60 @@ public extension GPUSplatCloud where Splat == SparkSplat {
         let bands = Int(degree) + 1
         return bands * bands - 1
     }
+
+    /// Builds a render-ready cloud that shares one SH palette across splats via
+    /// per-splat indices, instead of one coefficient row per splat.
+    ///
+    /// This mirrors how indexed formats (SOG) store SH: a small palette plus a
+    /// per-splat row index. Memory scales with the palette, not the splat count.
+    ///
+    /// - Parameters:
+    ///   - device: The device to allocate the buffers on.
+    ///   - splats: The application-generated splats (positions, color, etc.).
+    ///   - shPalette: Flattened palette, `paletteRowCount * (basisCount * 3)`
+    ///     floats, laid out row-major per palette entry.
+    ///   - shIndices: One palette row index per splat; each must be in range.
+    ///   - shDegree: The spherical-harmonics degree, 1 through 3.
+    ///   - modelTransform: The per-cloud model transform.
+    ///   - opacity: The cloud-level opacity multiplier, 0.0 to 1.0.
+    ///   - name: An optional label for the buffers, for GPU-capture identification.
+    /// - Throws: ``GPUSplatCloudError`` when the palette or indices are malformed.
+    convenience init(
+        device: MTLDevice,
+        splats: [ExtendedSplat],
+        shPalette: [Float],
+        shIndices: [UInt32],
+        shDegree: UInt8,
+        modelTransform: simd_float4x4 = .identity,
+        opacity: Float = 1.0,
+        name: String? = nil
+    ) throws {
+        guard shDegree >= 1, shDegree <= 3 else {
+            throw GPUSplatCloudError.unsupportedSphericalHarmonicsDegree(shDegree)
+        }
+        guard shIndices.count == splats.count else {
+            throw GPUSplatCloudError.malformedSphericalHarmonics(expectedRows: splats.count, actualRows: shIndices.count)
+        }
+        let floatsPerSplat = Self.shBasisCount(forDegree: shDegree) * 3
+        guard floatsPerSplat > 0, shPalette.count.isMultiple(of: floatsPerSplat) else {
+            throw GPUSplatCloudError.malformedSphericalHarmonics(expectedRows: floatsPerSplat, actualRows: shPalette.count)
+        }
+        let paletteRows = shPalette.count / floatsPerSplat
+        guard shIndices.allSatisfy({ Int($0) < paletteRows }) else {
+            throw GPUSplatCloudError.malformedSphericalHarmonics(expectedRows: paletteRows, actualRows: Int(shIndices.max() ?? 0))
+        }
+        let label = name ?? "splats"
+        var sparkSplats: [SparkSplat] = []
+        sparkSplats.reserveCapacity(splats.count)
+        for (index, splat) in splats.enumerated() {
+            var sparkSplat = SparkSplat(splat.genericSplat)
+            sparkSplat.shIndex = shIndices[index]
+            sparkSplats.append(sparkSplat)
+        }
+        let splatsBuffer = try device.makeTypedBuffer(values: sparkSplats, options: [.storageModeShared]).labeled("Splats (\(label))")
+        let shBuffer = try device.makeTypedBuffer(values: shPalette, options: [.storageModeShared]).labeled("SHCoefficients (\(label))")
+        self.init(splats: splatsBuffer, modelTransform: modelTransform, shCoefficients: shBuffer, shDegree: shDegree, opacity: opacity)
+    }
 }
 
 /// Errors from building a ``GPUSplatCloud`` from application-generated data.
