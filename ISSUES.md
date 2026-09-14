@@ -3361,6 +3361,16 @@ Preserve indexed SH data through loading and evaluate SH using a per-splat index
 - Tests cover shared palette rows, multiple clouds with overlapping local indices, and reorder/sort correctness.
 - Benchmarks report GPU memory and vertex-stage timing before and after the change.
 
+- `2026-09-14T21:59:18Z`: Benchmark (Helmet.sog, 34,734 splats, SH degree 3, 45 floats/splat):
+- SH palette entries: 32,768 (from meta.json shN.count).
+- SH memory before (dense, per-splat): 34,734*45*4 = 5.96 MiB.
+- SH memory after (shared palette): 32,768*45*4 = 5.63 MiB (~5.7% smaller).
+- Render (1024^2, 30f, debug): vertex 0.052ms, gpu sort 0.154ms, render 0.321ms median; no visual regression.
+
+Savings scale with palette sharing. Helmet's palette is nearly as large as its splat count, so the win is small here; heavily-deduplicated SOG palettes (e.g. 64 entries) save the vast majority of SH memory. The pipeline now preserves whatever sharing the source encodes instead of always expanding to one row per splat.
+
+Multi-cloud GPU sort (cloudIndex propagation) tracked separately in #172.
+
 ---
 
 ## 164: visionOS Spark renderer uses a single shared sort order across both eyes
@@ -3491,5 +3501,84 @@ created: 2026-09-14T17:00:15Z
 +++
 
 Reported on iPad: the FPS meter visibly flashes while showing 60 FPS. Expected: the meter remains visually stable while the frame rate is steady. Device model and iPadOS version were not specified.
+
+---
+
+## 170: visionOS: cp_frame_end_submission() failure when exiting immersive mode
+
++++
+status: closed
+priority: high
+kind: bug
+labels: visionOS
+created: 2026-09-14T17:48:28Z
+updated: 2026-09-14T21:14:05Z
+closed: 2026-09-14T21:14:05Z
++++
+
+Exiting immersive mode on visionOS produces a client error and crash.
+
+Runtime log:
+BUG IN CLIENT: cp_frame_end_submission() failed because the frame is not valid. Are failures from calls to cp_frame_query_drawables() or cp_frame_predict_timing() properly handled? (Namespace: 18, Code:2)
+
+Reproduction:
+1. Enter immersive mode on visionOS.
+2. Exit immersive mode.
+
+Expected: return to the windowed view without error.
+Actual: CompositorServices reports an invalid-frame submission and the app crashes.
+
+The message indicates a Compositor Services frame was submitted (cp_frame_end_submission) after it was no longer valid, likely a frame in flight when the immersive space tears down. Device: Apple Vision Pro (model/OS not specified).
+
+- `2026-09-14T21:14:05Z`: Fixed upstream in MetalSprockets#398 (b65b9323), verified by the user on Vision Pro. MSGS now depends on MetalSprockets 0.1.15.
+
+---
+
+## 171: Point renderer crashes on unsupported GPUs instead of failing gracefully
+
++++
+status: new
+priority: high
+kind: bug
+labels: pointsplat, rendering
+created: 2026-09-14T18:53:22Z
++++
+
+Selecting the Point renderer on a GPU without 64-bit atomics crashes the app.
+
+PointSplatRenderPipeline.init throws PointSplatError.unsupportedDevice when the device is not Apple9/Mac2. That throw propagates out of the RenderView draw closure and becomes a fatal error:
+
+MetalSprocketsUI/RenderView.swift:632: Fatal error: Error when drawing #0: unsupportedDevice
+
+Reproduction:
+1. Run on a GPU that lacks 64-bit atomics (pre-Apple9 / pre-Mac2).
+2. Select the Point renderer.
+
+Expected: the Point renderer is unavailable or degrades gracefully (e.g. hidden/disabled in the picker, or a visible message), without crashing.
+Actual: the app hits a fatalError in RenderView's draw closure and terminates.
+
+The device-capability throw happens per-frame inside the render loop, where there is no error handling, so any thrown error there is fatal.
+
+---
+
+## 172: Multi-cloud GPU sort does not carry cloudIndex (single-cloud only)
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: sorting, gpu, rendering, multicloud
+created: 2026-09-14T21:57:51Z
++++
+
+The GPU splat sort (GPUSplatSortComputePass) sorts a single cloud per pass and always emits cloudIndex 0. Rendering supports a MultiCloudArgumentBuffer (each cloud has its own splats, SH palette, and shIndex space, selected by IndexedDistance.cloudIndex), but nothing produces a merged, correctly-tagged sort order across multiple clouds on the GPU.
+
+Additionally, the 32-bit sort-key mode packs the full depth into the key and drops cloudIndex entirely, so even if a multi-cloud producer existed it would be lost in 32-bit mode.
+
+Impact: multiple simultaneously-rendered clouds cannot be depth-sorted together via the GPU path. The indexed-SH work (#163) is correct per cloud, but multi-cloud compositing across clouds is unresolved.
+
+Expected: a GPU sort path that merges splats from several clouds into one back-to-front order while preserving each splat's cloudIndex and per-cloud shIndex, in both 16- and 32-bit key modes.
+
+Context: surfaced while implementing indexed SH palettes (#163).
 
 ---
