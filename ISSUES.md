@@ -3453,12 +3453,13 @@ Reported on iPad: pinch-to-zoom does not work. Expected: pinching changes the zo
 ## 168: Selecting a sphere size in Generate does nothing on iPad
 
 +++
-status: new
+status: closed
 priority: medium
 kind: bug
 labels: ipad, ui
 created: 2026-09-14T16:50:39Z
-updated: 2026-09-14T17:02:46Z
+updated: 2026-09-14T17:13:01Z
+closed: 2026-09-14T17:13:01Z
 +++
 
 Confirmed on iPad: the Generate menu opens, but tapping a sphere size does nothing.
@@ -3471,6 +3472,8 @@ Expected: generate and display a sphere of the selected size.
 Actual: selecting the size has no visible effect.
 
 This clarifies the earlier report that Generate seemed to require multiple taps. The menu opens successfully; the failure occurs when selecting a sphere size.
+
+- `2026-09-14T17:13:02Z`: Fixed by isolating frame-timing state in a dedicated FrameTimingOverlay view modifier. Per-frame FPS updates were invalidating the whole ContentView (including the toolbar/Generate menu), which swallowed the sphere-size selection. The overlay now owns its own @State so timing updates invalidate only that subtree.
 
 ---
 

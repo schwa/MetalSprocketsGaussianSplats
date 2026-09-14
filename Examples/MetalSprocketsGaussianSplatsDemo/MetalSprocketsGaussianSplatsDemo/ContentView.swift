@@ -12,7 +12,6 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var cameraMatrix = simd_float4x4(translation: SIMD3<Float>(0, 0, 3))
-    @State private var frameTimingStatistics: FrameTimingStatistics?
     @State private var isImporting = false
     #if os(iOS)
     @State private var isARMode = false
@@ -159,31 +158,25 @@ struct ContentView: View {
     private var splatSurface: some View {
         splatRenderView
             .splatRenderer(demoState.renderer)
-        .onFrameTimingChange { frameTimingStatistics = $0 }
-        .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
-        .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first else {
-                return false
+            .modifier(FrameTimingOverlay())
+            .interactiveCamera(cameraMatrix: $cameraMatrix, mode: .turntable())
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first else {
+                    return false
+                }
+                Task {
+                    await demoState.loadCustomSplat(url: url)
+                }
+                return true
             }
-            Task {
-                await demoState.loadCustomSplat(url: url)
+            .overlay {
+                if demoState.isLoading {
+                    ProgressView("Loading\u{2026}")
+                        .padding(16)
+                        .background(.regularMaterial, in: .rect(cornerRadius: 12))
+                }
             }
-            return true
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if let frameTimingStatistics {
-                FrameTimingView(statistics: frameTimingStatistics, options: .all)
-                    .padding()
-            }
-        }
-        .overlay {
-            if demoState.isLoading {
-                ProgressView("Loading\u{2026}")
-                    .padding(16)
-                    .background(.regularMaterial, in: .rect(cornerRadius: 12))
-            }
-        }
-        .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
+            .modifier(SplatImporter(isImporting: $isImporting, demoState: demoState))
     }
 
     #endif
@@ -214,6 +207,23 @@ struct ContentView: View {
         Button("Load\u{2026}") {
             presentImporter()
         }
+    }
+}
+
+/// Owns the frame-timing state locally so per-frame updates invalidate only
+/// this subtree, not the toolbar and menus in the enclosing view.
+private struct FrameTimingOverlay: ViewModifier {
+    @State private var statistics: FrameTimingStatistics?
+
+    func body(content: Content) -> some View {
+        content
+            .onFrameTimingChange { statistics = $0 }
+            .overlay(alignment: .bottomTrailing) {
+                if let statistics {
+                    FrameTimingView(statistics: statistics, options: .all)
+                        .padding()
+                }
+            }
     }
 }
 
