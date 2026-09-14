@@ -117,12 +117,13 @@ Architecture refactor: Move sort management from SparkSplatRenderPipeline to the
 ## 6: Multi-splat mode FPS drops to ~10fps during camera rotation
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: effort:xl, not-testable
 created: 2026-02-20T00:00:00Z
-updated: 2026-07-21T22:29:46Z
+updated: 2026-09-14T16:35:13Z
+closed: 2026-09-14T16:35:13Z
 +++
 
 ## Problem
@@ -1156,12 +1157,13 @@ The demo only supports turntable drag rotation via .interactiveCamera(). Add pin
 ## 49: Metal GPU performance HUD disappears during drag/pan gestures
 
 +++
-status: blocked
+status: closed
 priority: low
 kind: bug
 labels: effort:xs, macOS, punted, blocked
 created: 2026-04-09T20:13:18Z
-updated: 2026-08-24T17:54:36Z
+updated: 2026-09-14T16:35:13Z
+closed: 2026-09-14T16:35:13Z
 +++
 
 The Metal GPU performance overlay disappears while dragging/panning the camera. Reappears when gesture ends. Same issue as MetalSprockets#34/#312. Flickering is reduced when shader validation is enabled (slower frame rate). Likely a SwiftUI overlay/z-ordering issue during gesture handling in RenderView.
@@ -1416,7 +1418,7 @@ priority: low
 kind: feature
 labels: tile-based, effort:xl
 created: 2026-07-20T19:01:34Z
-updated: 2026-07-21T22:29:46Z
+updated: 2026-09-14T16:41:02Z
 +++
 
 The GPU-sorted pipeline (SplatGPUSort) and the tile-based renderer are converging on the same front-end tools: frustum cull, depth keys, radix sort. They differ only in back-end — sorted instanced quads with hardware blending (Spark/GPU) vs per-pixel front-to-back imageblock accumulation with early termination (tile).
@@ -2198,7 +2200,7 @@ priority: low
 kind: enhancement
 labels: pointsplat, performance, effort:m, impact:high, punted
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:47:38Z
+updated: 2026-09-14T16:41:03Z
 +++
 
 RFC 0005 proposal 4: reuse surviving points across frames reservoir-style instead of resampling every frame, reducing noise and work during interactive motion. Depends on the reprojection transform (already available from #73's temporal reprojection). Part of RFCs/0005.
@@ -2232,7 +2234,7 @@ kind: enhancement
 labels: pointsplat, performance, effort:l, impact:high, punted, blocked
 depends: 104
 created: 2026-07-22T00:10:45Z
-updated: 2026-08-24T17:54:37Z
+updated: 2026-09-14T16:41:03Z
 +++
 
 RFC 0005 proposal 1, full version: re-derive the collision correction with the Poisson model replaced by a binomial-of-strata model for K stratified per-thread samples; tabulate if no closed form. Expected ~40% fewer points for high-opacity Gaussians at equal quality. Depends on #104 landing first as the cheap baseline. Part of RFCs/0005.
@@ -2251,7 +2253,7 @@ kind: enhancement
 labels: pointsplat, effort:m, impact:medium, punted, blocked
 depends: 112
 created: 2026-07-22T00:10:45Z
-updated: 2026-08-24T17:54:37Z
+updated: 2026-09-14T16:41:03Z
 +++
 
 RFC 0005 proposal 2b: track per-region variance and weight the temporal accumulation (or budget) toward unconverged regions. Part of RFCs/0005.
@@ -2269,7 +2271,7 @@ priority: low
 kind: enhancement
 labels: pointsplat, memory, effort:s, impact:low
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:37:59Z
+updated: 2026-09-14T16:41:03Z
 +++
 
 RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit fixed-point view-space depth and 3x12-bit sRGB color over [0,16) leave headroom; small quality/precision polish. Part of RFCs/0005.
@@ -2280,11 +2282,11 @@ RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit
 
 +++
 status: open
-priority: medium
+priority: low
 kind: bug
 labels: pointsplat, not-testable, effort:m
 created: 2026-07-22T02:48:17Z
-updated: 2026-08-24T17:44:45Z
+updated: 2026-09-14T16:36:55Z
 +++
 
 Rotating the camera shows content that looks a frame or several old, as if rendering lags the camera. Reproduces with temporal point reuse disabled (reuseFactor = 0, #107 reverted), so seeding is not (or not the only) cause.
@@ -2857,12 +2859,13 @@ Context: options in Sources/metalsprockets-gaussian-splat/BenchCommand.swift (`-
 ## 139: Remove CPU sorting and AsyncSortManager APIs
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: sorting, performance, cleanup, refactor, effort:l
 created: 2026-08-18T23:38:25Z
-updated: 2026-08-27T06:05:24Z
+updated: 2026-09-14T16:32:49Z
+closed: 2026-09-14T16:32:49Z
 +++
 
 The library still contains the obsolete CPU sorting path and AsyncSortManager-based API even though rendering now owns GPU sorting directly. This duplicates sorting infrastructure, exposes obsolete choices to clients, and retains code that is no longer needed.
@@ -2878,6 +2881,8 @@ Affected surface includes:
 The GPU sort requires 64-bit atomics. Supported deployment targets must therefore require compatible GPU families rather than retaining a CPU fallback.
 
 Motivation data: spark/CPU-sort takes 169 ms versus 81 ms for GPU sorting at 8M splats and scales worse below that.
+
+- `2026-09-14T16:32:49Z`: Removed CPU sort path and AsyncSortManager. Spark now sorts, culls, and renders on the GPU only. Deleted CPURadixSort, CPUSplatRadixSorter, SplatSorter, AsyncSortManager, SortEvent, SingleValueStream, the .sparkCPU renderer, the CLI --sort option, and related tests/docs. Per-eye visionOS sort ordering tracked separately in #164.
 
 ---
 
@@ -3088,11 +3093,11 @@ Debug rendering should be available as a separate Swift Package Manager product 
 
 +++
 status: open
-priority: medium
+priority: low
 kind: enhancement
 labels: effort:s
 created: 2026-08-25T17:59:31Z
-updated: 2026-08-27T03:14:52Z
+updated: 2026-09-14T16:40:58Z
 +++
 
 Binary little-endian PLY files use the GPU decoder, but binary big-endian files fall back to CPU decoding. This makes loading large big-endian PLY files substantially slower than equivalent little-endian files.
@@ -3139,11 +3144,11 @@ cSettings: [
 
 +++
 status: open
-priority: medium
+priority: low
 kind: enhancement
 labels: effort:s
 created: 2026-08-27T03:01:37Z
-updated: 2026-08-27T03:14:52Z
+updated: 2026-09-14T16:40:58Z
 +++
 
 SOGReaderGPU loads every archive entry through ZipArchive.data(for:), allocating and copying each complete entry into Data before image decoding and Metal upload. SOG bundles use stored ZIP entries, and SwiftZipReader exposes span-based access for those entries.
@@ -3245,11 +3250,12 @@ Add SGS file-format support, including format detection, decoding into the libra
 ## 159: Avoid rendering unchanged splat scenes
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
 labels: rendering, performance, power, effort:m
 created: 2026-08-27T06:05:48Z
+updated: 2026-09-14T16:37:48Z
 +++
 
 Splat rendering currently produces frames continuously even when the visible scene is unchanged. This wastes GPU time and power when splat data, transforms, camera state, viewport, renderer configuration, and other render inputs remain stable.
@@ -3328,11 +3334,12 @@ pointSplatResolve writes alpha 1 for every pixel and the fullscreen blit draws w
 ## 163: SH storage is duplicated per splat instead of preserving indexed palettes
 
 +++
-status: new
+status: open
 priority: high
 kind: enhancement
-labels: performance,memory,rendering,io,effort:xl,impact:high
+labels: performance, memory, rendering, io, effort:xl, impact:high
 created: 2026-09-10T05:07:58Z
+updated: 2026-09-14T16:37:48Z
 +++
 
 Spherical-harmonics coefficients are currently expanded into a dense row for every splat, and render shaders derive the SH row from the splat index. Formats such as SOG can encode a shared SH palette plus a per-splat palette index, but loading expands that palette and loses the indirection.
@@ -3352,5 +3359,102 @@ Preserve indexed SH data through loading and evaluate SH using a per-splat index
 - Dense PLY/SPZ and non-SH inputs continue to load and render correctly.
 - Tests cover shared palette rows, multiple clouds with overlapping local indices, and reorder/sort correctness.
 - Benchmarks report GPU memory and vertex-stage timing before and after the change.
+
+---
+
+## 164: visionOS Spark renderer uses a single shared sort order across both eyes
+
++++
+status: open
+priority: low
+kind: bug
+labels: sorting, visionos, effort:m
+created: 2026-09-14T16:29:26Z
+updated: 2026-09-14T16:38:00Z
++++
+
+The visionOS immersive Spark path (`SplatImmersiveContent` / `SplatImmersiveGPUSortElement`) sorts once for the whole frame using the left-eye depth as the sort key, then renders both eyes from that one order via vertex amplification.
+
+The removed CPU sort path (issue #139) previously sorted each eye separately, giving each eye its own back-to-front order. Sorting per eye removes depth-order disagreement between the eyes for distant splats, which can matter for stereo correctness.
+
+Restore per-eye sort ordering for the GPU path on visionOS: sort each eye independently (its own GPU sort by that eye's depth) and render each eye with its own sorted indices, rather than sharing one order.
+
+Introduced by the CPU-sort removal in #139.
+
+---
+
+## 165: PointSplat 'empty scene renders background' test fails: all pixels wrong
+
++++
+status: open
+priority: low
+kind: bug
+labels: tests, pointsplat, effort:s
+created: 2026-09-14T16:34:09Z
+updated: 2026-09-14T16:38:00Z
++++
+
+The test `PointSplatComputePass › emptyScene` (`empty scene renders background`) fails locally with all 768 channel expectations (16×16×3) failing, so the entire output texture is wrong, not just a few pixels.
+
+The test renders a single fully-transparent splat (color alpha 0) over a background of (0.25, 0.5, 0.75) and expects every pixel to equal the background within 0.01. Instead every pixel is off, which suggests the PointSplat compute pass is not clearing/writing the configured background color for a scene with no visible contribution (or is writing black / uninitialized values).
+
+Unrelated to the CPU-sort removal (#139) — the PointSplat compute path was not modified. Appears pre-existing and possibly GPU/driver dependent (other GPU-dependent tests in this suite behave similarly). Needs investigation to determine whether it is a background-fill bug in the point renderer or a test-environment issue.
+
+Location: Tests/MetalSprocketsGaussianSplatsTests/PointSplatComputePassTests.swift, `emptyScene()`.
+
+---
+
+## 166: Refactor Metal shaders into reusable helper functions
+
++++
+status: open
+priority: low
+kind: task
+labels: shaders, rendering, code-style, refactor, effort:l
+created: 2026-09-14T16:43:24Z
+updated: 2026-09-14T16:43:42Z
++++
+
+The Metal shader code duplicates logic that should live in shared, reusable helper functions. Shaders should be composed of small, named, reusable parts rather than inlining the same math in each entry point.
+
+Known examples:
+- **Quad generation from a splat** — the code that turns a splat's covariance/eigenvectors into a screen-space quad (corner offsets, extents) is written inline in the vertex shaders (e.g. SparkSplatRenderShader, StochasticSplatRenderShader) instead of a single shared function that every renderer calls.
+- **Spherical harmonics** — evaluateSH is already shared in SparkSplatSupport.h, but the surrounding SH setup (view direction, degree/index handling, palette lookup) is still partly duplicated at each call site and could be consolidated further.
+
+Desired outcome:
+- A pass over all files in Sources/MetalSprocketsGaussianSplatShaders/Metal that identifies logic which is (or should be) common and extracts it into well-named helper functions in shared headers (like SparkSplatSupport.h).
+- Extract even single-use blocks when pulling them into a named function improves clarity and future reuse.
+- Renderers (Spark, Stochastic, PointSplat, Tile, debug) share the same helpers for quad construction, SH evaluation, projection/culling math, and any other common operations found during the scan.
+- No behavior change; output must remain identical (golden-image and convergence tests still pass).
+
+This is primarily a readability/maintainability and reuse refactor, not a functional change.
+
+---
+
+## 167: Pinch to zoom does not work on iPad
+
++++
+status: new
+priority: medium
+kind: bug
+labels: ipad, input
+created: 2026-09-14T16:50:39Z
++++
+
+Reported on iPad: pinch-to-zoom does not work. Expected: pinching changes the zoom. Actual: the gesture does not zoom the view. Device model and OS version were not specified.
+
+---
+
+## 168: Generate appears to require multiple taps on iPad
+
++++
+status: new
+priority: medium
+kind: bug
+labels: ipad,ui
+created: 2026-09-14T16:50:39Z
++++
+
+Reported on iPad: Generate works, but appears to require multiple taps before taking effect. Expected: a single tap starts generation. Actual: the user appears to need repeated taps. It is not yet confirmed whether taps are missed or generation starts without visible feedback. Device model and OS version were not specified.
 
 ---
