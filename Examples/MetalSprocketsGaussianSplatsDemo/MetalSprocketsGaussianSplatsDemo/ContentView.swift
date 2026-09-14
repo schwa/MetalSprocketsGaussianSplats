@@ -35,12 +35,7 @@ struct ContentView: View {
         }
         .ornament(attachmentAnchor: .scene(.bottom)) {
             HStack {
-                Picker("Model", systemImage: "cube", selection: $demoState.selectedModel) {
-                    ForEach(SplatModel.allCases) { model in
-                        Text(model.rawValue).tag(model as SplatModel?)
-                    }
-                }
-                .pickerStyle(.menu)
+                modelPicker
                 Picker("Renderer", systemImage: "paintbrush", selection: $demoState.renderer) {
                     ForEach(SplatRenderer.allCases.filter { $0 != .pointSplat && $0 != .tileBased }, id: \.self) { r in
                         Text(r.rawValue.capitalized).tag(r)
@@ -110,12 +105,7 @@ struct ContentView: View {
             titledSplatSurface
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
-                        Picker("Model", systemImage: "cube", selection: $demoState.selectedModel) {
-                            ForEach(SplatModel.allCases) { model in
-                                Text(model.rawValue).tag(model as SplatModel?)
-                            }
-                        }
-                        .pickerStyle(.menu)
+                        modelPicker
                         Button("Load\u{2026}", systemImage: "folder") {
                             presentImporter()
                         }
@@ -189,6 +179,19 @@ struct ContentView: View {
         Task { @MainActor in
             isImporting = true
         }
+    }
+
+    private var modelPicker: some View {
+        Picker("Model", systemImage: "cube", selection: $demoState.selectedModel) {
+            // Tag for the custom/generated state so the nil selection is valid.
+            if demoState.selectedModel == nil {
+                Text(demoState.customModelName ?? "Custom").tag(SplatModel?.none)
+            }
+            ForEach(SplatModel.allCases) { model in
+                Text(model.rawValue).tag(model as SplatModel?)
+            }
+        }
+        .pickerStyle(.menu)
     }
 
     private var sortPrecisionPicker: some View {

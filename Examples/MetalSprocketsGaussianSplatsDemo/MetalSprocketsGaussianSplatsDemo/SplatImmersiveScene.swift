@@ -37,9 +37,9 @@ struct SplatImmersiveScene: Scene {
                     )
                 }
             }
-            .onFrameTimingChange { [weak demoState] statistics in
+            .onFrameTimingChange { [demoState] statistics in
                 Task { @MainActor in
-                    demoState?.immersiveFrameTiming = statistics
+                    demoState.immersiveFrameTiming = statistics
                 }
             }
         }
