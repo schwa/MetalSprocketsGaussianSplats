@@ -3220,12 +3220,13 @@ Add typed custom attribute storage and mutation for individual splats. Preserve 
 ## 157: Provide a complete public splat-cloud initializer
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:m
 created: 2026-08-27T03:59:50Z
-updated: 2026-08-27T05:43:52Z
+updated: 2026-09-14T16:57:29Z
+closed: 2026-09-14T16:57:29Z
 +++
 
 Provide a clear public initializer for constructing a splat cloud from application-generated splat data, including spherical harmonics and other supported attributes. The initializer must produce a cloud ready for rendering without requiring file-format round trips or access to internal APIs.
@@ -3451,7 +3452,7 @@ Reported on iPad: pinch-to-zoom does not work. Expected: pinching changes the zo
 status: new
 priority: medium
 kind: bug
-labels: ipad,ui
+labels: ipad, ui
 created: 2026-09-14T16:50:39Z
 +++
 

@@ -140,5 +140,99 @@ public extension GPUSplatCloud where Splat == SparkSplat {
             opacity: opacity
         )
     }
+
+    /// Builds a render-ready cloud from application-generated splats, including
+    /// optional spherical harmonics.
+    ///
+    /// This is the entry point for splat data your app produces in memory, with
+    /// no file-format round trip. Each ``ExtendedSplat`` carries position, scale,
+    /// color, and rotation, plus optional per-splat spherical-harmonics rows. The
+    /// initializer converts each splat to a `SparkSplat`, flattens the SH rows
+    /// into the coefficient buffer layout the renderers expect, and uploads both.
+    ///
+    /// - Parameters:
+    ///   - device: The device to allocate the buffers on.
+    ///   - splats: The application-generated splats.
+    ///   - shDegree: The spherical-harmonics degree, 0 for none through 3. When
+    ///     greater than 0, every splat must carry `shDegree`'s worth of SH rows.
+    ///   - modelTransform: The per-cloud model transform.
+    ///   - opacity: The cloud-level opacity multiplier, 0.0 to 1.0.
+    ///   - mortonOrdered: If true, reorders the splats and their SH together
+    ///     along a Morton curve before upload, for group-culling coherence (#89).
+    ///   - name: An optional label for the buffers, for GPU-capture identification.
+    /// - Throws: ``GPUSplatCloudError`` when a splat's SH rows do not match
+    ///   `shDegree`.
+    convenience init(
+        device: MTLDevice,
+        splats: [ExtendedSplat],
+        shDegree: UInt8 = 0,
+        modelTransform: simd_float4x4 = .identity,
+        opacity: Float = 1.0,
+        mortonOrdered: Bool = false,
+        name: String? = nil
+    ) throws {
+        guard shDegree <= 3 else {
+            throw GPUSplatCloudError.unsupportedSphericalHarmonicsDegree(shDegree)
+        }
+        var sparkSplats: [SparkSplat] = []
+        sparkSplats.reserveCapacity(splats.count)
+        var sh: [Float] = []
+        let basisCount = Self.shBasisCount(forDegree: shDegree)
+        if shDegree > 0 {
+            sh.reserveCapacity(splats.count * basisCount * 3)
+        }
+        for splat in splats {
+            sparkSplats.append(SparkSplat(splat.genericSplat))
+            guard shDegree > 0 else {
+                continue
+            }
+            let rows = splat.sphericalHarmonics ?? []
+            guard rows.count == basisCount, rows.allSatisfy({ $0.count == 3 }) else {
+                throw GPUSplatCloudError.malformedSphericalHarmonics(expectedRows: basisCount, actualRows: rows.count)
+            }
+            for row in rows {
+                sh.append(contentsOf: row)
+            }
+        }
+
+        if mortonOrdered {
+            if shDegree > 0, !sparkSplats.isEmpty, sh.count.isMultiple(of: sparkSplats.count) {
+                SplatMortonReorder.reorder(splats: &sparkSplats, shCoefficients: &sh)
+            } else {
+                SplatMortonReorder.reorder(splats: &sparkSplats)
+            }
+        }
+
+        let label = name ?? "splats"
+        var splatsBuffer = try device.makeTypedBuffer(element: SparkSplat.self, capacity: max(1, sparkSplats.count), options: [.storageModeShared]).labeled("Splats (\(label))")
+        splatsBuffer.count = sparkSplats.count
+        for (index, splat) in sparkSplats.enumerated() {
+            splatsBuffer[index] = splat
+        }
+        if shDegree > 0 {
+            var shBuffer = try device.makeTypedBuffer(values: sh.isEmpty ? [0] : sh, options: [.storageModeShared]).labeled("SHCoefficients (\(label))")
+            shBuffer.count = sh.count
+            self.init(splats: splatsBuffer, modelTransform: modelTransform, shCoefficients: shBuffer, shDegree: shDegree, opacity: opacity)
+        } else {
+            self.init(splats: splatsBuffer, modelTransform: modelTransform, opacity: opacity)
+        }
+    }
+
+    /// The number of SH basis functions (excluding the DC term) for a degree:
+    /// degree 1 has 3, degree 2 has 8, and degree 3 has 15.
+    private static func shBasisCount(forDegree degree: UInt8) -> Int {
+        guard degree > 0 else {
+            return 0
+        }
+        let bands = Int(degree) + 1
+        return bands * bands - 1
+    }
+}
+
+/// Errors from building a ``GPUSplatCloud`` from application-generated data.
+public enum GPUSplatCloudError: Error, Equatable {
+    /// A splat's spherical-harmonics rows did not match the requested degree.
+    case malformedSphericalHarmonics(expectedRows: Int, actualRows: Int)
+    case unsupportedSphericalHarmonicsDegree(UInt8)
 }
 #endif
