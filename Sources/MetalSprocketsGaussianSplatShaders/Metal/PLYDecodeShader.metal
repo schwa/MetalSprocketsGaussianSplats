@@ -56,6 +56,7 @@ inline float value(device const uchar *bytes, ulong record, device const int *of
     splat.scale = half3(scale);
     splat.color = uchar4(clamp(float4(color, alpha), 0.0, 1.0) * 255.0);
     splat.rotation = half4(rotation);
+    splat.shIndex = index;
     splatsOut[index] = splat;
 
     uint coefficientCount = params.shCoefficientCount;

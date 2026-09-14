@@ -115,7 +115,7 @@ namespace SparkSplatRenderShader {
             device const float* shCoefficients = cloudData.shCoefficients;
             if (shCoefficients != nullptr) {
                 float3 viewDir = normalize(worldCenter.xyz - cameraPosition);
-                float3 shColor = evaluateSH(viewDir, shCoefficients, splatIndex, shDegree);
+                float3 shColor = evaluateSH(viewDir, shCoefficients, splat.shIndex, shDegree);
                 rgba.rgb = clamp(rgba.rgb + shColor, 0.0, 1.0);
             }
         }

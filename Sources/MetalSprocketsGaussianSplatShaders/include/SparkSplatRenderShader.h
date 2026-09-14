@@ -37,7 +37,8 @@ struct SparkSplat {
     simd_half3 scale;      // 6 bytes
     simd_half4 rotation;   // 8 bytes
     simd_uchar4 color;     // 4 bytes
-    // 8 bytes padding to reach 32
+    unsigned int shIndex;  // 4 bytes: row index into the SH coefficient buffer
+    // 4 bytes padding to reach 32
 };
 
 _Static_assert(sizeof(struct SparkSplat) == 32, "SparkSplat must be 32 bytes");

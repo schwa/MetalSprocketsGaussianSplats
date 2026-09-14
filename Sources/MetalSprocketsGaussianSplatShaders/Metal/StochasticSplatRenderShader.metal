@@ -93,7 +93,7 @@ namespace StochasticSplatRenderShader {
         // Evaluate the spherical harmonics for view-dependent color.
         if (use_sh && shDegree > 0 && shCoefficients != nullptr) {
             float3 viewDir = normalize(worldCenter.xyz - cameraPosition.xyz);
-            float3 shColor = evaluateSH(viewDir, shCoefficients, splatIndex, shDegree);
+            float3 shColor = evaluateSH(viewDir, shCoefficients, splat.shIndex, shDegree);
             rgba.rgb = clamp(rgba.rgb + shColor, 0.0, 1.0);
         }
 

@@ -109,6 +109,7 @@ namespace SPZUnpackShader {
             uchar(rgb.z * 255.0),
             uchar(alpha * 255.0)
         );
+        splat.shIndex = gid;
         splatsOut[gid] = splat;
 
         // Spherical harmonics: (byte - 128) / 128 per coefficient-channel.

@@ -72,6 +72,9 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
     public convenience init(device: MTLDevice, splats: [Splat], modelTransform: simd_float4x4 = .identity, shCoefficients: [Float], shDegree: UInt8, opacity: Float = 1.0, mortonOrdered: Bool = false) throws {
         var splats = splats
         var shCoefficients = shCoefficients
+        for index in splats.indices {
+            splats[index].shIndex = UInt32(index)
+        }
         if mortonOrdered {
             SplatMortonReorder.reorder(splats: &splats, shCoefficients: &shCoefficients)
         }

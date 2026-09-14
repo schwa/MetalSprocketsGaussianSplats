@@ -410,7 +410,7 @@ namespace PointSplatRender {
         if (uniforms.shDegree > 0) {
             float3 worldCenter = (uniforms.modelMatrix * float4(float3(splat.position), 1.0)).xyz;
             float3 viewDir = normalize(worldCenter - uniforms.cameraPosition);
-            rgb = max(rgb + evaluateSH(viewDir, shCoefficients, gid, uniforms.shDegree), 0.0);
+            rgb = max(rgb + evaluateSH(viewDir, shCoefficients, splat.shIndex, uniforms.shDegree), 0.0);
         }
         colors[gid] = gps_pack_color(rgb.r, rgb.g, rgb.b);
 

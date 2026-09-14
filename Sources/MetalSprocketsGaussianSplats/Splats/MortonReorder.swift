@@ -56,7 +56,11 @@ public enum SplatMortonReorder {
                 shCoefficients[destination * floatsPerSplat + offset] = sourceCoefficients[source * floatsPerSplat + offset]
             }
         }
-        splats = order.map { splats[$0] }
+        splats = order.enumerated().map { destination, source in
+            var splat = splats[source]
+            splat.shIndex = UInt32(destination)
+            return splat
+        }
     }
 
     /// Reorders `splats` alone into Morton order.

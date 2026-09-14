@@ -25,4 +25,12 @@ extension SparkSplat: SortableSplatProtocol {
         SIMD3<Float>(position)
     }
 }
+
+public extension SparkSplat {
+    /// Convenience initializer that defaults `shIndex` to 0 (identity is set by
+    /// the cloud builders). Keeps call sites that predate the SH-index field.
+    init(position: simd_half3, scale: simd_half3, rotation: simd_half4, color: simd_uchar4) {
+        self.init(position: position, scale: scale, rotation: rotation, color: color, shIndex: 0)
+    }
+}
 #endif

@@ -54,6 +54,9 @@ public extension SplatReaderProtocol {
                 }
             }
         }
+        for index in splats.indices {
+            splats[index].shIndex = UInt32(index)
+        }
 
         if mortonOrdered {
             if degree > 0, !splats.isEmpty, sh.count.isMultiple(of: splats.count) {
@@ -182,7 +185,9 @@ public extension GPUSplatCloud where Splat == SparkSplat {
             sh.reserveCapacity(splats.count * basisCount * 3)
         }
         for splat in splats {
-            sparkSplats.append(SparkSplat(splat.genericSplat))
+            var sparkSplat = SparkSplat(splat.genericSplat)
+            sparkSplat.shIndex = UInt32(sparkSplats.count)
+            sparkSplats.append(sparkSplat)
             guard shDegree > 0 else {
                 continue
             }

@@ -139,7 +139,8 @@ public struct PackedSplatCloud {
             position: simd_half3(Float16(position.x), Float16(position.y), Float16(position.z)),
             scale: simd_half3(Float16(scale.x), Float16(scale.y), Float16(scale.z)),
             rotation: simd_half4(Float16(rotation.x), Float16(rotation.y), Float16(rotation.z), Float16(rotation.w)),
-            color: simd_uchar4(element.color.0, element.color.1, element.color.2, element.color.3)
+            color: simd_uchar4(element.color.0, element.color.1, element.color.2, element.color.3),
+            shIndex: 0
         )
     }
 }

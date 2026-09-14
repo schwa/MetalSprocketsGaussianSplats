@@ -101,6 +101,7 @@ namespace SOGDecodeShader {
             uchar(clamp(b, 0.0, 1.0) * 255.0),
             uchar(clamp(a, 0.0, 1.0) * 255.0)
         );
+        splat.shIndex = gid;
         splatsOut[gid] = splat;
 
         // Higher-order SH.
