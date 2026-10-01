@@ -288,6 +288,11 @@ public final class OffscreenSplatRenderer {
                 sortedIndices: sortedIndices
             )
         }
+        // The shaders write render_target_array_index, which needs a layered pass. The modifier must wrap the
+        // RenderPass; inside it the encoder already exists.
+        .renderPassDescriptorModifier { descriptor in
+            descriptor.renderTargetArrayLength = 1
+        }
     }
 
     /// Counters report the final tile render pass. The binning and sorting
@@ -322,6 +327,9 @@ public final class OffscreenSplatRenderer {
                 convertSRGBToLinear: configuration.convertSRGBToLinear
             )
             .depthCompare(function: .less, enabled: true)
+        }
+        .renderPassDescriptorModifier { descriptor in
+            descriptor.renderTargetArrayLength = 1
         }
         try render(pass: pass, in: offscreenRenderer)
         return FrameReport(render: renderSampleBox.take())
