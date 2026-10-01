@@ -4,7 +4,7 @@ on:
   pull_request:
 
 env:
-  XCODE_VERSION: "26.2"
+  XCODE_VERSION: "26.6"
 
 jobs:
   swiftlint:
@@ -28,9 +28,9 @@ jobs:
       - name: Trust plugins
         run: defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
       - name: Build (macOS)
-        run: swift build -v --disable-sandbox
+        run: swift build -v -Xswiftc -warnings-as-errors --disable-sandbox
       - name: Test (macOS)
-        run: swift test -v --disable-sandbox
+        run: swift test -v -Xswiftc -warnings-as-errors --disable-sandbox
         env:
           CI: "true"
 

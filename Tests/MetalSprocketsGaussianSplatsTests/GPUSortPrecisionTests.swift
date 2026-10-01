@@ -24,9 +24,20 @@ struct GPUSortPrecisionTests {
             let slot = resources.advance()
             let pass = try GPUSplatSortComputePass(splatCloud: cloud, projectionMatrix: .identity, modelMatrix: simd_float4x4(translation: [0, 0, -2]), cameraMatrix: .identity, cullEnabled: false, resources: resources, slotIndex: slot)
             try runner.run(pass)
-            let indices = resources.makeIndices(slot: slot, count: cloud.count, parameters: SortParameters(camera: .identity, model: .identity))
-            #expect(indices.indices.map(\.splatIndex) == (precision == .float16 ? [0, 1, 2] : [1, 2, 0]))
-            #expect(indices.indices.allSatisfy { $0.cloudIndex == 0 })
+            // The sort output is private storage; copy it to a shared buffer before reading it on the CPU.
+            let output = resources.slots[slot].output.unsafeMTLBuffer
+            let size = cloud.count * MemoryLayout<IndexedDistance>.stride
+            let readback = try #require(device.makeBuffer(length: size, options: .storageModeShared))
+            try runner.run(
+                BlitPass {
+                    Blit { encoder in
+                        encoder.copy(from: output, sourceOffset: 0, to: readback, destinationOffset: 0, size: size)
+                    }
+                }
+            )
+            let indices = Array(UnsafeBufferPointer(start: readback.contents().bindMemory(to: IndexedDistance.self, capacity: cloud.count), count: cloud.count))
+            #expect(indices.map(\.splatIndex) == (precision == .float16 ? [0, 1, 2] : [1, 2, 0]))
+            #expect(indices.allSatisfy { $0.cloudIndex == 0 })
         }
     }
 }

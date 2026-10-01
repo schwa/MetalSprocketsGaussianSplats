@@ -1,0 +1,50 @@
+# Buildkite pipeline for MetalSprocketsGaussianSplats.
+#
+# Runs on a self-hosted Mac with a Metal 4 GPU, so the GPU tests that GitHub Actions skips run here.
+# The agent Mac and queue are shared with MetalSprockets; agent setup is in its Documentation/Buildkite.md.
+
+# The cluster routes jobs by queue. Every agent on this queue must be a Mac with a Metal 4 GPU.
+agents:
+  queue: "default-queue"
+
+steps:
+  - label: ":swift: Lint"
+    key: "lint"
+    command: "swiftlint --strict"
+
+  - label: ":metal: Test (macOS, API Validation)"
+    key: "test"
+    # One GPU test run at a time on an agent, so parallel builds don't compete for the GPU.
+    concurrency: 1
+    concurrency_group: "metalsprocketsgaussiansplats/gpu-tests"
+    env:
+      MTL_DEBUG_LAYER: "1"
+    command:
+      - "swift build -Xswiftc -warnings-as-errors --disable-sandbox"
+      - "swift test -Xswiftc -warnings-as-errors --disable-sandbox"
+
+  - label: ":swift: Build (release)"
+    key: "build-release"
+    # Optimized builds can fail where Debug passes (MetalSprockets #460).
+    command: "swift build -c release -Xswiftc -warnings-as-errors --disable-sandbox"
+
+  - label: ":hammer: Demo ({{matrix.destination}}, {{matrix.configuration}})"
+    key: "demo"
+    matrix:
+      setup:
+        destination:
+          - "platform=macOS"
+          - "generic/platform=iOS"
+          - "generic/platform=xrOS"
+        configuration:
+          - "Debug"
+          - "Release"
+    command: >-
+      xcodebuild build
+      -project Examples/MetalSprocketsGaussianSplatsDemo/MetalSprocketsGaussianSplatsDemo.xcodeproj
+      -scheme MetalSprocketsGaussianSplatsDemo
+      -configuration {{matrix.configuration}}
+      -destination '{{matrix.destination}}'
+      -skipPackagePluginValidation
+      -skipMacroValidation
+      CODE_SIGNING_ALLOWED=NO
