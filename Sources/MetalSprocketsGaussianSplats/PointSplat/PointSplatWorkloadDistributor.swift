@@ -131,13 +131,17 @@ final class PointSplatWorkloadDistributor {
         self.maxBlockCarry = maxBlockCarry
     }
 
+    /// Every buffer the distributor owns, for residency.
+    var allBuffers: [MTLBuffer] {
+        [indicesBuffer, totalsBuffer, dispatchArgsBuffer, localPrefix, countBlockSums, countBlockBase, maxBlockMaxes, maxBlockCarry]
+    }
+
     /// The full distribution pipeline as compute elements for an enclosing
     /// ``ComputePass``. Every stage after the prefix sum dispatches
     /// indirectly from the GPU-side total, so cost scales with actual demand
     /// rather than capacity. Entries past the total are garbage and must not
     /// be consumed.
-    @ElementBuilder
-    func elements(counts: MTLBuffer, count: Int, seed: UInt32 = 0) throws -> some Element {
+    func elements(counts: MTLBuffer, count: Int, seed: UInt32 = 0) throws -> AnyElement {
         let blockSize = Self.blockSize
         let countBlocks = (max(count, 1) + blockSize - 1) / blockSize
         let numElements = UInt32(count)
@@ -149,7 +153,14 @@ final class PointSplatWorkloadDistributor {
         let single = MTLSize(width: 1, height: 1, depth: 1)
         let countGroups = MTLSize(width: countBlocks, height: 1, depth: 1)
 
-        try Group {
+        // Every stage reads what the previous one wrote. Metal 4 does not track
+        // hazards between dispatches, so each dependency needs an explicit
+        // encoder barrier or stages overlap and read stale data.
+        //
+        // The two groups are built as locals and type-erased: inlining the full
+        // dispatch tuple into the caller's result-builder tree makes the nested
+        // Element tuple large enough to crash value-witness copies.
+        let prefixSumGroup = try Group {
             // Pass A: raw demand into totals[1].
             try ComputePipeline(computeKernel: scanCountsBlock) {
                 try ComputeDispatch(threadgroups: countGroups, threadsPerThreadgroup: blockThreads)
@@ -158,6 +169,7 @@ final class PointSplatWorkloadDistributor {
                     .parameter("blockSums", buffer: countBlockSums)
                     .parameter("numElements", value: numElements)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: scanBlockSums) {
                 try ComputeDispatch(threadgroups: single, threadsPerThreadgroup: single)
                     .parameter("blockSums", buffer: countBlockSums)
@@ -165,6 +177,7 @@ final class PointSplatWorkloadDistributor {
                     .parameter("totals", buffer: totalsBuffer, offset: uintStride)
                     .parameter("numBlocks", value: numCountBlocks)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             // Over-budget? Reduce all counts proportionally (stochastic
             // rounding keeps the expectation right), then re-scan. This turns
             // budget overflow into uniform noise instead of truncating whole
@@ -177,6 +190,7 @@ final class PointSplatWorkloadDistributor {
                     .parameter("numElements", value: numElements)
                     .parameter("seed", value: seed)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             // Pass B: scan the (possibly scaled) counts into totals[0].
             try ComputePipeline(computeKernel: scanCountsBlock) {
                 try ComputeDispatch(threadgroups: countGroups, threadsPerThreadgroup: blockThreads)
@@ -185,6 +199,7 @@ final class PointSplatWorkloadDistributor {
                     .parameter("blockSums", buffer: countBlockSums)
                     .parameter("numElements", value: numElements)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: scanBlockSums) {
                 try ComputeDispatch(threadgroups: single, threadsPerThreadgroup: single)
                     .parameter("blockSums", buffer: countBlockSums)
@@ -192,6 +207,7 @@ final class PointSplatWorkloadDistributor {
                     .parameter("totals", buffer: totalsBuffer)
                     .parameter("numBlocks", value: numCountBlocks)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: writeDispatchArgs) {
                 try ComputeDispatch(threadgroups: single, threadsPerThreadgroup: single)
                     .parameter("totals", buffer: totalsBuffer)
@@ -199,12 +215,16 @@ final class PointSplatWorkloadDistributor {
                     .parameter("args", buffer: dispatchArgsBuffer)
             }
         }
-        try Group {
+        let scatterGroup = try Group {
+            // Ordered after Group A: clearIndices and the indirect dispatches
+            // read totals/dispatchArgs produced above.
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: clearIndices) {
                 try ComputeDispatch(indirectBuffer: dispatchArgsBuffer, threadsPerThreadgroup: blockThreads)
                     .parameter("indices", buffer: indicesBuffer)
                     .parameter("capacity", value: capacityValue)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: scatterIndices) {
                 try ComputeDispatch(threadgroups: countGroups, threadsPerThreadgroup: blockThreads)
                     .parameter("counts", buffer: counts)
@@ -214,6 +234,7 @@ final class PointSplatWorkloadDistributor {
                     .parameter("numElements", value: numElements)
                     .parameter("capacity", value: capacityValue)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: maxScanBlock) {
                 try ComputeDispatch(indirectBuffer: dispatchArgsBuffer, threadsPerThreadgroup: blockThreads)
                     .parameter("indices", buffer: indicesBuffer)
@@ -221,6 +242,7 @@ final class PointSplatWorkloadDistributor {
                     .parameter("totals", buffer: totalsBuffer)
                     .parameter("capacity", value: capacityValue)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: scanBlockMaxes) {
                 try ComputeDispatch(threadgroups: single, threadsPerThreadgroup: single)
                     .parameter("blockMaxes", buffer: maxBlockMaxes)
@@ -228,6 +250,7 @@ final class PointSplatWorkloadDistributor {
                     .parameter("totals", buffer: totalsBuffer)
                     .parameter("capacity", value: capacityValue)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: applyBlockMax) {
                 try ComputeDispatch(indirectBuffer: dispatchArgsBuffer, threadsPerThreadgroup: blockThreads)
                     .parameter("indices", buffer: indicesBuffer)
@@ -236,6 +259,11 @@ final class PointSplatWorkloadDistributor {
                     .parameter("capacity", value: capacityValue)
             }
         }
+        return try Group {
+            prefixSumGroup
+            scatterGroup
+        }
+        .eraseToAnyElement()
     }
 
     /// Validates `count` before building the element tree.
@@ -247,7 +275,7 @@ final class PointSplatWorkloadDistributor {
 
     /// Builds the thread-to-Gaussian map, blocking until the GPU work
     /// completes, and reads back the total. Convenience for offline/test use.
-    func build(counts: MTLBuffer, count: Int, commandQueue: MTLCommandQueue) throws -> Result {
+    func build(counts: MTLBuffer, count: Int, commandQueue: MTL4CommandQueue) throws -> Result {
         try validate(count: count)
         let runner: Runner
         if let existing = self.runner {

@@ -58,6 +58,9 @@ public struct TileBasedSplatPipeline: Element {
                 drawableSize: drawableSize,
                 tileSplatResources: tileSplatResources
             )
+            // Residency applies to the whole submission, so attaching it to the first pass covers every pass.
+            .useResourceCollection(tileSplatResources.resourceCollection)
+            .useResources(of: [splatCloud])
 
             // Pass 1b: compute the prefix sum of the tile counts.
             try TilePrefixSumComputePass(
@@ -82,6 +85,7 @@ public struct TileBasedSplatPipeline: Element {
             // Pass 3: render each pixel from the sorted splat lists, with early
             // alpha termination.
             try RenderPass {
+                QueueBarrier(after: .dispatch, before: .vertex)
                 try TileSplatRenderPass(
                     splatCloud: splatCloud,
                     tileSplatResources: tileSplatResources,
@@ -101,6 +105,7 @@ public struct TileBasedSplatPipeline: Element {
             // Optional heatmap overlay that shows the splat density per tile.
             if showHeatMap {
                 try RenderPass {
+                    QueueBarrier(after: .dispatch, before: .vertex)
                     try TileHeatMapRenderPass(tileSplatResources: tileSplatResources)
                 }
             }

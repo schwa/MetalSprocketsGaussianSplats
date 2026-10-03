@@ -11,7 +11,7 @@ import Testing
 ///
 /// The CPU reference is `SPZReader` streaming into `SparkSplat`. It is the
 /// device-free decoder for SPZ.
-@Suite("SPZReaderGPU")
+@Suite("SPZReaderGPU", .enabled(if: MetalTestSupport.supportsMetal4))
 struct SPZReaderGPUTests {
     @Test("GPU unpack matches the CPU reference on test-grid.spz")
     func parityWithCPUReader() throws {

@@ -33,13 +33,16 @@ steps:
         configuration:
           - "Debug"
           - "Release"
-    command: >-
-      xcodebuild build
-      -project Examples/MetalSprocketsGaussianSplatsDemo/MetalSprocketsGaussianSplatsDemo.xcodeproj
-      -scheme MetalSprocketsGaussianSplatsDemo
-      -configuration '{{matrix.configuration}}'
-      -destination '{{matrix.destination}}'
-      -skipPackagePluginValidation
-      -skipMacroValidation
-      CODE_SIGNING_ALLOWED=NO
+    command:
+      - rm -rf .ci-spm
+      - >-
+        xcodebuild build
+        -project Examples/MetalSprocketsGaussianSplatsDemo/MetalSprocketsGaussianSplatsDemo.xcodeproj
+        -scheme MetalSprocketsGaussianSplatsDemo
+        -configuration '{{matrix.configuration}}'
+        -destination '{{matrix.destination}}'
+        -clonedSourcePackagesDirPath .ci-spm
+        -skipPackagePluginValidation
+        -skipMacroValidation
+        CODE_SIGNING_ALLOWED=NO
 

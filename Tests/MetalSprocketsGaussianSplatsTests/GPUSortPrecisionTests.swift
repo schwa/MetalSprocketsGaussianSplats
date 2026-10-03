@@ -29,10 +29,11 @@ struct GPUSortPrecisionTests {
             let size = cloud.count * MemoryLayout<IndexedDistance>.stride
             let readback = try #require(device.makeBuffer(length: size, options: .storageModeShared))
             try runner.run(
-                BlitPass {
-                    Blit { encoder in
-                        encoder.copy(from: output, sourceOffset: 0, to: readback, destinationOffset: 0, size: size)
+                ComputePass {
+                    ComputeCommand { encoder in
+                        encoder.copy(sourceBuffer: output, sourceOffset: 0, destinationBuffer: readback, destinationOffset: 0, size: size)
                     }
+                    .useComputeResources([output, readback], usage: [.read, .write])
                 }
             )
             let indices = Array(UnsafeBufferPointer(start: readback.contents().bindMemory(to: IndexedDistance.self, capacity: cloud.count), count: cloud.count))

@@ -8,6 +8,7 @@ import simd
 import Splats
 import Testing
 
+@Suite(.enabled(if: MetalTestSupport.supportsMetal4))
 struct GeneratedSplatCloudTests {
     let device = MTLCreateSystemDefaultDevice()!
 

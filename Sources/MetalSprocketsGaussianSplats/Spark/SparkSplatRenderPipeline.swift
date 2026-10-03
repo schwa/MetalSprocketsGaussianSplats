@@ -48,6 +48,9 @@ public struct SparkSplatRenderPipeline: Element {
     /// one) so in-flight frames keep reading valid data.
     @MSState
     private var cloudDataCache: CloudDataCache?
+    /// Keeps the cloud data buffer resident across frames, instead of re-adding it to the residency set each frame.
+    @MSState
+    private var resourceCollection: ResourceCollection?
 
     struct CloudDataCache {
         var modelMatrix: simd_float4x4
@@ -239,8 +242,10 @@ public struct SparkSplatRenderPipeline: Element {
                 cloudDataArray.append(cloudData)
             }
             cloudDataBuffer = try device.makeTypedBuffer(values: cloudDataArray, options: []).labeled("CloudData")
+            try updateResidency(oldBuffer: cloudDataCache?.buffer, newBuffer: cloudDataBuffer, device: device)
             cloudDataCache = CloudDataCache(modelMatrix: modelMatrix, clouds: splatClouds, buffer: cloudDataBuffer)
         }
+        let resourceCollection = try self.resourceCollection.orThrow(.generic("Missing splat resource collection"))
 
         let argumentBuffer = MultiCloudArgumentBuffer(
             cloudCount: UInt32(splatClouds.count),
@@ -257,42 +262,47 @@ public struct SparkSplatRenderPipeline: Element {
                 resourcesToUse.append(shBuffer.unsafeMTLBuffer)
             }
         }
+        // The indirect draw reads its arguments by GPU address, so it must stay resident.
+        if let indirectArgs = sortedIndices.indirectDrawArgs {
+            resourcesToUse.append(indirectArgs)
+        }
+
+        let base = Draw { commandEncoder in
+            if let viewMappings = amplificationViewMappings {
+                commandEncoder.setVertexAmplificationCount(viewMappings)
+            } else {
+                commandEncoder.setVertexAmplificationCount(amplificationCount)
+            }
+            if let indirectArgs = sortedIndices.indirectDrawArgs {
+                // GPU sort path: instanceCount is the cull survivor count
+                // written by the sort's block-scan kernel.
+                commandEncoder.drawPrimitives(primitiveType: .triangleStrip, indirectBuffer: indirectArgs.gpuAddress)
+            } else {
+                commandEncoder.drawPrimitives(primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)
+            }
+        }
+        .vertexValues([SIMD2<Float>(-1, -1), SIMD2<Float>(-1, 1), SIMD2<Float>(1, -1), SIMD2<Float>(1, 1)], index: 0)
+        .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
+        .parameter("viewMatrices", values: viewMatrices)
+        .parameter("projectionMatrices", values: projectionMatrices)
+        .parameter("drawableSize", value: drawableSize)
+        .parameter("scale", value: Float(2.0))
+        .parameter("cameraPositions", values: cameraPositions)
+        .parameter("clouds", value: argumentBuffer)
+
+        // SH degree and bounding box bind only when their function constants
+        // (use_sh, use_bounding_box) are true; otherwise the shader omits the
+        // binding and Metal 4 rejects binding it at all.
+        var draw = base.eraseToAnyElement()
+        if useSphericalHarmonics {
+            draw = draw.parameter("shDegree", functionType: .vertex, value: UInt32(maxSHDegree)).eraseToAnyElement()
+        }
+        if let boundingBox {
+            draw = draw.parameter("boundingBox", functionType: .vertex, value: boundingBox).eraseToAnyElement()
+        }
 
         return try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-            Draw { commandEncoder in
-                let vertices: [SIMD2<Float>] = [
-                    [-1, -1], [-1, 1], [1, -1], [1, 1]
-                ]
-                commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                if var viewMappings = amplificationViewMappings {
-                    commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: &viewMappings)
-                } else {
-                    commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
-                }
-                if let indirectArgs = sortedIndices.indirectDrawArgs {
-                    // GPU sort path: instanceCount is the cull survivor count
-                    // written by the sort's block-scan kernel.
-                    commandEncoder.drawPrimitives(type: .triangleStrip, indirectBuffer: indirectArgs, indirectBufferOffset: 0)
-                } else {
-                    commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)
-                }
-            }
-            .parameter("indexedDistances", buffer: sortedIndices.indices.unsafeMTLBuffer)
-            .parameter("viewMatrices", values: viewMatrices)
-            .parameter("projectionMatrices", values: projectionMatrices)
-            .parameter("drawableSize", value: drawableSize)
-            .parameter("scale", value: Float(2.0))
-            .parameter("cameraPositions", values: cameraPositions)
-            .parameter("clouds", value: argumentBuffer)
-            // SH degree for multi-cloud (shader looks up per-cloud SH buffers).
-            // Reflection comes from the pipeline state, so this binds whenever
-            // the PSO has use_sh baked in (even from a previous cloud) and is
-            // skipped otherwise. Degree 0 short-circuits SH.
-            .parameter("shDegree", functionType: .vertex, value: UInt32(useSphericalHarmonics ? maxSHDegree : 0))
-            // Bounding box for vertex culling. When boundingBox is nil the
-            // use_bounding_box function constant is false, the binding is absent
-            // from reflection, and the placeholder value is silently skipped.
-            .parameter("boundingBox", functionType: .vertex, value: boundingBox ?? BoundingBox3D())
+            draw
         }
         .vertexDescriptor(vertexDescriptor)
         .renderPassDescriptorModifier { [amplificationCount] descriptor in
@@ -309,7 +319,7 @@ public struct SparkSplatRenderPipeline: Element {
         .renderPipelineDescriptorTransformer { [amplificationCount] renderPipelineDescriptor in
             renderPipelineDescriptor.inputPrimitiveTopology = .triangle
             renderPipelineDescriptor.maxVertexAmplificationCount = amplificationCount
-            renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
+            renderPipelineDescriptor.colorAttachments[0].blendingState = .enabled
             renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
             renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
             renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
@@ -321,6 +331,19 @@ public struct SparkSplatRenderPipeline: Element {
         .depthCompare(function: .always, enabled: false)
         #endif
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
+        .useResourceCollection(resourceCollection)
+        .useResources(of: splatClouds)
+    }
+
+    /// Registers the new cloud data buffer and unregisters the old one. In-flight frames keep their leases, so the old
+    /// buffer stays resident until those frames finish.
+    private func updateResidency(oldBuffer: TypedMTLBuffer<SplatCloudData>?, newBuffer: TypedMTLBuffer<SplatCloudData>, device: MTLDevice) throws {
+        let collection = try resourceCollection ?? ResourceCollection(device: device)
+        resourceCollection = collection
+        try collection.register(newBuffer.unsafeMTLBuffer)
+        if let oldBuffer {
+            collection.unregister(oldBuffer.unsafeMTLBuffer)
+        }
     }
 }
 

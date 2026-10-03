@@ -63,6 +63,9 @@ public struct TileBasedSplatPass: Element {
             .onChange(of: drawableSize) { _, _ in
                 resources = try! Self.makeResources(drawableSize: drawableSize)
             }
+            // Residency applies to the whole submission, so attaching it to the first pass covers every pass.
+            .useResourceCollection(resources.resourceCollection)
+            .useResources(of: [splatCloud])
 
             // Pass 1b: compute the prefix sum of the tile counts.
             try TilePrefixSumComputePass(
@@ -84,8 +87,10 @@ public struct TileBasedSplatPass: Element {
                 tileSplatResources: resources
             )
 
-            // Pass 3: render the splats with an imageblock fragment shader.
+            // Pass 3: render the splats with an imageblock fragment shader. The
+            // vertex stage reads the per-tile sorted splats produced above.
             try RenderPass {
+                QueueBarrier(after: .dispatch, before: .vertex)
                 try TileSplatRenderPass(
                     splatCloud: splatCloud,
                     tileSplatResources: resources,
@@ -108,6 +113,7 @@ public struct TileBasedSplatPass: Element {
             // Optional heatmap overlay that shows the splat density per tile.
             if showHeatMap {
                 try RenderPass {
+                    QueueBarrier(after: .dispatch, before: .vertex)
                     try TileHeatMapRenderPass(tileSplatResources: resources, showTileBorders: debugTileBorders)
                 }
                 // Composite over the splat pass instead of re-clearing the attachment.
@@ -117,20 +123,25 @@ public struct TileBasedSplatPass: Element {
             }
 
             // Copy the tile counters to the readback buffer for stats.
-            try BlitPass {
-                Blit { encoder in
+            try ComputePass {
+                // The binning write pass reuses tileCounters as local indices.
+                QueueBarrier(after: .dispatch, before: .blit)
+                ComputeCommand { encoder in
                     encoder.copy(
-                        from: resources.tileCounters.unsafeMTLBuffer,
+                        sourceBuffer: resources.tileCounters.unsafeMTLBuffer,
                         sourceOffset: 0,
-                        to: resources.tileCountersReadback.unsafeMTLBuffer,
+                        destinationBuffer: resources.tileCountersReadback.unsafeMTLBuffer,
                         destinationOffset: 0,
                         size: resources.tileCounters.unsafeMTLBuffer.length
                     )
                 }
+                .useComputeResources([resources.tileCounters.unsafeMTLBuffer, resources.tileCountersReadback.unsafeMTLBuffer], usage: [.read, .write])
             }
-            .onCommandBufferCompleted { _ in
+            // Labeled form selects the isolation-aware overload; a trailing closure picks the @Sendable one.
+            // swiftlint:disable:next trailing_closure
+            .onCommandBufferCompleted(perform: { [onFrameCompleted, resources] _ in
                 onFrameCompleted?(resources)
-            }
+            })
         }
     }
 

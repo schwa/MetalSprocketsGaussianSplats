@@ -5,8 +5,8 @@ import PackageDescription
 let package = Package(
     name: "MetalSprocketsGaussianSplats",
     platforms: [
-        .macOS(.v15),
-        .iOS(.v18),
+        .macOS(.v26),
+        .iOS(.v26),
         .visionOS(.v26)
     ],
     products: [
@@ -31,7 +31,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-collections", from: "1.2.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
         .package(url: "https://github.com/schwa/MetalCompilerPlugin", from: "0.1.4"),
-        .package(url: "https://github.com/schwa/MetalSprockets", from: "0.1.15"),
+        .package(url: "https://github.com/schwa/MetalSprockets", from: "0.2.0"),
         .package(url: "https://github.com/schwa/GeometryLite3D", from: "0.1.0"),
         .package(url: "https://github.com/schwa/SwiftZipReader", from: "0.0.2"),
         .package(url: "https://github.com/schwa/GoldenImage", from: "0.1.2"),

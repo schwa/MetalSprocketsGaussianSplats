@@ -98,6 +98,18 @@ public struct SparkSplatDebugRenderPipeline: Element {
     var fragmentShader: FragmentShader
     var vertexDescriptor: MTLVertexDescriptor
 
+    /// The cloud data buffer, rebuilt only when its contents change, and a collection that keeps it resident.
+    @MSState
+    private var cloudDataCache: CloudDataCache?
+
+    struct CloudDataCache {
+        var clouds: [GPUSplatCloud<SparkSplat>]
+        var modelMatrices: [simd_float4x4]
+        var opacities: [Float]
+        var buffer: TypedMTLBuffer<SplatCloudData>
+        var resourceCollection: ResourceCollection
+    }
+
     /// The total splat count across all clouds.
     var totalSplatCount: Int {
         splatClouds.reduce(0) { $0 + $1.count }
@@ -239,40 +251,46 @@ public struct SparkSplatDebugRenderPipeline: Element {
     ) throws -> some Element {
         let device = splatClouds[0].splats.unsafeMTLBuffer.device
 
-        var cloudDataArray: [SplatCloudData] = []
-        for cloud in splatClouds {
-            let combinedModel = modelMatrix * cloud.modelTransform
-            let cloudData = SplatCloudData(
-                splats: cloud.splats.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SparkSplat.self),
-                modelMatrix: combinedModel,
-                shCoefficients: nil,  // debug mode uses no spherical harmonics
-                opacity: cloud.opacity
-            )
-            cloudDataArray.append(cloudData)
+        let modelMatrices = splatClouds.map { modelMatrix * $0.modelTransform }
+        let opacities = splatClouds.map(\.opacity)
+        let cache: CloudDataCache
+        if let existing = cloudDataCache, existing.clouds == splatClouds, existing.modelMatrices == modelMatrices, existing.opacities == opacities {
+            cache = existing
+        } else {
+            let cloudDataArray = zip(splatClouds, modelMatrices).map { cloud, combinedModel in
+                SplatCloudData(
+                    splats: cloud.splats.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SparkSplat.self),
+                    modelMatrix: combinedModel,
+                    shCoefficients: nil,  // debug mode uses no spherical harmonics
+                    opacity: cloud.opacity
+                )
+            }
+            // A new buffer, never a mutation of the old one, so in-flight frames keep reading valid data.
+            let buffer = try device.makeTypedBuffer(values: cloudDataArray, options: []).labeled("CloudData")
+            let resourceCollection = try cloudDataCache?.resourceCollection ?? ResourceCollection(device: device)
+            try resourceCollection.register(buffer.unsafeMTLBuffer)
+            if let old = cloudDataCache?.buffer {
+                resourceCollection.unregister(old.unsafeMTLBuffer)
+            }
+            cache = CloudDataCache(clouds: splatClouds, modelMatrices: modelMatrices, opacities: opacities, buffer: buffer, resourceCollection: resourceCollection)
+            cloudDataCache = cache
         }
-
-        let cloudDataBuffer = try device.makeTypedBuffer(values: cloudDataArray, options: []).labeled("CloudData")
+        let cloudDataBuffer = cache.buffer
 
         let argumentBuffer = MultiCloudArgumentBuffer(
             cloudCount: UInt32(splatClouds.count),
             clouds: cloudDataBuffer.unsafeMTLBuffer.gpuAddressAsUnsafeMutablePointer(type: SplatCloudData.self)
         )
 
-        // Cloud buffers are referenced through GPU addresses, so they must be marked in use.
-        var resourcesToUse: [MTLResource] = [cloudDataBuffer.unsafeMTLBuffer]
-        for cloud in splatClouds {
-            resourcesToUse.append(cloud.splats.unsafeMTLBuffer)
-        }
-
+        let vertices: [SIMD2<Float>] = [
+            [-1, -1], [-1, 1], [1, -1], [1, 1]
+        ]
         return try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
-            let draw = Draw { commandEncoder in
-                let vertices: [SIMD2<Float>] = [
-                    [-1, -1], [-1, 1], [1, -1], [1, 1]
-                ]
-                commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
-                commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)
+            let base = Draw { commandEncoder in
+                commandEncoder.setVertexAmplificationCount(amplificationCount)
+                commandEncoder.drawPrimitives(primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: totalSplatCount)
             }
+            .vertexValues(vertices, index: 0)
             .parameter("indexedDistances", buffer: indexedDistancesBuffer.unsafeMTLBuffer)
             .parameter("viewMatrices", values: viewMatrices)
             .parameter("projectionMatrices", values: projectionMatrices)
@@ -280,10 +298,12 @@ public struct SparkSplatDebugRenderPipeline: Element {
             .parameter("scale", value: Float(2.0))
             .parameter("cameraPositions", values: cameraPositions)
             .parameter("clouds", value: argumentBuffer)
-            // Bounding box for vertex culling. If boundingBox is nil, the
-            // use_bounding_box function constant is false, reflection omits the
-            // binding, and the placeholder value is skipped.
-            .parameter("boundingBox", functionType: .vertex, value: boundingBox ?? BoundingBox3D())
+            // Bounding box for vertex culling. When boundingBox is nil the
+            // use_bounding_box function constant is false and the binding is
+            // absent from reflection, so Metal 4 rejects binding it at all.
+            let draw = boundingBox.map {
+                base.parameter("boundingBox", functionType: .vertex, value: $0).eraseToAnyElement()
+            } ?? base.eraseToAnyElement()
 
             // Fragment shader parameters for the debug mode. The opacity and
             // normal shaders take no parameters.
@@ -309,7 +329,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
         .renderPipelineDescriptorTransformer { [amplificationCount] renderPipelineDescriptor in
             renderPipelineDescriptor.inputPrimitiveTopology = .triangle
             renderPipelineDescriptor.maxVertexAmplificationCount = amplificationCount
-            renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
+            renderPipelineDescriptor.colorAttachments[0].blendingState = .enabled
             renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
             renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
             renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .one
@@ -318,7 +338,9 @@ public struct SparkSplatDebugRenderPipeline: Element {
             renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
         .depthCompare(function: .always, enabled: false)
-        .useResources(resourcesToUse, usage: .read, stages: .vertex)
+        // Cloud buffers are referenced through GPU addresses, so they must be resident.
+        .useResourceCollection(cache.resourceCollection)
+        .useResources(of: splatClouds)
     }
 }
 

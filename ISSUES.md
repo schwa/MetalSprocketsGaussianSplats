@@ -3361,7 +3361,7 @@ Preserve indexed SH data through loading and evaluate SH using a per-splat index
 - Tests cover shared palette rows, multiple clouds with overlapping local indices, and reorder/sort correctness.
 - Benchmarks report GPU memory and vertex-stage timing before and after the change.
 
-- `2026-09-14T21:59:18Z`: Benchmark (Helmet.sog, 34,734 splats, SH degree 3, 45 floats/splat):
+\- `2026-09-14T21:59:18Z`: Benchmark (Helmet.sog, 34,734 splats, SH degree 3, 45 floats/splat):
 - SH palette entries: 32,768 (from meta.json shN.count).
 - SH memory before (dense, per-splat): 34,734*45*4 = 5.96 MiB.
 - SH memory after (shared palette): 32,768*45*4 = 5.63 MiB (~5.7% smaller).
@@ -3580,5 +3580,245 @@ Impact: multiple simultaneously-rendered clouds cannot be depth-sorted together 
 Expected: a GPU sort path that merges splats from several clouds into one back-to-front order while preserving each splat's cloudIndex and per-cloud shIndex, in both 16- and 32-bit key modes.
 
 Context: surfaced while implementing indexed SH palettes (#163).
+
+---
+
+## 173: Stochastic renderer: keep splat buffers resident via ResourceCollection
+
++++
+status: closed
+priority: low
+kind: enhancement
+labels: residency, metal4, rendering
+created: 2026-10-02T20:24:36Z
+updated: 2026-10-02T20:44:29Z
+closed: 2026-10-02T20:44:29Z
++++
+
+Commit 8df76f15 fixed this for the Spark GPU-sort path (`GPUSortResources`, `SparkSplatRenderPipeline`). Long-lived buffers that go through the automatic `ResidencyTracker` are removed from the residency set and added again on every frame. The fix: put them in a `ResourceCollection` that the owner keeps, register each buffer once, and attach the collection with `.useResourceCollection(_:)` (MetalSprockets #474).
+
+Done when a GPU capture of this renderer shows no per-frame `addAllocation`/`removeAllocation` for its long-lived buffers.
+
+Scope: `StochasticSplatRenderPipeline`. It reads each cloud's Splats and SHCoefficients buffers.
+
+- `2026-10-02T20:44:29Z`: Fixed: persistent ResourceCollections and Metal 4 pass barriers for all renderers.
+
+---
+
+## 174: Tile-based renderer: keep TileSplatResources buffers resident via ResourceCollection
+
++++
+status: closed
+priority: low
+kind: enhancement
+labels: residency, metal4, rendering
+created: 2026-10-02T20:24:36Z
+updated: 2026-10-02T20:44:29Z
+closed: 2026-10-02T20:44:29Z
++++
+
+Commit 8df76f15 fixed this for the Spark GPU-sort path (`GPUSortResources`, `SparkSplatRenderPipeline`). Long-lived buffers that go through the automatic `ResidencyTracker` are removed from the residency set and added again on every frame. The fix: put them in a `ResourceCollection` that the owner keeps, register each buffer once, and attach the collection with `.useResourceCollection(_:)` (MetalSprockets #474).
+
+Done when a GPU capture of this renderer shows no per-frame `addAllocation`/`removeAllocation` for its long-lived buffers.
+
+Scope: `TileSplatResources` (TileSplatIndicesA/B, TileCounters, TileOffsets, MaxTileCount, TileCountersReadback, TileProjectedSplats) and the cloud buffers. The buffers are rebuilt on resize, so unregister the old ones then. `TileBasedSplatPass` and `TileBinningComputePass` use `useComputeResources`; replace that or add the collection.
+
+- `2026-10-02T20:44:29Z`: Fixed: persistent ResourceCollections and Metal 4 pass barriers for all renderers.
+
+---
+
+## 175: PointSplat renderer: keep buffers resident via ResourceCollection
+
++++
+status: closed
+priority: low
+kind: enhancement
+labels: residency, metal4, pointsplat
+created: 2026-10-02T20:24:36Z
+updated: 2026-10-02T20:44:30Z
+closed: 2026-10-02T20:44:30Z
++++
+
+Commit 8df76f15 fixed this for the Spark GPU-sort path (`GPUSortResources`, `SparkSplatRenderPipeline`). Long-lived buffers that go through the automatic `ResidencyTracker` are removed from the residency set and added again on every frame. The fix: put them in a `ResourceCollection` that the owner keeps, register each buffer once, and attach the collection with `.useResourceCollection(_:)` (MetalSprockets #474).
+
+Done when a GPU capture of this renderer shows no per-frame `addAllocation`/`removeAllocation` for its long-lived buffers.
+
+Scope: the buffers that `PointSplatRenderPipeline` makes (framebuffer, counts, colors, renderedMask, lodFlags, stats, group culling buffers), the `PointSplatWorkloadDistributor` buffers, and `PackedSplatCloud`. The buffers that depend on drawable size are rebuilt on resize, so unregister the old ones then.
+
+- `2026-10-02T20:44:30Z`: Fixed: persistent ResourceCollections and Metal 4 pass barriers for all renderers.
+
+---
+
+## 176: Debug Spark pipeline: keep CloudData and splat buffers resident via ResourceCollection
+
++++
+status: closed
+priority: low
+kind: enhancement
+labels: residency, metal4, debug
+created: 2026-10-02T20:24:37Z
+updated: 2026-10-02T20:44:30Z
+closed: 2026-10-02T20:44:30Z
++++
+
+Commit 8df76f15 fixed this for the Spark GPU-sort path (`GPUSortResources`, `SparkSplatRenderPipeline`). Long-lived buffers that go through the automatic `ResidencyTracker` are removed from the residency set and added again on every frame. The fix: put them in a `ResourceCollection` that the owner keeps, register each buffer once, and attach the collection with `.useResourceCollection(_:)` (MetalSprockets #474).
+
+Done when a GPU capture of this renderer shows no per-frame `addAllocation`/`removeAllocation` for its long-lived buffers.
+
+Scope: `SparkSplatDebugRenderPipeline`. It makes a new CloudData buffer on every body evaluation (no cache, unlike `SparkSplatRenderPipeline`), so it churns allocations as well as residency. Copy the cache and collection from `SparkSplatRenderPipeline`.
+
+- `2026-10-02T20:44:30Z`: Fixed: persistent ResourceCollections and Metal 4 pass barriers for all renderers.
+
+---
+
+## 177: Standalone GPUSplatSortComputePass does not keep the Splats buffer resident
+
++++
+status: closed
+priority: low
+kind: enhancement
+labels: residency, metal4, sorting
+created: 2026-10-02T20:24:37Z
+updated: 2026-10-02T20:44:30Z
+closed: 2026-10-02T20:44:30Z
++++
+
+Commit 8df76f15 fixed this for the Spark GPU-sort path (`GPUSortResources`, `SparkSplatRenderPipeline`). Long-lived buffers that go through the automatic `ResidencyTracker` are removed from the residency set and added again on every frame. The fix: put them in a `ResourceCollection` that the owner keeps, register each buffer once, and attach the collection with `.useResourceCollection(_:)` (MetalSprockets #474).
+
+Done when a GPU capture of this renderer shows no per-frame `addAllocation`/`removeAllocation` for its long-lived buffers.
+
+Scope: `GPUSplatSortComputePass` attaches `GPUSortResources.resourceCollection`, but the cloud's Splats buffer is covered only when `SparkSplatRenderPipeline` runs in the same submission. If the sort pass runs alone, Splats goes through the tracker. A possible fix: give `GPUSplatCloud` its own collection, which every renderer can then reuse.
+
+- `2026-10-02T20:44:30Z`: Fixed: persistent ResourceCollections and Metal 4 pass barriers for all renderers.
+
+---
+
+## 178: Tile-based renderer: missing Metal 4 barriers between passes
+
++++
+status: closed
+priority: medium
+kind: bug
+labels: metal4, rendering, barriers
+created: 2026-10-02T20:27:01Z
+updated: 2026-10-02T20:44:30Z
+closed: 2026-10-02T20:44:30Z
++++
+
+Metal 4 does not order encoders, so a pass that reads what an earlier pass wrote needs a barrier. `TileBasedSplatPass` already starts its main render pass with `QueueBarrier(after: .dispatch, before: .vertex)`. Three passes have no barrier:
+
+- `TileBasedSplatPipeline`: the main `RenderPass` (it reads the sorted per-tile lists). The Spark fix in `GPUSplatSortComputePass` uses `.barrierAfterPass(after: .dispatch, beforeQueueStages: .vertex)`; use the same, or a `QueueBarrier` in the consumer.
+- `TileBasedSplatPipeline` and `TileBasedSplatPass`: the heat-map `RenderPass` (it reads `tileCounters`).
+- `TileBasedSplatPass`: the readback `ComputePass` that copies `tileCounters`. It needs `QueueBarrier(after: .dispatch, before: .blit)`, because the binning write pass reuses the counters.
+
+Also check write-after-read hazards across frames. `TileSplatResources` has a single set of buffers, so the next frame's clear `fill` can overwrite `tileCounters` while the previous frame still reads them.
+
+Done when an Xcode GPU capture shows a dependency edge into each consuming pass.
+
+- `2026-10-02T20:44:30Z`: Fixed: persistent ResourceCollections and Metal 4 pass barriers for all renderers.
+
+---
+
+## 179: Audit Metal 4 inter-pass barriers in the stochastic, PointSplat, and GPU reader paths
+
++++
+status: closed
+priority: low
+kind: task
+labels: metal4, barriers
+created: 2026-10-02T20:27:02Z
+updated: 2026-10-02T20:44:30Z
+closed: 2026-10-02T20:44:30Z
++++
+
+The Spark sort→render path had no dependency edge between the sort and the render encoder (fixed with `barrierAfterPass` in `GPUSplatSortComputePass`). Check the other paths for the same gap:
+
+- `PointSplatRenderPipeline` has `QueueBarrier(after: .dispatch, before: .fragment)` on its blit pass. Confirm this is enough, and check write-after-read hazards on `PointSplatResources`, which are reused across frames.
+- `PointSplatWorkloadDistributor` and `PointSplatComputePass`: check the order of passes inside each submission.
+- `StochasticSplatRenderPipeline`: has a single render pass. Confirm it has no compute producer.
+- `PLYReaderGPU`, `SOGReaderGPU`, `SPZReaderGPU`: check that decode output is complete before it is used.
+
+Done when each path has its barriers or is marked as not needing them, and a GPU capture shows the expected edges.
+
+- `2026-10-02T20:44:30Z`: Fixed: persistent ResourceCollections and Metal 4 pass barriers for all renderers.
+
+---
+
+## 180: Xcode 'Unused Resource' insight on GPU sort scratch buffers
+
++++
+status: new
+priority: low
+kind: task
+labels: metal4, sorting, memory
+created: 2026-10-02T20:35:57Z
++++
+
+Xcode's GPU capture Insights (Bandwidth) report "Unused Buffer x 8" (about 643 KiB) on the "GPU Splat Sort" encoder. The flagged buffers are the current slot's scratch buffers: `recordsA`, `recordsB`, `hist`, `offset`, `total`, `digitBase`, `blockCounts` and `blockBase`. This was already reported before the Metal 4 port.
+
+## Findings (trace from 2026-10-02, Apple M5 Max, Helmet, 34,736 splats)
+
+The buffers are used. Checked with `gpudebug`:
+- The frame uses slot1. The sort dispatches bind the flagged slot1 buffers.
+- `blockCounts` is fully written (68 blocks, sum 34,734).
+- `drawArgs` = `{4, 34734, 0, 0}`.
+- `recordsA` holds valid records (69,467 of 69,468 words are non-zero).
+- The final `output` is fully decoded.
+
+They are also registered in `GPUSortResources.resourceCollection` and bound with `.parameter(buffer:)`. Residency and binding are correct.
+
+## What the insight means (inferred, not documented)
+
+Xcode's GPUToolsPlatformSupport has the strings "Unused Resource", "Large Unused Resource" and "Bound Unused Resource", with the advice "Avoid loading unused resources or consider setting their purgeable state to volatile until you need them", and an internal pass `_generateUnusedOutputFindings`. The flagged buffers are exactly the sort outputs that no later encoder reads. `output` and `drawArgs`, which the render pass reads, are not flagged. So the insight probably means "this memory holds data that nothing reads after this encoder". That is true of all scratch memory.
+
+Metal has no flag that marks a buffer as temporary (memoryless storage is for textures only). Reducing the number of scratch buffers will not remove the finding.
+
+## Options
+
+1. Accept the finding as expected. Add a note in `GPUSortResources` (recommended for now).
+2. Allocate the scratch from an `MTLHeap` and call `makeAliasable()` after the sort, so other temporary resources in the frame (tile renderer, PointSplat) can reuse the memory. This does not save memory until there are several temporary users. It is not known whether Xcode stops reporting aliased buffers.
+3. Set the scratch buffers purgeable (volatile) between uses. This is probably not worth it for data that is rebuilt every frame.
+
+Separate memory saving, not related to the insight: only `output` and `drawArgs` need one copy per frame in flight. The other scratch buffers could be one shared set if the sort pass starts with `QueueBarrier(after: .dispatch, before: .dispatch)`. That is 3x less scratch memory; `recordsA` and `recordsB` are 8 bytes per splat each.
+
+---
+
+## 181: SparkSplatRenderPipeline cloud-data cache misses modelTransform and opacity changes
+
++++
+status: new
+priority: medium
+kind: bug
+labels: rendering, spark
+created: 2026-10-02T20:43:37Z
++++
+
+The CloudData cache in `SparkSplatRenderPipeline` rebuilds only when `modelMatrix` changes or `cache.clouds == splatClouds` is false. `GPUSplatCloud` uses reference equality, and its `modelTransform` and `opacity` are mutable. So if you change a cloud's transform or opacity without changing the pipeline's `modelMatrix`, the old CloudData buffer stays in use and the change does not show.
+
+Fix: key the cache on the values that go into `SplatCloudData`, as `SparkSplatDebugRenderPipeline` now does: the clouds, the combined model matrices (`modelMatrix * cloud.modelTransform`), and the opacities.
+
+Done when changing a cloud's `modelTransform` or `opacity` shows in the next frame. Add a test.
+
+---
+
+## 182: Offscreen PointSplat: keep PackedSplatCloud buffer resident
+
++++
+status: closed
+priority: low
+kind: enhancement
+labels: residency, metal4, pointsplat
+created: 2026-10-02T20:43:38Z
+updated: 2026-10-02T20:49:16Z
+closed: 2026-10-02T20:49:16Z
++++
+
+`PointSplatComputePass` (the offscreen path) takes the splats as a raw `MTLBuffer`, which can be a `PackedSplatCloud` buffer. That buffer still uses automatic residency, so on repeated offscreen renders (benchmarks, convergence tests) it is removed from the residency set and added again each frame.
+
+The pass already attaches `PointSplatResources.resourceCollection`. Fix: give `PackedSplatCloud` its own `ResourceCollection` (like `GPUSplatCloud.resourceCollection()`), or let callers pass a collection in, and attach it in `PointSplatComputePass`.
+
+Done when a GPU capture of repeated offscreen PointSplat renders shows no per-frame `addAllocation`/`removeAllocation` for the splat buffer.
+
+- `2026-10-02T20:49:16Z`: PointSplatComputePass keeps its splat buffer and output texture in a persistent ResourceCollection.
 
 ---

@@ -1,6 +1,7 @@
 #if !arch(x86_64)
 
 import Metal
+import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import Splats
@@ -28,6 +29,10 @@ public final class GPUSortResources {
         /// (phase 2), one entry per COMPACT_BLOCK-element block.
         var blockCounts: MTLBuffer
         var blockBase: MTLBuffer
+
+        var allBuffers: [MTLBuffer] {
+            [recordsA, recordsB, hist, offset, total, digitBase, output.unsafeMTLBuffer, drawArgs, blockCounts, blockBase]
+        }
     }
 
     /// Elements per compaction block. Must match COMPACT_BLOCK in SplatGPUSort.metal.
@@ -41,14 +46,18 @@ public final class GPUSortResources {
     public private(set) var capacity: Int
     private(set) var slots: [Slot]
     private var slotIndex = 0
+    /// Keeps every slot's buffers resident across frames, instead of re-adding them to the residency set each frame.
+    let resourceCollection: ResourceCollection
 
     public init(device: MTLDevice, capacity: Int, slotCount: Int = 3, precision: SplatSortPrecision = .float16) throws {
         self.device = device
         self.precision = precision
         self.slotCount = slotCount
         self.capacity = max(capacity, 1)
+        resourceCollection = try ResourceCollection(device: device)
         slots = []
         slots = try (0..<slotCount).map { try Self.makeSlot(device: device, capacity: self.capacity, index: $0) }
+        try registerSlots()
     }
 
     /// Grow all slots to hold at least `newCapacity` splats. No-op when smaller.
@@ -56,8 +65,19 @@ public final class GPUSortResources {
         guard newCapacity > capacity else {
             return
         }
+        let newSlots = try (0..<slotCount).map { try Self.makeSlot(device: device, capacity: newCapacity, index: $0) }
+        for buffer in slots.flatMap(\.allBuffers) {
+            resourceCollection.unregister(buffer)
+        }
         capacity = newCapacity
-        slots = try (0..<slotCount).map { try Self.makeSlot(device: device, capacity: newCapacity, index: $0) }
+        slots = newSlots
+        try registerSlots()
+    }
+
+    private func registerSlots() throws {
+        for buffer in slots.flatMap(\.allBuffers) {
+            try resourceCollection.register(buffer)
+        }
     }
 
     /// Build ``SplatIndices`` viewing a slot's output buffer + indirect draw

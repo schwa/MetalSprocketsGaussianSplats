@@ -66,13 +66,10 @@ struct TileHeatMapRenderPass: Element {
             let fragmentShader = try updatedFragmentShader()
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
-                    // Full-screen quad vertices in NDC.
-                    let vertices: [SIMD2<Float>] = [
-                        [-1, -1], [-1, 1], [1, -1], [1, 1]
-                    ]
-                    commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                    commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+                    commandEncoder.drawPrimitives(primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4)
                 }
+                // Full-screen quad vertices in NDC.
+                .vertexValues([SIMD2<Float>(-1, -1), SIMD2<Float>(-1, 1), SIMD2<Float>(1, -1), SIMD2<Float>(1, 1)], index: 0)
                 .parameter("tileGridSize", value: tileSplatResources.tileGridSize)
                 .parameter("tileCounters", buffer: tileSplatResources.tileCounters.unsafeMTLBuffer)
                 .parameter("maxTileCount", buffer: tileSplatResources.maxTileCount.unsafeMTLBuffer)
@@ -80,7 +77,7 @@ struct TileHeatMapRenderPass: Element {
             }
             .vertexDescriptor(vertexDescriptor)
             .renderPipelineDescriptorTransformer { renderPipelineDescriptor in
-                renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
+                renderPipelineDescriptor.colorAttachments[0].blendingState = .enabled
                 renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
                 renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
                 renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha

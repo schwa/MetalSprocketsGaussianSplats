@@ -6,6 +6,7 @@ import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import MetalSupport
+internal import os
 
 /// A stochastic splat renderer that uses random sampling for transparency.
 ///
@@ -32,8 +33,7 @@ public struct StochasticSplatRenderPipeline: Element {
     @MSState
     private var lastUseSH: Bool?
 
-    @MSState
-    var blueNoiseTexture: MTLTexture
+    var blueNoise: BlueNoise
     @MSState
     var vertexShader: VertexShader
     @MSState
@@ -122,15 +122,7 @@ public struct StochasticSplatRenderPipeline: Element {
         let effectiveUseSH = useSH && hasSHData // SH needs the data to exist.
         self.useSphericalHarmonics = effectiveUseSH
 
-        guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        let device = _MTLCreateSystemDefaultDevice()
-        let textureLoader = MTKTextureLoader(device: device)
-        self.blueNoiseTexture = try textureLoader.newTexture(URL: url, options: [
-            .textureUsage: MTLTextureUsage.shaderRead.rawValue,
-            .textureStorageMode: MTLStorageMode.private.rawValue
-        ])
+        self.blueNoise = try BlueNoise.shared(device: _MTLCreateSystemDefaultDevice())
 
         let shaderLibrary = try ShaderLibrary(bundle: Bundle.metalSprocketsGaussianSplatShaders).namespaced("StochasticSplatRenderShader")
 
@@ -181,18 +173,18 @@ public struct StochasticSplatRenderPipeline: Element {
             let viewMatrices = cameraMatrices.map(\.inverse)
             let cameraPositions = cameraMatrices.map { SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z) }
             let amplificationCount = cameraMatrices.count
+            let vertices: [SIMD2<Float>] = [
+                [-1, -1], [-1, 1], [1, -1], [1, 1]
+            ]
             try RenderPipeline(vertexShader: shaders.vertex, fragmentShader: shaders.fragment) {
                 let draw = Draw { commandEncoder in
-                    let vertices: [SIMD2<Float>] = [
-                        [-1, -1], [-1, 1], [1, -1], [1, 1]
-                    ]
-                    commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                    commandEncoder.setVertexAmplificationCount(amplificationCount, viewMappings: nil)
-                    commandEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
+                    commandEncoder.setVertexAmplificationCount(amplificationCount)
+                    commandEncoder.drawPrimitives(primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: splatCloud.count)
                 }
+                .vertexValues(vertices, index: 0)
                 .parameter("uTime", value: frameTime)
                 .parameter("alphaThreshold", value: alphaThreshold)
-                .parameter("blueNoiseTexture", texture: blueNoiseTexture)
+                .parameter("blueNoiseTexture", texture: blueNoise.texture)
                 .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
                 .parameter("modelMatrix", value: modelMatrix)
                 .parameter("viewMatrices", values: viewMatrices)
@@ -213,6 +205,37 @@ public struct StochasticSplatRenderPipeline: Element {
                 descriptor.inputPrimitiveTopology = .triangle
                 descriptor.maxVertexAmplificationCount = amplificationCount
             }
+            .useResourceCollection(blueNoise.resourceCollection)
+            .useResources(of: [splatCloud])
+        }
+    }
+}
+
+/// The blue-noise texture, loaded once per device and kept resident. The pipeline is made every frame, so loading it
+/// in `init` would read the PNG and allocate a new texture each frame.
+struct BlueNoise {
+    let texture: MTLTexture
+    let resourceCollection: ResourceCollection
+
+    private static let cache = OSAllocatedUnfairLock<[ObjectIdentifier: Self]>(uncheckedState: [:])
+
+    static func shared(device: MTLDevice) throws -> Self {
+        try cache.withLockUnchecked { cache in
+            if let cached = cache[ObjectIdentifier(device)] {
+                return cached
+            }
+            guard let url = Bundle.module.url(forResource: "LDR_RGBA_0", withExtension: "png") else {
+                throw CocoaError(.fileNoSuchFile)
+            }
+            let texture = try MTKTextureLoader(device: device).newTexture(URL: url, options: [
+                .textureUsage: MTLTextureUsage.shaderRead.rawValue,
+                .textureStorageMode: MTLStorageMode.private.rawValue
+            ])
+            let resourceCollection = try ResourceCollection(device: device)
+            try resourceCollection.register(texture)
+            let blueNoise = Self(texture: texture, resourceCollection: resourceCollection)
+            cache[ObjectIdentifier(device)] = blueNoise
+            return blueNoise
         }
     }
 }

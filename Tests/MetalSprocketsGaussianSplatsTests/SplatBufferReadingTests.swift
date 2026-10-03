@@ -8,7 +8,7 @@ import Testing
 
 /// The unified buffer-producing reader API: `SplatReaderProtocol.read(device:)`,
 /// the `SplatLoader` facade, and the `GPUSplatCloud(_:)` convenience init.
-@Suite("SplatBufferReading")
+@Suite("SplatBufferReading", .enabled(if: MetalTestSupport.supportsMetal4))
 struct SplatBufferReadingTests {
     @Test("CPU reader read(device:) matches the streamed splat/SH counts")
     func readDeviceMatchesStream() throws {

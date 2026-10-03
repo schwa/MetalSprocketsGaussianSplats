@@ -403,10 +403,11 @@ struct BenchRunner {
         var rgba = [Float](repeating: 0, count: pixelCount * 4)
         if texture.storageMode == .managed {
             try runner.run(
-                BlitPass {
-                    Blit { encoder in
-                        encoder.synchronize(resource: texture)
+                ComputePass {
+                    ComputeCommand { encoder in
+                        encoder.optimizeContents(forCPUAccess: texture)
                     }
+                    .useComputeResources([texture], usage: [.read, .write])
                 }
             )
         }

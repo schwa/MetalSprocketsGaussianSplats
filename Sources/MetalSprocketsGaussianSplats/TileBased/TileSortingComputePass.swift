@@ -32,7 +32,9 @@ struct TileSortingComputePass: Element {
         get throws {
             let numTiles = tileSplatResources.numTiles
 
+            // Sorts the splats the binning-write pass compacted per tile.
             try ComputePass(label: "Tile Sort") {
+                QueueBarrier(after: .dispatch, before: .dispatch)
                 try ComputePipeline(computeKernel: sortKernel) {
                     try ComputeDispatch(
                         threadsPerGrid: MTLSize(width: numTiles, height: 1, depth: 1),

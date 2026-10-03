@@ -12,13 +12,17 @@ struct PointSplatWorkloadTests {
 
     let device: MTLDevice
     let queue: MTLCommandQueue
+    let mtl4Queue: MTL4CommandQueue
 
     init() throws {
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
+        guard let device = MTLCreateSystemDefaultDevice(),
+              let queue = device.makeCommandQueue(),
+              let mtl4Queue = device.makeMTL4CommandQueue() else {
             throw TestError.noMetalDevice
         }
         self.device = device
         self.queue = queue
+        self.mtl4Queue = mtl4Queue
     }
 
     private func run(counts: [UInt32], capacity: Int) throws -> (indices: [UInt32], total: Int) {
@@ -26,7 +30,7 @@ struct PointSplatWorkloadTests {
         guard let countsBuffer = device.makeBuffer(bytes: counts, length: MemoryLayout<UInt32>.stride * counts.count) else {
             throw TestError.bufferAllocationFailed
         }
-        let result = try distributor.build(counts: countsBuffer, count: counts.count, commandQueue: queue)
+        let result = try distributor.build(counts: countsBuffer, count: counts.count, commandQueue: mtl4Queue)
 
         // The result indices live in a private buffer. Blit them to a shared
         // buffer for inspection.

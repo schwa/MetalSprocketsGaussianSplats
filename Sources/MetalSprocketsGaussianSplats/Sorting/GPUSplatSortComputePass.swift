@@ -145,6 +145,7 @@ public struct GPUSplatSortComputePass: Element {
                         .parameter("p", value: distanceParams)
                         .parameter("blockCounts", buffer: slot.blockCounts)
                 }
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 // Phase 2: scan per-block counts into base offsets + survivor
                 // total (also writes the indirect draw args).
                 try ComputePipeline(computeKernel: compactScanBlocks) {
@@ -154,6 +155,7 @@ public struct GPUSplatSortComputePass: Element {
                         .parameter("drawArgs", buffer: slot.drawArgs)
                         .parameter("numBlocks", value: UInt32(numBlocks))
                 }
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 // Phase 3: stable-compact survivors recordsA -> recordsB.
                 try ComputePipeline(computeKernel: compactScatter) {
                     try ComputeDispatch(threadgroups: blockGroups, threadsPerThreadgroup: blockThreads)
@@ -162,26 +164,40 @@ public struct GPUSplatSortComputePass: Element {
                         .parameter("blockBase", buffer: slot.blockBase)
                         .parameter("blockCounts", buffer: slot.blockCounts)
                 }
+                EncoderBarrier(after: .dispatch, before: .dispatch)
+                // Each radix pass reads the previous pass's output; the pass
+                // itself inserts barriers between its own stages, and these
+                // barriers order one pass after the next.
                 // Only the final pass decodes into the IndexedDistance output.
                 try radixPass(shift: 0, src: slot.recordsB, dst: slot.recordsA, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 if resources.precision == .float32 {
                     try radixPass(shift: 8, src: slot.recordsA, dst: slot.recordsB, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                    EncoderBarrier(after: .dispatch, before: .dispatch)
                     try radixPass(shift: 16, src: slot.recordsB, dst: slot.recordsA, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                    EncoderBarrier(after: .dispatch, before: .dispatch)
                     try radixPass(shift: 24, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
                 } else {
                     try radixPass(shift: 8, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
                 }
             }
+            // Metal 4 does not order encoders. Every consumer draws from the sorted indices and the indirect
+            // draw args, so order the vertex stage of later passes after this pass.
+            .barrierAfterPass(after: .dispatch, beforeQueueStages: .vertex)
+            .useResourceCollection(resources.resourceCollection)
+            .useResources(of: [splatCloud])
         }
     }
 
-    private func radixPass(shift: UInt32, src: MTLBuffer, dst: MTLBuffer, decode: Bool, slot: GPUSortResources.Slot, count: Int, numTiles: Int, tileGroups: MTLSize, tileThreads: MTLSize, single: MTLSize) throws -> some Element {
+    private func radixPass(shift: UInt32, src: MTLBuffer, dst: MTLBuffer, decode: Bool, slot: GPUSortResources.Slot, count: Int, numTiles: Int, tileGroups: MTLSize, tileThreads: MTLSize, single: MTLSize) throws -> AnyElement {
         let params = SplatSortParams(
             numElements: UInt32(count),
             numTiles: UInt32(numTiles),
             elementsPerTile: UInt32(GPUSortResources.elementsPerTile),
             shift: shift
         )
+        // Dependent dispatches: Metal 4 does not auto-serialize, so order each
+        // stage against the previous with an encoder barrier.
         return try Group {
             try ComputePipeline(computeKernel: histogram) {
                 try ComputeDispatch(threadgroups: tileGroups, threadsPerThreadgroup: tileThreads)
@@ -190,6 +206,7 @@ public struct GPUSplatSortComputePass: Element {
                     .parameter("p", value: params)
                     .parameter("drawArgs", buffer: slot.drawArgs)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: scanOffsets) {
                 try ComputeDispatch(
                     threadsPerGrid: MTLSize(width: 256, height: 1, depth: 1),
@@ -201,11 +218,13 @@ public struct GPUSplatSortComputePass: Element {
                 .parameter("p", value: params)
                 .parameter("drawArgs", buffer: slot.drawArgs)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: scanDigitBase) {
                 try ComputeDispatch(threadsPerGrid: single, threadsPerThreadgroup: single)
                     .parameter("total", buffer: slot.total)
                     .parameter("digitBase", buffer: slot.digitBase)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: decode ? scatterDecode : scatter) {
                 try ComputeDispatch(threadgroups: tileGroups, threadsPerThreadgroup: tileThreads)
                     .parameter("inRecords", buffer: src)
@@ -216,6 +235,7 @@ public struct GPUSplatSortComputePass: Element {
                     .parameter("drawArgs", buffer: slot.drawArgs)
             }
         }
+        .eraseToAnyElement()
     }
 }
 

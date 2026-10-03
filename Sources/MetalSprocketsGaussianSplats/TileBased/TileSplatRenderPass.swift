@@ -100,9 +100,9 @@ public struct TileSplatRenderPass: Element {
             // Step 1: render the splats to the imageblock (no color output).
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: fragmentShader) {
                 Draw { commandEncoder in
-                    commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                    commandEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+                    commandEncoder.drawPrimitives(primitiveType: .triangle, vertexStart: 0, vertexCount: 3)
                 }
+                .vertexValues(vertices, index: 0)
                 .parameter("projectedSplats", buffer: tileSplatResources.projectedSplats.unsafeMTLBuffer)
                 .parameter("tileSplatIndices", buffer: tileSplatResources.tileSplatIndicesA.unsafeMTLBuffer)
                 .parameter("tileOffsets", buffer: tileSplatResources.tileOffsets.unsafeMTLBuffer)
@@ -117,13 +117,13 @@ public struct TileSplatRenderPass: Element {
             // transparent hole in the layer.
             try RenderPipeline(vertexShader: vertexShader, fragmentShader: blitFragmentShader) {
                 Draw { commandEncoder in
-                    commandEncoder.setVertexUnsafeBytes(of: vertices, index: 0)
-                    commandEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+                    commandEncoder.drawPrimitives(primitiveType: .triangle, vertexStart: 0, vertexCount: 3)
                 }
+                .vertexValues(vertices, index: 0)
             }
             .depthCompare(function: .always, enabled: false)
             .renderPipelineDescriptorTransformer { descriptor in
-                descriptor.colorAttachments[0].isBlendingEnabled = true
+                descriptor.colorAttachments[0].blendingState = .enabled
                 descriptor.colorAttachments[0].rgbBlendOperation = .add
                 descriptor.colorAttachments[0].alphaBlendOperation = .add
                 descriptor.colorAttachments[0].sourceRGBBlendFactor = .one

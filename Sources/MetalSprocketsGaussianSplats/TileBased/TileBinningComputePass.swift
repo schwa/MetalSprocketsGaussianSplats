@@ -47,19 +47,25 @@ struct TileBinningCountPass: Element {
 
     var body: some Element {
         get throws {
-            // Clear the tile counters before the count.
-            try BlitPass {
-                Blit { encoder in
+            // Clear the tile counters before the count. This is the first pass of the frame, and the tile buffers have
+            // one copy only, so wait for the previous frame to finish reading them (write-after-read). Later passes
+            // wait for this one, so this barrier orders the whole frame.
+            try ComputePass {
+                QueueBarrier(after: [.dispatch, .blit, .vertex, .fragment], before: .blit)
+                ComputeCommand { encoder in
                     encoder.fill(
                         buffer: tileSplatResources.tileCounters.unsafeMTLBuffer,
                         range: 0..<tileSplatResources.tileCounters.unsafeMTLBuffer.length,
                         value: 0
                     )
                 }
+                .useComputeResources([tileSplatResources.tileCounters.unsafeMTLBuffer], usage: .write)
             }
 
-            // Run the count kernel with one thread per splat.
+            // Run the count kernel with one thread per splat. It reads the
+            // counters the clear pass just zeroed, so order it after that blit.
             try ComputePass(label: "Tile Binning Count") {
+                QueueBarrier(after: .blit, before: .dispatch)
                 try ComputePipeline(computeKernel: computeKernel) {
                     try ComputeDispatch(
                         threadsPerGrid: MTLSize(width: splatCloud.count, height: 1, depth: 1),
@@ -124,19 +130,25 @@ struct TileBinningWritePass: Element {
 
     var body: some Element {
         get throws {
-            // Clear the tile counters before the write. The write reuses them as local indices.
-            try BlitPass {
-                Blit { encoder in
+            // Clear the tile counters before the write. The write reuses them as local indices. The prefix sum reads
+            // the counters, so wait for it first (write-after-read).
+            try ComputePass {
+                QueueBarrier(after: .dispatch, before: .blit)
+                ComputeCommand { encoder in
                     encoder.fill(
                         buffer: tileSplatResources.tileCounters.unsafeMTLBuffer,
                         range: 0..<tileSplatResources.tileCounters.unsafeMTLBuffer.length,
                         value: 0
                     )
                 }
+                .useComputeResources([tileSplatResources.tileCounters.unsafeMTLBuffer], usage: .write)
             }
 
-            // Run the write kernel with one thread per splat.
+            // Run the write kernel with one thread per splat. It reads the
+            // prefix-summed offsets (earlier dispatch) and the counters this
+            // component just cleared (blit).
             try ComputePass(label: "Tile Binning Write") {
+                QueueBarrier(after: [.dispatch, .blit], before: .dispatch)
                 try ComputePipeline(computeKernel: computeKernel) {
                     try ComputeDispatch(
                         threadsPerGrid: MTLSize(width: splatCloud.count, height: 1, depth: 1),

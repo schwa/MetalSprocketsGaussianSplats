@@ -178,7 +178,11 @@ public struct PointSplatRenderPipeline: Element {
             let seedReprojection: PointSplatResources.SeedReprojection? = nil
             let plan = resources.framePlan(planKey: UInt64(frameIndex), splats: splatCloud.splats.unsafeMTLBuffer)
             try ComputePass(label: "PointSplat") {
+                // The framebuffer, counts, and accumulation textures have one copy only. Wait for the previous
+                // frame's compute and blit to finish with them (write-after-read).
+                QueueBarrier(after: [.dispatch, .fragment], before: .dispatch)
                 try resources.frameElements(uniforms: uniforms, splats: splatCloud.splats.unsafeMTLBuffer, shBuffer: shBuffer, seed: frameIndex, packedBounds: GPSPackedSplatBounds(), plan: plan, seedReprojection: seedReprojection)
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 try ComputePipeline(computeKernel: resolveKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
                         .parameter("framebuffer", buffer: resources.framebuffer)
@@ -194,6 +198,7 @@ public struct PointSplatRenderPipeline: Element {
                         statistics.pointBudget = resources.distributor.capacity * pointsPerThread
                     }
                 }
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 if let previousViewProjection = accumulation.reprojectFrom {
                     // Camera moved: warp + clamp history instead of resetting
                     // to a single noisy frame (paper Sec. 3.6).
@@ -217,10 +222,15 @@ public struct PointSplatRenderPipeline: Element {
                     }
                 }
             }
+            .useResourceCollection(resources.resourceCollection)
+            .useResources(of: [splatCloud])
             try RenderPass {
+                // The blit samples the accumulation texture the compute pass
+                // just wrote.
+                QueueBarrier(after: .dispatch, before: .fragment)
                 try RenderPipeline(vertexShader: blitVertexShader, fragmentShader: blitFragmentShader) {
                     Draw { commandEncoder in
-                        commandEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+                        commandEncoder.drawPrimitives(primitiveType: .triangle, vertexStart: 0, vertexCount: 3)
                     }
                     .parameter("texture", texture: accumulation.output)
                 }
@@ -228,7 +238,7 @@ public struct PointSplatRenderPipeline: Element {
                 // Premultiplied source-over: uncovered pixels (alpha 0) keep
                 // whatever earlier passes drew, e.g. scene guides (#162).
                 .renderPipelineDescriptorTransformer { descriptor in
-                    descriptor.colorAttachments[0].isBlendingEnabled = true
+                    descriptor.colorAttachments[0].blendingState = .enabled
                     descriptor.colorAttachments[0].rgbBlendOperation = .add
                     descriptor.colorAttachments[0].alphaBlendOperation = .add
                     descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
@@ -335,6 +345,9 @@ final class PointSplatResources {
     private let copyTotalsKernel: ComputeKernel
 
     private let accumulationTextures: [MTLTexture]
+    /// Keeps every buffer and texture resident across frames, instead of re-adding them to the residency set each
+    /// frame. The resources are rebuilt as a whole on change, so the collection never changes after `init`.
+    let resourceCollection: ResourceCollection
     private(set) var accumulatedFrames: Int = 0
     private var frameParity: Int = 0
     private var lastCameraMatrix: simd_float4x4?
@@ -469,6 +482,14 @@ final class PointSplatResources {
         }
         resolveTexture = try makeTexture(label: "PointSplat resolve")
         accumulationTextures = [try makeTexture(label: "PointSplat accumulation A"), try makeTexture(label: "PointSplat accumulation B")]
+
+        resourceCollection = try ResourceCollection(device: device)
+        let buffers = [framebuffer, counts, colors, dummySHBuffer, renderedMask, lodFlags, statsBuffer, zeroTotals, groupBounds, visibleGroups, visibleGroupCount, groupDispatchArgs] + distributor.allBuffers
+        // Coverage is checked per object, so the mip views need their own entries.
+        let textures = [resolveTexture, depthPyramid] + accumulationTextures + pyramidLevelViews
+        for allocation in buffers as [any MTLAllocation] + textures as [any MTLAllocation] {
+            try resourceCollection.register(allocation)
+        }
     }
 
     /// Per-frame element-tree decisions that also advance resources state
@@ -508,7 +529,7 @@ final class PointSplatResources {
         var previousInverseProjection: simd_float4x4
     }
 
-    func frameElements(uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, packedBounds: GPSPackedSplatBounds = GPSPackedSplatBounds(), plan: FramePlan, seedReprojection: SeedReprojection? = nil) throws -> some Element {
+    func frameElements(uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, packedBounds: GPSPackedSplatBounds = GPSPackedSplatBounds(), plan: FramePlan, seedReprojection: SeedReprojection? = nil) throws -> AnyElement {
         try distributor.validate(count: splatCount)
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
         let pixelCount = width * height * supersampling * supersampling
@@ -529,6 +550,7 @@ final class PointSplatResources {
                 // surface before any fresh splats (RFC 0005 §4). Reads the
                 // previous frame's resolve and depth pyramid level 0. Both
                 // are still intact at this point.
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 try ComputePipeline(computeKernel: seedReprojectKernel) {
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
                         .parameter("framebuffer", buffer: framebuffer)
@@ -549,11 +571,15 @@ final class PointSplatResources {
                         .parameter("packedBounds", value: packedBounds)
                 }
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try phaseElements(uniforms: phase1, splats: splats, shBuffer: shBuffer, seed: seed, statsOffset: 0, packedBounds: packedBounds)
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try pyramidElements(uniforms: uniforms)
             if plan.occlusionPhase2 {
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 try phaseElements(uniforms: phase2, splats: splats, shBuffer: shBuffer, seed: seed &+ 0x9E37_79B9, statsOffset: 2, packedBounds: packedBounds)
                 // Refresh the pyramid with phase-2 contributions for next frame.
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 try pyramidElements(uniforms: uniforms)
             } else {
                 // No phase 2 this frame: zero its stats slots.
@@ -565,6 +591,7 @@ final class PointSplatResources {
                 }
             }
         }
+        .eraseToAnyElement()
     }
 
     /// Box-filters the supersampled framebuffer into `outTexture`.
@@ -578,13 +605,15 @@ final class PointSplatResources {
     }
 
     /// One preprocess -> distribute -> splat round for the given phase.
-    private func phaseElements(uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, statsOffset: Int, packedBounds: GPSPackedSplatBounds) throws -> some Element {
+    private func phaseElements(uniforms: PointSplatUniforms, splats: MTLBuffer, shBuffer: MTLBuffer, seed: UInt32, statsOffset: Int, packedBounds: GPSPackedSplatBounds) throws -> AnyElement {
         let blockThreads = MTLSize(width: 256, height: 1, depth: 1)
         let single = MTLSize(width: 1, height: 1, depth: 1)
 
         // Reset counts/mask/visible-group counter. Cull whole groups against
         // the frustum and depth pyramid. Then run the per-Gaussian preprocess
-        // only for surviving groups (#75).
+        // only for surviving groups (#75). Every stage reads the previous
+        // stage's output; Metal 4 does not auto-order dispatches, so each
+        // dependency needs an encoder barrier.
         return try Group {
             try ComputePipeline(computeKernel: clearCountsKernel) {
                 try ComputeDispatch(threadsPerGrid: MTLSize(width: max(splatCount, 1), height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
@@ -593,6 +622,7 @@ final class PointSplatResources {
                     .parameter("visibleGroupCount", buffer: visibleGroupCount)
                     .parameter("uniforms", value: uniforms)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: groupCullKernel) {
                 try ComputeDispatch(threadsPerGrid: MTLSize(width: groupCount, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
                     .parameter("bounds", buffer: groupBounds)
@@ -602,11 +632,13 @@ final class PointSplatResources {
                     .parameter("groupCount", value: UInt32(groupCount))
                     .parameter("depthPyramid", texture: depthPyramid)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: groupDispatchArgsKernel) {
                 try ComputeDispatch(threadsPerGrid: single, threadsPerThreadgroup: single)
                     .parameter("visibleGroupCount", buffer: visibleGroupCount)
                     .parameter("args", buffer: groupDispatchArgs)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: preprocessKernel) {
                 try ComputeDispatch(indirectBuffer: groupDispatchArgs, threadsPerThreadgroup: blockThreads)
                     .parameter("splats", buffer: splats)
@@ -621,13 +653,16 @@ final class PointSplatResources {
                     .parameter("lodFlags", buffer: lodFlags)
                     .parameter("depthPyramid", texture: depthPyramid)
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try distributor.elements(counts: counts, count: splatCount, seed: seed)
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: copyTotalsKernel) {
                 try ComputeDispatch(threadsPerGrid: MTLSize(width: 2, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 2, height: 1, depth: 1))
                     .parameter("totals", buffer: distributor.totalsBuffer)
                     .parameter("dst", buffer: statsBuffer)
                     .parameter("offset", value: UInt32(statsOffset))
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: splatKernel) {
                 try ComputeDispatch(indirectBuffer: distributor.dispatchArgsBuffer, threadsPerThreadgroup: blockThreads)
                     .parameter("splats", buffer: splats)
@@ -641,11 +676,12 @@ final class PointSplatResources {
                     .parameter("lodFlags", buffer: lodFlags)
             }
         }
+        .eraseToAnyElement()
     }
 
     /// Extracts native-resolution max depth from the framebuffer and builds
     /// the max-depth mip chain.
-    private func pyramidElements(uniforms: PointSplatUniforms) throws -> some Element {
+    private func pyramidElements(uniforms: PointSplatUniforms) throws -> AnyElement {
         try Group {
             try ComputePipeline(computeKernel: depthExtractKernel) {
                 try ComputeDispatch(threadsPerGrid: MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
@@ -653,8 +689,12 @@ final class PointSplatResources {
                     .parameter("uniforms", value: uniforms)
                     .parameter("outDepth", texture: pyramidLevelViews[0])
             }
+            EncoderBarrier(after: .dispatch, before: .dispatch)
+            // Each level reads the level above it, so the per-level dispatches
+            // are serialized with a barrier before every iteration.
             try ComputePipeline(computeKernel: depthDownsampleKernel) {
                 ForEach(Array(1..<pyramidLevels), id: \.self) { [pyramidLevelViews] level in
+                    EncoderBarrier(after: .dispatch, before: .dispatch)
                     let destination = pyramidLevelViews[level]
                     try ComputeDispatch(threadsPerGrid: MTLSize(width: destination.width, height: destination.height, depth: 1), threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
                         .parameter("src", texture: pyramidLevelViews[level - 1])
@@ -662,6 +702,7 @@ final class PointSplatResources {
                 }
             }
         }
+        .eraseToAnyElement()
     }
 
     struct AccumulationStep {

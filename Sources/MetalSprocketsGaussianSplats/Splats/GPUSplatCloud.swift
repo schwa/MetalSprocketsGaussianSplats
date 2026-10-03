@@ -2,6 +2,7 @@
 
 import GeometryLite3D
 @preconcurrency import Metal
+import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 internal import os
 import simd
@@ -25,6 +26,9 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
     }
 
     private let state: Mutex<MutableState>
+
+    /// Keeps the splat and SH buffers resident across frames. Made on first use, because the initializers do not throw.
+    private let residency = OSAllocatedUnfairLock<ResourceCollection?>(uncheckedState: nil)
 
     /// The per-cloud model transform.
     public var modelTransform: simd_float4x4 {
@@ -93,6 +97,34 @@ public final class GPUSplatCloud <Splat>: Equatable, Sendable where Splat: Sorta
     /// The number of splats in the splat cloud.
     public var count: Int {
         splats.count
+    }
+
+    /// A collection that holds this cloud's buffers. Attach it with `.useResourceCollection(_:)` in every pass that
+    /// reads the cloud, so the buffers stay resident instead of being added to the residency set again each frame.
+    public func resourceCollection() throws -> ResourceCollection {
+        try residency.withLockUnchecked { collection in
+            if let collection {
+                return collection
+            }
+            let created = try ResourceCollection(device: splats.unsafeMTLBuffer.device)
+            try created.register(splats.unsafeMTLBuffer)
+            if let shCoefficients {
+                try created.register(shCoefficients.unsafeMTLBuffer)
+            }
+            collection = created
+            return created
+        }
+    }
+}
+
+public extension Element {
+    /// Attaches the resource collection of each cloud. See ``GPUSplatCloud/resourceCollection()``.
+    func useResources<Splat>(of clouds: [GPUSplatCloud<Splat>]) throws -> AnyElement {
+        var element = eraseToAnyElement()
+        for cloud in clouds {
+            element = element.useResourceCollection(try cloud.resourceCollection()).eraseToAnyElement()
+        }
+        return element
     }
 }
 

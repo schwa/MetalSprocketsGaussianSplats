@@ -1,6 +1,7 @@
 #if !arch(x86_64)
 import Foundation
 import Metal
+import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import simd
 import Splats
@@ -62,6 +63,17 @@ final class TileSplatResources {
     /// Drawable size this resource was created for.
     private(set) var drawableSize: SIMD2<Float>
 
+    /// Keeps every buffer resident across frames, instead of re-adding them to the residency set each frame.
+    let resourceCollection: ResourceCollection
+
+    private var allBuffers: [MTLBuffer] {
+        [
+            tileSplatIndicesA.unsafeMTLBuffer, tileSplatIndicesB.unsafeMTLBuffer, tileCounters.unsafeMTLBuffer,
+            tileOffsets.unsafeMTLBuffer, maxTileCount.unsafeMTLBuffer, projectedSplats.unsafeMTLBuffer,
+            tileCountersReadback.unsafeMTLBuffer
+        ]
+    }
+
     // MARK: - Initialization
 
     init(device: MTLDevice, drawableSize: SIMD2<Float>) throws {
@@ -97,6 +109,26 @@ final class TileSplatResources {
 
         self.projectedSplats = try device.makeTypedBuffer(element: TileProjectedSplat.self, capacity: 1, options: .storageModePrivate).labeled("TileProjectedSplats")
         self.projectedSplats.count = 1
+
+        self.resourceCollection = try ResourceCollection(device: device)
+        for buffer in allBuffers {
+            try resourceCollection.register(buffer)
+        }
+    }
+
+    /// Swaps the registered buffers after a reallocation. Buffers that in-flight frames still use stay resident until
+    /// those frames finish.
+    private func replaceRegistered(_ change: () throws -> Void) throws {
+        let oldBuffers = allBuffers
+        try change()
+        let newBuffers = allBuffers
+        let kept = Set(newBuffers.map(ObjectIdentifier.init))
+        for buffer in newBuffers {
+            try resourceCollection.register(buffer)
+        }
+        for buffer in oldBuffers where !kept.contains(ObjectIdentifier(buffer)) {
+            resourceCollection.unregister(buffer)
+        }
     }
 
     /// Grows the projected-splat buffer to hold at least `splatCount` entries.
@@ -105,8 +137,10 @@ final class TileSplatResources {
         guard projectedSplats.capacity < required else {
             return
         }
-        projectedSplats = try device.makeTypedBuffer(element: TileProjectedSplat.self, capacity: required, options: .storageModePrivate).labeled("TileProjectedSplats")
-        projectedSplats.count = required
+        try replaceRegistered {
+            projectedSplats = try device.makeTypedBuffer(element: TileProjectedSplat.self, capacity: required, options: .storageModePrivate).labeled("TileProjectedSplats")
+            projectedSplats.count = required
+        }
     }
 
     // MARK: - Resize
@@ -123,7 +157,12 @@ final class TileSplatResources {
         guard needsResize(for: newDrawableSize) else {
             return
         }
+        try replaceRegistered {
+            try reallocate(for: newDrawableSize)
+        }
+    }
 
+    private func reallocate(for newDrawableSize: SIMD2<Float>) throws {
         self.drawableSize = newDrawableSize
 
         let gridWidth = (UInt32(newDrawableSize.x) + Self.tileSize - 1) / Self.tileSize

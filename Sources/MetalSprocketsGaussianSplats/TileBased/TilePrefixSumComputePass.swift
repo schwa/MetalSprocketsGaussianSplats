@@ -33,8 +33,10 @@ struct TilePrefixSumComputePass: Element {
 
     var body: some Element {
         get throws {
-            // Run the prefix sum kernel with a single thread.
+            // Run the prefix sum kernel with a single thread. It reads the
+            // per-tile counts produced by the count pass.
             try ComputePass(label: "Tile Prefix Sum") {
+                QueueBarrier(after: .dispatch, before: .dispatch)
                 try ComputePipeline(computeKernel: computeKernel) {
                     try ComputeDispatch(
                         threadsPerGrid: MTLSize(width: 1, height: 1, depth: 1),

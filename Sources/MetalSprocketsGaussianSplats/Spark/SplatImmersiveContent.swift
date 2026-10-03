@@ -139,13 +139,13 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
             switch renderer {
             case .stochastic:
                 Draw { encoder in
-                    var viewMappings = (0 ..< context.viewCount).map {
+                    let viewMappings = (0 ..< context.viewCount).map {
                         MTLVertexAmplificationViewMapping(
                             viewportArrayIndexOffset: UInt32($0),
                             renderTargetArrayIndexOffset: UInt32($0)
                         )
                     }
-                    encoder.setVertexAmplificationCount(context.viewCount, viewMappings: &viewMappings)
+                    encoder.setVertexAmplificationCount(viewMappings)
                     encoder.setViewports(context.viewports)
                 }
                 try StochasticSplatRenderPipeline(
@@ -161,7 +161,6 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                 .renderPipelineDescriptorTransformer { descriptor in
                     descriptor.maxVertexAmplificationCount = context.viewCount
                     descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
-                    descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
                 }
             case .sparkGPU:
                 // GPU-sorted path. It needs a ``SplatImmersiveGPUSortElement``
@@ -171,13 +170,13 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                 // indirect draw is the number of splats that pass the cull.
                 if let gpuSortedIndices {
                     Draw { encoder in
-                        var viewMappings = (0 ..< context.viewCount).map {
+                        let viewMappings = (0 ..< context.viewCount).map {
                             MTLVertexAmplificationViewMapping(
                                 viewportArrayIndexOffset: UInt32($0),
                                 renderTargetArrayIndexOffset: 0
                             )
                         }
-                        encoder.setVertexAmplificationCount(context.viewCount, viewMappings: &viewMappings)
+                        encoder.setVertexAmplificationCount(viewMappings)
                         encoder.setViewports(context.viewports)
                     }
                     try SparkSplatRenderPipeline(
@@ -199,7 +198,6 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                     .renderPipelineDescriptorTransformer { descriptor in
                         descriptor.maxVertexAmplificationCount = context.viewCount
                         descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
-                        descriptor.depthAttachmentPixelFormat = context.drawable.depthTextures[0].pixelFormat
                     }
                 }
             case .tileBased, .pointSplat:

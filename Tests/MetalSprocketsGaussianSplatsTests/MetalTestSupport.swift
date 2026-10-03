@@ -17,6 +17,14 @@ enum MetalTestSupport {
     }
     """
 
+    /// MetalSprockets renders only with Metal 4. GitHub's virtualized runners don't support it.
+    static let supportsMetal4: Bool = {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            return false
+        }
+        return device.supportsFamily(.metal4)
+    }()
+
     static let supports64BitAtomics: Bool = {
         // The probe is not reliable on GitHub's virtualized GPU. It can succeed
         // while later compiles of the real shaders fail. Skip the GPU-shader

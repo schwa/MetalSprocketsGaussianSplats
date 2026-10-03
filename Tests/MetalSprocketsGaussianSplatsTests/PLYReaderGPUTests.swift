@@ -6,7 +6,7 @@ import simd
 @testable import Splats
 import Testing
 
-@Suite("PLYReaderGPU")
+@Suite("PLYReaderGPU", .enabled(if: MetalTestSupport.supportsMetal4))
 struct PLYReaderGPUTests {
     @Test("GPU decode matches the CPU reference")
     func parityWithCPUReader() throws {

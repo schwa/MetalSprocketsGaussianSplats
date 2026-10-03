@@ -18,6 +18,7 @@ timeline.xctimeline
 playground.xcworkspace
 
 # Swift Package Manager
+Package.resolved
 #
 # Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
 # Packages/
@@ -38,3 +39,6 @@ tmp
 # Generated DocC output
 docs/
 **/project.xcworkspace/xcshareddata
+
+# CI: workspace-local SPM clone dir
+.ci-spm/

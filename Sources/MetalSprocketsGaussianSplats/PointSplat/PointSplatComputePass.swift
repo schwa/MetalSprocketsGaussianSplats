@@ -36,6 +36,14 @@ public struct PointSplatComputePass: Element {
     private var pointsPerThread: Int
 
     @MSState private var resources: PointSplatResources?
+    /// Keeps the caller's splat buffer and output texture resident across frames. The pass only sees raw objects
+    /// (for example a `PackedSplatCloud` buffer), so it registers them itself and swaps them when they change.
+    @MSState private var inputResidency: InputResidency?
+
+    private struct InputResidency {
+        var collection: ResourceCollection
+        var allocations: [any MTLAllocation]
+    }
 
     @MSEnvironment(\.device)
     private var environmentDevice
@@ -147,6 +155,31 @@ public struct PointSplatComputePass: Element {
         return newResources
     }
 
+    private func validatedInputResidency(device: MTLDevice) throws -> ResourceCollection {
+        let current: [any MTLAllocation] = [splats, outTexture]
+        let currentIdentifiers = current.map { ObjectIdentifier($0) }
+        let collection: ResourceCollection
+        var previous: [any MTLAllocation] = []
+        if let inputResidency, inputResidency.collection.device === device {
+            if inputResidency.allocations.map({ ObjectIdentifier($0) }) == currentIdentifiers {
+                return inputResidency.collection
+            }
+            collection = inputResidency.collection
+            previous = inputResidency.allocations
+        } else {
+            collection = try ResourceCollection(device: device)
+        }
+        for allocation in current {
+            try collection.register(allocation)
+        }
+        // In-flight frames keep their leases, so unregistered objects stay resident until those frames finish.
+        for allocation in previous where !currentIdentifiers.contains(ObjectIdentifier(allocation)) {
+            collection.unregister(allocation)
+        }
+        inputResidency = InputResidency(collection: collection, allocations: current)
+        return collection
+    }
+
     public var body: some Element {
         get throws {
             let resources = try validatedResources()
@@ -176,8 +209,12 @@ public struct PointSplatComputePass: Element {
             let plan = resources.framePlan(planKey: planKey, splats: splats)
             return try ComputePass(label: "PointSplat offscreen") {
                 try resources.frameElements(uniforms: uniforms, splats: splats, shBuffer: resources.dummySHBuffer, seed: frameSeed, packedBounds: packedBounds ?? GPSPackedSplatBounds(), plan: plan)
+                // Resolve box-filters the framebuffer the frame work just wrote.
+                EncoderBarrier(after: .dispatch, before: .dispatch)
                 try resources.resolveElements(uniforms: uniforms, outTexture: outTexture)
             }
+            .useResourceCollection(resources.resourceCollection)
+            .useResourceCollection(try validatedInputResidency(device: resources.device))
         }
     }
 }
