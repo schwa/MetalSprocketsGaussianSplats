@@ -3822,3 +3822,23 @@ Done when a GPU capture of repeated offscreen PointSplat renders shows no per-fr
 - `2026-10-02T20:49:16Z`: PointSplatComputePass keeps its splat buffer and output texture in a persistent ResourceCollection.
 
 ---
+
+## 183: Credit PointSplat papers in README Acknowledgments
+
++++
+status: new
+priority: low
+kind: documentation
+created: 2026-10-07T18:51:45Z
++++
+
+README Acknowledgments lists only antimatter15 and sparkjs, and says "the two renderers". The PointSplat renderer is based on work that is not credited there.
+
+Add:
+- Rijsdijk et al., *Gaussian Point Splatting* (SIGGRAPH 2026): https://momentsingraphics.de/Siggraph2026.html, reference impl https://github.com/JorisAR/gaussian-point-splatting
+- Schütz, Kerbl, Wimmer, *Rendering Point Clouds with Compute Shaders and Vertex Order Optimization* (EGSR/CGF 2021): https://github.com/m-schuetz/compute_rasterizer. Source of the 64-bit depth+color atomic_min framebuffer (cited in PointSplatShaders.h).
+- Maybe Schütz et al., *Software Rasterization of 2 Billion Points in Real Time* (HPG 2022), if relevant.
+
+Also fix "the two renderers" wording and check the licenses of the reference code.
+
+---
