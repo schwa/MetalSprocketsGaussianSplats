@@ -125,7 +125,7 @@ public struct PointSplatRenderPipeline: Element {
     /// rather than a freshly created system-default device (#83).
     private func validatedResources() throws -> PointSplatResources {
         guard let device = environmentDevice else {
-            throw MetalSprocketsError.missingEnvironment(\.device)
+            throw MetalSprocketsError.missingEnvironment("device")
         }
         let width = max(Int(drawableSize.x), 1)
         let height = max(Int(drawableSize.y), 1)

@@ -138,7 +138,7 @@ public struct PointSplatComputePass: Element {
     /// `@MSState` persists them across body evaluations and frames.
     private func validatedResources() throws -> PointSplatResources {
         guard let device = environmentDevice else {
-            throw MetalSprocketsError.missingEnvironment(\.device)
+            throw MetalSprocketsError.missingEnvironment("device")
         }
         if let resources, resources.device === device, resources.splatCount == splatCount, resources.width == outTexture.width, resources.height == outTexture.height, resources.supersampling == supersampling, resources.pointsPerThread == pointsPerThread, resources.backgroundColor == backgroundColor {
             return resources
