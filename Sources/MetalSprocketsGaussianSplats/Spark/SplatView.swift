@@ -128,10 +128,10 @@ public struct SplatView: View {
                 // it from the projection. Reversed-infinite-Z gets a finite far
                 // value only for quantization.
                 let depthRange: ClosedRange<Float> = switch projection.depthMode {
-                case .standard(let zClip):
+                case .standard(let zClip), .reversed(let zClip):
                     zClip
-                case .reversed(let zMin):
-                    zMin...1_000
+                case .reversedInfinite(let zNear):
+                    zNear...1_000
                 }
                 try PointSplatRenderPipeline(
                     splatCloud: splatCloud,
