@@ -314,7 +314,7 @@ struct BenchRunner {
         return try measure { frame in
             let renderPass = try RenderPass {
                 try StochasticSplatRenderPipeline(splatCloud: cloud, projectionMatrix: projectionMatrix, modelMatrix: .identity, cameraMatrix: cameraMatrix, drawableSize: drawableSize, frameTime: UInt32(frame))
-                    .depthCompare(function: .less, enabled: true)
+                    .depthCompare(function: .less, writes: true)
             }
             .renderPassDescriptorModifier { descriptor in
                 descriptor.renderTargetArrayLength = 1

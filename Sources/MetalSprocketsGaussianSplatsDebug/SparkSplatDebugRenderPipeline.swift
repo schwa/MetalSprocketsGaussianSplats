@@ -337,7 +337,7 @@ public struct SparkSplatDebugRenderPipeline: Element {
             renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
             renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
-        .depthCompare(function: .always, enabled: false)
+        .depthCompare(function: .always, writes: false)
         // Cloud buffers are referenced through GPU addresses, so they must be resident.
         .useResourceCollection(cache.resourceCollection)
         .useResources(of: splatClouds)

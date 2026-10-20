@@ -85,7 +85,7 @@ struct TileHeatMapRenderPass: Element {
                 renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
                 renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
             }
-            .depthCompare(function: .always, enabled: false)
+            .depthCompare(function: .always, writes: false)
         }
     }
 }

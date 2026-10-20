@@ -321,7 +321,7 @@ public final class OffscreenSplatRenderer {
                 frameTime: frameIndex,
                 convertSRGBToLinear: configuration.convertSRGBToLinear
             )
-            .depthCompare(function: .less, enabled: true)
+            .depthCompare(function: .less, writes: true)
         }
         try render(pass: pass, in: offscreenRenderer)
         return FrameReport(render: renderSampleBox.take())

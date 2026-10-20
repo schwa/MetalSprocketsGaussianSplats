@@ -108,7 +108,7 @@ public struct TileSplatRenderPass: Element {
                 .parameter("tileOffsets", buffer: tileSplatResources.tileOffsets.unsafeMTLBuffer)
                 .parameter("uniforms", value: uniforms)
             }
-            .depthCompare(function: .always, enabled: false)
+            .depthCompare(function: .always, writes: false)
 
             // Step 2: blit the imageblock to the color attachment (framebuffer).
             // The tile shader blends the splats internally, but the result is
@@ -121,7 +121,7 @@ public struct TileSplatRenderPass: Element {
                 }
                 .vertexValues(vertices, index: 0)
             }
-            .depthCompare(function: .always, enabled: false)
+            .depthCompare(function: .always, writes: false)
             .renderPipelineDescriptorTransformer { descriptor in
                 descriptor.colorAttachments[0].blendingState = .enabled
                 descriptor.colorAttachments[0].rgbBlendOperation = .add

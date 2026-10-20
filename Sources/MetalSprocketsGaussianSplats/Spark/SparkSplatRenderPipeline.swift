@@ -328,7 +328,7 @@ public struct SparkSplatRenderPipeline: Element {
             renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
         #if !os(visionOS)
-        .depthCompare(function: .always, enabled: false)
+        .depthCompare(function: .always, writes: false)
         #endif
         .useResources(resourcesToUse, usage: .read, stages: .vertex)
         .useResourceCollection(resourceCollection)

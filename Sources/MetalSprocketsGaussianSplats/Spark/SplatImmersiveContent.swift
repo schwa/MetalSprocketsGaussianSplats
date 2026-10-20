@@ -157,7 +157,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                     frameTime: frameCount,
                     convertSRGBToLinear: true
                 )
-                .depthCompare(function: .greater, enabled: true)
+                .depthCompare(function: .greater, writes: true)
                 .renderPipelineDescriptorTransformer { descriptor in
                     descriptor.maxVertexAmplificationCount = context.viewCount
                     descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat
@@ -194,7 +194,7 @@ public struct SplatImmersiveElement: Element, @unchecked Sendable {
                             renderTargetArrayIndexOffset: 0
                         )
                     })
-                    .depthCompare(function: .greater, enabled: true)
+                    .depthCompare(function: .greater, writes: true)
                     .renderPipelineDescriptorTransformer { descriptor in
                         descriptor.maxVertexAmplificationCount = context.viewCount
                         descriptor.colorAttachments[0].pixelFormat = context.drawable.colorTextures[0].pixelFormat

@@ -118,7 +118,7 @@ public struct SplatView: View {
                         drawableSize: size,
                         frameTime: stochasticSeed
                     )
-                    .depthCompare(function: .less, enabled: true)
+                    .depthCompare(function: .less, writes: true)
                 }
                 .renderPassDescriptorModifier { descriptor in
                     descriptor.renderTargetArrayLength = 1

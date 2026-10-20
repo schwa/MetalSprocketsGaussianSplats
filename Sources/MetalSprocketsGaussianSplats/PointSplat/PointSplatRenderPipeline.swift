@@ -234,7 +234,7 @@ public struct PointSplatRenderPipeline: Element {
                     }
                     .parameter("texture", texture: accumulation.output)
                 }
-                .depthCompare(function: .always, enabled: false)
+                .depthCompare(function: .always, writes: false)
                 // Premultiplied source-over: uncovered pixels (alpha 0) keep
                 // whatever earlier passes drew, e.g. scene guides (#162).
                 .renderPipelineDescriptorTransformer { descriptor in
