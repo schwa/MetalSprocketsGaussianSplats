@@ -5,6 +5,7 @@ import MetalCompilerPluginSupport
 import MetalSprockets
 import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
+import SwiftPLY
 
 public struct PLYReaderGPU {
     public struct Result {
@@ -30,21 +31,27 @@ public struct PLYReaderGPU {
         guard reader.format == .binaryLittleEndian, let element = reader.primaryElement else {
             throw SplatsError.unsupportedFormat("GPU PLY decoding requires a binary_little_endian vertex element")
         }
-        guard !element.properties.contains(where: { $0.isList || $0.type == .double }) else {
+        let propertyTypes: [PLYReader.PropertyType] = element.properties.compactMap { property in
+            if case .scalar(let type) = property.kind, type != .double {
+                return type
+            }
+            return nil
+        }
+        guard propertyTypes.count == element.properties.count else {
             throw SplatsError.unsupportedFormat("GPU PLY decoding requires scalar properties no wider than 32 bits")
         }
 
         let count = element.count
-        let recordStride = element.properties.reduce(0) { $0 + $1.type.size }
+        let recordStride = propertyTypes.reduce(0) { $0 + $1.size }
         guard count <= UInt32.max, recordStride <= UInt32.max, reader.bodyOffset + count * recordStride <= data.count else {
             throw SplatsError.invalidData
         }
 
         var propertyOffsets: [String: (Int32, UInt32)] = [:]
         var byteOffset = 0
-        for property in element.properties {
-            propertyOffsets[property.name] = (Int32(byteOffset), property.type.gpuCode)
-            byteOffset += property.type.size
+        for (property, type) in zip(element.properties, propertyTypes) {
+            propertyOffsets[property.name] = (Int32(byteOffset), type.gpuCode)
+            byteOffset += type.size
         }
 
         let shDegree: UInt8 = if propertyOffsets["f_rest_44"] != nil { 3 } else if propertyOffsets["f_rest_23"] != nil { 2 } else if propertyOffsets["f_rest_8"] != nil { 1 } else { 0 }

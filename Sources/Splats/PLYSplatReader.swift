@@ -1,5 +1,6 @@
 import Foundation
 import simd
+import SwiftPLY
 
 /// Reads a PLY file with Gaussian splat data.
 ///
@@ -29,22 +30,39 @@ public struct PLYSplatReader: SplatReaderProtocol {
             throw SplatsError.noElements
         }
         let layout = Layout(properties: element.properties, degree: shDegree)
-        var index = 0
+        guard layout.x != nil, layout.y != nil, layout.z != nil else {
+            throw SplatsError.invalidRecord(0)
+        }
+        // Read every used property as Float into one flat array, then decode each record from it.
+        let stride = layout.propertyNames.count
+        let definition = PLYStructureDefinition(
+            stride: stride * MemoryLayout<Float>.stride,
+            fields: layout.propertyNames.enumerated().map { index, name in
+                .init(propertyName: name, type: .float, offset: index * MemoryLayout<Float>.stride)
+            }
+        )
+        var values = [Float](repeating: 0, count: plyReader.maximumRecordCount(of: element) * stride)
+        let count = try values.withUnsafeMutableBytes { buffer in
+            try plyReader.read(element: element, into: buffer, definition: definition)
+        }
         let numCoeffs = layout.fRest.count / 3
         // Scratch reused across records; COW protects handlers that retain it.
         var shScratch: [[Float]] = Array(repeating: [0, 0, 0], count: numCoeffs)
-        try plyReader.readFloatValues(element: element) { values in
-            guard let splat = layout.genericSplat(from: values) else {
-                throw SplatsError.invalidRecord(index)
+        try values.withUnsafeBufferPointer { buffer in
+            for index in 0..<count {
+                let record = UnsafeBufferPointer(rebasing: buffer[(index * stride)..<((index + 1) * stride)])
+                guard let splat = layout.genericSplat(from: record) else {
+                    throw SplatsError.invalidRecord(index)
+                }
+                let sh: [[Float]]? = numCoeffs > 0 && layout.fillSphericalHarmonics(from: record, into: &shScratch) ? shScratch : nil
+                try handler(index, ExtendedSplat(genericSplat: splat, sphericalHarmonics: sh))
             }
-            let sh: [[Float]]? = numCoeffs > 0 && layout.fillSphericalHarmonics(from: values, into: &shScratch) ? shScratch : nil
-            try handler(index, ExtendedSplat(genericSplat: splat, sphericalHarmonics: sh))
-            index += 1
         }
     }
 
-    /// Property indices resolved once so per-record decoding avoids dictionaries.
+    /// Indices into a record of the used properties, resolved once so per-record decoding avoids dictionaries.
     private struct Layout {
+        var propertyNames: [String] = []
         var x: Int?
         var y: Int?
         var z: Int?
@@ -57,20 +75,34 @@ public struct PLYSplatReader: SplatReaderProtocol {
         var fRest: [Int?]
 
         init(properties: [PLYReader.Property], degree: UInt8) {
+            let available = Set(properties.compactMap { property -> String? in
+                if case .scalar = property.kind {
+                    return property.name
+                }
+                return nil
+            })
             var indices: [String: Int] = [:]
-            indices.reserveCapacity(properties.count)
-            for (index, property) in properties.enumerated() {
-                indices[property.name] = index
+            var names: [String] = []
+            func index(_ name: String) -> Int? {
+                guard available.contains(name) else {
+                    return nil
+                }
+                if let index = indices[name] {
+                    return index
+                }
+                names.append(name)
+                indices[name] = names.count - 1
+                return names.count - 1
             }
-            x = indices["x"]
-            y = indices["y"]
-            z = indices["z"]
-            scale = [indices["scale_0"] ?? indices["sx"], indices["scale_1"] ?? indices["sy"], indices["scale_2"] ?? indices["sz"]]
-            fdc = [indices["f_dc_0"], indices["f_dc_1"], indices["f_dc_2"]]
-            rgb = [indices["red"], indices["green"], indices["blue"]]
-            opacity = indices["opacity"]
-            alpha = indices["alpha"]
-            rot = [indices["rot_0"], indices["rot_1"], indices["rot_2"], indices["rot_3"]]
+            x = index("x")
+            y = index("y")
+            z = index("z")
+            scale = [index("scale_0") ?? index("sx"), index("scale_1") ?? index("sy"), index("scale_2") ?? index("sz")]
+            fdc = [index("f_dc_0"), index("f_dc_1"), index("f_dc_2")]
+            rgb = [index("red"), index("green"), index("blue")]
+            opacity = index("opacity")
+            alpha = index("alpha")
+            rot = [index("rot_0"), index("rot_1"), index("rot_2"), index("rot_3")]
 
             let numCoeffs: Int
             switch degree {
@@ -83,17 +115,18 @@ public struct PLYSplatReader: SplatReaderProtocol {
             default:
                 numCoeffs = 0
             }
-            fRest = (0..<(numCoeffs * 3)).map { indices["f_rest_\($0)"] }
+            fRest = (0..<(numCoeffs * 3)).map { index("f_rest_\($0)") }
+            propertyNames = names
         }
 
-        private func float(_ values: [Float?], _ index: Int?) -> Float? {
+        private func float(_ values: UnsafeBufferPointer<Float>, _ index: Int?) -> Float? {
             guard let index else {
                 return nil
             }
             return values[index]
         }
 
-        func genericSplat(from values: [Float?]) -> GenericSplat? {
+        func genericSplat(from values: UnsafeBufferPointer<Float>) -> GenericSplat? {
             guard let x = float(values, x), let y = float(values, y), let z = float(values, z) else {
                 return nil
             }
@@ -153,7 +186,7 @@ public struct PLYSplatReader: SplatReaderProtocol {
             )
         }
 
-        func fillSphericalHarmonics(from values: [Float?], into coefficients: inout [[Float]]) -> Bool {
+        func fillSphericalHarmonics(from values: UnsafeBufferPointer<Float>, into coefficients: inout [[Float]]) -> Bool {
             let numCoeffs = fRest.count / 3
             // PLY f_rest is planar (all R, then all G, then all B). The output is interleaved [[R,G,B], ...].
             for i in 0..<numCoeffs {

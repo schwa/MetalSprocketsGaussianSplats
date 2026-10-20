@@ -27,7 +27,7 @@ GPU decoders and PLY through the CPU reader.
 Supported formats:
 
 - **PLY** — the standard Gaussian splatting interchange format, in ASCII
-  and binary encodings (``PLYSplatReader``, built on ``PLYReader``).
+  and binary encodings (``PLYSplatReader``, built on [SwiftPLY](https://github.com/schwa/SwiftPLY)).
 - **SPZ** — Niantic's compressed splat format (``SPZReader``).
 - **SOG** — PlayCanvas' compressed splat format, decoded on the GPU
   (``SOGReaderGPU``).
@@ -48,10 +48,6 @@ Supported formats:
 
 - ``GenericSplat``
 - ``ExtendedSplat``
-
-### PLY Parsing
-
-- ``PLYReader``
 
 ### GPU Buffers
 

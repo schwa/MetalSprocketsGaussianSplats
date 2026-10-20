@@ -2,12 +2,9 @@ import Foundation
 
 internal enum SplatsError: Error, Equatable {
     // PLY errors
-    case invalidEncoding
     case invalidHeader
     case unsupportedFormat(String)
-    case missingEndHeader
     case noElements
-    case formatNotSet
     case invalidData
 
     // PLYSplat errors
@@ -30,18 +27,12 @@ internal enum SplatsError: Error, Equatable {
 extension SplatsError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .invalidEncoding:
-            "PLY file has an invalid or unsupported text encoding."
         case .invalidHeader:
             "PLY header is malformed."
         case .unsupportedFormat(let format):
             "Unsupported splat format: \(format)."
-        case .missingEndHeader:
-            "PLY header is missing the end_header marker."
         case .noElements:
             "PLY file declares no elements."
-        case .formatNotSet:
-            "PLY header does not declare a format."
         case .invalidData:
             "Splat file contains invalid data."
         case .invalidRecord(let index):

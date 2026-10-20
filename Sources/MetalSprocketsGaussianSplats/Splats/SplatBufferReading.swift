@@ -5,6 +5,7 @@ import GeometryLite3D
 import MetalSprocketsGaussianSplatShaders
 import simd
 import Splats
+import SwiftPLY
 
 // MARK: - SplatBufferResult
 

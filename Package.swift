@@ -37,7 +37,8 @@ let package = Package(
         .package(url: "https://github.com/schwa/GoldenImage", .upToNextMinor(from: "0.1.6")),
         .package(url: "https://github.com/schwa/MetalSupport", .upToNextMinor(from: "1.0.7")),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),
-        .package(url: "https://github.com/facebook/zstd", from: "1.5.7")
+        .package(url: "https://github.com/facebook/zstd", from: "1.5.7"),
+        .package(url: "https://github.com/schwa/SwiftPLY", .upToNextMinor(from: "0.0.1"))
     ],
     targets: [
         .target(
@@ -48,7 +49,8 @@ let package = Package(
                 .product(name: "GeometryLite3D", package: "GeometryLite3D"),
                 "SwiftZipReader",
                 .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
-                .product(name: "libzstd", package: "zstd")
+                .product(name: "libzstd", package: "zstd"),
+                .product(name: "SwiftPLY", package: "SwiftPLY")
             ],
             resources: [
                 .copy("Empty.txt")
@@ -65,7 +67,8 @@ let package = Package(
                 .product(name: "MetalCompilerPluginSupport", package: "MetalCompilerPlugin"),
                 .product(name: "MetalSprocketsUI", package: "MetalSprockets"),
                 .product(name: "Collections", package: "swift-collections"),
-                .product(name: "GeometryLite3D", package: "GeometryLite3D")
+                .product(name: "GeometryLite3D", package: "GeometryLite3D"),
+                .product(name: "SwiftPLY", package: "SwiftPLY")
             ],
             resources: [
                 .process("Resources/LDR_RGBA_0.png")
