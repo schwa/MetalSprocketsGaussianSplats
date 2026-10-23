@@ -53,9 +53,24 @@ public struct SparkSplatRenderPipeline: Element {
     private var resourceCollection: ResourceCollection?
 
     struct CloudDataCache {
-        var modelMatrix: simd_float4x4
         var clouds: [GPUSplatCloud<SparkSplat>]
+        var modelMatrices: [simd_float4x4]
+        var opacities: [Float]
         var buffer: TypedMTLBuffer<SplatCloudData>
+
+        init(modelMatrix: simd_float4x4, clouds: [GPUSplatCloud<SparkSplat>], buffer: TypedMTLBuffer<SplatCloudData>) {
+            self.clouds = clouds
+            self.modelMatrices = clouds.map { modelMatrix * $0.modelTransform }
+            self.opacities = clouds.map(\.opacity)
+            self.buffer = buffer
+        }
+
+        // GPUSplatCloud compares by reference, so also key on its mutable values.
+        func matches(clouds: [GPUSplatCloud<SparkSplat>], modelMatrix: simd_float4x4) -> Bool {
+            self.clouds == clouds
+                && modelMatrices == clouds.map { modelMatrix * $0.modelTransform }
+                && opacities == clouds.map(\.opacity)
+        }
     }
     var vertexDescriptor: MTLVertexDescriptor
     var convertSRGBToLinear: Bool
@@ -227,7 +242,7 @@ public struct SparkSplatRenderPipeline: Element {
 
         // Build (or reuse) the per-cloud data buffer.
         let cloudDataBuffer: TypedMTLBuffer<SplatCloudData>
-        if let cache = cloudDataCache, cache.modelMatrix == modelMatrix, cache.clouds == splatClouds {
+        if let cache = cloudDataCache, cache.matches(clouds: splatClouds, modelMatrix: modelMatrix) {
             cloudDataBuffer = cache.buffer
         } else {
             var cloudDataArray: [SplatCloudData] = []

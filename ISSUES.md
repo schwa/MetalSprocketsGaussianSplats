@@ -3795,12 +3795,13 @@ Separate memory saving, not related to the insight: only `output` and `drawArgs`
 ## 181: SparkSplatRenderPipeline cloud-data cache misses modelTransform and opacity changes
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: effort:s, area:rendering, area:spark
 created: 2026-10-02T20:43:37Z
-updated: 2026-10-23T14:20:42Z
+updated: 2026-10-23T21:15:57Z
+closed: 2026-10-23T21:15:57Z
 +++
 
 The CloudData cache in `SparkSplatRenderPipeline` rebuilds only when `modelMatrix` changes or `cache.clouds == splatClouds` is false. `GPUSplatCloud` uses reference equality, and its `modelTransform` and `opacity` are mutable. So if you change a cloud's transform or opacity without changing the pipeline's `modelMatrix`, the old CloudData buffer stays in use and the change does not show.
