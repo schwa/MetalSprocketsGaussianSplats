@@ -71,6 +71,9 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
     @Option(help: "GPU sort depth-key precision: 16 or 32 bits")
     var sortPrecision: SplatSortPrecision = .float16
 
+    @Option(name: .customLong("metalfx"), help: "MetalFX spatial upscale factor for the spark renderer (1 = off). Renders at size / factor, then upscales.")
+    var metalFXScale: Float = 1
+
     @Option(help: "Renderer to use (spark, point, tile, stochastic)")
     var renderer: RendererKind = .spark
 
@@ -153,7 +156,7 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
         )
 
         if let statistics {
-            let report = makeReport(samples: samples, splats: splatCount, shDegree: Int(effectiveSHDegree), width: renderConfig.width, height: renderConfig.height, warmup: warmup, renderer: rendererKind)
+            let report = makeReport(samples: samples, splats: splatCount, shDegree: Int(effectiveSHDegree), width: renderConfig.width, height: renderConfig.height, warmup: warmup, renderer: rendererKind, metalFXScale: rendererKind == .spark && metalFXScale > 1 ? metalFXScale : nil)
             try emitReport(report, format: statistics)
         }
 
@@ -309,7 +312,8 @@ struct GaussianSplatRenderer: AsyncParsableCommand {
                 pointSupersampling: supersampling,
                 pointPointsPerThread: pointsPerThread,
                 collectGPUCounters: statistics != nil,
-                sortPrecision: sortPrecision
+                sortPrecision: sortPrecision,
+                metalFXScale: metalFXScale
             )
         )
 

@@ -2524,12 +2524,13 @@ Our CLI only reports counter-derived GPU times (GPUCounterSample). Add the comma
 ## 124: SplatView: support MetalFX spatial upscaling
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: performance, effort:l, area:rendering, area:cli
 created: 2026-08-18T19:00:23Z
-updated: 2026-10-23T14:20:35Z
+updated: 2026-10-23T21:24:52Z
+closed: 2026-10-23T21:24:52Z
 +++
 
 Add optional MetalFX spatial upscaling to SplatView (Sources/MetalSprocketsGaussianSplats/Spark/SplatView.swift): render the splats at a reduced resolution (e.g. factor 2 = quarter the fragments) and upscale to the final drawable size. A large fragment-cost lever for the Spark/GPU renderers.

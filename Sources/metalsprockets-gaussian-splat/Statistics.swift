@@ -75,9 +75,14 @@ struct StatisticsReport: Codable {
     /// correlation-free, so it is a sanity cross-check on the counter-derived
     /// numbers. For the GPU sort this spans sort plus render in one submission.
     var commandBufferGpu: Stat?
+    /// MetalFX spatial upscale factor, when used.
+    var metalFXScale: Float?
+    /// MetalFX upscale GPU time. MetalFX is not a pass, so it has no counters:
+    /// this is the submission time minus the sort and render passes.
+    var upscaleGpu: Stat?
 }
 
-func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, height: Int, warmup: Int, renderer: RendererKind) -> StatisticsReport {
+func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, height: Int, warmup: Int, renderer: RendererKind, metalFXScale: Float? = nil) -> StatisticsReport {
     let sortGPUTimes = samples.compactMap { $0.sortGPU?.duration }
     let gpuTimes = samples.compactMap { $0.render?.duration }
     let vertexTimes = samples.compactMap { $0.render?.vertex?.duration }
@@ -90,6 +95,12 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
             return nil
         }
         return (sample.sortGPU?.duration ?? 0) + render
+    }
+    let upscaleTimes = metalFXScale == nil ? [] : samples.compactMap { sample -> Double? in
+        guard let total = sample.commandBufferGPUTime, let render = sample.render?.duration else {
+            return nil
+        }
+        return max(0, total - render - (sample.sortGPU?.duration ?? 0))
     }
     let visible = samples.last?.visibleSplats
     return StatisticsReport(
@@ -108,7 +119,9 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
         vertex: vertexTimes.isEmpty ? nil : stat(vertexTimes),
         fragment: fragmentTimes.isEmpty ? nil : stat(fragmentTimes),
         gpuTotal: gpuTotalTimes.isEmpty ? nil : stat(gpuTotalTimes),
-        commandBufferGpu: commandBufferGPUTimes.isEmpty ? nil : stat(commandBufferGPUTimes)
+        commandBufferGpu: commandBufferGPUTimes.isEmpty ? nil : stat(commandBufferGPUTimes),
+        metalFXScale: metalFXScale,
+        upscaleGpu: upscaleTimes.isEmpty ? nil : stat(upscaleTimes)
     )
 }
 
@@ -130,6 +143,9 @@ private func printTextReport(_ report: StatisticsReport) {
     print("  scene       \(report.splats) splats, SH degree \(report.shDegree)")
     print("  renderer    \(report.renderer)")
     print("  size        \(report.width)x\(report.height)")
+    if let scale = report.metalFXScale {
+        print("  metalfx     \(scale)x spatial upscale")
+    }
     if let visible = report.visibleSplats, let culled = report.culledSplats {
         let percent = report.splats > 0 ? Double(culled) / Double(report.splats) * 100 : 0
         print(String(format: "  culling     %d visible, %d culled (%.1f%%)", visible, culled, percent))
@@ -152,6 +168,9 @@ private func printTextReport(_ report: StatisticsReport) {
     }
     if let commandBufferGpu = report.commandBufferGpu {
         line("gpu submit", commandBufferGpu)
+    }
+    if let upscaleGpu = report.upscaleGpu {
+        line("gpu upscale", upscaleGpu)
     }
 }
 

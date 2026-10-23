@@ -66,6 +66,10 @@ public final class OffscreenSplatRenderer {
         /// Sample GPU timestamps each frame and report them in ``FrameReport``.
         public var collectGPUCounters: Bool
         public var sortPrecision: SplatSortPrecision
+        /// MetalFX spatial upscale factor for the spark renderer. Values above
+        /// 1 render at `size / metalFXScale` and upscale to full size.
+        /// Other renderers ignore it.
+        public var metalFXScale: Float
 
         public init(
             width: Int,
@@ -77,7 +81,8 @@ public final class OffscreenSplatRenderer {
             pointSupersampling: Int = 2,
             pointPointsPerThread: Int = 4,
             collectGPUCounters: Bool = false,
-            sortPrecision: SplatSortPrecision = .float16
+            sortPrecision: SplatSortPrecision = .float16,
+            metalFXScale: Float = 1
         ) {
             self.width = width
             self.height = height
@@ -89,6 +94,7 @@ public final class OffscreenSplatRenderer {
             self.pointPointsPerThread = pointPointsPerThread
             self.collectGPUCounters = collectGPUCounters
             self.sortPrecision = sortPrecision
+            self.metalFXScale = metalFXScale
         }
     }
 
@@ -131,6 +137,14 @@ public final class OffscreenSplatRenderer {
     // through its own runner, not the offscreen renderer's render target.
     private let pointRunner: Runner?
     private let pointTexture: MTLTexture?
+    // MetalFX upscale target (private, full size); nil when not upscaling.
+    private let upscaledTexture: MTLTexture?
+    private let upscaleResources: ResourceCollection
+
+    /// The size the splats are rasterized at, before any MetalFX upscale.
+    public var renderSize: SIMD2<Int> {
+        SIMD2(Int(drawableSize.x), Int(drawableSize.y))
+    }
 
     /// - Parameters:
     ///   - renderer: Which splat renderer draws the frames.
@@ -158,9 +172,21 @@ public final class OffscreenSplatRenderer {
         self.projectionMatrix = projection.projectionMatrix(aspectRatio: aspectRatio)
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
-        self.drawableSize = SIMD2<Float>(Float(configuration.width), Float(configuration.height))
         self.sortParameters = SortParameters(camera: cameraMatrix, model: modelMatrix)
         let device = device ?? _MTLCreateSystemDefaultDevice()
+
+        var renderConfiguration = configuration
+        self.upscaleResources = try ResourceCollection(device: device)
+        if renderer == .spark, configuration.metalFXScale > 1, MetalFXUpscale.isSupported(device: device) {
+            renderConfiguration.width = max(1, Int((Float(configuration.width) / configuration.metalFXScale).rounded()))
+            renderConfiguration.height = max(1, Int((Float(configuration.height) / configuration.metalFXScale).rounded()))
+            let texture = try MetalFXUpscale.makeOutputTexture(device: device, pixelFormat: .bgra8Unorm_srgb, width: configuration.width, height: configuration.height)
+            try upscaleResources.register(texture)
+            self.upscaledTexture = texture
+        } else {
+            self.upscaledTexture = nil
+        }
+        self.drawableSize = SIMD2<Float>(Float(renderConfiguration.width), Float(renderConfiguration.height))
 
         switch renderer {
         case .point:
@@ -176,7 +202,7 @@ public final class OffscreenSplatRenderer {
             self.gpuSortResources = nil
 
         case .spark:
-            let offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: configuration)
+            let offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: renderConfiguration)
             self.offscreenRenderer = offscreenRenderer
             self.gpuSortResources = try GPUSortResources(device: offscreenRenderer.device, capacity: splatCloud.count, slotCount: 1, precision: configuration.sortPrecision)
             self.pointRunner = nil
@@ -232,6 +258,9 @@ public final class OffscreenSplatRenderer {
         guard let offscreenRenderer else {
             throw MetalSprocketsError.generic("No frame rendered yet")
         }
+        if let upscaledTexture {
+            return try MetalFXUpscale.readableCopy(of: upscaledTexture, using: offscreenRenderer).toCGImage()
+        }
         return try offscreenRenderer.colorTexture.toCGImage()
     }
 
@@ -256,18 +285,28 @@ public final class OffscreenSplatRenderer {
                 slotIndex: slot
             )
             let renderPass = try makeSparkRenderPass(sortedIndices: sortedIndices)
+            let upscale = upscaledTexture.map { MetalFXUpscale.element(input: offscreenRenderer.colorTexture, output: $0) }
+            let resources = upscaleResources
             if configuration.collectGPUCounters {
                 let sortBox = sortSampleBox
                 let renderBox = renderSampleBox
                 report.commandBufferGPUTime = try offscreenRenderer.render(Group {
                     sortPass.gpuCounters(label: "splat sort") { sortBox.set($0) }
                     renderPass.gpuCounters(label: "splat render") { renderBox.set($0) }
-                }).gpuTime
+                    if let upscale {
+                        upscale
+                    }
+                }
+                .useResourceCollection(resources)).gpuTime
             } else {
                 report.commandBufferGPUTime = try offscreenRenderer.render(Group {
                     sortPass
                     renderPass
-                }).gpuTime
+                    if let upscale {
+                        upscale
+                    }
+                }
+                .useResourceCollection(resources)).gpuTime
             }
             report.visibleSplats = gpuSortResources.lastSurvivorCount
         }

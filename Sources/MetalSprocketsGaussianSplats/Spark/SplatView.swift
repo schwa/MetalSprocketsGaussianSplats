@@ -60,6 +60,10 @@ public struct SplatView: View {
     /// per camera or model change, so the pattern varies during motion but
     /// freezes when the view is stationary. This removes constant shimmer (#51).
     @State private var stochasticSeed: UInt32 = 0
+    /// MetalFX upscale factor for ``SplatRenderer/sparkGPU``. 1 disables it.
+    private let metalFXScale: Float
+    /// Reduced-size and upscaled targets; nil when MetalFX is off or unsupported.
+    @State private var metalFXTargets: MetalFXUpscaleTargets?
 
     /// Creates a `SplatView` that renders the given splat cloud.
     ///
@@ -68,11 +72,15 @@ public struct SplatView: View {
     ///   - cameraMatrix: The camera-to-world transform matrix.
     ///   - modelMatrix: The model-to-world transform matrix.
     ///   - projection: The perspective projection to use for rendering.
+    ///   - metalFXScale: For the Spark GPU renderer, values above 1 render at
+    ///     `size / metalFXScale` and upscale with MetalFX. Ignored when the
+    ///     device does not support MetalFX spatial scaling.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         cameraMatrix: simd_float4x4,
         modelMatrix: simd_float4x4 = .identity,
         sortPrecision: SplatSortPrecision = .float16,
+        metalFXScale: Float = 1,
         projection: PerspectiveProjection = PerspectiveProjection(
             verticalAngleOfView: .degrees(60),
             depthMode: .standard(zClip: 0.01 ... 1_000)
@@ -82,8 +90,11 @@ public struct SplatView: View {
         self.cameraMatrix = cameraMatrix
         self.modelMatrix = modelMatrix
         self.projection = projection
+        self.metalFXScale = metalFXScale
         let device = MTLCreateSystemDefaultDevice()!
         _sortResources = State(initialValue: try! GPUSortResources(device: device, capacity: splatCloud.count, precision: sortPrecision))
+        let useMetalFX = metalFXScale > 1 && MetalFXUpscale.isSupported(device: device)
+        _metalFXTargets = State(initialValue: useMetalFX ? try? MetalFXUpscaleTargets(device: device) : nil)
     }
 
     public var body: some View {
@@ -92,14 +103,29 @@ public struct SplatView: View {
             let size = SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
             switch renderer {
             case .sparkGPU:
-                try GPUSortedSplatRenderPipeline(
-                    splatCloud: splatCloud,
-                    projectionMatrix: projectionMatrix,
-                    modelMatrix: modelMatrix,
-                    cameraMatrix: cameraMatrix,
-                    drawableSize: size,
-                    resources: sortResources
-                )
+                if let metalFXTargets {
+                    let outputSize = SIMD2<Int>(Int(drawableSize.width), Int(drawableSize.height))
+                    let inputSize = SIMD2<Int>(max(1, Int((size.x / metalFXScale).rounded())), max(1, Int((size.y / metalFXScale).rounded())))
+                    try MetalFXUpscaledContent(targets: metalFXTargets, inputSize: inputSize, outputSize: outputSize, pixelFormat: .bgra8Unorm_srgb) {
+                        try GPUSortedSplatRenderPipeline(
+                            splatCloud: splatCloud,
+                            projectionMatrix: projectionMatrix,
+                            modelMatrix: modelMatrix,
+                            cameraMatrix: cameraMatrix,
+                            drawableSize: SIMD2<Float>(inputSize),
+                            resources: sortResources
+                        )
+                    }
+                } else {
+                    try GPUSortedSplatRenderPipeline(
+                        splatCloud: splatCloud,
+                        projectionMatrix: projectionMatrix,
+                        modelMatrix: modelMatrix,
+                        cameraMatrix: cameraMatrix,
+                        drawableSize: size,
+                        resources: sortResources
+                    )
+                }
             case .tileBased:
                 try TileBasedSplatPass(
                     splatCloud: splatCloud,
