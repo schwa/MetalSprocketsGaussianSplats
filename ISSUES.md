@@ -3040,9 +3040,9 @@ References:
 status: open
 priority: medium
 kind: enhancement
-labels: effort:m
+labels: effort:m, deferred
 created: 2026-08-25T01:58:54Z
-updated: 2026-08-27T03:14:52Z
+updated: 2026-10-23T21:38:46Z
 +++
 
 The debug renderer can color splats by properties such as size, depth, opacity, and cloud index, but it cannot consume a per-splat classification ID and assign a categorical color.
@@ -3258,9 +3258,9 @@ Add SGS file-format support, including format detection, decoding into the libra
 status: open
 priority: medium
 kind: enhancement
-labels: performance, power, effort:m, area:rendering
+labels: performance, power, effort:m, area:rendering, deferred
 created: 2026-08-27T06:05:48Z
-updated: 2026-10-23T14:20:33Z
+updated: 2026-10-23T21:31:11Z
 +++
 
 Splat rendering currently produces frames continuously even when the visible scene is unchanged. This wastes GPU time and power when splat data, transforms, camera state, viewport, renderer configuration, and other render inputs remain stable.
