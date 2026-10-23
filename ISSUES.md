@@ -3899,3 +3899,30 @@ This is related to #184. A cross-fade uses one global blend value; this needs a 
 - `2026-10-23T14:16:16Z`: Plan: this is built first in Radiance (Radiance#75), using the same offscreen A/B targets as #184 with a per-pixel mask. Once it is proven, it may move into this library.
 
 ---
+
+## 186: SOG loading un-premultiplies texture pixels on the CPU
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: performance, io
+created: 2026-10-23T17:23:00Z
++++
+
+SOGReaderGPU decodes each SOG WebP image with ImageIO by drawing it into a premultiplied RGBA8 CGContext. SOGImageDecode.decodeViaImageIO then un-premultiplies every pixel in a scalar Swift loop with Float math. Only after that are the pixels uploaded as .rgba8Uint textures for the GPU decode kernel.
+
+A typical room-sized SOG has 7 images of about 564x560, so this is about 2.2 million pixels per file, all on the CPU.
+
+Measured in Radiance, 13 SOGs (190k-410k splats each) loading in parallel:
+- Debug build: 5.7-7.6 s per file
+- Release build: about 0.1 s per file
+
+A standalone ImageIO decode of all 7 images in one of these SOGs takes about 90 ms. So the WebP decode is not the main cost. I think this loop is the main Debug cost, but I have not profiled it.
+
+Also: when the image is drawn premultiplied and then un-premultiplied, the color channels lose precision wherever alpha is low. SOG stores data in alpha, so this can change the decoded values.
+
+## Proposed fix (per schwa)
+Move the un-premultiply onto the GPU, as part of the existing decode kernel or as a step before it.
+
+---
