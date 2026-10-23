@@ -27,6 +27,10 @@ enum SOGImageDecode {
         let width = cgImage.width
         let height = cgImage.height
 
+        if let pixels = straightRGBA8Bytes(cgImage) {
+            return (pixels, width, height)
+        }
+
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         // CGContext supports only premultiplied (or skip) alpha for 8-bit RGBA.
@@ -55,5 +59,42 @@ enum SOGImageDecode {
             }
         }
         return (pixels, width, height)
+    }
+
+    // ImageIO usually decodes WebP as straight-alpha RGBA8. Copying those bytes
+    // avoids a premultiplied draw, which loses color precision at low alpha.
+    private static func straightRGBA8Bytes(_ cgImage: CGImage) -> [UInt8]? {
+        let byteOrder = cgImage.bitmapInfo.intersection(.byteOrderMask)
+        guard cgImage.bitsPerComponent == 8,
+              cgImage.bitsPerPixel == 32,
+              cgImage.alphaInfo == .last,
+              byteOrder == [] || byteOrder == .byteOrder32Big,
+              !cgImage.bitmapInfo.contains(.floatComponents),
+              cgImage.colorSpace?.model == .rgb,
+              let data = cgImage.dataProvider?.data,
+              let source = CFDataGetBytePtr(data) else {
+            return nil
+        }
+        let width = cgImage.width
+        let height = cgImage.height
+        let sourceBytesPerRow = cgImage.bytesPerRow
+        let rowBytes = width * 4
+        guard sourceBytesPerRow >= rowBytes, CFDataGetLength(data) >= sourceBytesPerRow * (height - 1) + rowBytes else {
+            return nil
+        }
+        var pixels = [UInt8](repeating: 0, count: rowBytes * height)
+        pixels.withUnsafeMutableBytes { destination in
+            guard let base = destination.baseAddress else {
+                return
+            }
+            if sourceBytesPerRow == rowBytes {
+                base.copyMemory(from: source, byteCount: rowBytes * height)
+            } else {
+                for row in 0..<height {
+                    (base + row * rowBytes).copyMemory(from: source + row * sourceBytesPerRow, byteCount: rowBytes)
+                }
+            }
+        }
+        return pixels
     }
 }
