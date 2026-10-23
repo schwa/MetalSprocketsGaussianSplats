@@ -1417,9 +1417,9 @@ Performance: the one-thread-per-tile serial radix remains the known bottleneck. 
 status: open
 priority: low
 kind: feature
-labels: effort:xl, area:tile-based
+labels: effort:xl, area:tile-based, deferred
 created: 2026-07-20T19:01:34Z
-updated: 2026-10-23T14:20:39Z
+updated: 2026-10-23T21:11:02Z
 +++
 
 The GPU-sorted pipeline (SplatGPUSort) and the tile-based renderer are converging on the same front-end tools: frustum cull, depth keys, radix sort. They differ only in back-end — sorted instanced quads with hardware blending (Spark/GPU) vs per-pixel front-to-back imageblock accumulation with early termination (tile).
@@ -2270,9 +2270,9 @@ RFC 0005 proposal 2b: track per-region variance and weight the temporal accumula
 status: open
 priority: low
 kind: enhancement
-labels: effort:s, impact:low, area:pointsplat, area:memory
+labels: effort:s, impact:low, area:pointsplat, area:memory, deferred
 created: 2026-07-22T00:10:45Z
-updated: 2026-10-23T14:20:43Z
+updated: 2026-10-23T21:11:02Z
 +++
 
 RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit fixed-point view-space depth and 3x12-bit sRGB color over [0,16) leave headroom; small quality/precision polish. Part of RFCs/0005.
@@ -2285,9 +2285,9 @@ RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit
 status: open
 priority: low
 kind: bug
-labels: not-testable, effort:m, area:pointsplat
+labels: not-testable, effort:m, area:pointsplat, deferred
 created: 2026-07-22T02:48:17Z
-updated: 2026-10-23T14:20:30Z
+updated: 2026-10-23T21:13:09Z
 +++
 
 Rotating the camera shows content that looks a frame or several old, as if rendering lags the camera. Reproduces with temporal point reuse disabled (reuseFactor = 0, #107 reverted), so seeding is not (or not the only) cause.
@@ -2679,9 +2679,9 @@ See SPZReader.parseV4 and the SplatLoaderBenchmark numbers.
 status: open
 priority: low
 kind: enhancement
-labels: performance, effort:m, area:io, area:spz
+labels: performance, effort:m, area:io, area:spz, deferred
 created: 2026-08-18T22:38:12Z
-updated: 2026-10-23T14:20:44Z
+updated: 2026-10-23T21:11:02Z
 +++
 
 After parallelizing the v4 ZSTD streams (#129), SPZ v4 load is still much slower than v3 at 1M splats (~82ms vs ~18ms). The gap is NOT serialization (streams now decompress concurrently) — it is decompressor throughput:
@@ -2823,9 +2823,9 @@ Medium. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Share
 status: open
 priority: low
 kind: enhancement
-labels: performance, effort:m, area:sorting, area:gpu, area:memory
+labels: performance, effort:m, area:sorting, area:gpu, area:memory, deferred
 created: 2026-08-18T23:17:38Z
-updated: 2026-10-23T14:20:43Z
+updated: 2026-10-23T21:11:02Z
 +++
 
 cullMark reads position from a dense packed_half3 buffer (6 bytes/splat) built once at load, instead of the 32-byte SparkSplat record. This pass touches every splat so fetch traffic dominates. Add a packed_half3 positions buffer on GPUSplatCloud (built at load), a positions arg + usePositions flag on cullMark, and populate it in the loader/builder.
@@ -2928,9 +2928,9 @@ Source: ~/Shared/Work/Projects/gaussiansplats-ios (SplatRenderTuning in Sources/
 status: open
 priority: low
 kind: enhancement
-labels: effort:l, area:rendering, area:cli
+labels: effort:l, area:rendering, area:cli, deferred
 created: 2026-08-24T17:30:49Z
-updated: 2026-10-23T14:20:35Z
+updated: 2026-10-23T21:11:02Z
 +++
 
 The offline renderer only supports perspective projection. It cannot render a 360°×180° equirectangular panorama from a camera position.
@@ -2963,9 +2963,9 @@ The offline renderer accepts camera position and look-at target, but has no dire
 status: open
 priority: low
 kind: enhancement
-labels: effort:l, area:rendering, area:cli
+labels: effort:l, area:rendering, area:cli, deferred
 created: 2026-08-24T17:30:49Z
-updated: 2026-10-23T14:20:35Z
+updated: 2026-10-23T21:11:02Z
 +++
 
 The offline renderer cannot simulate depth of field. It has no aperture, focus-distance, or sensor-size controls, so every rendered depth remains equally sharp.
@@ -2978,9 +2978,9 @@ The offline renderer cannot simulate depth of field. It has no aperture, focus-d
 status: open
 priority: low
 kind: enhancement
-labels: effort:l, area:rendering, area:cli
+labels: effort:l, area:rendering, area:cli, deferred
 created: 2026-08-24T17:30:50Z
-updated: 2026-10-23T14:20:35Z
+updated: 2026-10-23T21:11:02Z
 +++
 
 The offline renderer cannot accumulate samples along a camera movement. It has no end camera position, target, or up vector, shutter fraction, or motion-sample count.
@@ -3012,9 +3012,9 @@ Expected: Spark debug visualizations are available with GPU-sorted rendering, wi
 status: open
 priority: medium
 kind: feature
-labels: effort:l, area:splats
+labels: effort:l, area:splats, deferred
 created: 2026-08-24T21:15:41Z
-updated: 2026-10-23T14:20:40Z
+updated: 2026-10-23T21:13:09Z
 +++
 
 Lixel CyberColor (LCC) datasets are not currently supported by `SplatLoader`. An LCC dataset uses a `.lcc` JSON metadata file with companion `index.bin` and `data.bin` files, plus optional spherical-harmonic and environment data.
@@ -3096,9 +3096,9 @@ Debug rendering should be available as a separate Swift Package Manager product 
 status: open
 priority: low
 kind: enhancement
-labels: effort:s
+labels: effort:s, deferred
 created: 2026-08-25T17:59:31Z
-updated: 2026-09-14T16:40:58Z
+updated: 2026-10-23T21:11:02Z
 +++
 
 Binary little-endian PLY files use the GPU decoder, but binary big-endian files fall back to CPU decoding. This makes loading large big-endian PLY files substantially slower than equivalent little-endian files.
@@ -3147,9 +3147,9 @@ cSettings: [
 status: open
 priority: low
 kind: enhancement
-labels: effort:s
+labels: effort:s, deferred
 created: 2026-08-27T03:01:37Z
-updated: 2026-09-14T16:40:58Z
+updated: 2026-10-23T21:11:03Z
 +++
 
 SOGReaderGPU loads every archive entry through ZipArchive.data(for:), allocating and copying each complete entry into Data before image decoding and Metal upload. SOG bundles use stored ZIP entries, and SwiftZipReader exposes span-based access for those entries.
@@ -3164,9 +3164,9 @@ Expected: stored SOG payloads can flow from the memory-mapped archive into decod
 status: open
 priority: medium
 kind: feature
-labels: effort:xl
+labels: effort:xl, deferred
 created: 2026-08-27T03:59:48Z
-updated: 2026-08-27T05:43:52Z
+updated: 2026-10-23T21:13:09Z
 +++
 
 Provide a shared writer API for every splat format the library can read, including PLY, SPZ, and SOG. Writers must support Data and file URL output, preserve spherical harmonics where the destination format permits it, and report lossy or unsupported conversions.
@@ -3179,9 +3179,9 @@ Provide a shared writer API for every splat format the library can read, includi
 status: open
 priority: medium
 kind: feature
-labels: effort:xl
+labels: effort:xl, deferred
 created: 2026-08-27T03:59:49Z
-updated: 2026-08-27T05:43:52Z
+updated: 2026-10-23T21:13:09Z
 +++
 
 Provide an editable splat-cloud representation that supports inserting, updating, and deleting splats while preserving stable identities. It must support rebuilding or updating the GPU buffers after edits and recovering editable data from loaded clouds.
@@ -3194,9 +3194,9 @@ Provide an editable splat-cloud representation that supports inserting, updating
 status: open
 priority: medium
 kind: feature
-labels: effort:xl
+labels: effort:xl, deferred
 created: 2026-08-27T03:59:49Z
-updated: 2026-08-27T05:43:52Z
+updated: 2026-10-23T21:13:09Z
 +++
 
 Support point picking, screen-space marquee selection, and 3D bounding-box selection. Selection results must use stable splat identities rather than transient sorted or render-buffer indices.
@@ -3209,9 +3209,9 @@ Support point picking, screen-space marquee selection, and 3D bounding-box selec
 status: open
 priority: medium
 kind: feature
-labels: effort:l
+labels: effort:l, deferred
 created: 2026-08-27T03:59:49Z
-updated: 2026-08-27T05:43:52Z
+updated: 2026-10-23T21:13:09Z
 +++
 
 Add typed custom attribute storage and mutation for individual splats. Preserve attributes through edits and compatible file formats, and report when a destination format cannot encode them.
@@ -3240,9 +3240,9 @@ Provide a clear public initializer for constructing a splat cloud from applicati
 status: open
 priority: medium
 kind: feature
-labels: effort:l
+labels: effort:l, deferred
 created: 2026-08-27T04:03:21Z
-updated: 2026-08-27T05:43:52Z
+updated: 2026-10-23T21:13:09Z
 +++
 
 Add SGS file-format support, including format detection, decoding into the library’s splat representation, and encoding when SGS supports writing.
@@ -3382,9 +3382,9 @@ Multi-cloud GPU sort (cloudIndex propagation) tracked separately in #172.
 status: open
 priority: low
 kind: bug
-labels: effort:m, area:sorting, visionOS
+labels: effort:m, area:sorting, visionOS, deferred
 created: 2026-09-14T16:29:26Z
-updated: 2026-10-23T14:20:47Z
+updated: 2026-10-23T21:11:03Z
 +++
 
 The visionOS immersive Spark path (`SplatImmersiveContent` / `SplatImmersiveGPUSortElement`) sorts once for the whole frame using the left-eye depth as the sort key, then renders both eyes from that one order via vertex amplification.
@@ -3427,9 +3427,9 @@ Location: Tests/MetalSprocketsGaussianSplatsTests/PointSplatComputePassTests.swi
 status: open
 priority: low
 kind: task
-labels: code-style, refactor, effort:l, area:rendering, area:shaders
+labels: code-style, refactor, effort:l, area:rendering, area:shaders, deferred
 created: 2026-09-14T16:43:24Z
-updated: 2026-10-23T14:20:46Z
+updated: 2026-10-23T21:11:03Z
 +++
 
 The Metal shader code duplicates logic that should live in shared, reusable helper functions. Shaders should be composed of small, named, reusable parts rather than inlining the same math in each entry point.
@@ -3544,9 +3544,9 @@ The message indicates a Compositor Services frame was submitted (cp_frame_end_su
 status: open
 priority: high
 kind: bug
-labels: effort:s, area:pointsplat, area:rendering
+labels: effort:s, area:pointsplat, area:rendering, deferred
 created: 2026-09-14T18:53:22Z
-updated: 2026-10-23T14:20:33Z
+updated: 2026-10-23T21:13:09Z
 +++
 
 Selecting the Point renderer on a GPU without 64-bit atomics crashes the app.
@@ -3758,9 +3758,9 @@ Done when each path has its barriers or is marked as not needing them, and a GPU
 status: open
 priority: low
 kind: task
-labels: effort:xs, area:sorting, area:metal4, area:memory
+labels: effort:xs, area:sorting, area:metal4, area:memory, deferred
 created: 2026-10-02T20:35:57Z
-updated: 2026-10-23T14:20:43Z
+updated: 2026-10-23T21:11:03Z
 +++
 
 Xcode's GPU capture Insights (Bandwidth) report "Unused Buffer x 8" (about 643 KiB) on the "GPU Splat Sort" encoder. The flagged buffers are the current slot's scratch buffers: `recordsA`, `recordsB`, `hist`, `offset`, `total`, `digitBase`, `blockCounts` and `blockBase`. This was already reported before the Metal 4 port.
