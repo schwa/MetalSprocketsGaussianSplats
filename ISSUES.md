@@ -3843,12 +3843,13 @@ Done when a GPU capture of repeated offscreen PointSplat renders shows no per-fr
 ## 183: Credit PointSplat papers in README Acknowledgments
 
 +++
-status: open
+status: closed
 priority: low
 kind: documentation
 labels: effort:xs
 created: 2026-10-07T18:51:45Z
-updated: 2026-10-23T14:20:19Z
+updated: 2026-10-23T21:25:26Z
+closed: 2026-10-23T21:25:26Z
 +++
 
 README Acknowledgments lists only antimatter15 and sparkjs, and says "the two renderers". The PointSplat renderer is based on work that is not credited there.

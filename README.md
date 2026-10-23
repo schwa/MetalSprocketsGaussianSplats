@@ -165,8 +165,10 @@ MIT License. See LICENSE file for details.
 
 ## Acknowledgments
 
-The two renderers in this project are based on work by the projects below. A
-big thanks to their authors for releasing their code under permissive licenses.
+The renderers in this project are based on work by the projects and papers
+below. A big thanks to their authors for releasing their code and research.
 
 • [antimatter15](https://github.com/antimatter15/splat) (MIT license)
 • [sparkjs](http://sparkjs.dev) (MIT License)
+• Rijsdijk et al., [*Gaussian Point Splatting*](https://momentsingraphics.de/Siggraph2026.html) (SIGGRAPH 2026), the basis of the PointSplat renderer. Reference implementation: [gaussian-point-splatting](https://github.com/JorisAR/gaussian-point-splatting) (BSD 3-Clause License)
+• Schütz, Kerbl, Wimmer, [*Rendering Point Clouds with Compute Shaders and Vertex Order Optimization*](https://github.com/m-schuetz/compute_rasterizer) (EGSR/CGF 2021), the source of PointSplat's 64-bit depth+color `atomic_min` framebuffer technique
