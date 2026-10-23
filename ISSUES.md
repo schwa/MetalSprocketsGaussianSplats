@@ -3928,3 +3928,18 @@ Also: when the image is drawn premultiplied and then un-premultiplied, the color
 Move the un-premultiply onto the GPU, as part of the existing decode kernel or as a step before it.
 
 ---
+
+## 187: Debug renderer looks up SH by splat index instead of shIndex
+
++++
+status: closed
+priority: medium
+kind: bug
+created: 2026-10-23T18:29:47Z
+updated: 2026-10-23T18:31:30Z
+closed: 2026-10-23T18:31:30Z
++++
+
+SparkSplatDebugRenderShader.metal calls evaluateSH with splatIndex. The other renderers use splat.shIndex. For SOG files with higher-order SH, shCoefficients is a shared palette, not one row per splat. So the debug renderer reads the wrong palette entries, or reads past the end of the buffer. Fix: pass splat.shIndex.
+
+---
