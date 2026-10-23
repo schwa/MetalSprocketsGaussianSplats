@@ -3048,6 +3048,8 @@ The debug renderer can color splats by properties such as size, depth, opacity, 
 
 This prevents visual inspection of externally generated classifications, including k-means cluster assignments. Classification IDs must remain associated with the correct splats when clouds use Morton ordering or sorted render indices.
 
+- `2026-10-23T21:16:42Z`: Read the debug pipeline and GPUSplatCloud. Punting: needs API decisions the code can't settle. (1) Where the per-splat IDs live: a side buffer per cloud, or a splat attribute — this overlaps the deferred #156 (custom per-splat attributes). (2) Morton ordering: GPUSplatCloud's Morton init discards the permutation, so caller-supplied IDs in source order can't be matched; we'd need to keep the permutation (or reorder IDs with the splats at load). (3) Palette: fixed hash colors vs caller-supplied table, and the ID cap. Unblocker: should IDs be a per-cloud side buffer reordered with the splats at load (my suggestion), or wait for #156?
+
 ---
 
 ## 148: SplatView owns debug rendering concerns
@@ -3263,6 +3265,8 @@ updated: 2026-10-23T14:20:33Z
 Splat rendering currently produces frames continuously even when the visible scene is unchanged. This wastes GPU time and power when splat data, transforms, camera state, viewport, renderer configuration, and other render inputs remain stable.
 
 Expected behavior: render a new frame when a render-affecting input changes or an animation requires it. Reuse the existing frame while the scene is unchanged. Changes to transforms, splat data, camera state, viewport size, renderer configuration, and other visible inputs must invalidate the frame.
+
+- `2026-10-23T21:16:18Z`: Investigated SplatView/RenderView. Punting: MetalSprockets RenderView's update closure never sets needsDisplay, so enabling .metalEnableSetNeedsDisplay(true)/.metalIsPaused(true) would freeze the view on input changes. A real fix needs a MetalSprockets change (mark needsDisplay in RenderView's update when on-demand drawing is enabled), plus a per-renderer opt-out: stochastic and PointSplat accumulate across frames and need continuous drawing. Unblocker: OK to change MetalSprockets RenderView first (separate repo), or should SplatView own an explicit invalidation API?
 
 ---
 
