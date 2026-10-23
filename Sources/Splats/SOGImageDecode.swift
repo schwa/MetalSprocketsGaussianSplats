@@ -68,7 +68,7 @@ enum SOGImageDecode {
         guard cgImage.bitsPerComponent == 8,
               cgImage.bitsPerPixel == 32,
               cgImage.alphaInfo == .last,
-              byteOrder == [] || byteOrder == .byteOrder32Big,
+              byteOrder.isEmpty || byteOrder == .byteOrder32Big,
               !cgImage.bitmapInfo.contains(.floatComponents),
               cgImage.colorSpace?.model == .rgb,
               let data = cgImage.dataProvider?.data,
