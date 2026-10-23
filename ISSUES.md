@@ -70,9 +70,9 @@ Test may have pre-existing golden image mismatch. Needs investigation.
 status: closed
 priority: medium
 kind: bug
-labels: effort:m, punted
+labels: effort:m, deferred
 created: 2026-02-19T00:00:00Z
-updated: 2026-08-24T17:54:36Z
+updated: 2026-10-23T14:17:15Z
 closed: 2026-08-24T17:54:36Z
 +++
 
@@ -256,8 +256,9 @@ We need unit tests that render splats via OffscreenRenderer and compare against 
 status: closed
 priority: high
 kind: bug
-labels: memory-leak, metal, async
+labels: memory-leak, async, area:metal
 created: 2026-03-09T00:00:00Z
+updated: 2026-10-23T14:20:44Z
 closed: 2026-03-09T00:00:00Z
 +++
 
@@ -453,9 +454,9 @@ CPUSplatRadixSorter already has internal static convenience methods (sort(device
 status: closed
 priority: medium
 kind: enhancement
-labels: performance, sorting
+labels: performance, area:sorting
 created: 2026-03-30T00:00:00Z
-updated: 2026-04-07T23:28:48Z
+updated: 2026-10-23T14:20:31Z
 closed: 2026-04-07T23:28:48Z
 +++
 
@@ -572,9 +573,9 @@ The name should be short, memorable, and clearly associated with MetalSprocketsG
 status: closed
 priority: medium
 kind: feature
-labels: performance, metal, sorting
+labels: performance, area:sorting, area:metal
 created: 2026-03-31T15:58:34Z
-updated: 2026-03-31T19:59:41Z
+updated: 2026-10-23T14:20:45Z
 closed: 2026-03-31T19:59:41Z
 +++
 
@@ -669,9 +670,9 @@ The antimatter15 splat format and rendering code should be deprecated and eventu
 status: closed
 priority: low
 kind: task
-labels: documentation, api
+labels: area:api, area:documentation
 created: 2026-03-31T15:59:58Z
-updated: 2026-03-31T16:02:23Z
+updated: 2026-10-23T14:20:47Z
 closed: 2026-03-31T16:02:23Z
 +++
 
@@ -726,9 +727,9 @@ closed: 2026-04-09T20:32:10Z
 status: closed
 priority: low
 kind: enhancement
-labels: api, ergonomics, effort:m
+labels: ergonomics, effort:m, area:api
 created: 2026-03-31T19:59:36Z
-updated: 2026-07-21T22:35:56Z
+updated: 2026-10-23T14:20:36Z
 closed: 2026-07-21T22:35:56Z
 +++
 
@@ -896,9 +897,9 @@ Provide a public RealityKit Scene (or ImmersiveSpace content) in the library tha
 status: closed
 priority: medium
 kind: enhancement
-labels: visionOS, sorting, effort:l, not-testable
+labels: visionOS, effort:l, not-testable, area:sorting
 created: 2026-04-09T17:40:46Z
-updated: 2026-07-21T21:37:23Z
+updated: 2026-10-23T14:20:31Z
 closed: 2026-07-21T21:37:23Z
 +++
 
@@ -914,9 +915,9 @@ Currently SplatImmersiveElement sorts once using the left eye's camera matrix an
 status: blocked
 priority: medium
 kind: bug
-labels: effort:s, visionOS, sorting, not-testable, punted, blocked
+labels: effort:s, visionOS, not-testable, deferred, area:sorting
 created: 2026-04-09T17:40:54Z
-updated: 2026-08-24T17:54:37Z
+updated: 2026-10-23T14:31:31Z
 +++
 
 Distant splats flicker during immersive rendering. Likely cause: the pending release depth (3 buffers) is too shallow for visionOS stereo rendering, which has more in-flight GPU work. A pool buffer may be returned and overwritten by a new sort while the GPU is still reading it. To diagnose: disable pool release entirely (just allocate fresh buffers) and see if flicker disappears. If confirmed, either increase the pending release depth for visionOS or make it configurable.
@@ -940,9 +941,9 @@ The flicker is constant and minor, present even when head is relatively stationa
 status: closed
 priority: medium
 kind: enhancement
-labels: effort:s, visionOS, api, not-testable
+labels: effort:s, visionOS, not-testable, area:api
 created: 2026-04-09T17:41:13Z
-updated: 2026-07-21T21:34:32Z
+updated: 2026-10-23T14:20:37Z
 closed: 2026-07-21T21:34:32Z
 +++
 
@@ -982,9 +983,9 @@ The immersive butterfly appears dull and desaturated compared to the same splat 
 status: closed
 priority: low
 kind: enhancement
-labels: effort:xs, visionOS, sorting
+labels: effort:xs, visionOS, area:sorting
 created: 2026-04-09T17:51:37Z
-updated: 2026-04-09T17:57:45Z
+updated: 2026-10-23T14:20:31Z
 closed: 2026-04-09T17:57:45Z
 +++
 
@@ -1000,9 +1001,9 @@ SplatImmersiveElement currently uses eye 0's camera matrix for sorting. Using th
 status: closed
 priority: low
 kind: bug
-labels: effort:s, visionOS, demo
+labels: effort:s, visionOS, area:demo
 created: 2026-04-09T18:09:00Z
-updated: 2026-04-09T19:13:38Z
+updated: 2026-10-23T14:20:35Z
 closed: 2026-04-09T19:13:38Z
 +++
 
@@ -1038,9 +1039,9 @@ SplatView renders nothing in visionOS and iPad simulators — sorting runs but n
 status: closed
 priority: low
 kind: enhancement
-labels: effort:xs, demo
+labels: effort:xs, area:demo
 created: 2026-04-09T19:17:42Z
-updated: 2026-04-09T19:53:34Z
+updated: 2026-10-23T14:20:35Z
 closed: 2026-04-09T19:53:34Z
 +++
 
@@ -1054,9 +1055,9 @@ The MetalSprockets FrameTimingView provides an FPS overlay. Add it to the demo a
 status: closed
 priority: low
 kind: feature
-labels: effort:m, demo, iOS, not-testable
+labels: effort:m, iOS, not-testable, area:demo
 created: 2026-04-09T19:19:51Z
-updated: 2026-07-21T23:05:17Z
+updated: 2026-10-23T14:20:35Z
 closed: 2026-07-21T23:05:17Z
 +++
 
@@ -1070,9 +1071,9 @@ The MetalSprockets demo has an ARKit mode that renders the camera feed (YCbCr bi
 status: closed
 priority: low
 kind: bug
-labels: effort:s, stochastic
+labels: effort:s, area:stochastic
 created: 2026-04-09T20:05:59Z
-updated: 2026-04-09T20:41:51Z
+updated: 2026-10-23T14:20:43Z
 closed: 2026-04-09T20:41:51Z
 +++
 
@@ -1090,9 +1091,9 @@ Switching to stochastic mode in SplatView crashes with 'MTLDepthStencilDescripto
 status: closed
 priority: medium
 kind: bug
-labels: effort:xs, macOS, demo, not-testable
+labels: effort:xs, macOS, not-testable, area:demo
 created: 2026-04-09T20:07:10Z
-updated: 2026-07-21T21:27:48Z
+updated: 2026-10-23T14:20:35Z
 closed: 2026-07-21T21:27:48Z
 +++
 
@@ -1106,9 +1107,9 @@ SplatView (via RenderView/MTKView) renders nothing when .toolbar is applied or w
 status: closed
 priority: low
 kind: enhancement
-labels: effort:m, tile-based
+labels: effort:m, area:tile-based
 created: 2026-04-09T20:08:11Z
-updated: 2026-07-21T20:43:22Z
+updated: 2026-10-23T14:20:38Z
 closed: 2026-07-21T20:43:22Z
 +++
 
@@ -1124,9 +1125,9 @@ SplatRenderer currently has .spark and .stochastic but not .tileBased. TileBased
 status: closed
 priority: medium
 kind: bug
-labels: effort:s, stochastic, performance
+labels: effort:s, performance, area:stochastic
 created: 2026-04-09T20:08:30Z
-updated: 2026-04-09T20:10:24Z
+updated: 2026-10-23T14:20:43Z
 closed: 2026-04-09T20:10:24Z
 +++
 
@@ -1142,9 +1143,9 @@ When SplatView is set to .stochastic renderer, the AsyncSortManager continues so
 status: closed
 priority: medium
 kind: enhancement
-labels: effort:m, demo
+labels: effort:m, area:demo
 created: 2026-04-09T20:09:00Z
-updated: 2026-04-09T20:23:49Z
+updated: 2026-10-23T14:20:36Z
 closed: 2026-04-09T20:23:49Z
 +++
 
@@ -1160,9 +1161,9 @@ The demo only supports turntable drag rotation via .interactiveCamera(). Add pin
 status: closed
 priority: low
 kind: bug
-labels: effort:xs, macOS, punted, blocked
+labels: effort:xs, macOS, deferred
 created: 2026-04-09T20:13:18Z
-updated: 2026-09-14T16:35:13Z
+updated: 2026-10-23T14:31:31Z
 closed: 2026-09-14T16:35:13Z
 +++
 
@@ -1179,9 +1180,9 @@ The Metal GPU performance overlay disappears while dragging/panning the camera. 
 status: closed
 priority: low
 kind: feature
-labels: visionOS, stochastic, effort:s
+labels: visionOS, effort:s, area:stochastic
 created: 2026-04-09T20:13:29Z
-updated: 2026-04-09T21:29:56Z
+updated: 2026-10-23T14:20:43Z
 closed: 2026-04-09T21:29:56Z
 +++
 
@@ -1198,9 +1199,9 @@ SplatImmersiveElement currently only uses SparkSplatRenderPipeline. Add support 
 status: closed
 priority: low
 kind: enhancement
-labels: effort:s, stochastic
+labels: effort:s, area:stochastic
 created: 2026-04-09T20:13:57Z
-updated: 2026-07-21T22:35:29Z
+updated: 2026-10-23T14:20:43Z
 closed: 2026-07-21T22:35:29Z
 +++
 
@@ -1214,9 +1215,9 @@ Currently frameTime (frame counter) is passed as the stochastic seed every frame
 status: closed
 priority: medium
 kind: enhancement
-labels: effort:xs, demo, visionOS
+labels: effort:xs, visionOS, area:demo
 created: 2026-04-09T21:46:47Z
-updated: 2026-04-09T21:55:41Z
+updated: 2026-10-23T14:20:36Z
 closed: 2026-04-09T21:55:41Z
 +++
 
@@ -1232,9 +1233,9 @@ When the user enters immersive mode, the windowed SplatView keeps rendering in t
 status: closed
 priority: low
 kind: enhancement
-labels: effort:m, visionOS, demo
+labels: effort:m, visionOS, area:demo
 created: 2026-04-09T21:48:27Z
-updated: 2026-04-09T22:32:36Z
+updated: 2026-10-23T14:20:36Z
 closed: 2026-04-09T22:32:36Z
 +++
 
@@ -1251,9 +1252,9 @@ FrameTimingView is available for windowed SplatView via .onFrameTimingChange but
 status: open
 priority: medium
 kind: feature
-labels: effort:m, visionOS, demo, not-testable, punted
+labels: effort:m, visionOS, not-testable, deferred, area:demo
 created: 2026-04-09T21:57:38Z
-updated: 2026-07-21T22:48:16Z
+updated: 2026-10-23T14:20:36Z
 +++
 
 The immersive splat currently has no gesture interaction — the splat is static in space. Add gesture support for manipulating the splat in immersive mode.
@@ -1266,9 +1267,9 @@ The immersive splat currently has no gesture interaction — the splat is static
 status: closed
 priority: low
 kind: task
-labels: effort:s, demo
+labels: effort:s, area:demo
 created: 2026-04-09T22:00:25Z
-updated: 2026-04-09T22:02:16Z
+updated: 2026-10-23T14:20:36Z
 closed: 2026-04-09T22:02:16Z
 +++
 
@@ -1319,9 +1320,9 @@ SplatImmersiveContent drives immersive visionOS rendering via the CPU AsyncSortM
 status: closed
 priority: medium
 kind: bug
-labels: tile-based, effort:l
+labels: effort:l, area:tile-based
 created: 2026-07-20T18:53:32Z
-updated: 2026-07-21T21:48:53Z
+updated: 2026-10-23T14:20:38Z
 closed: 2026-07-21T21:48:53Z
 +++
 
@@ -1337,9 +1338,9 @@ The tile-based renderer runs significantly slower than the Spark and GPU-sorted 
 status: closed
 priority: medium
 kind: bug
-labels: tile-based
+labels: area:tile-based
 created: 2026-07-20T18:53:32Z
-updated: 2026-07-21T15:08:16Z
+updated: 2026-10-23T14:20:39Z
 closed: 2026-07-21T15:08:16Z
 +++
 
@@ -1362,9 +1363,9 @@ Expected: matching color/contrast. Actual: Tile output is visibly washed out.
 status: closed
 priority: low
 kind: enhancement
-labels: tile-based
+labels: area:tile-based
 created: 2026-07-20T18:53:32Z
-updated: 2026-07-20T18:55:19Z
+updated: 2026-10-23T14:20:39Z
 closed: 2026-07-20T18:55:19Z
 +++
 
@@ -1380,9 +1381,9 @@ The GPU-sorted pipeline (SplatGPUSort) culls splats against the frustum before s
 status: closed
 priority: low
 kind: enhancement
-labels: tile-based, effort:m
+labels: effort:m, area:tile-based
 created: 2026-07-20T18:53:32Z
-updated: 2026-07-21T23:01:46Z
+updated: 2026-10-23T14:20:39Z
 closed: 2026-07-21T23:01:46Z
 +++
 
@@ -1416,9 +1417,9 @@ Performance: the one-thread-per-tile serial radix remains the known bottleneck. 
 status: open
 priority: low
 kind: feature
-labels: tile-based, effort:xl
+labels: effort:xl, area:tile-based
 created: 2026-07-20T19:01:34Z
-updated: 2026-09-14T16:41:02Z
+updated: 2026-10-23T14:20:39Z
 +++
 
 The GPU-sorted pipeline (SplatGPUSort) and the tile-based renderer are converging on the same front-end tools: frustum cull, depth keys, radix sort. They differ only in back-end — sorted instanced quads with hardware blending (Spark/GPU) vs per-pixel front-to-back imageblock accumulation with early termination (tile).
@@ -1440,9 +1441,9 @@ Related: #58 (tile perf), #59 (tile blending), #61 (global tile|depth sort repla
 status: closed
 priority: high
 kind: none
-labels: performance, pointsplat
+labels: performance, area:pointsplat
 created: 2026-07-21T14:52:10Z
-updated: 2026-07-21T17:57:49Z
+updated: 2026-10-23T14:20:27Z
 closed: 2026-07-21T17:57:49Z
 +++
 
@@ -1459,9 +1460,9 @@ The splat kernel is dispatched over maxPointsPerFrame (default 4M) threads every
 status: closed
 priority: medium
 kind: none
-labels: pointsplat
+labels: area:pointsplat
 created: 2026-07-21T14:52:10Z
-updated: 2026-07-21T15:17:45Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T15:17:45Z
 +++
 
@@ -1477,9 +1478,9 @@ PointSplat renders base splat color only; view-dependent SH color (used by Spark
 status: closed
 priority: low
 kind: none
-labels: performance, pointsplat
+labels: performance, area:pointsplat
 created: 2026-07-21T14:52:10Z
-updated: 2026-07-21T20:23:36Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T20:23:36Z
 +++
 
@@ -1495,9 +1496,9 @@ The splat kernel has an early depth test (plain aliased read) before atomic_min,
 status: closed
 priority: medium
 kind: task
-labels: performance, pointsplat, effort:m
+labels: performance, effort:m, area:pointsplat
 created: 2026-07-21T14:52:10Z
-updated: 2026-07-21T21:37:44Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T21:37:44Z
 +++
 
@@ -1515,9 +1516,9 @@ RFC 0003 verification plan items not yet done: GPU capture to confirm even occup
 status: closed
 priority: medium
 kind: none
-labels: pointsplat
+labels: area:pointsplat
 created: 2026-07-21T14:52:10Z
-updated: 2026-07-21T20:36:39Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T20:36:39Z
 +++
 
@@ -1533,9 +1534,9 @@ PointSplatRenderPipeline hardcodes nearPlane 0.2 / farPlane 200 for the 28-bit f
 status: closed
 priority: high
 kind: none
-labels: bug, pointsplat
+labels: bug, area:pointsplat
 created: 2026-07-21T14:52:11Z
-updated: 2026-07-21T15:08:17Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T15:08:17Z
 +++
 
@@ -1552,9 +1553,9 @@ The resolve/accumulation textures hold raw (sRGB-encoded) splat color values in 
 status: closed
 priority: low
 kind: none
-labels: pointsplat
+labels: area:pointsplat
 created: 2026-07-21T14:52:11Z
-updated: 2026-07-21T19:07:30Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T19:07:30Z
 +++
 
@@ -1571,9 +1572,9 @@ RFC 0003 defers hierarchical/occlusion culling (two-phase scheme, depth mip chai
 status: closed
 priority: medium
 kind: task
-labels: pointsplat, code-style, effort:m
+labels: code-style, effort:m, area:pointsplat
 created: 2026-07-21T17:47:37Z
-updated: 2026-07-21T21:40:10Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T21:40:10Z
 +++
 
@@ -1587,9 +1588,9 @@ Offscreen and live rendering have largely parallel/duplicated code paths. Needs 
 status: closed
 priority: medium
 kind: bug
-labels: splats, effort:m
+labels: effort:m, area:splats
 created: 2026-07-21T18:07:20Z
-updated: 2026-07-21T21:42:33Z
+updated: 2026-10-23T14:20:39Z
 closed: 2026-07-21T21:42:33Z
 +++
 
@@ -1605,9 +1606,9 @@ Loading sphere-32M.sog fails with failedToDecodeImage(quats.webp). The file is a
 status: closed
 priority: high
 kind: enhancement
-labels: splats, performance
+labels: performance, area:splats
 created: 2026-07-21T18:35:05Z
-updated: 2026-07-21T18:40:09Z
+updated: 2026-10-23T14:20:39Z
 closed: 2026-07-21T18:40:09Z
 +++
 
@@ -1623,9 +1624,9 @@ Loading large SOG files (e.g. sphere-48M.sog) through SOGReaderCPU takes minutes
 status: closed
 priority: low
 kind: feature
-labels: pointsplat
+labels: area:pointsplat
 created: 2026-07-21T19:07:30Z
-updated: 2026-07-21T19:41:31Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T19:41:31Z
 +++
 
@@ -1641,9 +1642,9 @@ Accumulation resets to 1 SPP noise the moment the camera moves. The paper's repr
 status: closed
 priority: low
 kind: feature
-labels: pointsplat
+labels: area:pointsplat
 created: 2026-07-21T19:45:06Z
-updated: 2026-07-21T20:14:13Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T20:14:13Z
 +++
 
@@ -1659,9 +1660,9 @@ There is no way to view raw single-frame PointSplat output. Temporal accumulatio
 status: closed
 priority: medium
 kind: enhancement
-labels: pointsplat, performance, effort:l
+labels: performance, effort:l, area:pointsplat
 created: 2026-07-21T20:18:36Z
-updated: 2026-07-21T21:57:34Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T21:57:34Z
 +++
 
@@ -1675,9 +1676,9 @@ Per-Gaussian preprocess is O(total splats) every frame even when most of the clo
 status: closed
 priority: low
 kind: task
-labels: pointsplat, performance, effort:s
+labels: performance, effort:s, area:pointsplat
 created: 2026-07-21T20:18:36Z
-updated: 2026-07-21T23:03:48Z
+updated: 2026-10-23T14:20:28Z
 closed: 2026-07-21T23:03:48Z
 +++
 
@@ -1694,9 +1695,9 @@ We use the paper's defaults (2x2 supersampling, K=4) untested on our hardware. T
 status: closed
 priority: low
 kind: enhancement
-labels: pointsplat, splats, memory, effort:l
+labels: effort:l, area:pointsplat, area:splats, area:memory
 created: 2026-07-21T20:18:36Z
-updated: 2026-07-21T23:12:18Z
+updated: 2026-10-23T14:20:43Z
 closed: 2026-07-21T23:12:18Z
 +++
 
@@ -1712,9 +1713,9 @@ SparkSplat is 32 bytes plus float32 SH coefficients; the paper packs a Gaussian 
 status: closed
 priority: low
 kind: enhancement
-labels: pointsplat, effort:m, punted
+labels: effort:m, deferred, area:pointsplat
 created: 2026-07-21T20:37:59Z
-updated: 2026-07-21T23:28:05Z
+updated: 2026-10-23T14:20:29Z
 closed: 2026-07-21T23:28:05Z
 +++
 
@@ -1731,9 +1732,9 @@ MetalSprockets 92dbfa0 added declarative indirect dispatch (ComputeDispatch(indi
 status: closed
 priority: medium
 kind: bug
-labels: spark, performance, code-style, effort:s
+labels: performance, code-style, effort:s, area:spark
 created: 2026-07-21T20:28:32Z
-updated: 2026-07-21T21:09:07Z
+updated: 2026-10-23T14:20:41Z
 closed: 2026-07-21T21:09:07Z
 +++
 
@@ -1749,9 +1750,9 @@ closed: 2026-07-21T21:09:07Z
 status: closed
 priority: medium
 kind: bug
-labels: spark, gpu-sort, code-style, effort:s
+labels: code-style, effort:s, area:spark, area:gpu-sort
 created: 2026-07-21T20:28:39Z
-updated: 2026-07-21T21:12:15Z
+updated: 2026-10-23T14:20:47Z
 closed: 2026-07-21T21:12:15Z
 +++
 
@@ -1767,9 +1768,9 @@ closed: 2026-07-21T21:12:15Z
 status: closed
 priority: low
 kind: task
-labels: stochastic, code-style, effort:s
+labels: code-style, effort:s, area:stochastic
 created: 2026-07-21T20:28:39Z
-updated: 2026-07-21T22:34:34Z
+updated: 2026-10-23T14:20:43Z
 closed: 2026-07-21T22:34:34Z
 +++
 
@@ -1783,9 +1784,9 @@ The Draw closure in StochasticSplatRenderPipeline binds `time`, `alphaThreshold`
 status: closed
 priority: medium
 kind: bug
-labels: pointsplat, code-style, effort:s
+labels: code-style, effort:s, area:pointsplat
 created: 2026-07-21T20:28:46Z
-updated: 2026-07-21T21:32:07Z
+updated: 2026-10-23T14:20:29Z
 closed: 2026-07-21T21:32:07Z
 +++
 
@@ -1801,9 +1802,9 @@ closed: 2026-07-21T21:32:07Z
 status: closed
 priority: low
 kind: task
-labels: pointsplat, code-style, effort:s
+labels: code-style, effort:s, area:pointsplat
 created: 2026-07-21T20:28:46Z
-updated: 2026-07-21T22:37:31Z
+updated: 2026-10-23T14:20:29Z
 closed: 2026-07-21T22:37:31Z
 +++
 
@@ -1817,9 +1818,9 @@ closed: 2026-07-21T22:37:31Z
 status: closed
 priority: low
 kind: task
-labels: tile-based, spark, code-style, effort:s
+labels: code-style, effort:s, area:tile-based, area:spark
 created: 2026-07-21T20:28:54Z
-updated: 2026-07-21T22:36:48Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-07-21T22:36:48Z
 +++
 
@@ -1833,9 +1834,9 @@ TileSplatRenderPass's first Draw closure binds the splat buffer, tile indices, t
 status: closed
 priority: low
 kind: task
-labels: spark, tile-based, code-style, effort:s
+labels: code-style, effort:s, area:tile-based, area:spark
 created: 2026-07-21T20:28:54Z
-updated: 2026-07-21T22:39:16Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-07-21T22:39:16Z
 +++
 
@@ -1855,9 +1856,9 @@ A shader-compilation failure at runtime (e.g. bad function constant) takes down 
 status: closed
 priority: low
 kind: task
-labels: spark, code-style, effort:s
+labels: code-style, effort:s, area:spark
 created: 2026-07-21T20:28:32Z
-updated: 2026-07-21T22:40:04Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-07-21T22:40:04Z
 +++
 
@@ -1871,9 +1872,9 @@ In SparkSplatRenderPipeline's Draw closure, `shDegreeValue` (index 11) and `boun
 status: closed
 priority: medium
 kind: feature
-labels: splats, effort:l, punted
+labels: effort:l, deferred, area:splats
 created: 2026-07-21T21:44:25Z
-updated: 2026-07-21T22:58:34Z
+updated: 2026-10-23T14:20:39Z
 closed: 2026-07-21T22:58:34Z
 +++
 
@@ -1908,9 +1909,9 @@ Source comments across the project have not been audited against the house writi
 status: closed
 priority: medium
 kind: enhancement
-labels: pointsplat, performance, effort:m
+labels: performance, effort:m, area:pointsplat
 created: 2026-07-21T21:57:34Z
-updated: 2026-07-21T22:41:13Z
+updated: 2026-10-23T14:20:29Z
 closed: 2026-07-21T22:41:13Z
 +++
 
@@ -1924,9 +1925,9 @@ Group-level hierarchical culling (#75) uses groups of 256 consecutive Gaussians 
 status: closed
 priority: low
 kind: enhancement
-labels: pointsplat, effort:l
+labels: effort:l, area:pointsplat
 created: 2026-07-21T23:28:02Z
-updated: 2026-07-21T23:36:31Z
+updated: 2026-10-23T14:20:29Z
 closed: 2026-07-21T23:36:31Z
 +++
 
@@ -1942,9 +1943,9 @@ Two stages: (1) convert encodePhase to element-built ComputePipelines (ComputeKe
 status: closed
 priority: low
 kind: enhancement
-labels: splats, code-style, effort:s
+labels: code-style, effort:s, area:splats
 created: 2026-07-21T23:43:53Z
-updated: 2026-07-21T23:46:28Z
+updated: 2026-10-23T14:20:40Z
 closed: 2026-07-21T23:46:28Z
 +++
 
@@ -1974,9 +1975,9 @@ BenchCommand creates its own command queue and a raw MTLBlitCommandEncoder to sy
 status: closed
 priority: medium
 kind: bug
-labels: concurrency, splats, effort:s
+labels: effort:s, area:splats, area:concurrency
 created: 2026-07-21T23:48:54Z
-updated: 2026-07-21T23:55:14Z
+updated: 2026-10-23T14:20:44Z
 closed: 2026-07-21T23:55:14Z
 +++
 
@@ -1990,9 +1991,9 @@ GPUSplatCloud is @unchecked Sendable but modelTransform and opacity are plain va
 status: closed
 priority: medium
 kind: bug
-labels: concurrency, sorting, effort:s
+labels: effort:s, area:sorting, area:concurrency
 created: 2026-07-21T23:48:54Z
-updated: 2026-07-21T23:55:48Z
+updated: 2026-10-23T14:20:44Z
 closed: 2026-07-21T23:55:48Z
 +++
 
@@ -2006,9 +2007,9 @@ AsyncSortManager.managedSortedIndicesStream uses the closure AsyncStream initial
 status: closed
 priority: low
 kind: bug
-labels: concurrency, demo, iOS, effort:xs
+labels: iOS, effort:xs, area:demo, area:concurrency
 created: 2026-07-21T23:49:07Z
-updated: 2026-07-21T23:55:05Z
+updated: 2026-10-23T14:20:44Z
 closed: 2026-07-21T23:55:05Z
 +++
 
@@ -2022,9 +2023,9 @@ ARSplatSessionModel.session(_:didUpdate:) spawns an unstructured Task { @MainAct
 status: closed
 priority: low
 kind: task
-labels: concurrency, pointsplat, code-style, effort:xs
+labels: code-style, effort:xs, area:pointsplat, area:concurrency
 created: 2026-07-21T23:49:07Z
-updated: 2026-07-21T23:55:56Z
+updated: 2026-10-23T14:20:44Z
 closed: 2026-07-21T23:55:56Z
 +++
 
@@ -2038,9 +2039,9 @@ PointSplatStatistics is @unchecked Sendable but its three fields have no synchro
 status: closed
 priority: low
 kind: enhancement
-labels: concurrency, demo, effort:xs
+labels: effort:xs, area:demo, area:concurrency
 created: 2026-07-21T23:49:08Z
-updated: 2026-07-21T23:56:49Z
+updated: 2026-10-23T14:20:44Z
 closed: 2026-07-21T23:56:49Z
 +++
 
@@ -2054,9 +2055,9 @@ loadCustomSplat offloads parsing via Task.detached(priority: .userInitiated), wh
 status: closed
 priority: low
 kind: bug
-labels: demo, iOS, code-style, effort:xs
+labels: iOS, code-style, effort:xs, area:demo
 created: 2026-07-21T23:50:42Z
-updated: 2026-07-21T23:55:36Z
+updated: 2026-10-23T14:20:36Z
 closed: 2026-07-21T23:55:36Z
 +++
 
@@ -2070,9 +2071,9 @@ ARSplatView.init calls MTLCreateSystemDefaultDevice()! and try! AsyncSortManager
 status: closed
 priority: medium
 kind: task
-labels: api, effort:s
+labels: effort:s, area:api
 created: 2026-07-21T23:52:19Z
-updated: 2026-07-21T23:56:40Z
+updated: 2026-10-23T14:20:37Z
 closed: 2026-07-21T23:56:40Z
 +++
 
@@ -2086,9 +2087,9 @@ These public types have no users outside the library (not demo, CLI, or tests): 
 status: closed
 priority: low
 kind: enhancement
-labels: api, pointsplat, effort:s
+labels: effort:s, area:pointsplat, area:api
 created: 2026-07-21T23:52:19Z
-updated: 2026-07-21T23:56:49Z
+updated: 2026-10-23T14:20:37Z
 closed: 2026-07-21T23:56:49Z
 +++
 
@@ -2102,9 +2103,9 @@ PointSplat has three public error enums: PointSplatRenderer.RendererError, Point
 status: closed
 priority: low
 kind: enhancement
-labels: api, effort:m
+labels: effort:m, area:api
 created: 2026-07-21T23:52:19Z
-updated: 2026-07-21T23:58:39Z
+updated: 2026-10-23T14:20:37Z
 closed: 2026-07-21T23:58:39Z
 +++
 
@@ -2118,9 +2119,9 @@ SparkSplatRenderPipeline has three public init overloads with 9 parameters each 
 status: closed
 priority: low
 kind: task
-labels: api, splats, effort:s
+labels: effort:s, area:api, area:splats
 created: 2026-07-21T23:52:19Z
-updated: 2026-07-21T23:57:47Z
+updated: 2026-10-23T14:20:40Z
 closed: 2026-07-21T23:57:47Z
 +++
 
@@ -2134,9 +2135,9 @@ All splat readers stream via read(_ handler:) and conform to SplatReaderProtocol
 status: closed
 priority: low
 kind: bug
-labels: api, visionOS, effort:xs
+labels: visionOS, effort:xs, area:api
 created: 2026-07-21T23:52:20Z
-updated: 2026-07-21T23:59:38Z
+updated: 2026-10-23T14:20:37Z
 closed: 2026-07-21T23:59:38Z
 +++
 
@@ -2150,9 +2151,9 @@ SplatImmersiveRenderState.init constructs its per-eye AsyncSortManagers with try
 status: closed
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:s, impact:high
+labels: performance, effort:s, impact:high, area:pointsplat
 created: 2026-07-22T00:10:33Z
-updated: 2026-07-22T02:39:41Z
+updated: 2026-10-23T14:20:29Z
 closed: 2026-07-22T02:39:41Z
 +++
 
@@ -2166,9 +2167,9 @@ RFC 0005 proposal 1, cheap intermediate: stratify u1 (the angle) across a thread
 status: closed
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:s, impact:high
+labels: performance, effort:s, impact:high, area:pointsplat
 created: 2026-07-22T00:10:33Z
-updated: 2026-07-22T02:41:03Z
+updated: 2026-10-23T14:20:29Z
 closed: 2026-07-22T02:41:03Z
 +++
 
@@ -2182,9 +2183,9 @@ RFC 0005 proposal 2a: the RFC 0004 budget-scaling pass applies a uniform T/deman
 status: closed
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:m, impact:medium
+labels: performance, effort:m, impact:medium, area:pointsplat
 created: 2026-07-22T00:10:33Z
-updated: 2026-07-22T02:50:25Z
+updated: 2026-10-23T14:20:29Z
 closed: 2026-07-22T02:50:25Z
 +++
 
@@ -2198,9 +2199,9 @@ RFC 0005 proposal 3: when over budget, grow point size for small-footprint Gauss
 status: open
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:m, impact:high, punted
+labels: performance, effort:m, impact:high, deferred, area:pointsplat
 created: 2026-07-22T00:10:45Z
-updated: 2026-09-14T16:41:03Z
+updated: 2026-10-23T14:20:30Z
 +++
 
 RFC 0005 proposal 4: reuse surviving points across frames reservoir-style instead of resampling every frame, reducing noise and work during interactive motion. Depends on the reprojection transform (already available from #73's temporal reprojection). Part of RFCs/0005.
@@ -2215,9 +2216,9 @@ RFC 0005 proposal 4: reuse surviving points across frames reservoir-style instea
 status: closed
 priority: low
 kind: enhancement
-labels: pointsplat, effort:m, impact:medium
+labels: effort:m, impact:medium, area:pointsplat
 created: 2026-07-22T00:10:45Z
-updated: 2026-07-22T02:54:34Z
+updated: 2026-10-23T14:20:30Z
 closed: 2026-07-22T02:54:34Z
 +++
 
@@ -2231,10 +2232,10 @@ RFC 0005 proposal 5: for Gaussians with sub-pixel footprints, splat a single exa
 status: blocked
 priority: low
 kind: enhancement
-labels: pointsplat, performance, effort:l, impact:high, punted, blocked
+labels: performance, effort:l, impact:high, deferred, area:pointsplat
 depends: 104
 created: 2026-07-22T00:10:45Z
-updated: 2026-09-14T16:41:03Z
+updated: 2026-10-23T14:31:31Z
 +++
 
 RFC 0005 proposal 1, full version: re-derive the collision correction with the Poisson model replaced by a binomial-of-strata model for K stratified per-thread samples; tabulate if no closed form. Expected ~40% fewer points for high-opacity Gaussians at equal quality. Depends on #104 landing first as the cheap baseline. Part of RFCs/0005.
@@ -2250,10 +2251,10 @@ RFC 0005 proposal 1, full version: re-derive the collision correction with the P
 status: blocked
 priority: low
 kind: enhancement
-labels: pointsplat, effort:m, impact:medium, punted, blocked
+labels: effort:m, impact:medium, deferred, area:pointsplat
 depends: 112
 created: 2026-07-22T00:10:45Z
-updated: 2026-09-14T16:41:03Z
+updated: 2026-10-23T14:31:31Z
 +++
 
 RFC 0005 proposal 2b: track per-region variance and weight the temporal accumulation (or budget) toward unconverged regions. Part of RFCs/0005.
@@ -2269,9 +2270,9 @@ RFC 0005 proposal 2b: track per-region variance and weight the temporal accumula
 status: open
 priority: low
 kind: enhancement
-labels: pointsplat, memory, effort:s, impact:low
+labels: effort:s, impact:low, area:pointsplat, area:memory
 created: 2026-07-22T00:10:45Z
-updated: 2026-09-14T16:41:03Z
+updated: 2026-10-23T14:20:43Z
 +++
 
 RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit fixed-point view-space depth and 3x12-bit sRGB color over [0,16) leave headroom; small quality/precision polish. Part of RFCs/0005.
@@ -2284,9 +2285,9 @@ RFC 0005 proposal 7: revisit the 64-bit framebuffer packing - the paper's 28-bit
 status: open
 priority: low
 kind: bug
-labels: pointsplat, not-testable, effort:m
+labels: not-testable, effort:m, area:pointsplat
 created: 2026-07-22T02:48:17Z
-updated: 2026-09-14T16:36:55Z
+updated: 2026-10-23T14:20:30Z
 +++
 
 Rotating the camera shows content that looks a frame or several old, as if rendering lags the camera. Reproduces with temporal point reuse disabled (reuseFactor = 0, #107 reverted), so seeding is not (or not the only) cause.
@@ -2306,9 +2307,9 @@ Repro: demo, PointSplat renderer, rotate camera. Bisect by toggling reprojection
 status: closed
 priority: low
 kind: feature
-labels: cli, performance
+labels: performance, area:cli
 created: 2026-08-11T05:32:09Z
-updated: 2026-08-11T06:45:16Z
+updated: 2026-10-23T14:20:34Z
 closed: 2026-08-11T06:45:16Z
 +++
 
@@ -2324,9 +2325,9 @@ The reference splat-render CLI (gaussiansplats-ios) reports render statistics vi
 status: closed
 priority: low
 kind: feature
-labels: cli, performance
+labels: performance, area:cli
 created: 2026-08-11T05:32:16Z
-updated: 2026-08-24T17:44:45Z
+updated: 2026-10-23T14:20:34Z
 closed: 2026-08-24T17:44:45Z
 +++
 
@@ -2342,9 +2343,9 @@ splat-render (gaussiansplats-ios) offers --metalfx <factor>: it renders at a red
 status: closed
 priority: low
 kind: feature
-labels: cli
+labels: area:cli
 created: 2026-08-11T05:32:16Z
-updated: 2026-08-11T14:44:24Z
+updated: 2026-10-23T14:20:34Z
 closed: 2026-08-11T14:44:24Z
 +++
 
@@ -2360,9 +2361,9 @@ splat-render (gaussiansplats-ios) accepts --camera-matrix with 16 column-major v
 status: closed
 priority: medium
 kind: enhancement
-labels: pointsplat, performance, cli
+labels: performance, area:pointsplat, area:cli
 created: 2026-08-11T06:51:36Z
-updated: 2026-08-11T06:55:18Z
+updated: 2026-10-23T14:20:34Z
 closed: 2026-08-11T06:55:18Z
 +++
 
@@ -2378,9 +2379,9 @@ PointSplatRenderer's public API is an imperative class (render(...) -> MTLTextur
 status: closed
 priority: medium
 kind: enhancement
-labels: pointsplat, cli
+labels: area:pointsplat, area:cli
 created: 2026-08-11T06:54:29Z
-updated: 2026-08-11T06:58:28Z
+updated: 2026-10-23T14:20:34Z
 closed: 2026-08-11T06:58:28Z
 +++
 
@@ -2396,9 +2397,9 @@ PointSplatRenderer is an imperative class: render(...) blocks on its own private
 status: closed
 priority: medium
 kind: enhancement
-labels: cli, architecture
+labels: architecture, area:cli
 created: 2026-08-11T06:59:15Z
-updated: 2026-08-11T07:07:33Z
+updated: 2026-10-23T14:20:34Z
 closed: 2026-08-11T07:07:33Z
 +++
 
@@ -2416,9 +2417,9 @@ Concretely, the CLI's performRender has a per-renderer frame function for each p
 status: closed
 priority: medium
 kind: task
-labels: pointsplat, architecture
+labels: architecture, area:pointsplat
 created: 2026-08-11T07:11:33Z
-updated: 2026-08-11T07:17:01Z
+updated: 2026-10-23T14:20:30Z
 closed: 2026-08-11T07:17:01Z
 +++
 
@@ -2434,9 +2435,9 @@ The element is the main unit of composition; PointSplatRenderer survives only as
 status: closed
 priority: medium
 kind: bug
-labels: tools
+labels: area:tools
 created: 2026-08-11T16:23:41Z
-updated: 2026-08-11T16:47:53Z
+updated: 2026-10-23T14:20:46Z
 closed: 2026-08-11T16:47:53Z
 +++
 
@@ -2459,9 +2460,9 @@ Expected: PNG written. Actual: 'Browser error: Failed to load resource: the serv
 status: closed
 priority: medium
 kind: feature
-labels: spz, format
+labels: area:spz, area:format
 created: 2026-08-18T18:11:38Z
-updated: 2026-08-18T18:39:44Z
+updated: 2026-10-23T14:20:47Z
 closed: 2026-08-18T18:39:44Z
 +++
 
@@ -2486,9 +2487,9 @@ Scope note: v4 read support first. Encode/write is separate. Spec: https://githu
 status: closed
 priority: low
 kind: enhancement
-labels: cli, metrics, effort:s
+labels: effort:s, area:cli, area:metrics
 created: 2026-08-18T18:58:01Z
-updated: 2026-08-24T17:53:10Z
+updated: 2026-10-23T14:20:45Z
 closed: 2026-08-24T17:53:10Z
 +++
 
@@ -2506,9 +2507,9 @@ Our CLI (Sources/metalsprockets-gaussian-splat/Statistics.swift) reports `sortGp
 status: closed
 priority: low
 kind: enhancement
-labels: cli, metrics
+labels: area:cli, area:metrics
 created: 2026-08-18T18:58:01Z
-updated: 2026-08-18T23:15:55Z
+updated: 2026-10-23T14:20:45Z
 closed: 2026-08-18T23:15:55Z
 +++
 
@@ -2526,9 +2527,9 @@ Our CLI only reports counter-derived GPU times (GPUCounterSample). Add the comma
 status: open
 priority: medium
 kind: feature
-labels: rendering, performance, cli, effort:l
+labels: performance, effort:l, area:rendering, area:cli
 created: 2026-08-18T19:00:23Z
-updated: 2026-08-24T17:44:46Z
+updated: 2026-10-23T14:20:35Z
 +++
 
 Add optional MetalFX spatial upscaling to SplatView (Sources/MetalSprocketsGaussianSplats/Spark/SplatView.swift): render the splats at a reduced resolution (e.g. factor 2 = quarter the fragments) and upscale to the final drawable size. A large fragment-cost lever for the Spark/GPU renderers.
@@ -2551,9 +2552,9 @@ Out of scope: MetalFX temporal (separate; needs motion vectors + jitter).
 status: closed
 priority: low
 kind: task
-labels: performance, testing, io
+labels: performance, area:io, area:tests
 created: 2026-08-18T19:00:51Z
-updated: 2026-08-18T19:40:42Z
+updated: 2026-10-23T14:20:47Z
 closed: 2026-08-18T19:40:42Z
 +++
 
@@ -2575,9 +2576,9 @@ Report per format: file size, splat count, decode wall time (median/min), and MB
 status: closed
 priority: low
 kind: task
-labels: io, sog, refactor, cleanup
+labels: refactor, cleanup, area:io, area:sog
 created: 2026-08-18T19:44:55Z
-updated: 2026-08-18T20:39:20Z
+updated: 2026-10-23T14:20:46Z
 closed: 2026-08-18T20:39:20Z
 +++
 
@@ -2600,9 +2601,9 @@ Prefer (c) or (a) so non-GPU consumers (parsing, tooling, tests without a device
 status: closed
 priority: low
 kind: feature
-labels: io, spz, performance, metal
+labels: performance, area:io, area:spz, area:metal
 created: 2026-08-18T19:47:02Z
-updated: 2026-08-18T20:49:44Z
+updated: 2026-10-23T14:20:45Z
 closed: 2026-08-18T20:49:44Z
 +++
 
@@ -2626,9 +2627,9 @@ Scope: SPZ only. PLY and .splat are legacy — no GPU treatment for them.
 status: closed
 priority: low
 kind: task
-labels: io, api, deprecation, refactor
+labels: deprecation, refactor, area:api, area:io
 created: 2026-08-18T20:21:46Z
-updated: 2026-08-18T21:03:46Z
+updated: 2026-10-23T14:20:41Z
 closed: 2026-08-18T21:03:46Z
 +++
 
@@ -2654,9 +2655,9 @@ Depends on / relates to #126 (remove SOGReaderCPU).
 status: closed
 priority: low
 kind: enhancement
-labels: spz, performance, io
+labels: performance, area:io, area:spz
 created: 2026-08-18T20:49:44Z
-updated: 2026-08-18T22:38:12Z
+updated: 2026-10-23T14:20:44Z
 closed: 2026-08-18T22:38:12Z
 +++
 
@@ -2678,9 +2679,9 @@ See SPZReader.parseV4 and the SplatLoaderBenchmark numbers.
 status: open
 priority: low
 kind: enhancement
-labels: spz, performance, io, effort:m
+labels: performance, effort:m, area:io, area:spz
 created: 2026-08-18T22:38:12Z
-updated: 2026-08-24T17:44:46Z
+updated: 2026-10-23T14:20:44Z
 +++
 
 After parallelizing the v4 ZSTD streams (#129), SPZ v4 load is still much slower than v3 at 1M splats (~82ms vs ~18ms). The gap is NOT serialization (streams now decompress concurrently) — it is decompressor throughput:
@@ -2706,9 +2707,9 @@ Do not over-optimize against the synthetic fixture; gather a real-world SPZ v4 c
 status: closed
 priority: medium
 kind: enhancement
-labels: gpu, sorting, performance
+labels: performance, area:sorting, area:gpu
 created: 2026-08-18T23:17:37Z
-updated: 2026-08-18T23:52:15Z
+updated: 2026-10-23T14:20:40Z
 closed: 2026-08-18T23:52:15Z
 +++
 
@@ -2726,9 +2727,9 @@ See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shared/Work/P
 status: closed
 priority: low
 kind: enhancement
-labels: gpu, sorting, performance
+labels: performance, area:sorting, area:gpu
 created: 2026-08-18T23:17:38Z
-updated: 2026-08-18T23:57:31Z
+updated: 2026-10-23T14:20:40Z
 closed: 2026-08-18T23:57:31Z
 +++
 
@@ -2744,9 +2745,9 @@ Trivial. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Shar
 status: closed
 priority: low
 kind: enhancement
-labels: gpu, sorting, performance
+labels: performance, area:sorting, area:gpu
 created: 2026-08-18T23:17:38Z
-updated: 2026-08-19T00:03:37Z
+updated: 2026-10-23T14:20:40Z
 closed: 2026-08-19T00:03:37Z
 +++
 
@@ -2764,9 +2765,9 @@ Low-medium effort; pure reduction, output identical. See ~/Desktop/RFC-port-gpu-
 status: closed
 priority: low
 kind: enhancement
-labels: gpu, sorting, performance
+labels: performance, area:sorting, area:gpu
 created: 2026-08-18T23:17:38Z
-updated: 2026-08-19T00:10:38Z
+updated: 2026-10-23T14:20:40Z
 closed: 2026-08-19T00:10:38Z
 +++
 
@@ -2784,9 +2785,9 @@ Medium (dispatch topology change). See ~/Desktop/RFC-port-gpu-sort-render-optimi
 status: closed
 priority: low
 kind: enhancement
-labels: gpu, sorting, performance
+labels: performance, area:sorting, area:gpu
 created: 2026-08-18T23:17:38Z
-updated: 2026-08-19T15:26:27Z
+updated: 2026-10-23T14:20:40Z
 closed: 2026-08-19T15:26:27Z
 +++
 
@@ -2802,9 +2803,9 @@ Medium; interacts with A1 (same kernel). See ~/Desktop/RFC-port-gpu-sort-render-
 status: closed
 priority: low
 kind: enhancement
-labels: gpu, sorting, performance, visionOS
+labels: performance, visionOS, area:sorting, area:gpu
 created: 2026-08-18T23:17:38Z
-updated: 2026-08-19T15:32:35Z
+updated: 2026-10-23T14:20:40Z
 closed: 2026-08-19T15:32:35Z
 +++
 
@@ -2822,9 +2823,9 @@ Medium. See ~/Desktop/RFC-port-gpu-sort-render-optimizations.md. Source: ~/Share
 status: open
 priority: low
 kind: enhancement
-labels: gpu, sorting, performance, memory, effort:m
+labels: performance, effort:m, area:sorting, area:gpu, area:memory
 created: 2026-08-18T23:17:38Z
-updated: 2026-08-24T17:44:46Z
+updated: 2026-10-23T14:20:43Z
 +++
 
 cullMark reads position from a dense packed_half3 buffer (6 bytes/splat) built once at load, instead of the 32-byte SparkSplat record. This pass touches every splat so fetch traffic dominates. Add a packed_half3 positions buffer on GPUSplatCloud (built at load), a positions arg + usePositions flag on cullMark, and populate it in the loader/builder.
@@ -2862,9 +2863,9 @@ Context: options in Sources/metalsprockets-gaussian-splat/BenchCommand.swift (`-
 status: closed
 priority: low
 kind: task
-labels: sorting, performance, cleanup, refactor, effort:l
+labels: performance, cleanup, refactor, effort:l, area:sorting
 created: 2026-08-18T23:38:25Z
-updated: 2026-09-14T16:32:49Z
+updated: 2026-10-23T14:20:32Z
 closed: 2026-09-14T16:32:49Z
 +++
 
@@ -2892,9 +2893,9 @@ Motivation data: spark/CPU-sort takes 169 ms versus 81 ms for GPU sorting at 8M 
 status: closed
 priority: medium
 kind: enhancement
-labels: rendering, quality, performance
+labels: quality, performance, area:rendering
 created: 2026-08-19T00:23:34Z
-updated: 2026-08-19T00:37:14Z
+updated: 2026-10-23T14:20:32Z
 closed: 2026-08-19T00:37:14Z
 +++
 
@@ -2927,9 +2928,9 @@ Source: ~/Shared/Work/Projects/gaussiansplats-ios (SplatRenderTuning in Sources/
 status: open
 priority: low
 kind: enhancement
-labels: cli, rendering, effort:l
+labels: effort:l, area:rendering, area:cli
 created: 2026-08-24T17:30:49Z
-updated: 2026-08-24T17:54:37Z
+updated: 2026-10-23T14:20:35Z
 +++
 
 The offline renderer only supports perspective projection. It cannot render a 360°×180° equirectangular panorama from a camera position.
@@ -2944,9 +2945,9 @@ The offline renderer only supports perspective projection. It cannot render a 36
 status: closed
 priority: low
 kind: enhancement
-labels: cli, rendering, effort:s
+labels: effort:s, area:rendering, area:cli
 created: 2026-08-24T17:30:49Z
-updated: 2026-08-24T17:50:00Z
+updated: 2026-10-23T14:20:35Z
 closed: 2026-08-24T17:50:00Z
 +++
 
@@ -2962,9 +2963,9 @@ The offline renderer accepts camera position and look-at target, but has no dire
 status: open
 priority: low
 kind: enhancement
-labels: cli, rendering, effort:l
+labels: effort:l, area:rendering, area:cli
 created: 2026-08-24T17:30:49Z
-updated: 2026-08-24T17:44:46Z
+updated: 2026-10-23T14:20:35Z
 +++
 
 The offline renderer cannot simulate depth of field. It has no aperture, focus-distance, or sensor-size controls, so every rendered depth remains equally sharp.
@@ -2977,9 +2978,9 @@ The offline renderer cannot simulate depth of field. It has no aperture, focus-d
 status: open
 priority: low
 kind: enhancement
-labels: cli, rendering, effort:l
+labels: effort:l, area:rendering, area:cli
 created: 2026-08-24T17:30:50Z
-updated: 2026-08-24T17:44:46Z
+updated: 2026-10-23T14:20:35Z
 +++
 
 The offline renderer cannot accumulate samples along a camera movement. It has no end camera position, target, or up vector, shutter fraction, or motion-sample count.
@@ -3011,9 +3012,9 @@ Expected: Spark debug visualizations are available with GPU-sorted rendering, wi
 status: open
 priority: medium
 kind: feature
-labels: splats, effort:l
+labels: effort:l, area:splats
 created: 2026-08-24T21:15:41Z
-updated: 2026-08-27T03:14:51Z
+updated: 2026-10-23T14:20:40Z
 +++
 
 Lixel CyberColor (LCC) datasets are not currently supported by `SplatLoader`. An LCC dataset uses a `.lcc` JSON metadata file with companion `index.bin` and `data.bin` files, plus optional spherical-harmonic and environment data.
@@ -3114,9 +3115,9 @@ Actual: Only binary little-endian PLY files use GPU decoding.
 status: closed
 priority: high
 kind: bug
-labels: metal, release-builds
+labels: release-builds, area:metal
 created: 2026-08-25T22:10:25Z
-updated: 2026-08-25T22:53:27Z
+updated: 2026-10-23T14:20:45Z
 closed: 2026-08-25T22:53:27Z
 +++
 
@@ -3254,9 +3255,9 @@ Add SGS file-format support, including format detection, decoding into the libra
 status: open
 priority: medium
 kind: enhancement
-labels: rendering, performance, power, effort:m
+labels: performance, power, effort:m, area:rendering
 created: 2026-08-27T06:05:48Z
-updated: 2026-09-14T16:37:48Z
+updated: 2026-10-23T14:20:33Z
 +++
 
 Splat rendering currently produces frames continuously even when the visible scene is unchanged. This wastes GPU time and power when splat data, transforms, camera state, viewport, renderer configuration, and other render inputs remain stable.
@@ -3303,9 +3304,9 @@ Spark should explicitly bind a depth-disabled state, or otherwise guarantee that
 status: closed
 priority: medium
 kind: none
-labels: api
+labels: area:api
 created: 2026-09-09T20:23:10Z
-updated: 2026-09-09T20:29:55Z
+updated: 2026-10-23T14:20:37Z
 closed: 2026-09-09T20:29:55Z
 +++
 
@@ -3338,9 +3339,9 @@ pointSplatResolve writes alpha 1 for every pixel and the fullscreen blit draws w
 status: open
 priority: high
 kind: enhancement
-labels: performance, memory, rendering, io, effort:xl, impact:high
+labels: performance, effort:xl, impact:high, area:rendering, area:io, area:memory
 created: 2026-09-10T05:07:58Z
-updated: 2026-09-14T16:37:48Z
+updated: 2026-10-23T14:20:43Z
 +++
 
 Spherical-harmonics coefficients are currently expanded into a dense row for every splat, and render shaders derive the SH row from the splat index. Formats such as SOG can encode a shared SH palette plus a per-splat palette index, but loading expands that palette and loses the indirection.
@@ -3371,6 +3372,8 @@ Savings scale with palette sharing. Helmet's palette is nearly as large as its s
 
 Multi-cloud GPU sort (cloudIndex propagation) tracked separately in #172.
 
+- `2026-10-23T14:20:27Z`: Related: #172 (multi-cloud GPU sort does not carry cloudIndex).
+
 ---
 
 ## 164: visionOS Spark renderer uses a single shared sort order across both eyes
@@ -3379,9 +3382,9 @@ Multi-cloud GPU sort (cloudIndex propagation) tracked separately in #172.
 status: open
 priority: low
 kind: bug
-labels: sorting, visionos, effort:m
+labels: effort:m, area:sorting, visionOS
 created: 2026-09-14T16:29:26Z
-updated: 2026-09-14T16:38:00Z
+updated: 2026-10-23T14:20:47Z
 +++
 
 The visionOS immersive Spark path (`SplatImmersiveContent` / `SplatImmersiveGPUSortElement`) sorts once for the whole frame using the left-eye depth as the sort key, then renders both eyes from that one order via vertex amplification.
@@ -3400,9 +3403,9 @@ Introduced by the CPU-sort removal in #139.
 status: closed
 priority: low
 kind: bug
-labels: tests, pointsplat, effort:s
+labels: effort:s, area:pointsplat, area:tests
 created: 2026-09-14T16:34:09Z
-updated: 2026-09-14T17:36:29Z
+updated: 2026-10-23T14:20:46Z
 closed: 2026-09-14T17:36:29Z
 +++
 
@@ -3424,9 +3427,9 @@ Location: Tests/MetalSprocketsGaussianSplatsTests/PointSplatComputePassTests.swi
 status: open
 priority: low
 kind: task
-labels: shaders, rendering, code-style, refactor, effort:l
+labels: code-style, refactor, effort:l, area:rendering, area:shaders
 created: 2026-09-14T16:43:24Z
-updated: 2026-09-14T16:43:42Z
+updated: 2026-10-23T14:20:46Z
 +++
 
 The Metal shader code duplicates logic that should live in shared, reusable helper functions. Shaders should be composed of small, named, reusable parts rather than inlining the same math in each entry point.
@@ -3451,9 +3454,9 @@ This is primarily a readability/maintainability and reuse refactor, not a functi
 status: closed
 priority: medium
 kind: bug
-labels: ipad, input
+labels: ipad, area:input
 created: 2026-09-14T16:50:39Z
-updated: 2026-09-14T17:02:22Z
+updated: 2026-10-23T14:20:46Z
 closed: 2026-09-14T17:02:22Z
 +++
 
@@ -3469,9 +3472,9 @@ Reported on iPad: pinch-to-zoom does not work. Expected: pinching changes the zo
 status: closed
 priority: medium
 kind: bug
-labels: ipad, ui
+labels: ipad, area:ui
 created: 2026-09-14T16:50:39Z
-updated: 2026-09-14T17:13:01Z
+updated: 2026-10-23T14:20:45Z
 closed: 2026-09-14T17:13:01Z
 +++
 
@@ -3496,8 +3499,9 @@ This clarifies the earlier report that Generate seemed to require multiple taps.
 status: new
 priority: medium
 kind: bug
-labels: ipad, ui
+labels: ipad, effort:xs, needs-info, area:ui
 created: 2026-09-14T17:00:15Z
+updated: 2026-10-23T14:20:45Z
 +++
 
 Reported on iPad: the FPS meter visibly flashes while showing 60 FPS. Expected: the meter remains visually stable while the frame rate is steady. Device model and iPadOS version were not specified.
@@ -3537,11 +3541,12 @@ The message indicates a Compositor Services frame was submitted (cp_frame_end_su
 ## 171: Point renderer crashes on unsupported GPUs instead of failing gracefully
 
 +++
-status: new
+status: open
 priority: high
 kind: bug
-labels: pointsplat, rendering
+labels: effort:s, area:pointsplat, area:rendering
 created: 2026-09-14T18:53:22Z
+updated: 2026-10-23T14:20:33Z
 +++
 
 Selecting the Point renderer on a GPU without 64-bit atomics crashes the app.
@@ -3564,11 +3569,12 @@ The device-capability throw happens per-frame inside the render loop, where ther
 ## 172: Multi-cloud GPU sort does not carry cloudIndex (single-cloud only)
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
-labels: sorting, gpu, rendering, multicloud
+labels: effort:l, area:sorting, area:rendering, area:gpu, area:multicloud
 created: 2026-09-14T21:57:51Z
+updated: 2026-10-23T14:20:45Z
 +++
 
 The GPU splat sort (GPUSplatSortComputePass) sorts a single cloud per pass and always emits cloudIndex 0. Rendering supports a MultiCloudArgumentBuffer (each cloud has its own splats, SH palette, and shIndex space, selected by IndexedDistance.cloudIndex), but nothing produces a merged, correctly-tagged sort order across multiple clouds on the GPU.
@@ -3581,6 +3587,8 @@ Expected: a GPU sort path that merges splats from several clouds into one back-t
 
 Context: surfaced while implementing indexed SH palettes (#163).
 
+- `2026-10-23T14:20:27Z`: Related: #163 (indexed SH palettes; per-cloud correct, cross-cloud sort unresolved here).
+
 ---
 
 ## 173: Stochastic renderer: keep splat buffers resident via ResourceCollection
@@ -3589,9 +3597,9 @@ Context: surfaced while implementing indexed SH palettes (#163).
 status: closed
 priority: low
 kind: enhancement
-labels: residency, metal4, rendering
+labels: area:rendering, area:metal4, area:residency
 created: 2026-10-02T20:24:36Z
-updated: 2026-10-02T20:44:29Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-10-02T20:44:29Z
 +++
 
@@ -3611,9 +3619,9 @@ Scope: `StochasticSplatRenderPipeline`. It reads each cloud's Splats and SHCoeff
 status: closed
 priority: low
 kind: enhancement
-labels: residency, metal4, rendering
+labels: area:rendering, area:metal4, area:residency
 created: 2026-10-02T20:24:36Z
-updated: 2026-10-02T20:44:29Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-10-02T20:44:29Z
 +++
 
@@ -3633,9 +3641,9 @@ Scope: `TileSplatResources` (TileSplatIndicesA/B, TileCounters, TileOffsets, Max
 status: closed
 priority: low
 kind: enhancement
-labels: residency, metal4, pointsplat
+labels: area:pointsplat, area:metal4, area:residency
 created: 2026-10-02T20:24:36Z
-updated: 2026-10-02T20:44:30Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-10-02T20:44:30Z
 +++
 
@@ -3655,9 +3663,9 @@ Scope: the buffers that `PointSplatRenderPipeline` makes (framebuffer, counts, c
 status: closed
 priority: low
 kind: enhancement
-labels: residency, metal4, debug
+labels: debug, area:metal4, area:residency
 created: 2026-10-02T20:24:37Z
-updated: 2026-10-02T20:44:30Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-10-02T20:44:30Z
 +++
 
@@ -3677,9 +3685,9 @@ Scope: `SparkSplatDebugRenderPipeline`. It makes a new CloudData buffer on every
 status: closed
 priority: low
 kind: enhancement
-labels: residency, metal4, sorting
+labels: area:sorting, area:metal4, area:residency
 created: 2026-10-02T20:24:37Z
-updated: 2026-10-02T20:44:30Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-10-02T20:44:30Z
 +++
 
@@ -3699,9 +3707,9 @@ Scope: `GPUSplatSortComputePass` attaches `GPUSortResources.resourceCollection`,
 status: closed
 priority: medium
 kind: bug
-labels: metal4, rendering, barriers
+labels: area:rendering, area:metal4, area:barriers
 created: 2026-10-02T20:27:01Z
-updated: 2026-10-02T20:44:30Z
+updated: 2026-10-23T14:20:46Z
 closed: 2026-10-02T20:44:30Z
 +++
 
@@ -3725,9 +3733,9 @@ Done when an Xcode GPU capture shows a dependency edge into each consuming pass.
 status: closed
 priority: low
 kind: task
-labels: metal4, barriers
+labels: area:metal4, area:barriers
 created: 2026-10-02T20:27:02Z
-updated: 2026-10-02T20:44:30Z
+updated: 2026-10-23T14:20:46Z
 closed: 2026-10-02T20:44:30Z
 +++
 
@@ -3747,11 +3755,12 @@ Done when each path has its barriers or is marked as not needing them, and a GPU
 ## 180: Xcode 'Unused Resource' insight on GPU sort scratch buffers
 
 +++
-status: new
+status: open
 priority: low
 kind: task
-labels: metal4, sorting, memory
+labels: effort:xs, area:sorting, area:metal4, area:memory
 created: 2026-10-02T20:35:57Z
+updated: 2026-10-23T14:20:43Z
 +++
 
 Xcode's GPU capture Insights (Bandwidth) report "Unused Buffer x 8" (about 643 KiB) on the "GPU Splat Sort" encoder. The flagged buffers are the current slot's scratch buffers: `recordsA`, `recordsB`, `hist`, `offset`, `total`, `digitBase`, `blockCounts` and `blockBase`. This was already reported before the Metal 4 port.
@@ -3786,11 +3795,12 @@ Separate memory saving, not related to the insight: only `output` and `drawArgs`
 ## 181: SparkSplatRenderPipeline cloud-data cache misses modelTransform and opacity changes
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
-labels: rendering, spark
+labels: effort:s, area:rendering, area:spark
 created: 2026-10-02T20:43:37Z
+updated: 2026-10-23T14:20:42Z
 +++
 
 The CloudData cache in `SparkSplatRenderPipeline` rebuilds only when `modelMatrix` changes or `cache.clouds == splatClouds` is false. `GPUSplatCloud` uses reference equality, and its `modelTransform` and `opacity` are mutable. So if you change a cloud's transform or opacity without changing the pipeline's `modelMatrix`, the old CloudData buffer stays in use and the change does not show.
@@ -3807,9 +3817,9 @@ Done when changing a cloud's `modelTransform` or `opacity` shows in the next fra
 status: closed
 priority: low
 kind: enhancement
-labels: residency, metal4, pointsplat
+labels: area:pointsplat, area:metal4, area:residency
 created: 2026-10-02T20:43:38Z
-updated: 2026-10-02T20:49:16Z
+updated: 2026-10-23T14:20:42Z
 closed: 2026-10-02T20:49:16Z
 +++
 
@@ -3826,10 +3836,12 @@ Done when a GPU capture of repeated offscreen PointSplat renders shows no per-fr
 ## 183: Credit PointSplat papers in README Acknowledgments
 
 +++
-status: new
+status: open
 priority: low
 kind: documentation
+labels: effort:xs
 created: 2026-10-07T18:51:45Z
+updated: 2026-10-23T14:20:19Z
 +++
 
 README Acknowledgments lists only antimatter15 and sparkjs, and says "the two renderers". The PointSplat renderer is based on work that is not credited there.
@@ -3840,5 +3852,50 @@ Add:
 - Maybe Schütz et al., *Software Rasterization of 2 Billion Points in Real Time* (HPG 2022), if relevant.
 
 Also fix "the two renderers" wording and check the licenses of the reference code.
+
+---
+
+## 184: No way to cross-fade between two splat cloud groups
+
++++
+status: open
+priority: medium
+kind: feature
+labels: area:multisplat-walkthrough, deferred, effort:m, area:rendering, area:multicloud
+created: 2026-10-23T14:11:13Z
+updated: 2026-10-23T14:20:45Z
++++
+
+The multi-cloud path draws every cloud into one pass, and each cloud blends over the earlier ones. There is no way to fade from one set of clouds to another without artifacts.
+
+A per-cloud opacity fade in one pass does not work. When the two clouds cover the same geometry, both are partly transparent at the midpoint, so that geometry goes see-through and the background shows through.
+
+Missing: a way to render two groups of clouds (outgoing and incoming) and show a blend of them controlled by a 0...1 parameter. At every value of the parameter, each group must look fully opaque, as it does when it is drawn alone.
+
+The feature must work with the existing GPU sort and culling, and with MetalFX upscaling when that exists (#124).
+
+- `2026-10-23T14:16:16Z`: Plan: this is built first in Radiance (Radiance#74), using the existing plumbing: per-cloud passes, a renderPassDescriptorModifier that sends each pass to an offscreen target, and a full-screen mix pass. Once it is proven and generic enough, it may move into this library.
+
+---
+
+## 185: No way to show a second splat cloud group through a screen-space region
+
++++
+status: open
+priority: low
+kind: feature
+labels: area:multisplat-walkthrough, deferred, effort:m, area:rendering, area:multicloud
+depends: 184
+created: 2026-10-23T14:11:13Z
+updated: 2026-10-23T14:20:45Z
++++
+
+Some apps need a 'portal' effect. Inside some region of the screen, the user sees a different splat scene from the one around it, and both scenes are viewed with the same camera. The region can be a shape that moves or animates.
+
+Missing: a way to render two groups of clouds and choose, per pixel, which group shows, from a mask or a region shape. Each group must look fully opaque in its part of the screen, with no bleed from the other group.
+
+This is related to #184. A cross-fade uses one global blend value; this needs a blend value for each pixel.
+
+- `2026-10-23T14:16:16Z`: Plan: this is built first in Radiance (Radiance#75), using the same offscreen A/B targets as #184 with a per-pixel mask. Once it is proven, it may move into this library.
 
 ---
