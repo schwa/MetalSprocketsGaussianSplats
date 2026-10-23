@@ -94,8 +94,8 @@ kernel void splatCullMark(device const SparkSplat  *splats      [[buffer(0)]],
         float distance = viewPos.z * (p.reversed ? -1.0 : 1.0);
         uint key = use_float32_keys
             ? floatFlip32(as_type<uint>(distance))
-            : uint(min(floatFlip16(as_type<ushort>(half(distance))), kMaxSurvivorKey)) | (p.cloudIndex << 16);
-        rec = uint2(key, gid);
+            : uint(min(floatFlip16(as_type<ushort>(half(distance))), kMaxSurvivorKey));
+        rec = uint2(key, p.indexBase + gid);
     }
 
     // Exclusive scan of alive flags -> stable in-block rank (gid order).
@@ -111,8 +111,9 @@ kernel void splatCullMark(device const SparkSplat  *splats      [[buffer(0)]],
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
 
-    if (alive) { records[groupId * COMPACT_BLOCK + warpTotals[warp] + lanePrefix] = rec; }
-    if (lid == 0) { blockCounts[groupId] = tgTotal; }
+    uint block = p.blockOffset + groupId;
+    if (alive) { records[block * COMPACT_BLOCK + warpTotals[warp] + lanePrefix] = rec; }
+    if (lid == 0) { blockCounts[block] = tgTotal; }
 }
 
 // Phase 2 (single thread): exclusive prefix sum of the per-block survivor counts
@@ -227,6 +228,9 @@ kernel void splatRadixScatter(device const uint2 *inRecords  [[buffer(0)]],
                               device const uint   *digitBase  [[buffer(3)]],
                               constant SplatSortParams &p      [[buffer(4)]],
                               device const uint   *drawArgs    [[buffer(5)]],
+                              // cloudBases[c] = global index of cloud c's first splat (ascending).
+                              constant uint       *cloudBases  [[buffer(6), function_constant(decode_output)]],
+                              constant uint       &cloudCount  [[buffer(7), function_constant(decode_output)]],
                               uint tile  [[threadgroup_position_in_grid]],
                               uint lane  [[thread_position_in_threadgroup]],
                               uint tsize [[threads_per_threadgroup]]) {
@@ -268,8 +272,15 @@ kernel void splatRadixScatter(device const uint2 *inRecords  [[buffer(0)]],
         if (active) {
             if (decode_output) {
                 IndexedDistance out;
-                out.splatIndex = rec.y;
-                out.cloudIndex = use_float32_keys ? 0 : ushort(rec.x >> 16);
+                // Binary search for the last cloud whose base <= rec.y.
+                uint low = 0;
+                uint high = cloudCount - 1;
+                while (low < high) {
+                    uint middle = (low + high + 1) / 2;
+                    if (cloudBases[middle] <= rec.y) { low = middle; } else { high = middle - 1; }
+                }
+                out.splatIndex = rec.y - cloudBases[low];
+                out.cloudIndex = ushort(low);
                 out.distanceToCamera = use_float32_keys
                     ? half(as_type<float>(floatUnflip32(rec.x)))
                     : as_type<half>(floatUnflip16(ushort(rec.x & 0xFFFFu)));

@@ -6,7 +6,7 @@ import MetalSprocketsGaussianSplatShaders
 import MetalSprocketsSupport
 import Splats
 
-/// Compute pass encoding the full GPU splat sort for one cloud into one slot of
+/// Compute pass encoding the full GPU splat sort for one or more clouds into one slot of
 /// a ``GPUSortResources``: frustum cull + stable compaction, then a two- or four-pass
 /// 8-bit LSD radix over the selected depth-key precision, then decode into
 /// `IndexedDistance` records the render vertex shader reads.
@@ -14,8 +14,12 @@ import Splats
 /// Culled splats are dropped before the radix, so the sort processes only
 /// survivors. The survivor count lands in the slot's indirect draw args
 /// (`instanceCount`) for the render pass to draw with.
+///
+/// With several clouds, all splats are merged into one back-to-front order and
+/// each output record carries its `cloudIndex` and the splat's index in that
+/// cloud. Size the resources with ``GPUSortResources/requiredCapacity(for:)``.
 public struct GPUSplatSortComputePass: Element {
-    var splatCloud: GPUSplatCloud<SparkSplat>
+    var splatClouds: [GPUSplatCloud<SparkSplat>]
     var projectionMatrices: [simd_float4x4]
     var modelMatrix: simd_float4x4
     var cameraMatrices: [simd_float4x4]
@@ -59,8 +63,7 @@ public struct GPUSplatSortComputePass: Element {
         )
     }
 
-    /// Full initializer supporting stereo. With two views the cull keeps any
-    /// splat visible to either view. The sort key is the first view's depth.
+    /// Single-cloud initializer supporting stereo.
     public init(
         splatCloud: GPUSplatCloud<SparkSplat>,
         projectionMatrices: [simd_float4x4],
@@ -72,10 +75,38 @@ public struct GPUSplatSortComputePass: Element {
         resources: GPUSortResources,
         slotIndex: Int
     ) throws {
+        try self.init(
+            splatClouds: [splatCloud],
+            projectionMatrices: projectionMatrices,
+            modelMatrix: modelMatrix,
+            cameraMatrices: cameraMatrices,
+            cullEnabled: cullEnabled,
+            guardBand: guardBand,
+            reversed: reversed,
+            resources: resources,
+            slotIndex: slotIndex
+        )
+    }
+
+    /// Full initializer supporting several clouds and stereo. With two views the
+    /// cull keeps any splat visible to either view. The sort key is the first view's depth.
+    public init(
+        splatClouds: [GPUSplatCloud<SparkSplat>],
+        projectionMatrices: [simd_float4x4],
+        modelMatrix: simd_float4x4,
+        cameraMatrices: [simd_float4x4],
+        cullEnabled: Bool = true,
+        guardBand: Float = 0.2,
+        reversed: Bool = false,
+        resources: GPUSortResources,
+        slotIndex: Int
+    ) throws {
+        precondition(!splatClouds.isEmpty, "Must have at least one splat cloud")
+        precondition(splatClouds.count <= Int(UInt16.max), "cloudIndex is 16-bit")
         precondition(!projectionMatrices.isEmpty, "Must have at least one projection matrix")
         precondition(projectionMatrices.count == cameraMatrices.count, "projectionMatrices and cameraMatrices must have the same count")
         precondition(projectionMatrices.count <= 2, "GPU sort supports at most two views")
-        self.splatCloud = splatCloud
+        self.splatClouds = splatClouds
         self.projectionMatrices = projectionMatrices
         self.modelMatrix = modelMatrix
         self.cameraMatrices = cameraMatrices
@@ -104,30 +135,41 @@ public struct GPUSplatSortComputePass: Element {
 
     public var body: some Element {
         get throws {
-            let count = splatCloud.count
             let slot = resources.slots[slotIndex]
-            let modelViews = cameraMatrices.map { $0.inverse * modelMatrix * splatCloud.modelTransform }
             let viewCount = cameraMatrices.count
-
             let compactBlock = GPUSortResources.compactBlock
             let elementsPerTile = GPUSortResources.elementsPerTile
-            let numBlocks = (count + compactBlock - 1) / compactBlock
+
+            // Each cloud gets its own range of compaction blocks and global indices.
+            var cloudBases: [UInt32] = []
+            var cullDispatches: [(cloud: GPUSplatCloud<SparkSplat>, params: SplatDistanceParams, blocks: Int)] = []
+            var count = 0
+            var numBlocks = 0
+            for cloud in splatClouds {
+                let modelViews = cameraMatrices.map { $0.inverse * modelMatrix * cloud.modelTransform }
+                let cloudBlocks = (cloud.count + compactBlock - 1) / compactBlock
+                let params = SplatDistanceParams(
+                    modelView: modelViews[0],
+                    projection: projectionMatrices[0],
+                    modelView1: viewCount > 1 ? modelViews[1] : modelViews[0],
+                    projection1: viewCount > 1 ? projectionMatrices[1] : projectionMatrices[0],
+                    viewCount: UInt32(viewCount),
+                    numElements: UInt32(cloud.count),
+                    blockOffset: UInt32(numBlocks),
+                    indexBase: UInt32(count),
+                    reversed: reversed ? 1 : 0,
+                    cullEnabled: cullEnabled ? 1 : 0,
+                    guardBand: guardBand
+                )
+                cloudBases.append(UInt32(count))
+                cullDispatches.append((cloud, params, cloudBlocks))
+                count += cloud.count
+                numBlocks += cloudBlocks
+            }
+            precondition(numBlocks * compactBlock <= resources.capacity || splatClouds.count == 1, "GPUSortResources too small; use requiredCapacity(for:)")
             let numTiles = (count + elementsPerTile - 1) / elementsPerTile
 
-            let distanceParams = SplatDistanceParams(
-                modelView: modelViews[0],
-                projection: projectionMatrices[0],
-                modelView1: viewCount > 1 ? modelViews[1] : modelViews[0],
-                projection1: viewCount > 1 ? projectionMatrices[1] : projectionMatrices[0],
-                viewCount: UInt32(viewCount),
-                numElements: UInt32(count),
-                cloudIndex: 0,
-                reversed: reversed ? 1 : 0,
-                cullEnabled: cullEnabled ? 1 : 0,
-                guardBand: guardBand
-            )
-
-            // Fixed 256-thread groups so block index == threadgroup index,
+            // Fixed 512-thread groups so block index == threadgroup index,
             // matching the compaction kernels' gid = group * COMPACT_BLOCK + lid.
             let blockGroups = MTLSize(width: numBlocks, height: 1, depth: 1)
             let blockThreads = MTLSize(width: compactBlock, height: 1, depth: 1)
@@ -138,12 +180,15 @@ public struct GPUSplatSortComputePass: Element {
 
             return try ComputePass(label: "GPU Splat Sort") {
                 // Phase 1: cull + build records, tallying survivors per block.
-                try ComputePipeline(computeKernel: cullMark) {
-                    try ComputeDispatch(threadgroups: blockGroups, threadsPerThreadgroup: blockThreads)
-                        .parameter("splats", buffer: splatCloud.splats.unsafeMTLBuffer)
-                        .parameter("records", buffer: slot.recordsA)
-                        .parameter("p", value: distanceParams)
-                        .parameter("blockCounts", buffer: slot.blockCounts)
+                // Clouds write disjoint block ranges, so they need no barrier between them.
+                ForEach(Array(cullDispatches.enumerated()), id: \.offset) { _, dispatch in
+                    try ComputePipeline(computeKernel: cullMark) {
+                        try ComputeDispatch(threadgroups: MTLSize(width: dispatch.blocks, height: 1, depth: 1), threadsPerThreadgroup: blockThreads)
+                            .parameter("splats", buffer: dispatch.cloud.splats.unsafeMTLBuffer)
+                            .parameter("records", buffer: slot.recordsA)
+                            .parameter("p", value: dispatch.params)
+                            .parameter("blockCounts", buffer: slot.blockCounts)
+                    }
                 }
                 EncoderBarrier(after: .dispatch, before: .dispatch)
                 // Phase 2: scan per-block counts into base offsets + survivor
@@ -176,20 +221,21 @@ public struct GPUSplatSortComputePass: Element {
                     EncoderBarrier(after: .dispatch, before: .dispatch)
                     try radixPass(shift: 16, src: slot.recordsB, dst: slot.recordsA, decode: false, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
                     EncoderBarrier(after: .dispatch, before: .dispatch)
-                    try radixPass(shift: 24, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                    try radixPass(shift: 24, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single, cloudBases: cloudBases)
                 } else {
-                    try radixPass(shift: 8, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single)
+                    try radixPass(shift: 8, src: slot.recordsA, dst: slot.output.unsafeMTLBuffer, decode: true, slot: slot, count: count, numTiles: numTiles, tileGroups: tileGroups, tileThreads: tileThreads, single: single, cloudBases: cloudBases)
                 }
             }
             // Metal 4 does not order encoders. Every consumer draws from the sorted indices and the indirect
             // draw args, so order the vertex stage of later passes after this pass.
             .barrierAfterPass(after: .dispatch, beforeQueueStages: .vertex)
             .useResourceCollection(resources.resourceCollection)
-            .useResources(of: [splatCloud])
+            .useResources(of: splatClouds)
         }
     }
 
-    private func radixPass(shift: UInt32, src: MTLBuffer, dst: MTLBuffer, decode: Bool, slot: GPUSortResources.Slot, count: Int, numTiles: Int, tileGroups: MTLSize, tileThreads: MTLSize, single: MTLSize) throws -> AnyElement {
+    // swiftlint:disable:next function_parameter_count
+    private func radixPass(shift: UInt32, src: MTLBuffer, dst: MTLBuffer, decode: Bool, slot: GPUSortResources.Slot, count: Int, numTiles: Int, tileGroups: MTLSize, tileThreads: MTLSize, single: MTLSize, cloudBases: [UInt32] = []) throws -> AnyElement {
         let params = SplatSortParams(
             numElements: UInt32(count),
             numTiles: UInt32(numTiles),
@@ -226,13 +272,20 @@ public struct GPUSplatSortComputePass: Element {
             }
             EncoderBarrier(after: .dispatch, before: .dispatch)
             try ComputePipeline(computeKernel: decode ? scatterDecode : scatter) {
-                try ComputeDispatch(threadgroups: tileGroups, threadsPerThreadgroup: tileThreads)
+                let dispatch = try ComputeDispatch(threadgroups: tileGroups, threadsPerThreadgroup: tileThreads)
                     .parameter("inRecords", buffer: src)
                     .parameter("outRecords", buffer: dst)
                     .parameter("offset", buffer: slot.offset)
                     .parameter("digitBase", buffer: slot.digitBase)
                     .parameter("p", value: params)
                     .parameter("drawArgs", buffer: slot.drawArgs)
+                if decode {
+                    dispatch
+                        .parameter("cloudBases", values: cloudBases)
+                        .parameter("cloudCount", value: UInt32(cloudBases.count))
+                } else {
+                    dispatch
+                }
             }
         }
         .eraseToAnyElement()

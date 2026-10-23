@@ -3573,12 +3573,13 @@ The device-capability throw happens per-frame inside the render loop, where ther
 ## 172: Multi-cloud GPU sort does not carry cloudIndex (single-cloud only)
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: effort:l, area:sorting, area:rendering, area:gpu, area:multicloud
 created: 2026-09-14T21:57:51Z
-updated: 2026-10-23T14:20:45Z
+updated: 2026-10-23T21:19:20Z
+closed: 2026-10-23T21:19:20Z
 +++
 
 The GPU splat sort (GPUSplatSortComputePass) sorts a single cloud per pass and always emits cloudIndex 0. Rendering supports a MultiCloudArgumentBuffer (each cloud has its own splats, SH palette, and shIndex space, selected by IndexedDistance.cloudIndex), but nothing produces a merged, correctly-tagged sort order across multiple clouds on the GPU.

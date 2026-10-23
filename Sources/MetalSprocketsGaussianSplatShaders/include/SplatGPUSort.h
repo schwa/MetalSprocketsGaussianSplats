@@ -7,8 +7,10 @@
 // and Swift. Plain C layout so a single definition is used by both sides.
 //
 // Intermediate records are uint2 (8 bytes): x holds the sortable depth key,
-// y holds the splat index. In 16-bit mode x also carries cloudIndex in its high
-// 16 bits; 32-bit mode uses all of x for depth and emits cloudIndex 0.
+// y holds a global splat index: the cloud's base (sum of earlier cloud counts)
+// plus the splat's index in its cloud. The final scatter maps it back to
+// cloudIndex + splatIndex with the cloud base table, so multi-cloud sorts work
+// in both key precisions.
 // Two or four 8-bit radix passes sort the selected key precision.
 
 /// Parameters for the radix histogram / scan / scatter kernels.
@@ -27,7 +29,8 @@ struct SplatDistanceParams {
     float4x4 projection1;       // second projection (stereo); valid when viewCount > 1
     unsigned int viewCount;     // 1 = mono, 2 = stereo (cull keeps splats visible to either view)
     unsigned int numElements;   // total input splats (dispatch grid)
-    unsigned int cloudIndex;    // carried into each record's high 16 bits
+    unsigned int blockOffset;   // first compaction block of this cloud in the shared records
+    unsigned int indexBase;     // global index of this cloud's first splat
     unsigned int reversed;      // 1 = reverse sort order (flip distance sign)
     unsigned int cullEnabled;   // 1 = apply frustum cull, 0 = keep every splat
     float guardBand;            // fractional NDC margin kept beyond frustum edges

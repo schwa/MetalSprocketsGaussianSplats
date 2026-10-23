@@ -60,6 +60,15 @@ public final class GPUSortResources {
         try registerSlots()
     }
 
+    /// The capacity needed to sort `clouds` together. Each cloud starts on a
+    /// fresh compaction block, so this pads every cloud to a block boundary.
+    public static func requiredCapacity(for clouds: [GPUSplatCloud<SparkSplat>]) -> Int {
+        if clouds.count == 1 {
+            return clouds[0].count
+        }
+        return clouds.reduce(0) { $0 + ($1.count + compactBlock - 1) / compactBlock * compactBlock }
+    }
+
     /// Grow all slots to hold at least `newCapacity` splats. No-op when smaller.
     public func ensure(capacity newCapacity: Int) throws {
         guard newCapacity > capacity else {
