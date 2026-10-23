@@ -3957,11 +3957,12 @@ SparkSplatDebugRenderShader.metal calls evaluateSH with splatIndex. The other re
 ## 188: GPUSortedSplatRenderPipeline and SplatView render only one cloud
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
-labels: effort:m, area:rendering, area:multicloud
+labels: effort:m, area:rendering, area:multicloud, deferred
 created: 2026-10-23T21:42:11Z
+updated: 2026-10-23T21:47:47Z
 +++
 
 The GPU sort can merge several clouds into one order (#172), and SparkSplatRenderPipeline accepts several clouds, but GPUSortedSplatRenderPipeline and SplatView take a single GPUSplatCloud. So there is no high-level way to render several clouds (each with its own SH palette, #163) together with GPU sorting. OffscreenSplatRenderer is also single-cloud.
