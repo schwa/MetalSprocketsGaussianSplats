@@ -2,6 +2,7 @@
 import CoreGraphics
 import GeometryLite3D
 import Metal
+import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
 import simd
@@ -114,6 +115,60 @@ struct GeneratedSplatCloudTests {
         #expect(throws: GPUSplatCloudError.self) {
             try GPUSplatCloud<SparkSplat>(device: device, splats: splats, shPalette: [0, 0, 0], shIndices: [5], shDegree: 1)
         }
+    }
+
+    @Test
+    @MainActor
+    func multiCloudPalettesWithOverlappingIndicesRenderLikeDense() throws {
+        // Both clouds use local palette index 0, but their palettes differ.
+        let rowA: [Float] = [0.4, 0.1, 0.1, 0.4, 0.1, 0.1, 0.4, 0.1, 0.1]
+        let rowB: [Float] = [0.1, 0.1, 0.4, 0.1, 0.1, 0.4, 0.1, 0.1, 0.4]
+        // Distinct depths so the merged sort has no ties.
+        let positionsA: [SIMD3<Float>] = [[-0.3, 0.3, 0], [-0.3, -0.3, 0.1]]
+        let positionsB: [SIMD3<Float>] = [[0.3, 0.3, 0.05], [0.3, -0.3, 0.15]]
+        func splats(_ positions: [SIMD3<Float>]) -> [ExtendedSplat] {
+            positions.map { ExtendedSplat(genericSplat: GenericSplat(position: $0, scale: [0.3, 0.3, 0.3], color: [0.5, 0.5, 0.5, 1])) }
+        }
+        let cloudA = try GPUSplatCloud<SparkSplat>(device: device, splats: splats(positionsA), shPalette: rowA, shIndices: [0, 0], shDegree: 1)
+        let cloudB = try GPUSplatCloud<SparkSplat>(device: device, splats: splats(positionsB), shPalette: rowB, shIndices: [0, 0], shDegree: 1)
+        #expect(cloudA.splats.map(\.shIndex) == cloudB.splats.map(\.shIndex))
+
+        // Dense single-cloud equivalent with every row expanded.
+        func rows(_ row: [Float]) -> [[Float]] {
+            stride(from: 0, to: row.count, by: 3).map { Array(row[$0..<$0 + 3]) }
+        }
+        let denseSplats = splats(positionsA).map { ExtendedSplat(genericSplat: $0.genericSplat, sphericalHarmonics: rows(rowA)) }
+            + splats(positionsB).map { ExtendedSplat(genericSplat: $0.genericSplat, sphericalHarmonics: rows(rowB)) }
+        let dense = try GPUSplatCloud<SparkSplat>(device: device, splats: denseSplats, shDegree: 1)
+
+        let camera = simd_float4x4(translation: [0, 0, 2])
+        let projection = PerspectiveProjection(verticalAngleOfView: .degrees(60), depthMode: .standard(zClip: 0.01 ... 100))
+        let multiImage = try renderMultiCloud([cloudA, cloudB], camera: camera, projection: projection)
+        let denseImage = try render(dense, camera: camera, projection: projection)
+        #expect(multiImage == denseImage)
+    }
+
+    @MainActor
+    private func renderMultiCloud(_ clouds: [GPUSplatCloud<SparkSplat>], camera: simd_float4x4, projection: PerspectiveProjection) throws -> [UInt8] {
+        let size = 64
+        let renderer = try OffscreenRenderer(size: CGSize(width: size, height: size), device: device)
+        renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        let projectionMatrix = projection.projectionMatrix(aspectRatio: 1)
+        let resources = try GPUSortResources(device: device, capacity: GPUSortResources.requiredCapacity(for: clouds), slotCount: 1)
+        let slot = resources.advance()
+        let total = clouds.reduce(0) { $0 + $1.count }
+        let sortedIndices = resources.makeIndices(slot: slot, count: total, parameters: SortParameters(camera: camera, model: .identity))
+        let rendering = try renderer.render(Group {
+            try GPUSplatSortComputePass(splatClouds: clouds, projectionMatrices: [projectionMatrix], modelMatrix: .identity, cameraMatrices: [camera], resources: resources, slotIndex: slot)
+            try RenderPass {
+                try SparkSplatRenderPipeline(splatClouds: clouds, projectionMatrices: [projectionMatrix], modelMatrix: .identity, cameraMatrices: [camera], drawableSize: [Float(size), Float(size)], configuration: .init(convertSRGBToLinear: false), sortedIndices: sortedIndices)
+            }
+        })
+        let image = try rendering.texture.toCGImage()
+        var bytes = [UInt8](repeating: 0, count: size * size * 4)
+        let context = try #require(CGContext(data: &bytes, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
+        return bytes
     }
 
     @MainActor

@@ -3341,12 +3341,13 @@ pointSplatResolve writes alpha 1 for every pixel and the fullscreen blit draws w
 ## 163: SH storage is duplicated per splat instead of preserving indexed palettes
 
 +++
-status: open
+status: closed
 priority: high
 kind: enhancement
 labels: performance, effort:xl, impact:high, area:rendering, area:io, area:memory
 created: 2026-09-10T05:07:58Z
-updated: 2026-10-23T14:20:43Z
+updated: 2026-10-23T21:42:17Z
+closed: 2026-10-23T21:42:17Z
 +++
 
 Spherical-harmonics coefficients are currently expanded into a dense row for every splat, and render shaders derive the SH row from the splat index. Formats such as SOG can encode a shared SH palette plus a per-splat palette index, but loading expands that palette and loses the indirection.
@@ -3378,6 +3379,7 @@ Savings scale with palette sharing. Helmet's palette is nearly as large as its s
 Multi-cloud GPU sort (cloudIndex propagation) tracked separately in #172.
 
 - `2026-10-23T14:20:27Z`: Related: #172 (multi-cloud GPU sort does not carry cloudIndex).
+- `2026-10-23T21:42:17Z`: Closing. Stages 1-3 landed earlier (per-splat shIndex everywhere, SOG palette preserved, public palette initializer); #172 fixed the multi-cloud sort. Added multiCloudPalettesWithOverlappingIndicesRenderLikeDense (two clouds both using local index 0 with different palettes, multi-cloud GPU sort + render == dense single cloud; fails if a palette is swapped). Packed PointSplat unpack now sets shIndex = 0 (that path is shDegree 0). Follow-ups: #188 (high-level multi-cloud render path), #189 (packed PointSplat SH).
 
 ---
 
@@ -3949,5 +3951,37 @@ closed: 2026-10-23T18:31:30Z
 +++
 
 SparkSplatDebugRenderShader.metal calls evaluateSH with splatIndex. The other renderers use splat.shIndex. For SOG files with higher-order SH, shCoefficients is a shared palette, not one row per splat. So the debug renderer reads the wrong palette entries, or reads past the end of the buffer. Fix: pass splat.shIndex.
+
+---
+
+## 188: GPUSortedSplatRenderPipeline and SplatView render only one cloud
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: effort:m, area:rendering, area:multicloud
+created: 2026-10-23T21:42:11Z
++++
+
+The GPU sort can merge several clouds into one order (#172), and SparkSplatRenderPipeline accepts several clouds, but GPUSortedSplatRenderPipeline and SplatView take a single GPUSplatCloud. So there is no high-level way to render several clouds (each with its own SH palette, #163) together with GPU sorting. OffscreenSplatRenderer is also single-cloud.
+
+Expected: a GPU-sorted render path and view that take several clouds and depth-sort them together.
+
+---
+
+## 189: Packed PointSplat path renders without spherical harmonics
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: effort:m, area:pointsplat, deferred
+created: 2026-10-23T21:42:11Z
++++
+
+The offline PointSplatComputePass (used by the CLI point renderer and the packed 18-byte splat path) always sets shDegree 0, so SH clouds render with base color only there. Packed splats (GPSPackedSplat) also have no shIndex field, so they cannot reference an SH palette row.
+
+Found while closing #163. The interactive PointSplatRenderPipeline does evaluate SH.
 
 ---

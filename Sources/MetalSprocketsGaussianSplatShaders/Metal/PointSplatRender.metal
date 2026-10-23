@@ -158,6 +158,8 @@ namespace PointSplatRender {
         splat.rotation = half4(q);
 
         splat.color = uchar4(packed.color[0], packed.color[1], packed.color[2], packed.color[3]);
+        // Packed splats carry no SH; the packed path always renders with shDegree 0.
+        splat.shIndex = 0;
         return splat;
     }
 
