@@ -1,13 +1,13 @@
 {
-  "originHash" : "eae93d5785e8b52a56607646c6836614235b5698b13d06262cbe8661acef34f8",
+  "originHash" : "65ea5c7ebabc0c76f8500fd700deaac19b67fc96807706226a13234a9a7fe861",
   "pins" : [
     {
       "identity" : "geometrylite3d",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/GeometryLite3D",
       "state" : {
-        "revision" : "4a1c76400e564b76140a14d14a7e6d6279908faf",
-        "version" : "0.2.4"
+        "revision" : "3a206f518d934ea5a1de9e3a7579f48156bd0448",
+        "version" : "0.2.6"
       }
     },
     {
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/schwa/MetalSprockets",
       "state" : {
-        "revision" : "e6ca72d543ae2e43c191a5e2b23cfe899904ac89",
-        "version" : "0.2.5"
+        "revision" : "7038521ecde3278818a9dc26cd25d371341b155b",
+        "version" : "0.2.8"
       }
     },
     {
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections",
       "state" : {
-        "revision" : "35a1edcb8ebd2bfe251d587f0b69e62af28f508c",
-        "version" : "1.7.3"
+        "revision" : "844289ac455816e193f1dbbe014f3c4dbe429410",
+        "version" : "1.7.4"
       }
     },
     {
