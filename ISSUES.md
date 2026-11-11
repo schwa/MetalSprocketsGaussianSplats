@@ -4040,12 +4040,13 @@ Found by splat-render (`~/Projects/Scratch/splat-render`, issue #5).
 ## 192: Anti-aliasing opacity scale cannot be turned off separately from dilation
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: area:shaders, effort:s
 created: 2026-11-11T00:26:58Z
-updated: 2026-11-11T00:36:03Z
+updated: 2026-11-11T00:45:43Z
+closed: 2026-11-11T00:45:43Z
 +++
 
 `SparkSplatRenderShader.metal` (around line 154) adds `BLUR_AMOUNT` to the 2D covariance and then always multiplies the opacity by `sqrt(detOrig / det)` (the Mip-Splatting anti-aliasing scale). No setting turns the opacity scale off while keeping the dilation.

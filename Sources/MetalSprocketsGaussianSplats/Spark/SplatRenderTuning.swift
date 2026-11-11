@@ -14,11 +14,16 @@ public struct SplatRenderTuning: Equatable, Sendable {
     /// Anti-aliasing covariance dilation in px². A value of 0 disables it. A
     /// higher value inflates and blurs every splat.
     public var blurAmount: Float
+    /// Scales opacity by `sqrt(det(cov) / det(cov + blur))` after dilation
+    /// (Mip-Splatting / gsplat "antialiased" mode). Off matches INRIA and
+    /// gsplat's default "classic" mode.
+    public var antialiasOpacityScale: Bool
 
-    public init(maxStdDev: Float = 2.5, minAlpha: Float = 2.0 / 255.0, blurAmount: Float = 0.05) {
+    public init(maxStdDev: Float = 2.5, minAlpha: Float = 2.0 / 255.0, blurAmount: Float = 0.05, antialiasOpacityScale: Bool = true) {
         self.maxStdDev = maxStdDev
         self.minAlpha = minAlpha
         self.blurAmount = blurAmount
+        self.antialiasOpacityScale = antialiasOpacityScale
     }
 
     /// Tuned defaults from the blur-reduction experiments (sharp, cheaper).

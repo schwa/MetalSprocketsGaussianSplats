@@ -223,11 +223,12 @@ public struct SparkSplatRenderPipeline: Element {
     }
 
     /// Sets the render-tuning function constants. maxStdDev and minAlpha are used
-    /// by both stages; blurAmount only by the vertex stage.
+    /// by both stages; blurAmount and antialiasOpacityScale only by the vertex stage.
     private static func applyTuning(_ tuning: SplatRenderTuning, vertex: inout FunctionConstants, fragment: inout FunctionConstants) {
         vertex["fc_max_std_dev"] = .float(tuning.maxStdDev)
         vertex["fc_min_alpha"] = .float(tuning.minAlpha)
         vertex["fc_blur_amount"] = .float(tuning.blurAmount)
+        vertex["fc_aa_opacity_scale"] = .bool(tuning.antialiasOpacityScale)
         fragment["fc_max_std_dev"] = .float(tuning.maxStdDev)
         fragment["fc_min_alpha"] = .float(tuning.minAlpha)
     }

@@ -70,6 +70,8 @@ public final class OffscreenSplatRenderer {
         /// 1 render at `size / metalFXScale` and upscale to full size.
         /// Other renderers ignore it.
         public var metalFXScale: Float
+        /// Spark render-quality tuning. Other renderers ignore it.
+        public var sparkTuning: SplatRenderTuning
 
         public init(
             width: Int,
@@ -82,7 +84,8 @@ public final class OffscreenSplatRenderer {
             pointPointsPerThread: Int = 4,
             collectGPUCounters: Bool = false,
             sortPrecision: SplatSortPrecision = .float16,
-            metalFXScale: Float = 1
+            metalFXScale: Float = 1,
+            sparkTuning: SplatRenderTuning = .default
         ) {
             self.width = width
             self.height = height
@@ -95,6 +98,7 @@ public final class OffscreenSplatRenderer {
             self.collectGPUCounters = collectGPUCounters
             self.sortPrecision = sortPrecision
             self.metalFXScale = metalFXScale
+            self.sparkTuning = sparkTuning
         }
     }
 
@@ -323,7 +327,7 @@ public final class OffscreenSplatRenderer {
                 modelMatrix: modelMatrix,
                 cameraMatrix: cameraMatrix,
                 drawableSize: drawableSize,
-                configuration: .init(convertSRGBToLinear: configuration.convertSRGBToLinear),
+                configuration: .init(convertSRGBToLinear: configuration.convertSRGBToLinear, tuning: configuration.sparkTuning),
                 sortedIndices: sortedIndices
             )
         }

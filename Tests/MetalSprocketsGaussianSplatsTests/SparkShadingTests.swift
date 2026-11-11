@@ -45,20 +45,45 @@ struct SparkShadingTests {
         #expect(abs(difference - expected) < 0.05, "difference \(difference), expected \(expected)")
     }
 
+    // A sub-pixel splat: dilation grows its footprint, and the opacity scale
+    // then dims it. With the scale off (gsplat classic), it keeps full opacity.
+    @Test @MainActor
+    func antialiasOpacityScaleCanBeTurnedOff() throws {
+        var classic = SplatRenderTuning.default
+        classic.blurAmount = 0.3
+        classic.antialiasOpacityScale = false
+        var antialiased = classic
+        antialiased.antialiasOpacityScale = true
+        let tiny: SIMD3<Float> = [0.002, 0.002, 0.002]
+        let classicPixel = try centerPixel(cameraPosition: [0, 0, 3], shCoefficients: [], shDegree: 0, baseColor: [1, 1, 1], scale: tiny, tuning: classic)
+        let antialiasedPixel = try centerPixel(cameraPosition: [0, 0, 3], shCoefficients: [], shDegree: 0, baseColor: [1, 1, 1], scale: tiny, tuning: antialiased)
+        #expect(classicPixel.x > 0.2, "classic \(classicPixel.x)")
+        #expect(antialiasedPixel.x < classicPixel.x / 3, "antialiased \(antialiasedPixel.x), classic \(classicPixel.x)")
+    }
+
     // MARK: - Helpers
 
     @MainActor
-    private func centerPixel(cameraPosition: SIMD3<Float>, shCoefficients: [Float], shDegree: UInt8, baseColor: SIMD3<Float> = [0.5, 0.5, 0.5]) throws -> SIMD3<Float> {
+    private func centerPixel(
+        cameraPosition: SIMD3<Float>,
+        shCoefficients: [Float],
+        shDegree: UInt8,
+        baseColor: SIMD3<Float> = [0.5, 0.5, 0.5],
+        scale: SIMD3<Float> = [0.5, 0.5, 0.5],
+        tuning: SplatRenderTuning = .default
+    ) throws -> SIMD3<Float> {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let generic = GenericSplat(position: .zero, scale: [0.5, 0.5, 0.5], color: SIMD4(baseColor, 1), rotation: [0, 0, 0, 1])
-        let cloud = try GPUSplatCloud<SparkSplat>(device: device, splats: [SparkSplat(generic)], shCoefficients: shCoefficients, shDegree: shDegree)
+        let generic = GenericSplat(position: .zero, scale: scale, color: SIMD4(baseColor, 1), rotation: [0, 0, 0, 1])
+        let cloud = shDegree == 0
+            ? try GPUSplatCloud<SparkSplat>(device: device, splats: [SparkSplat(generic)])
+            : try GPUSplatCloud<SparkSplat>(device: device, splats: [SparkSplat(generic)], shCoefficients: shCoefficients, shDegree: shDegree)
         let size = 32
         let renderer = try OffscreenSplatRenderer(
             renderer: .spark,
             splatCloud: cloud,
             projection: PerspectiveProjection(verticalAngleOfView: .degrees(30), depthMode: .standard(zClip: 0.01 ... 100)),
             cameraMatrix: LookAt(position: cameraPosition, target: .zero, up: [0, 1, 0]).cameraMatrix,
-            configuration: .init(width: size, height: size, convertSRGBToLinear: false),
+            configuration: .init(width: size, height: size, convertSRGBToLinear: false, sparkTuning: tuning),
             device: device
         )
         try renderer.renderFrame()

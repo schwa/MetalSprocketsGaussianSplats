@@ -37,9 +37,11 @@ namespace SparkSplatRenderShader {
     constant float fc_max_std_dev [[function_constant(3)]];
     constant float fc_min_alpha   [[function_constant(4)]];
     constant float fc_blur_amount [[function_constant(5)]];
+    constant bool fc_aa_opacity_scale [[function_constant(6)]];
     constant float MAX_STD_DEV = is_function_constant_defined(fc_max_std_dev) ? fc_max_std_dev : 2.5;
     constant float MIN_ALPHA   = is_function_constant_defined(fc_min_alpha)   ? fc_min_alpha   : (2.0 / 255.0);
     constant float BLUR_AMOUNT = is_function_constant_defined(fc_blur_amount) ? fc_blur_amount : 0.05;
+    constant bool AA_OPACITY_SCALE = is_function_constant_defined(fc_aa_opacity_scale) ? fc_aa_opacity_scale : true;
 
     // MARK: - Vertex Shader
 
@@ -156,9 +158,10 @@ namespace SparkSplatRenderShader {
         cov2D.d += BLUR_AMOUNT;
         float det = cov2D.a * cov2D.d - cov2D.b * cov2D.b;
 
-        // Anti-aliasing intensity scale.
-        float blurAdjust = sqrt(max(0.0, detOrig / det));
-        rgba.a *= blurAdjust;
+        // Anti-aliasing intensity scale. INRIA and gsplat's classic mode skip it.
+        if (AA_OPACITY_SCALE) {
+            rgba.a *= sqrt(max(0.0, detOrig / det));
+        }
 
         if (rgba.a < MIN_ALPHA) {
             return out;
