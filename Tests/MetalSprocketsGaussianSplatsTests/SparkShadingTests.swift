@@ -8,7 +8,17 @@ import simd
 import Splats
 import Testing
 
-@Suite("Spark shading matches INRIA/gsplat")
+// INRIA 3DGS / gsplat classic: 3σ footprint, eps2d = 0.3 px², no opacity scale.
+@Test
+func defaultTuningMatchesGsplat() {
+    let tuning = SplatRenderTuning.default
+    #expect(tuning.maxStdDev == 3.0)
+    #expect(tuning.blurAmount == 0.3)
+    #expect(tuning.antialiasOpacityScale == false)
+}
+
+// Renders through the GPU sort, which GitHub's virtualized GPU cannot run.
+@Suite("Spark shading matches INRIA/gsplat", .enabled(if: MetalTestSupport.supports64BitAtomics))
 struct SparkShadingTests {
     // INRIA: color = 0.5 + C0*dc - C1*y*sh1 + C1*z*sh2 - C1*x*sh3, dir = position - camera.
     // With only sh3.r = 1 and the camera on +X, dir = -X, so red rises above the base color.
@@ -59,15 +69,6 @@ struct SparkShadingTests {
         let antialiasedPixel = try centerPixel(cameraPosition: [0, 0, 3], shCoefficients: [], shDegree: 0, baseColor: [1, 1, 1], scale: tiny, tuning: antialiased)
         #expect(classicPixel.x > 0.2, "classic \(classicPixel.x)")
         #expect(antialiasedPixel.x < classicPixel.x / 3, "antialiased \(antialiasedPixel.x), classic \(classicPixel.x)")
-    }
-
-    // INRIA 3DGS / gsplat classic: 3σ footprint, eps2d = 0.3 px², no opacity scale.
-    @Test
-    func defaultTuningMatchesGsplat() {
-        let tuning = SplatRenderTuning.default
-        #expect(tuning.maxStdDev == 3.0)
-        #expect(tuning.blurAmount == 0.3)
-        #expect(tuning.antialiasOpacityScale == false)
     }
 
     // With convertSRGBToLinear, the shader decodes sRGB and the sRGB target encodes
