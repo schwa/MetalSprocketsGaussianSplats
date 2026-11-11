@@ -4271,6 +4271,8 @@ SOG meta.json can have `"model": "antialiased"` (v2 and v3). The sample `cluster
 
 The reader does not read `model`, and the Spark renderer uses the default tuning (0.3 px² dilation, no opacity scale, #196) for every scene. `SplatRenderTuning.antialiasOpacityScale` (#192) exists, but nothing sets it from the file.
 
+- `2026-11-11T04:26:52Z`: Tried: read meta.json "model" into SplatBufferResult.renderModel, added SplatRenderTuning(model:) (antialiased = 0.1 px² filter + opacity scale, per the SOG v3 spec text), and used it in the CLI. Result: cluster-fly.sog (tagged antialiased) dropped from 38.4 to 28.1 dB against the splat-render gsplat reference, while cluster-fly.ply (same capture, no tag) stays at 38.0 dB. The gsplat reference renders classic mode, so this only shows disagreement with it, not that the change is wrong. Punting: I cannot tell whether cluster-fly was really trained antialiased, or whether the filter should be 0.1 px² (SOG spec) or 0.3 px² with compensation (gsplat antialiased). Unblocker: a scene with known antialiased training and ground-truth images, or a gsplat reference rendered with rasterize_mode="antialiased" to compare against.
+
 ---
 
 ## 200: Stochastic, tile and debug renderers convert sRGB to linear with pow 2.2
