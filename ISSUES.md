@@ -4189,3 +4189,44 @@ gaussiansplats-ios made the same changes in `rvnrxwko` (blur 0.05 → 0.3) and `
 May contribute to #195.
 
 ---
+
+## 197: metalsprockets-gaussian-splat CLI flags differ from the splat-render spec
+
++++
+status: open
+priority: medium
+kind: enhancement
+labels: area:cli, effort:m
+created: 2026-11-11T02:16:45Z
+updated: 2026-11-11T02:28:02Z
++++
+
+The `metalsprockets-gaussian-splat` command line does not match the splat-render spec (`~/Projects/Scratch/splat-render/docs/help.txt` and `docs/spec.md`). The splat-render metalsprockets backend (`splat-render-metalsprockets`) has its own wrapper because of this.
+
+Differences:
+
+| splat-render | metalsprockets-gaussian-splat |
+|---|---|
+| scene is a positional argument | `--splat <path>` |
+| `-o, --output`; omit to write no file | `--output`; default `output.png` unless `--statistics` |
+| `-w, --width` | `--width` (no short form) |
+| `--camera-position, --eye` | `--camera-position` |
+| `--camera-look-at, --look-at` | `--camera-lookat` |
+| `--camera-up, --up` | `--camera-up` |
+| `--camera-matrix` combined with another camera flag is a usage error | `--camera-matrix` overrides the other camera flags |
+| `-f, --projection-fov, --fov` (default 60) | `--projection-fov` (no default shown) |
+| `--projection-near, --near` | `--near` |
+| `--projection-far, --far` | `--far` |
+| `--spherical-harmonics-degree, --sh-degree <0-3>` | missing |
+| `--dilation/--no-dilation` (default on) | missing |
+| `--color-space <srgb\|linear>` | `--srgb-to-linear` flag |
+| `--upscale-factor <factor>` | `--metalfx <factor>` |
+| `--statistics, --stats [text\|json]`; bare means text | `--statistics, --stats <text\|json>` |
+| `--warmup-frames, --warmup` | `--warmup` |
+| `--measured-frames, --frames` | `--frames` |
+
+Other spec points not checked against this CLI: exit codes (64 usage, 65 unreadable scene), validating arguments before loading the scene, and the `--config` JSON schema (`docs/config.schema.json`, camelCase long flag names, unknown key is a usage error).
+
+Flags that exist only here (`--renderer`, `--supersampling`, `--points-per-thread`, `--sort-precision`, `--capture`, `--reveal`, the `bench` subcommand) are allowed by the spec as backend-specific extras.
+
+---
