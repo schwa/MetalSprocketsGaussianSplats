@@ -4018,12 +4018,13 @@ Expected: v3 .sog files load and render correctly. Actual: unsupported.
 ## 191: sRGB to linear conversion uses pow 2.2, not the sRGB curve
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: area:shaders, effort:xs
 created: 2026-11-11T00:26:57Z
-updated: 2026-11-11T00:36:03Z
+updated: 2026-11-11T02:43:54Z
+closed: 2026-11-11T02:43:54Z
 +++
 
 With `convertSRGBToLinear`, the shaders convert splat colors with `pow(rgba.rgb, float3(2.2))`. This is an approximation of the sRGB transfer curve. The exact curve is `c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)`. The difference is largest in dark tones.
@@ -4266,5 +4267,25 @@ created: 2026-11-11T02:42:40Z
 SOG meta.json can have `"model": "antialiased"` (v2 and v3). The sample `cluster-fly.sog` has it. Scenes trained in that mode expect the anti-aliasing opacity scale `sqrt(det Σ / det(Σ + filter))`, with a 0.1 px² filter instead of the 0.3 px² dilation (see the SOG v3 proposal, playcanvas/splat-transform#362, "Rendering opacity above 1").
 
 The reader does not read `model`, and the Spark renderer uses the default tuning (0.3 px² dilation, no opacity scale, #196) for every scene. `SplatRenderTuning.antialiasOpacityScale` (#192) exists, but nothing sets it from the file.
+
+---
+
+## 200: Stochastic, tile and debug renderers convert sRGB to linear with pow 2.2
+
++++
+status: new
+priority: low
+kind: bug
+labels: area:shaders, effort:xs
+created: 2026-11-11T02:43:54Z
++++
+
+With convertSRGBToLinear, these shaders still convert splat colors with `pow(rgba.rgb, float3(2.2))` instead of the exact sRGB curve. The difference is largest in dark tones.
+
+- `Sources/MetalSprocketsGaussianSplatShaders/Metal/StochasticSplatRenderShader.metal`
+- `Sources/MetalSprocketsGaussianSplatShaders/Metal/TileSplatBinning.metal`
+- `Sources/MetalSprocketsGaussianSplatsDebugShaders/Metal/SparkSplatDebugRenderShader.metal`
+
+The Spark renderer was fixed in #191.
 
 ---

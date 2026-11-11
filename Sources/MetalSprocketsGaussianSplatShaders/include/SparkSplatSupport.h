@@ -96,6 +96,13 @@ namespace SparkSplatSupport {
         return result;
     }
 
+    // MARK: - Color
+
+    /// The exact sRGB transfer curve, decode direction.
+    inline float3 srgbToLinear(float3 c) {
+        return select(pow((c + 0.055) / 1.055, float3(2.4)), c / 12.92, c <= 0.04045);
+    }
+
     // MARK: - Quaternion Math
 
     /// Rotate vector by quaternion

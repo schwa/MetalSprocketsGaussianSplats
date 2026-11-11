@@ -70,6 +70,16 @@ struct SparkShadingTests {
         #expect(tuning.antialiasOpacityScale == false)
     }
 
+    // With convertSRGBToLinear, the shader decodes sRGB and the sRGB target encodes
+    // it again, so a dark color must come back unchanged. pow(c, 2.2) is far off here.
+    @Test @MainActor
+    func srgbToLinearUsesTheSRGBCurve() throws {
+        let base: Float = 0.03
+        let pixel = try centerPixel(cameraPosition: [0, 0, 3], shCoefficients: [], shDegree: 0, baseColor: SIMD3(repeating: base), convertSRGBToLinear: true)
+        let expected = linear(UInt8((base * 255).rounded()))
+        #expect(abs(pixel.x - expected) < 0.0008, "red \(pixel.x), expected \(expected)")
+    }
+
     // MARK: - Helpers
 
     @MainActor
@@ -79,7 +89,8 @@ struct SparkShadingTests {
         shDegree: UInt8,
         baseColor: SIMD3<Float> = [0.5, 0.5, 0.5],
         scale: SIMD3<Float> = [0.5, 0.5, 0.5],
-        tuning: SplatRenderTuning = .default
+        tuning: SplatRenderTuning = .default,
+        convertSRGBToLinear: Bool = false
     ) throws -> SIMD3<Float> {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let generic = GenericSplat(position: .zero, scale: scale, color: SIMD4(baseColor, 1), rotation: [0, 0, 0, 1])
@@ -92,7 +103,7 @@ struct SparkShadingTests {
             splatCloud: cloud,
             projection: PerspectiveProjection(verticalAngleOfView: .degrees(30), depthMode: .standard(zClip: 0.01 ... 100)),
             cameraMatrix: LookAt(position: cameraPosition, target: .zero, up: [0, 1, 0]).cameraMatrix,
-            configuration: .init(width: size, height: size, convertSRGBToLinear: false, sparkTuning: tuning),
+            configuration: .init(width: size, height: size, convertSRGBToLinear: convertSRGBToLinear, sparkTuning: tuning),
             device: device
         )
         try renderer.renderFrame()
