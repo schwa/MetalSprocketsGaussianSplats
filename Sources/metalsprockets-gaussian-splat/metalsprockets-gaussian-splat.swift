@@ -4,6 +4,7 @@ import Foundation
 import GeometryLite3D
 import ImageIO
 import Metal
+import MetalFX
 import MetalSprockets
 import MetalSprocketsGaussianSplats
 import MetalSprocketsGaussianSplatShaders
@@ -13,511 +14,263 @@ import simd
 import Splats
 import SwiftUI
 
+// The command line follows the splat-render spec
+// (~/Projects/Scratch/splat-render/docs/help.txt and spec.md).
+
 @main
 struct GaussianSplatRenderer: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "metalsprockets-gaussian-splat",
-        abstract: "Render Gaussian splat files to PNG images",
-        subcommands: [BenchCommand.self]
+        abstract: "Render a Gaussian splat scene to a PNG, and optionally time it.",
+        subcommands: [BenchCommand.self],
+        helpNames: [.long, .short]
     )
 
-    @Option(help: "Background color in RGBA format (e.g., 0,0,0,1 for black)")
-    var background: String = "0,0,0,1"
+    @Argument(help: ArgumentHelp("Scene to render (.sog, .ply, .splat, .spz).", valueName: "scene"))
+    var scene: String?
 
-    @Option(help: "Width of the output image")
-    var width: Int = 1_024
+    @OptionGroup(title: "Input") var input: InputOptions
+    @OptionGroup(title: "Output") var output: OutputOptions
+    @OptionGroup(title: "Camera") var camera: CameraOptions
+    @OptionGroup(title: "Projection") var projection: ProjectionOptions
+    @OptionGroup(title: "Quality") var quality: QualityOptions
+    @OptionGroup(title: "Timing") var timing: TimingOptions
+    @OptionGroup(title: "Extras") var extra: ExtraOptions
 
-    @Option(help: "Height of the output image")
-    var height: Int = 768
-
-    @Option(help: "Output PNG file path (default: output.png; with --statistics, omit to skip writing)")
-    var output: String?
-
-    @Option(help: "Model position in x,y,z format (e.g., 0,0,0)")
-    var modelPosition: String?
-
-    @Option(help: "Camera position in x,y,z format (e.g., 0,0,1.5)")
-    var cameraPosition: String?
-
-    @Option(help: "Camera look-at target in x,y,z format (e.g., 0,0,0)")
-    var cameraLookat: String?
-
-    @Option(help: "Camera up direction in x,y,z format (e.g., 0,1,0)")
-    var cameraUp: String?
-    @Option(help: "Camera rotation as quaternion (x,y,z,w) or 3x3 matrix (9 values comma-separated)")
-    var cameraRotation: String?
-
-    @Option(help: "Camera-to-world matrix, 16 comma-separated column-major values. Overrides every other camera flag.")
-    var cameraMatrix: String?
-
-    @Option(help: "Projection field of view in degrees")
-    var projectionFov: Double?
-
-    @Option(help: "Camera near clipping plane")
-    var near: Float = 0.1
-
-    @Option(help: "Camera far clipping plane")
-    var far: Float = 100.0
-
-    @Option(help: "Path to splat file (.splat, .ply, .spz, .sog) to render")
-    var splat: String?
-
-    @Option(help: "Path to JSON configuration file")
-    var config: String?
-
-    @Flag(help: "Enable Metal frame capture for debugging in Xcode")
-    var capture: Bool = false
-
-    @Option(help: "GPU sort depth-key precision: 16 or 32 bits")
-    var sortPrecision: SplatSortPrecision = .float16
-
-    @Option(name: .customLong("metalfx"), help: "MetalFX spatial upscale factor for the spark renderer (1 = off). Renders at size / factor, then upscales.")
-    var metalFXScale: Float = 1
-
-    @Option(help: "Renderer to use (spark, point, tile, stochastic)")
-    var renderer: RendererKind = .spark
-
-    @Option(help: "Point renderer supersampling factor")
-    var supersampling: Int = 2
-
-    @Option(help: "Point renderer points per thread")
-    var pointsPerThread: Int = 4
-
-    @Flag(help: "Convert sRGB to linear in fragment shader (for Spark renderer)")
-    var srgbToLinear: Bool = false
-
-    @Flag(help: "Render settings label on top of the image")
-    var label: Bool = false
-
-    @Flag(help: "Reveal output file in Finder after rendering")
-    var reveal: Bool = false
-
-    @Option(name: [.customLong("statistics"), .customLong("stats")], help: "Report frame timings (wall, CPU sort, GPU render with vertex/fragment breakdown) as text or json")
-    var statistics: StatisticsFormat?
-
-    @Option(help: "Frames to render and discard before measuring, to warm pipeline caches and GPU clocks")
-    var warmup: Int = 0
-
-    @Option(help: "Frames to measure (medians reported)")
-    var frames: Int = 1
-
-    func validate() throws {
-        guard warmup >= 0 else {
-            throw ValidationError("--warmup must not be negative")
+    // Exit codes: 64 for a usage error, 65 for an unreadable scene, 1 for a failed render.
+    static func main() async {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        // The positional scene would otherwise swallow the subcommand name.
+        if arguments.first == BenchCommand.configuration.commandName {
+            await BenchCommand.main(Array(arguments.dropFirst()))
+            return
         }
-        guard frames >= 1 else {
-            throw ValidationError("--frames must be at least 1")
-        }
-    }
-
-    mutating func run() async throws {
-        try await _run()
-    }
-
-    @MainActor
-    mutating func _run() throws {
-        #if !arch(x86_64)
-        let renderConfig = try loadConfig()
-        let device = _MTLCreateSystemDefaultDevice()
-        let modelMatrix = try parseModelMatrix(from: renderConfig)
-        let cameraMatrix = try parseCameraMatrix(from: renderConfig)
-        let useSrgbToLinear = renderConfig.srgbToLinear ?? false
-
-        // SOG decodes on the GPU with a compute-kernel de-quantize. Every other
-        // format streams through the CPU reader. See SplatLoader and #126.
-        let result = try SplatLoader.read(device: device, url: URL(fileURLWithPath: renderConfig.splat))
-        let sparkGPUSplatCloud = GPUSplatCloud(result, modelTransform: modelMatrix)
-        let effectiveSHDegree = result.shDegree
-        note("Loaded \(result.count) splats, SH degree: \(effectiveSHDegree)")
-
-        let size = CGSize(width: renderConfig.width, height: renderConfig.height)
-        let projection = try createProjection(from: renderConfig)
-        let bgColor = renderConfig.getBackground()
-
-        guard let rendererKind = RendererKind(rawValue: renderConfig.renderer ?? "spark") else {
-            throw ValidationError("Unknown renderer: \(renderConfig.renderer ?? ""). Supported: \(RendererKind.allCases.map(\.rawValue).joined(separator: ", "))")
-        }
-
-        // A statistics run with no explicit destination is measurement-only.
-        let needsImage = statistics == nil || output != nil || config != nil
-
-        let (image, splatCount, samples) = try performRender(
-            size: size,
-            rendererKind: rendererKind,
-            projection: projection,
-            bgColor: bgColor,
-            useSrgbToLinear: useSrgbToLinear,
-            near: renderConfig.near,
-            far: renderConfig.far,
-            modelMatrix: modelMatrix,
-            cameraMatrix: cameraMatrix,
-            sparkGPUSplatCloud: sparkGPUSplatCloud,
-            needsImage: needsImage
-        )
-
-        if let statistics {
-            let report = makeReport(samples: samples, splats: splatCount, shDegree: Int(effectiveSHDegree), width: renderConfig.width, height: renderConfig.height, warmup: warmup, renderer: rendererKind, metalFXScale: rendererKind == .spark && metalFXScale > 1 ? metalFXScale : nil)
-            try emitReport(report, format: statistics)
-        }
-
-        if var cgImage = image {
-            if label {
-                cgImage = addLabel(to: cgImage, renderConfig: renderConfig, splatCount: splatCount, useSrgbToLinear: useSrgbToLinear, effectiveSHDegree: effectiveSHDegree)
+        let command: any ParsableCommand
+        do {
+            command = try parseAsRoot(normalizeArguments(arguments))
+        } catch {
+            if exitCode(for: error) == .success {
+                print(fullMessage(for: error))
+                Foundation.exit(0)
             }
-
-            try saveOutput(cgImage: cgImage, to: renderConfig.output, reveal: reveal)
+            fail(message(for: error), code: 64)
         }
-        #else
-        throw ValidationError("This tool requires Apple Silicon (ARM64) on macOS")
-        #endif
-    }
-
-    /// Prints chatter that is not the report. In JSON mode it goes to stderr, so
-    /// stdout stays a single parseable document.
-    private func note(_ message: String) {
-        if statistics == .json {
-            FileHandle.standardError.write(Data((message + "\n").utf8))
-        } else {
-            print(message)
-        }
-    }
-
-    // MARK: - Config Loading
-
-    mutating func loadConfig() throws -> RenderConfig {
-        var renderConfig: RenderConfig
-        if let configPath = config {
-            renderConfig = try RenderConfig.load(from: configPath)
-            try applyCliOverrides(to: &renderConfig)
-        } else {
-            guard let splatPath = splat else {
-                throw ValidationError("Must specify a splat file with --splat or use --config")
+        guard let root = command as? Self else {
+            do {
+                var command = command
+                if var asyncCommand = command as? any AsyncParsableCommand {
+                    try await asyncCommand.run()
+                } else {
+                    try command.run()
+                }
+            } catch {
+                exit(withError: error)
             }
-            renderConfig = try buildConfigFromCli(splatPath: splatPath)
+            return
         }
-
-        let splatPath = renderConfig.splat
-        guard FileManager.default.fileExists(atPath: splatPath) else {
-            throw ValidationError("Splat file not found: \(splatPath)")
-        }
-
-        return renderConfig
-    }
-
-    mutating func applyCliOverrides(to renderConfig: inout RenderConfig) throws {
-        if background != "0,0,0,1" {
-            let bgComponents = try parseRGBA(background)
-            renderConfig.background = [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w]
-        }
-        if width != 1_024 { renderConfig.width = width }
-        if height != 768 { renderConfig.height = height }
-        if let output { renderConfig.output = output }
-        if let pos = modelPosition {
-            let v = try parseXYZ(pos)
-            renderConfig.modelPosition = [v.x, v.y, v.z]
-        }
-        if let pos = cameraPosition {
-            let v = try parseXYZ(pos)
-            renderConfig.cameraPosition = [v.x, v.y, v.z]
-        }
-        if let lookat = cameraLookat {
-            let v = try parseXYZ(lookat)
-            renderConfig.cameraLookat = [v.x, v.y, v.z]
-        }
-        if let up = cameraUp {
-            let vector = try parseXYZ(up)
-            renderConfig.cameraUp = [vector.x, vector.y, vector.z]
-        }
-        if let rot = cameraRotation {
-            renderConfig.cameraRotation = rot.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
-        }
-        if let matrix = cameraMatrix {
-            renderConfig.cameraMatrix = try parseFloatList(matrix, count: 16, label: "Camera matrix")
-        }
-        if let fov = projectionFov { renderConfig.projectionFov = fov }
-        if near != 0.1 { renderConfig.near = near }
-        if far != 100.0 { renderConfig.far = far }
-        if let s = splat { renderConfig.splat = s }
-        if renderer != .spark { renderConfig.renderer = renderer.rawValue }
-        if srgbToLinear { renderConfig.srgbToLinear = true }
-    }
-
-    func buildConfigFromCli(splatPath: String) throws -> RenderConfig {
-        let bgComponents = try parseRGBA(background)
-        return RenderConfig(
-            background: [bgComponents.x, bgComponents.y, bgComponents.z, bgComponents.w],
-            width: width,
-            height: height,
-            output: output ?? "output.png",
-            modelPosition: try modelPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
-            cameraPosition: try cameraPosition.map { let v = try parseXYZ($0); return [v.x, v.y, v.z] },
-            cameraLookat: try cameraLookat.map { let vector = try parseXYZ($0); return [vector.x, vector.y, vector.z] },
-            cameraUp: try cameraUp.map { let vector = try parseXYZ($0); return [vector.x, vector.y, vector.z] },
-            cameraRotation: cameraRotation?.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) },
-            cameraMatrix: try cameraMatrix.map { try parseFloatList($0, count: 16, label: "Camera matrix") },
-            projectionFov: projectionFov,
-            near: near,
-            far: far,
-            splat: splatPath,
-            renderer: renderer.rawValue,
-            srgbToLinear: srgbToLinear
-        )
-    }
-
-    #if !arch(x86_64)
-    // MARK: - Rendering
-
-    @MainActor
-    func performRender(
-        size: CGSize,
-        rendererKind: RendererKind,
-        projection: any ProjectionProtocol,
-        bgColor: SIMD4<Float>,
-        useSrgbToLinear: Bool,
-        near: Float,
-        far: Float,
-        modelMatrix: simd_float4x4,
-        cameraMatrix: simd_float4x4,
-        sparkGPUSplatCloud: GPUSplatCloud<SparkSplat>,
-        needsImage: Bool
-    ) throws -> (CGImage?, Int, [FrameSample]) {
-        let libraryRenderer: OffscreenSplatRenderer.Renderer
-        switch rendererKind {
-        case .spark:
-            libraryRenderer = .spark
-
-        case .point:
-            libraryRenderer = .point
-
-        case .tile:
-            libraryRenderer = .tile
-
-        case .stochastic:
-            libraryRenderer = .stochastic
-        }
-
-        let renderer = try OffscreenSplatRenderer(
-            renderer: libraryRenderer,
-            splatCloud: sparkGPUSplatCloud,
-            projection: projection,
-            cameraMatrix: cameraMatrix,
-            modelMatrix: modelMatrix,
-            configuration: .init(
-                width: Int(size.width),
-                height: Int(size.height),
-                backgroundColor: bgColor,
-                convertSRGBToLinear: useSrgbToLinear,
-                nearPlane: near,
-                farPlane: far,
-                pointSupersampling: supersampling,
-                pointPointsPerThread: pointsPerThread,
-                collectGPUCounters: statistics != nil,
-                sortPrecision: sortPrecision,
-                metalFXScale: metalFXScale
-            )
-        )
-
-        var samples: [FrameSample] = []
-        try MTLCaptureManager.shared().with(enabled: capture) {
-            for _ in 0..<warmup {
-                try renderer.renderFrame()
+        do {
+            #if arch(x86_64)
+            throw RenderError("This tool requires Apple Silicon (ARM64) on macOS")
+            #else
+            let settings = try Settings(command: root)
+            try await MainActor.run {
+                try render(settings)
             }
-            for _ in 0..<frames {
-                let start = ContinuousClock.now
-                let report = try renderer.renderFrame()
-                samples.append(FrameSample(
-                    wallTime: elapsedSeconds(since: start),
-                    sortGPU: report.sortGPU,
-                    render: report.render,
-                    visibleSplats: report.visibleSplats,
-                    commandBufferGPUTime: report.commandBufferGPUTime
-                ))
+            #endif
+        } catch let error as UsageError {
+            fail(error.message, code: 64)
+        } catch let error as SceneError {
+            fail(error.message, code: 65)
+        } catch let error as RenderError {
+            fail(error.message, code: 1)
+        } catch {
+            fail("\(error)", code: 1)
+        }
+    }
+
+    /// ArgumentParser has no option with an optional value, so a bare
+    /// `--statistics` becomes `--statistics text`.
+    static func normalizeArguments(_ arguments: [String]) -> [String] {
+        var result: [String] = []
+        for (index, argument) in arguments.enumerated() {
+            result.append(argument)
+            if argument == "--statistics" || argument == "--stats" {
+                let following = index + 1 < arguments.count ? arguments[index + 1] : nil
+                if following.flatMap(StatisticsFormat.init(rawValue:)) == nil {
+                    result.append(StatisticsFormat.text.rawValue)
+                }
             }
         }
-
-        return (needsImage ? try renderer.makeImage() : nil, sparkGPUSplatCloud.count, samples)
+        return result
     }
 
-    // MARK: - Label Overlay
-
-    @MainActor
-    func addLabel(to cgImage: CGImage, renderConfig: RenderConfig, splatCount: Int, useSrgbToLinear: Bool, effectiveSHDegree: UInt8) -> CGImage {
-        let fovStr = renderConfig.projectionFov.map { $0.formatted(.number.precision(.fractionLength(1))) + "°" } ?? "60°"
-        let camPos = renderConfig.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
-        let modelPos = renderConfig.getModelPosition() ?? SIMD3<Float>(0, 0, 0)
-
-        let shInfo = " | SH: \(effectiveSHDegree > 0 ? "deg \(effectiveSHDegree)" : "off")"
-        let labelText = """
-        Renderer: Spark | sRGB→Linear: \(useSrgbToLinear)\(shInfo)
-        Size: \(renderConfig.width)x\(renderConfig.height) | FOV: \(fovStr)
-        Splats: \(splatCount) | Near/Far: \(renderConfig.near)/\(renderConfig.far)
-        Camera: (\(camPos.x.formatted(.number.precision(.fractionLength(2)))), \(camPos.y.formatted(.number.precision(.fractionLength(2)))), \(camPos.z.formatted(.number.precision(.fractionLength(2)))))
-        Model: (\(modelPos.x.formatted(.number.precision(.fractionLength(2)))), \(modelPos.y.formatted(.number.precision(.fractionLength(2)))), \(modelPos.z.formatted(.number.precision(.fractionLength(2)))))
-        """
-
-        let labelView = ZStack(alignment: .bottomLeading) {
-            Image(decorative: cgImage, scale: 1.0)
-            Text(labelText)
-                .font(.system(size: 14, weight: .medium, design: .monospaced))
-                .foregroundColor(.white)
-                .padding(8)
-                .background(Color.black.opacity(0.7))
-                .cornerRadius(4)
-                .padding(10)
-        }
-
-        let renderer = ImageRenderer(content: labelView)
-        renderer.scale = 1.0
-        return renderer.cgImage ?? cgImage
-    }
-
-    // MARK: - Output Saving
-
-    func saveOutput(cgImage: CGImage, to outputPath: String, reveal: Bool) throws {
-        var finalPath = outputPath
-        if !finalPath.hasPrefix("/") {
-            finalPath = FileManager.default.currentDirectoryPath + "/" + finalPath
-        }
-
-        let outputURL = URL(fileURLWithPath: finalPath)
-        if let parentDir = outputURL.deletingLastPathComponent().path as String? {
-            try FileManager.default.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
-        }
-
-        guard let destination = CGImageDestinationCreateWithURL(outputURL as CFURL, "public.png" as CFString, 1, nil) else {
-            throw ValidationError("Failed to create image destination")
-        }
-
-        CGImageDestinationAddImage(destination, cgImage, nil)
-
-        guard CGImageDestinationFinalize(destination) else {
-            throw ValidationError("Failed to write image to \(outputPath)")
-        }
-
-        if reveal {
-            NSWorkspace.shared.selectFile(finalPath, inFileViewerRootedAtPath: "")
-        }
-    }
-    #endif
-
-    // MARK: - Helper Functions
-
-    func parseRGBA(_ string: String) throws -> SIMD4<Float> {
-        let components = string.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
-        guard components.count == 4 else {
-            throw ValidationError("Background color must be in RGBA format (4 comma-separated values)")
-        }
-        return SIMD4<Float>(components[0], components[1], components[2], components[3])
-    }
-
-    func parseFloatList(_ string: String, count: Int, label: String) throws -> [Float] {
-        let components = string.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
-        guard components.count == count else {
-            throw ValidationError("\(label) must be \(count) comma-separated values")
-        }
-        return components
-    }
-
-    func parseXYZ(_ string: String) throws -> SIMD3<Float> {
-        let components = string.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
-        guard components.count == 3 else {
-            throw ValidationError("Position must be in x,y,z format (3 comma-separated values)")
-        }
-        return SIMD3<Float>(components[0], components[1], components[2])
-    }
-
-    func parseModelMatrix(from config: RenderConfig) throws -> simd_float4x4 {
-        if let position = config.getModelPosition() {
-            return simd_float4x4(translation: position)
-        }
-        return .identity
-    }
-
-    func parseCameraMatrix(from config: RenderConfig) throws -> simd_float4x4 {
-        // Priority order: full matrix, then rotation, then lookat, then position.
-        if let matrix = config.getCameraMatrix() {
-            if config.cameraPosition != nil || config.cameraLookat != nil || config.cameraUp != nil || config.cameraRotation != nil {
-                throw ValidationError("--camera-matrix is the whole camera; it cannot be combined with other camera flags")
-            }
-            return matrix
-        }
-        if let rotation = config.getCameraRotation() {
-            guard config.cameraUp == nil else {
-                throw ValidationError("--camera-up cannot be combined with --camera-rotation")
-            }
-            return try parseCameraRotationMatrix(rotation, config: config)
-        }
-
-        if config.cameraLookat != nil || config.cameraUp != nil {
-            let position = config.getCameraPosition() ?? SIMD3<Float>(0, 0, 1.5)
-            let target = config.getCameraLookat() ?? .zero
-            let up = config.getCameraUp() ?? SIMD3<Float>(0, 1, 0)
-            guard simd_length_squared(up) > 0 else {
-                throw ValidationError("--camera-up must not be zero")
-            }
-            guard simd_length_squared(simd_cross(target - position, up)) > 0 else {
-                throw ValidationError("--camera-up must not be parallel to the viewing direction")
-            }
-            return LookAt(position: position, target: target, up: up).cameraMatrix
-        }
-
-        if let position = config.getCameraPosition() {
-            return simd_float4x4(translation: position)
-        }
-
-        return LookAt(position: SIMD3<Float>(0, 0, 1.5), target: SIMD3<Float>(0, 0, 0), up: SIMD3<Float>(0, 1, 0)).cameraMatrix
-    }
-
-    func parseCameraRotationMatrix(_ components: [Float], config: RenderConfig) throws -> simd_float4x4 {
-        if components.count == 4 {
-            // Quaternion components in (x, y, z, w) order.
-            let quat = simd_quatf(ix: components[0], iy: components[1], iz: components[2], r: components[3])
-            let rotationMatrix = simd_float4x4(quat)
-
-            if let position = config.getCameraPosition() {
-                var matrix = rotationMatrix
-                matrix.columns.3 = SIMD4<Float>(position.x, position.y, position.z, 1)
-                return matrix
-            }
-            return rotationMatrix
-        }
-        if components.count == 9 {
-            // Row-major 3x3 rotation matrix.
-            let matrix = simd_float4x4(
-                SIMD4<Float>(components[0], components[1], components[2], 0),
-                SIMD4<Float>(components[3], components[4], components[5], 0),
-                SIMD4<Float>(components[6], components[7], components[8], 0),
-                SIMD4<Float>(0, 0, 0, 1)
-            )
-
-            if let position = config.getCameraPosition() {
-                var finalMatrix = matrix
-                finalMatrix.columns.3 = SIMD4<Float>(position.x, position.y, position.z, 1)
-                return finalMatrix
-            }
-            return matrix
-        }
-        throw ValidationError("Camera rotation must be either 4 values (quaternion x,y,z,w) or 9 values (3x3 matrix)")
-    }
-
-    func createProjection(from config: RenderConfig) throws -> any ProjectionProtocol {
-        let angleOfView = config.projectionFov.map { AngleF.degrees(Float($0)) } ?? AngleF.degrees(60)
-        return PerspectiveProjection(
-            verticalAngleOfView: angleOfView,
-            depthMode: .standard(zClip: config.near...config.far)
-        )
+    static func fail(_ message: String, code: Int32) -> Never {
+        FileHandle.standardError.write(Data("error: \(message)\n".utf8))
+        Foundation.exit(code)
     }
 }
 
-// MARK: - Matrix Extensions
+#if !arch(x86_64)
+// MARK: - Rendering
 
-extension simd_float4x4 {
-    init(translation: SIMD3<Float>) {
-        self.init(
-            SIMD4<Float>(1, 0, 0, 0),
-            SIMD4<Float>(0, 1, 0, 0),
-            SIMD4<Float>(0, 0, 1, 0),
-            SIMD4<Float>(translation.x, translation.y, translation.z, 1)
+@MainActor
+private func render(_ settings: Settings) throws {
+    // Check the camera before the scene loads, as the spec asks.
+    let cameraMatrix = try settings.cameraToWorld()
+    guard let device = MTLCreateSystemDefaultDevice() else {
+        throw RenderError("no Metal device")
+    }
+    var upscaleFactor = settings.upscaleFactor
+    if upscaleFactor != nil, !MTLFXSpatialScalerDescriptor.supportsMetal4FX(device) {
+        FileHandle.standardError.write(Data("warning: this GPU has no MetalFX spatial upscaler; rendering at full size\n".utf8))
+        upscaleFactor = nil
+    }
+    let cloud = try loadScene(path: settings.scene, maximumDegree: settings.sphericalHarmonicsDegree, device: device)
+
+    let libraryRenderer: OffscreenSplatRenderer.Renderer
+    switch settings.renderer {
+    case .spark:
+        libraryRenderer = .spark
+
+    case .point:
+        libraryRenderer = .point
+
+    case .tile:
+        libraryRenderer = .tile
+
+    case .stochastic:
+        libraryRenderer = .stochastic
+    }
+
+    let linear = settings.colorSpace == .linear
+    var tuning = SplatRenderTuning.default
+    tuning.blurAmount = settings.dilation ? 0.3 : 0
+    let renderer = try OffscreenSplatRenderer(
+        renderer: libraryRenderer,
+        splatCloud: cloud,
+        projection: PerspectiveProjection(
+            verticalAngleOfView: .degrees(Float(settings.projectionFov)),
+            depthMode: .standard(zClip: Float(settings.projectionNear)...Float(settings.projectionFar))
+        ),
+        cameraMatrix: cameraMatrix,
+        modelMatrix: settings.modelMatrix(),
+        configuration: .init(
+            width: settings.width,
+            height: settings.height,
+            backgroundColor: clearColor(settings: settings),
+            convertSRGBToLinear: linear,
+            nearPlane: Float(settings.projectionNear),
+            farPlane: Float(settings.projectionFar),
+            pointSupersampling: settings.supersampling,
+            pointPointsPerThread: settings.pointsPerThread,
+            collectGPUCounters: settings.statistics != nil,
+            sortPrecision: settings.sortPrecision,
+            metalFXScale: Float(upscaleFactor ?? 1),
+            sparkTuning: tuning,
+            // srgb writes splat colors as they are, so the target does no encoding.
+            // linear blends in linear space and lets the sRGB target encode.
+            colorPixelFormat: linear ? .bgra8Unorm_srgb : .bgra8Unorm
         )
+    )
+
+    var samples: [FrameSample] = []
+    try MTLCaptureManager.shared().with(enabled: settings.capture) {
+        for _ in 0..<settings.warmupFrames {
+            try renderer.renderFrame()
+        }
+        for _ in 0..<settings.measuredFrames {
+            let start = ContinuousClock.now
+            let report = try renderer.renderFrame()
+            samples.append(FrameSample(
+                wallTime: elapsedSeconds(since: start),
+                sortGPU: report.sortGPU,
+                render: report.render,
+                visibleSplats: report.visibleSplats,
+                commandBufferGPUTime: report.commandBufferGPUTime
+            ))
+        }
+    }
+
+    if let output = settings.output {
+        var image = try renderer.makeImage()
+        if settings.label {
+            image = addLabel(to: image, settings: settings, splatCount: cloud.count, shDegree: cloud.shDegree)
+        }
+        try savePNG(image, to: output, reveal: settings.reveal)
+    }
+
+    if let format = settings.statistics {
+        let metalFXScale = settings.renderer == .spark ? upscaleFactor.map(Float.init) : nil
+        let report = makeReport(samples: samples, splats: cloud.count, shDegree: Int(cloud.shDegree), width: settings.width, height: settings.height, warmup: settings.warmupFrames, renderer: settings.renderer, metalFXScale: metalFXScale)
+        try emitReport(report, format: format)
     }
 }
+
+/// The blend is premultiplied, so the clear color is too. In linear mode the
+/// background, given in sRGB, is converted to linear first.
+private func clearColor(settings: Settings) -> SIMD4<Float> {
+    let background = settings.backgroundColor
+    let alpha = background.w
+    func channel(_ value: Float) -> Float {
+        (settings.colorSpace == .linear ? srgbToLinear(value) : value) * alpha
+    }
+    return SIMD4(channel(background.x), channel(background.y), channel(background.z), alpha)
+}
+
+private func srgbToLinear(_ value: Float) -> Float {
+    value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+}
+
+// MARK: - Label
+
+@MainActor
+private func addLabel(to image: CGImage, settings: Settings, splatCount: Int, shDegree: UInt8) -> CGImage {
+    let fov = settings.projectionFov.formatted(.number.precision(.fractionLength(0...2)))
+    var lines = [
+        "metalsprockets-gaussian-splat (\(settings.renderer.rawValue))",
+        "\(settings.width)x\(settings.height)  FOV \(fov)°  \(settings.colorSpace.rawValue)",
+        "\(splatCount) splats, SH \(shDegree > 0 ? "degree \(shDegree)" : "off")",
+        URL(fileURLWithPath: settings.scene).lastPathComponent
+    ]
+    if let factor = settings.upscaleFactor {
+        lines.insert("upscale \(factor.formatted())x", at: 2)
+    }
+    let labelView = ZStack(alignment: .topLeading) {
+        Image(decorative: image, scale: 1.0)
+        Text(lines.joined(separator: "\n"))
+            .font(.system(size: 14, weight: .medium, design: .monospaced))
+            .foregroundColor(.white)
+            .padding(8)
+            .background(Color.black.opacity(0.7))
+            .cornerRadius(4)
+            .padding(10)
+    }
+    let renderer = ImageRenderer(content: labelView)
+    renderer.scale = 1.0
+    return renderer.cgImage ?? image
+}
+
+// MARK: - Output
+
+private func savePNG(_ image: CGImage, to path: String, reveal: Bool) throws {
+    let url = URL(fileURLWithPath: path)
+    do {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    } catch {
+        throw RenderError("cannot write \(path): \(error.localizedDescription)")
+    }
+    // The texture bytes are already in the output encoding, so tag them sRGB
+    // rather than letting ImageIO convert from device RGB.
+    let tagged = CGColorSpace(name: CGColorSpace.sRGB).flatMap { image.copy(colorSpace: $0) } ?? image
+    guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+        throw RenderError("cannot write \(path)")
+    }
+    CGImageDestinationAddImage(destination, tagged, nil)
+    guard CGImageDestinationFinalize(destination) else {
+        throw RenderError("cannot write \(path)")
+    }
+    if reveal {
+        NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
+    }
+}
+#endif

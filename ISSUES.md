@@ -4193,12 +4193,13 @@ May contribute to #195.
 ## 197: metalsprockets-gaussian-splat CLI flags differ from the splat-render spec
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: area:cli, effort:m
 created: 2026-11-11T02:16:45Z
-updated: 2026-11-11T02:28:02Z
+updated: 2026-11-11T02:35:31Z
+closed: 2026-11-11T02:35:31Z
 +++
 
 The `metalsprockets-gaussian-splat` command line does not match the splat-render spec (`~/Projects/Scratch/splat-render/docs/help.txt` and `docs/spec.md`). The splat-render metalsprockets backend (`splat-render-metalsprockets`) has its own wrapper because of this.
@@ -4228,5 +4229,23 @@ Differences:
 Other spec points not checked against this CLI: exit codes (64 usage, 65 unreadable scene), validating arguments before loading the scene, and the `--config` JSON schema (`docs/config.schema.json`, camelCase long flag names, unknown key is a usage error).
 
 Flags that exist only here (`--renderer`, `--supersampling`, `--points-per-thread`, `--sort-precision`, `--capture`, `--reveal`, the `bench` subcommand) are allowed by the spec as backend-specific extras.
+
+---
+
+## 198: CLI --statistics json output does not match the splat-render statistics schema
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: area:cli, effort:s
+created: 2026-11-11T02:35:21Z
++++
+
+With `--statistics json`, `metalsprockets-gaussian-splat` writes its own report (`splats`, `shDegree`, `wall`, `sortGpu`, `renderGpu`, `vertex`, `fragment`, `culledSplats`, ...). The splat-render spec requires the schema in `~/Projects/Scratch/splat-render/docs/statistics.schema.json`: `backend`, `scene`, `splatCount`, `width`, `height`, `warmupFrames`, `measuredFrames`, `wallMilliseconds` and optional `gpuMilliseconds` and `passes`, each timing as `{median, min, max}`, with `additionalProperties: false`.
+
+splat-render tests that fail against this CLI: `test_statistics.py::test_json_matches_schema`, `test_json_values`, `test_one_frame_has_one_value`.
+
+Left over from #197.
 
 ---

@@ -72,6 +72,10 @@ public final class OffscreenSplatRenderer {
         public var metalFXScale: Float
         /// Spark render-quality tuning. Other renderers ignore it.
         public var sparkTuning: SplatRenderTuning
+        /// Color target format: `.bgra8Unorm_srgb` or `.bgra8Unorm`. With
+        /// `.bgra8Unorm`, shader output is stored with no sRGB encoding. The
+        /// point renderer ignores it.
+        public var colorPixelFormat: MTLPixelFormat
 
         public init(
             width: Int,
@@ -85,7 +89,8 @@ public final class OffscreenSplatRenderer {
             collectGPUCounters: Bool = false,
             sortPrecision: SplatSortPrecision = .float16,
             metalFXScale: Float = 1,
-            sparkTuning: SplatRenderTuning = .default
+            sparkTuning: SplatRenderTuning = .default,
+            colorPixelFormat: MTLPixelFormat = .bgra8Unorm_srgb
         ) {
             self.width = width
             self.height = height
@@ -99,6 +104,7 @@ public final class OffscreenSplatRenderer {
             self.sortPrecision = sortPrecision
             self.metalFXScale = metalFXScale
             self.sparkTuning = sparkTuning
+            self.colorPixelFormat = colorPixelFormat
         }
     }
 
@@ -143,7 +149,8 @@ public final class OffscreenSplatRenderer {
     private let pointTexture: MTLTexture?
     // MetalFX upscale target (private, full size); nil when not upscaling.
     private let upscaledTexture: MTLTexture?
-    private let upscaleResources: ResourceCollection
+    /// Color, depth and MetalFX output textures, made resident for every render.
+    private let outputResources: ResourceCollection
 
     /// The size the splats are rasterized at, before any MetalFX upscale.
     public var renderSize: SIMD2<Int> {
@@ -180,12 +187,13 @@ public final class OffscreenSplatRenderer {
         let device = device ?? _MTLCreateSystemDefaultDevice()
 
         var renderConfiguration = configuration
-        self.upscaleResources = try ResourceCollection(device: device)
+        let outputResources = try ResourceCollection(device: device)
+        self.outputResources = outputResources
         if renderer == .spark, configuration.metalFXScale > 1, MetalFXUpscale.isSupported(device: device) {
             renderConfiguration.width = max(1, Int((Float(configuration.width) / configuration.metalFXScale).rounded()))
             renderConfiguration.height = max(1, Int((Float(configuration.height) / configuration.metalFXScale).rounded()))
-            let texture = try MetalFXUpscale.makeOutputTexture(device: device, pixelFormat: .bgra8Unorm_srgb, width: configuration.width, height: configuration.height)
-            try upscaleResources.register(texture)
+            let texture = try MetalFXUpscale.makeOutputTexture(device: device, pixelFormat: configuration.colorPixelFormat, width: configuration.width, height: configuration.height)
+            try outputResources.register(texture)
             self.upscaledTexture = texture
         } else {
             self.upscaledTexture = nil
@@ -206,22 +214,33 @@ public final class OffscreenSplatRenderer {
             self.gpuSortResources = nil
 
         case .spark:
-            let offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: renderConfiguration)
+            let offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: renderConfiguration, resources: outputResources)
             self.offscreenRenderer = offscreenRenderer
             self.gpuSortResources = try GPUSortResources(device: offscreenRenderer.device, capacity: splatCloud.count, slotCount: 1, precision: configuration.sortPrecision)
             self.pointRunner = nil
             self.pointTexture = nil
 
         case .tile, .stochastic:
-            self.offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: configuration)
+            self.offscreenRenderer = try Self.makeOffscreenRenderer(device: device, configuration: configuration, resources: outputResources)
             self.gpuSortResources = nil
             self.pointRunner = nil
             self.pointTexture = nil
         }
     }
 
-    private static func makeOffscreenRenderer(device: MTLDevice, configuration: Configuration) throws -> OffscreenRenderer {
-        let renderer = try OffscreenRenderer(size: CGSize(width: configuration.width, height: configuration.height), device: device)
+    private static func makeOffscreenRenderer(device: MTLDevice, configuration: Configuration, resources: ResourceCollection) throws -> OffscreenRenderer {
+        let colorDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: configuration.colorPixelFormat, width: configuration.width, height: configuration.height, mipmapped: false)
+        colorDescriptor.usage = [.renderTarget, .shaderRead]
+        let colorTexture = try device.makeTexture(descriptor: colorDescriptor).orThrow(.resourceCreationFailure("Failed to create color texture"))
+        colorTexture.label = "Color Texture"
+        let depthDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .depth32Float, width: configuration.width, height: configuration.height, mipmapped: false)
+        depthDescriptor.usage = [.renderTarget]
+        depthDescriptor.storageMode = .private
+        let depthTexture = try device.makeTexture(descriptor: depthDescriptor).orThrow(.resourceCreationFailure("Failed to create depth texture"))
+        depthTexture.label = "Depth Texture"
+        try resources.register(colorTexture)
+        try resources.register(depthTexture)
+        let renderer = try OffscreenRenderer(size: CGSize(width: configuration.width, height: configuration.height), colorTexture: colorTexture, depthTexture: depthTexture)
         renderer.renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
             red: Double(configuration.backgroundColor.x),
             green: Double(configuration.backgroundColor.y),
@@ -290,7 +309,7 @@ public final class OffscreenSplatRenderer {
             )
             let renderPass = try makeSparkRenderPass(sortedIndices: sortedIndices)
             let upscale = upscaledTexture.map { MetalFXUpscale.element(input: offscreenRenderer.colorTexture, output: $0) }
-            let resources = upscaleResources
+            let resources = outputResources
             if configuration.collectGPUCounters {
                 let sortBox = sortSampleBox
                 let renderBox = renderSampleBox
@@ -402,9 +421,9 @@ public final class OffscreenSplatRenderer {
     private func render(pass: some Element, in offscreenRenderer: OffscreenRenderer) throws -> TimeInterval? {
         if configuration.collectGPUCounters {
             let box = renderSampleBox
-            return try offscreenRenderer.render(pass.gpuCounters(label: "splat render") { box.set($0) }).gpuTime
+            return try offscreenRenderer.render(pass.gpuCounters(label: "splat render") { box.set($0) }.useResourceCollection(outputResources)).gpuTime
         }
-        return try offscreenRenderer.render(pass).gpuTime
+        return try offscreenRenderer.render(pass.useResourceCollection(outputResources)).gpuTime
     }
 
     // MARK: - Point image conversion
