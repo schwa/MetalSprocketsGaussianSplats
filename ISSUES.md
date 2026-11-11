@@ -3974,15 +3974,210 @@ Expected: a GPU-sorted render path and view that take several clouds and depth-s
 ## 189: Packed PointSplat path renders without spherical harmonics
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
 labels: effort:m, area:pointsplat, deferred
 created: 2026-10-23T21:42:11Z
+updated: 2026-11-11T00:36:03Z
 +++
 
 The offline PointSplatComputePass (used by the CLI point renderer and the packed 18-byte splat path) always sets shDegree 0, so SH clouds render with base color only there. Packed splats (GPSPackedSplat) also have no shIndex field, so they cannot reference an SH palette row.
 
 Found while closing #163. The interactive PointSplatRenderPipeline does evaluate SH.
+
+---
+
+## 190: Support SOG format v3
+
++++
+status: open
+priority: medium
+kind: feature
+labels: effort:l, area:sog
+created: 2026-11-11T00:12:47Z
+updated: 2026-11-11T00:36:03Z
++++
+
+SOG reader only handles v2. PlayCanvas proposed SOG v3 (https://github.com/playcanvas/splat-transform/issues/362), which v2 readers must reject. v3 changes:
+
+- Rotation: 24-bit exponential map in alpha channels of means_l, means_u, scales; quats.webp removed
+- Opacity: (sh0.a/204)², up to 1.5625; meta.opacity.max when >1
+- SH bands: 1–4 (v2: 1–3)
+- SH palette: up to 2^24 entries (shN_labels.b holds bits 16–23)
+- Optional blind_<i>.webp per-gaussian data
+- Optional top-level extras and comments in meta (and Streamed SOG lod-meta.json)
+
+Expected: v3 .sog files load and render correctly. Actual: unsupported.
+
+---
+
+## 191: sRGB to linear conversion uses pow 2.2, not the sRGB curve
+
++++
+status: open
+priority: low
+kind: bug
+labels: area:shaders, effort:xs
+created: 2026-11-11T00:26:57Z
+updated: 2026-11-11T00:36:03Z
++++
+
+With `convertSRGBToLinear`, the shaders convert splat colors with `pow(rgba.rgb, float3(2.2))`. This is an approximation of the sRGB transfer curve. The exact curve is `c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)`. The difference is largest in dark tones.
+
+Places:
+- `Sources/MetalSprocketsGaussianSplatShaders/Metal/SparkSplatRenderShader.metal:202`
+- `Sources/MetalSprocketsGaussianSplatShaders/Metal/StochasticSplatRenderShader.metal:168`
+- `Sources/MetalSprocketsGaussianSplatShaders/Metal/TileSplatBinning.metal:108`
+- `Sources/MetalSprocketsGaussianSplatsDebugShaders/Metal/SparkSplatDebugRenderShader.metal:262`
+
+The colors are base color plus SH, computed in float in the vertex shader, so a hardware sRGB texture decode cannot do this conversion.
+
+Found by splat-render (`~/Projects/Scratch/splat-render`, issue #5).
+
+---
+
+## 192: Anti-aliasing opacity scale cannot be turned off separately from dilation
+
++++
+status: open
+priority: medium
+kind: bug
+labels: area:shaders, effort:s
+created: 2026-11-11T00:26:58Z
+updated: 2026-11-11T00:36:03Z
++++
+
+`SparkSplatRenderShader.metal` (around line 154) adds `BLUR_AMOUNT` to the 2D covariance and then always multiplies the opacity by `sqrt(detOrig / det)` (the Mip-Splatting anti-aliasing scale). No setting turns the opacity scale off while keeping the dilation.
+
+The INRIA rasterizer and gsplat in its default mode dilate without the opacity scale. Scenes trained that way render darker in fine detail when the scale is applied. Only scenes trained in the anti-aliased mode expect it.
+
+Expected: the dilation and the opacity scale can be set separately (for example a tuning flag).
+
+Found by splat-render (`~/Projects/Scratch/splat-render`, issue #4). Its metalsprockets backend scores about 10 dB lower PSNR against gsplat than the other backends (issue #9). This may be one of the causes, but that is not checked.
+
+- `2026-11-11T00:35:07Z`: gaussiansplats-ios removed the opacity scale outright in `rypoqvxv` (dilation only, as in gsplat "classic" mode). Here the scale is also in `SparkSplatDebugRenderShader.metal`, `StochasticSplatRenderShader.metal` and `TileSplatBinning.metal`. The default blur value depends on this, see #196.
+
+---
+
+## 193: Spark renderer SH colors are mirrored
+
++++
+status: open
+priority: high
+kind: bug
+labels: area:shaders, effort:s
+created: 2026-11-11T00:31:57Z
+updated: 2026-11-11T00:36:03Z
++++
+
+On a sphere with strong SH (`Samples/sh-sphere/sh-sphere.ply`, band 1 red, band 2 green, band 3 blue), the view-dependent colors are mirrored: the magenta and green halves are swapped. With SH degree 0 the sphere is gray, as expected.
+
+PSNR against gsplat at 128×96, camera at (0, 0, 3.5) looking at the origin, up +Y:
+
+| Renderer | PSNR |
+|---|---|
+| MetalSprocketsGaussianSplats | 15.27 dB |
+| GaussianSplatMetal (gaussiansplats-ios) | 37.55 dB |
+| WebGPU port | 48.03 dB |
+
+The result is the same from `.ply` and from `.sog` (15.27 dB both), so the loaders are not the cause.
+
+Found by splat-render (`~/Projects/Scratch/splat-render`), which renders the same scenes with several renderers and compares them with gsplat by PSNR. The samples are in `~/Projects/Scratch/splat-render/Samples`. Its metalsprockets backend pins commit `7829a8d` and uses `SplatLoader.read`, `GPUSplatSortComputePass`, and `SparkSplatRenderPipeline`.
+
+Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference.py --reference --backend metalsprockets -k sh-sphere`
+
+- `2026-11-11T00:35:06Z`: gaussiansplats-ios fixed this in `nxqqxxsv` (its #34): degree-1 y and x terms negated, signed `SH_C2`/`SH_C3` arrays as in INRIA, the INRIA polynomial forms, and C3 term 5 uses 1.4453 instead of 2.8906. Our `SparkSplatSupport.h` still has the old basis.
+
+---
+
+## 194: .splat loader makes rotated splats too large
+
++++
+status: open
+priority: medium
+kind: bug
+labels: area:io, effort:s
+created: 2026-11-11T00:31:57Z
+updated: 2026-11-11T00:36:03Z
++++
+
+`Samples/test-splats/plane.splat` is a 21×21 grid of splats with rotation (-0.5, -0.5, -0.5, -0.5) and scale 0.1. Loaded from `.splat`, every splat is drawn much larger, so the grid becomes a solid square. `six-splats.splat` (identity rotation) is correct.
+
+PSNR against gsplat at 128×96:
+
+| Input | MetalSprocketsGaussianSplats | GaussianSplatMetal |
+|---|---|---|
+| `plane.splat` | 21.63 dB | 51.97 dB |
+| the same scene as `.ply` | 29.73 dB | 51.81 dB |
+| the same scene as `.sog` | 29.74 dB | 51.79 dB |
+
+So the `.splat` path loses about 8 dB more than `.ply` and `.sog`. The remaining gap from `.ply` and `.sog` is not explained.
+
+Found by splat-render (`~/Projects/Scratch/splat-render`), which renders the same scenes with several renderers and compares them with gsplat by PSNR. The samples are in `~/Projects/Scratch/splat-render/Samples`. Its metalsprockets backend pins commit `7829a8d` and uses `SplatLoader.read`, `GPUSplatSortComputePass`, and `SparkSplatRenderPipeline`.
+
+Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference.py --reference --backend metalsprockets -k plane`
+
+---
+
+## 195: Real captures render darker than gsplat
+
++++
+status: open
+priority: high
+kind: bug
+labels: area:shaders, effort:m
+created: 2026-11-11T00:31:57Z
+updated: 2026-11-11T00:36:03Z
++++
+
+Real captures render darker than gsplat and the other renderers.
+
+PSNR against gsplat at 128×96:
+
+| Scene | MetalSprocketsGaussianSplats | GaussianSplatMetal | Spark (sparkjs) |
+|---|---|---|---|
+| `cluster-fly.ply` (25,627 splats, SH 3) | 27.99 dB | 38.20 dB | 38.65 dB |
+| `cluster-fly.sog` | 28.11 dB | 38.34 dB | 38.94 dB |
+| `lion.spz` (195,099 splats, SH 2) | 20.43 dB | 35.67 dB | 37.21 dB |
+
+On 100 poses of a larger demo scene at 640×480, the mean is 27.59 dB, against 36–39 dB for the other renderers.
+
+The cause is not known. A possible cause is the anti-aliasing opacity scale (#192), which gsplat does not apply. The SH problem (#193) can also contribute on scenes with SH.
+
+Found by splat-render (`~/Projects/Scratch/splat-render`), which renders the same scenes with several renderers and compares them with gsplat by PSNR. The samples are in `~/Projects/Scratch/splat-render/Samples`. Its metalsprockets backend pins commit `7829a8d` and uses `SplatLoader.read`, `GPUSplatSortComputePass`, and `SparkSplatRenderPipeline`.
+
+Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference.py --reference --backend metalsprockets -k "cluster-fly or lion"`
+
+- `2026-11-11T00:36:06Z`: Related: #192 (opacity scale), #193 (SH mirrored), #196 (default blur/footprint). Re-measure after those land.
+
+---
+
+## 196: Default AA dilation and footprint cutoff differ from gsplat
+
++++
+status: open
+priority: medium
+kind: bug
+labels: area:shaders, effort:xs
+depends: 192
+created: 2026-11-11T00:35:02Z
+updated: 2026-11-11T00:36:04Z
++++
+
+The default `SplatRenderTuning` (`Sources/MetalSprocketsGaussianSplats/Spark/SplatRenderTuning.swift`) differs from INRIA 3DGS / gsplat:
+
+| Setting | Here | gsplat |
+|---|---|---|
+| `blurAmount` (2D covariance dilation, px²) | 0.05 | 0.3 (`eps2d`) |
+| `maxStdDev` (footprint cutoff) | 2.5σ | 3σ |
+
+Scenes trained with gsplat expect the gsplat values. The smaller dilation makes thin splats too sharp and too thin. The smaller cutoff clips the tails of every splat.
+
+An earlier issue lowered `blurAmount` from 0.3 to 0.05 because 0.3 looked too blurry. That result was measured with the anti-aliasing opacity scale on (#192). With the opacity scale off, as gsplat does it, 0.3 is the reference value.
+
+gaussiansplats-ios made the same changes in `rvnrxwko` (blur 0.05 → 0.3) and `lszttvop` (maxStdDev 2.5 → 3.0, its issue #39).
+
+May contribute to #195.
 
 ---
