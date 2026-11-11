@@ -125,15 +125,73 @@ func makeReport(samples: [FrameSample], splats: Int, shDegree: Int, width: Int, 
     )
 }
 
-func emitReport(_ report: StatisticsReport, format: StatisticsFormat) throws {
+func emitReport(_ report: StatisticsReport, samples: [FrameSample], scene: String, format: StatisticsFormat) throws {
     switch format {
     case .text:
         printTextReport(report)
 
     case .json:
+        let json = JSONReport(report: report, samples: samples, scene: scene)
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        print(String(bytes: try encoder.encode(report), encoding: .utf8) ?? "")
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        print(String(bytes: try encoder.encode(json), encoding: .utf8) ?? "")
+    }
+}
+
+/// `--statistics json`, in the splat-render schema
+/// (~/Projects/Scratch/splat-render/docs/statistics.schema.json).
+private struct JSONReport: Encodable {
+    struct Timing: Encodable {
+        var median: Double
+        var min: Double
+        var max: Double
+
+        /// Input in seconds, output in milliseconds.
+        init(_ seconds: [Double]) {
+            let sorted = seconds.map { $0 * 1_000 }.sorted()
+            let middle = sorted.count / 2
+            median = sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+            min = sorted.first ?? 0
+            max = sorted.last ?? 0
+        }
+    }
+
+    struct Pass: Encodable {
+        var name: String
+        var gpuMilliseconds: Timing
+    }
+
+    var backend = "metalsprockets"
+    var scene: String
+    var splatCount: Int
+    var width: Int
+    var height: Int
+    var upscaleFactor: Float?
+    var warmupFrames: Int
+    var measuredFrames: Int
+    var wallMilliseconds: Timing
+    var gpuMilliseconds: Timing?
+    var passes: [Pass]?
+
+    init(report: StatisticsReport, samples: [FrameSample], scene: String) {
+        self.scene = scene
+        splatCount = report.splats
+        width = report.width
+        height = report.height
+        upscaleFactor = report.metalFXScale
+        warmupFrames = report.warmup
+        measuredFrames = samples.count
+        wallMilliseconds = Timing(samples.map(\.wallTime))
+        // Leave out a timing unless every frame has it.
+        func all(_ values: [Double]) -> Timing? {
+            values.count == samples.count && !values.isEmpty ? Timing(values) : nil
+        }
+        gpuMilliseconds = all(samples.compactMap(\.commandBufferGPUTime))
+        let passes = [
+            ("sort", all(samples.compactMap { $0.sortGPU?.duration })),
+            ("rasterize", all(samples.compactMap { $0.render?.duration }))
+        ].compactMap { name, timing in timing.map { Pass(name: name, gpuMilliseconds: $0) } }
+        self.passes = passes.isEmpty ? nil : passes
     }
 }
 

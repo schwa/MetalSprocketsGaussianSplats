@@ -4240,12 +4240,13 @@ Flags that exist only here (`--renderer`, `--supersampling`, `--points-per-threa
 ## 198: CLI --statistics json output does not match the splat-render statistics schema
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: area:cli, effort:s
 created: 2026-11-11T02:35:21Z
-updated: 2026-11-11T04:24:21Z
+updated: 2026-11-11T04:29:21Z
+closed: 2026-11-11T04:29:21Z
 +++
 
 With `--statistics json`, `metalsprockets-gaussian-splat` writes its own report (`splats`, `shDegree`, `wall`, `sortGpu`, `renderGpu`, `vertex`, `fragment`, `culledSplats`, ...). The splat-render spec requires the schema in `~/Projects/Scratch/splat-render/docs/statistics.schema.json`: `backend`, `scene`, `splatCount`, `width`, `height`, `warmupFrames`, `measuredFrames`, `wallMilliseconds` and optional `gpuMilliseconds` and `passes`, each timing as `{median, min, max}`, with `additionalProperties: false`.

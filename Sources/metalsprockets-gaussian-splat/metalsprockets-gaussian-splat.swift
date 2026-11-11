@@ -202,7 +202,7 @@ private func render(_ settings: Settings) throws {
     if let format = settings.statistics {
         let metalFXScale = settings.renderer == .spark ? upscaleFactor.map(Float.init) : nil
         let report = makeReport(samples: samples, splats: cloud.count, shDegree: Int(cloud.shDegree), width: settings.width, height: settings.height, warmup: settings.warmupFrames, renderer: settings.renderer, metalFXScale: metalFXScale)
-        try emitReport(report, format: format)
+        try emitReport(report, samples: samples, scene: settings.scene, format: format)
     }
 }
 
