@@ -105,7 +105,7 @@ namespace TileSplatBinning {
         float blurAdjust = sqrt(max(0.0, detOrig / det));
         float baseAlpha = rgba.a * blurAdjust;
         projected.centerConicAB = float4(screenCenter, conic.x, conic.y);
-        projected.colorAlpha = float4(pow(rgba.rgb, float3(2.2)), baseAlpha);
+        projected.colorAlpha = float4(srgbToLinear(rgba.rgb), baseAlpha);
         projected.conicD = conic.z;
 
         float2 majorAxisNDC = (2.0 / drawableSize) * eigen.majorAxis;

@@ -73,10 +73,10 @@ struct SparkShadingTests {
 
     // With convertSRGBToLinear, the shader decodes sRGB and the sRGB target encodes
     // it again, so a dark color must come back unchanged. pow(c, 2.2) is far off here.
-    @Test @MainActor
-    func srgbToLinearUsesTheSRGBCurve() throws {
+    @Test(arguments: [OffscreenSplatRenderer.Renderer.spark, .tile, .stochastic]) @MainActor
+    func srgbToLinearUsesTheSRGBCurve(renderer: OffscreenSplatRenderer.Renderer) throws {
         let base: Float = 0.03
-        let pixel = try centerPixel(cameraPosition: [0, 0, 3], shCoefficients: [], shDegree: 0, baseColor: SIMD3(repeating: base), convertSRGBToLinear: true)
+        let pixel = try centerPixel(cameraPosition: [0, 0, 3], shCoefficients: [], shDegree: 0, baseColor: SIMD3(repeating: base), convertSRGBToLinear: true, renderer: renderer)
         let expected = linear(UInt8((base * 255).rounded()))
         #expect(abs(pixel.x - expected) < 0.0008, "red \(pixel.x), expected \(expected)")
     }
@@ -91,7 +91,8 @@ struct SparkShadingTests {
         baseColor: SIMD3<Float> = [0.5, 0.5, 0.5],
         scale: SIMD3<Float> = [0.5, 0.5, 0.5],
         tuning: SplatRenderTuning = .default,
-        convertSRGBToLinear: Bool = false
+        convertSRGBToLinear: Bool = false,
+        renderer: OffscreenSplatRenderer.Renderer = .spark
     ) throws -> SIMD3<Float> {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let generic = GenericSplat(position: .zero, scale: scale, color: SIMD4(baseColor, 1), rotation: [0, 0, 0, 1])
@@ -100,7 +101,7 @@ struct SparkShadingTests {
             : try GPUSplatCloud<SparkSplat>(device: device, splats: [SparkSplat(generic)], shCoefficients: shCoefficients, shDegree: shDegree)
         let size = 32
         let renderer = try OffscreenSplatRenderer(
-            renderer: .spark,
+            renderer: renderer,
             splatCloud: cloud,
             projection: PerspectiveProjection(verticalAngleOfView: .degrees(30), depthMode: .standard(zClip: 0.01 ... 100)),
             cameraMatrix: LookAt(position: cameraPosition, target: .zero, up: [0, 1, 0]).cameraMatrix,

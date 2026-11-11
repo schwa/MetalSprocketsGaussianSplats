@@ -4278,12 +4278,13 @@ The reader does not read `model`, and the Spark renderer uses the default tuning
 ## 200: Stochastic, tile and debug renderers convert sRGB to linear with pow 2.2
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: area:shaders, effort:xs
 created: 2026-11-11T02:43:54Z
-updated: 2026-11-11T04:24:21Z
+updated: 2026-11-11T04:28:19Z
+closed: 2026-11-11T04:28:19Z
 +++
 
 With convertSRGBToLinear, these shaders still convert splat colors with `pow(rgba.rgb, float3(2.2))` instead of the exact sRGB curve. The difference is largest in dark tones.

@@ -42,7 +42,8 @@ namespace BlitShader {
             // Color is premultiplied by coverage; unpremultiply before the
             // sRGB decode, then restore (#162).
             float alpha = max(color.a, 1e-5);
-            color.rgb = pow(color.rgb / alpha, float3(2.2)) * alpha;
+            float3 c = color.rgb / alpha;
+            color.rgb = select(pow((c + 0.055) / 1.055, float3(2.4)), c / 12.92, c <= 0.04045) * alpha;
         }
         return color;
     }

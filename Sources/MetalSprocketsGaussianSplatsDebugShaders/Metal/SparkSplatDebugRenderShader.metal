@@ -259,7 +259,7 @@ namespace SparkSplatRenderShader {
 
         // Convert sRGB to linear for correct blending.
         if (convert_srgb_to_linear) {
-            rgba.rgb = pow(rgba.rgb, float3(2.2));
+            rgba.rgb = srgbToLinear(rgba.rgb);
         }
 
         float z = dot(in.splatUv, in.splatUv);
