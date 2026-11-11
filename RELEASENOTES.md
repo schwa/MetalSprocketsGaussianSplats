@@ -1,5 +1,17 @@
 # Release Notes
 
+## Unreleased
+
+### Breaking
+
+- `metalsprockets-gaussian-splat` follows the splat-render command-line spec. The scene is
+  positional (was `--splat`). `--camera-lookat` is `--camera-look-at`, `--srgb-to-linear` is
+  `--color-space linear`, `--metalfx` is `--upscale-factor`, `--near`/`--far` are aliases of
+  `--projection-near`/`--projection-far`. Without `-o` no file is written. The default camera
+  is at `0,0,5`. `--config` keys are the camelCase long flag names (`scene`, `cameraLookAt`,
+  `projectionNear`, ...), and unknown keys are an error. Exit codes: 64 usage, 65 unreadable
+  scene, 1 render failure.
+
 ## 0.1.9
 
 ### Features

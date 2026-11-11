@@ -17,7 +17,7 @@ Forward pass follows the INRIA / gsplat conventions:
   - global back-to-front depth sort, per-pixel alpha compositing in f32
   - alpha skip threshold 1/255, transmittance early-out at 1e-4
 
-CLI flags mirror metalsprockets-gaussian-splat where sensible. The camera
+CLI flags follow metalsprockets-gaussian-splat and the splat-render spec. The camera
 matrix is camera-to-world, OpenGL convention (camera looks down -Z, Y up),
 column-major when passed as 16 floats.
 """
@@ -311,64 +311,76 @@ def look_at(position, target, up=(0.0, 1.0, 0.0)) -> np.ndarray:
 
 @app.command()
 def main(
-    splat: Optional[Path] = typer.Option(None, help="Path to .ply splat file"),
-    config: Optional[Path] = typer.Option(None, help="JSON config (same schema as metalsprockets-gaussian-splat)"),
-    output: str = typer.Option("output.png", help="Output PNG path"),
-    width: int = typer.Option(1024),
-    height: int = typer.Option(768),
-    background: str = typer.Option("0,0,0,1", help="RGBA background"),
+    scene: Optional[Path] = typer.Argument(None, help="Scene to render (.ply; others are converted with splat-transform)"),
+    config: Optional[Path] = typer.Option(None, help="JSON config: long flag names in camelCase, as in metalsprockets-gaussian-splat"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output PNG path"),
+    width: Optional[int] = typer.Option(None, "--width", "-w", help="Output width. (default: 1024)"),
+    height: Optional[int] = typer.Option(None, help="Output height. (default: 768)"),
+    background: Optional[str] = typer.Option(None, help="RGBA background. (default: 0,0,0,1)"),
     model_position: Optional[str] = typer.Option(None, help="x,y,z model translation"),
-    camera_position: Optional[str] = typer.Option(None, help="x,y,z"),
-    camera_lookat: Optional[str] = typer.Option(None, help="x,y,z"),
+    camera_position: Optional[str] = typer.Option(None, "--camera-position", "--eye", help="x,y,z. (default: 0,0,5)"),
+    camera_look_at: Optional[str] = typer.Option(None, "--camera-look-at", "--look-at", help="x,y,z. (default: 0,0,0)"),
+    camera_up: Optional[str] = typer.Option(None, "--camera-up", "--up", help="x,y,z. (default: 0,1,0)"),
     camera_matrix: Optional[str] = typer.Option(None, help="16 column-major floats, camera-to-world (OpenGL)"),
-    projection_fov: float = typer.Option(60.0, help="Vertical FOV in degrees"),
-    near: float = typer.Option(0.1),
-    far: float = typer.Option(100.0),
-    sh_degree: Optional[int] = typer.Option(None, help="Override SH degree (0-3)"),
-    dilation: bool = typer.Option(True, help="Apply INRIA 0.3px covariance dilation"),
-    srgb: bool = typer.Option(True, help="Treat splat colors as sRGB (write bytes directly, no conversion)"),
+    projection_fov: Optional[float] = typer.Option(None, "--projection-fov", "--fov", "-f", help="Vertical FOV in degrees. (default: 60)"),
+    projection_near: Optional[float] = typer.Option(None, "--projection-near", "--near", help="(default: 0.1)"),
+    projection_far: Optional[float] = typer.Option(None, "--projection-far", "--far", help="(default: 100)"),
+    sh_degree: Optional[int] = typer.Option(None, "--spherical-harmonics-degree", "--sh-degree", help="Highest SH degree (0-3)"),
+    dilation: Optional[bool] = typer.Option(None, "--dilation/--no-dilation", help="Apply INRIA 0.3px covariance dilation. (default: on)"),
 ):
-    """Render a 3DGS .ply to PNG with a pure-PyTorch reference forward pass."""
-    if config is not None:
-        cfg = json.loads(config.read_text())
-        splat = splat or Path(cfg["splat"])
-        width = cfg.get("width", width)
-        height = cfg.get("height", height)
-        if output == "output.png":  # CLI flag wins over config
-            output = cfg.get("output", output)
-        projection_fov = cfg.get("projectionFov", projection_fov)
-        near = cfg.get("near", near)
-        far = cfg.get("far", far)
-        if "background" in cfg:
-            background = ",".join(str(x) for x in cfg["background"])
-        if "cameraPosition" in cfg and camera_position is None:
-            camera_position = ",".join(str(x) for x in cfg["cameraPosition"])
-        if "cameraLookat" in cfg and camera_lookat is None:
-            camera_lookat = ",".join(str(x) for x in cfg["cameraLookat"])
-        if "cameraMatrix" in cfg and camera_matrix is None:
-            camera_matrix = ",".join(str(x) for x in cfg["cameraMatrix"])
-        if "modelPosition" in cfg and model_position is None:
-            model_position = ",".join(str(x) for x in cfg["modelPosition"])
+    """Render a 3DGS .ply to PNG with a pure-PyTorch reference forward pass.
 
-    if splat is None:
-        raise typer.BadParameter("Must specify --splat or --config")
-    splat = ensure_ply(splat)
+    Colors are written as sRGB bytes with no conversion (--color-space srgb).
+    """
+    cfg = json.loads(config.read_text()) if config is not None else {}
+    base = config.parent if config is not None else Path.cwd()
+
+    def from_config(value, key, default=None, path=False, vector=False):
+        if value is not None or key not in cfg:
+            return value if value is not None else default
+        item = cfg[key]
+        if path:
+            return str(base / item)
+        if vector:
+            return ",".join(str(x) for x in item)
+        return item
+
+    scene_path = from_config(str(scene) if scene else None, "scene", path=True)
+    output = from_config(output, "output", path=True)
+    width = from_config(width, "width", 1024)
+    height = from_config(height, "height", 768)
+    background = from_config(background, "background", "0,0,0,1", vector=True)
+    model_position = from_config(model_position, "modelPosition", vector=True)
+    camera_position = from_config(camera_position, "cameraPosition", vector=True)
+    camera_look_at = from_config(camera_look_at, "cameraLookAt", vector=True)
+    camera_up = from_config(camera_up, "cameraUp", vector=True)
+    camera_matrix = from_config(camera_matrix, "cameraMatrix", vector=True)
+    projection_fov = from_config(projection_fov, "projectionFov", 60.0)
+    near = from_config(projection_near, "projectionNear", 0.1)
+    far = from_config(projection_far, "projectionFar", 100.0)
+    sh_degree = from_config(sh_degree, "sphericalHarmonicsDegree")
+    dilation = from_config(dilation, "dilation", True)
+
+    if scene_path is None:
+        raise typer.BadParameter("Must give a scene or --config with a scene key")
+    if output is None:
+        raise typer.BadParameter("Must give --output")
+    splat = ensure_ply(Path(scene_path))
 
     bg = parse_floats(background, 4, "background")
     model_t = (parse_floats(model_position, 3, "model position")
                if model_position else np.zeros(3)).astype(np.float32)
 
     if camera_matrix is not None:
+        if any(v is not None for v in (camera_position, camera_look_at, camera_up)):
+            raise typer.BadParameter("--camera-matrix cannot be combined with other --camera-* options")
         vals = parse_floats(camera_matrix, 16, "camera matrix")
         c2w = vals.reshape(4, 4, order="F")  # column-major
-    elif camera_lookat is not None:
-        pos = parse_floats(camera_position, 3, "camera position") if camera_position else np.array([0, 0, 1.5])
-        c2w = look_at(pos, parse_floats(camera_lookat, 3, "camera lookat"))
-    elif camera_position is not None:
-        c2w = np.eye(4)
-        c2w[:3, 3] = parse_floats(camera_position, 3, "camera position")
     else:
-        c2w = look_at([0, 0, 1.5], [0, 0, 0])
+        pos = parse_floats(camera_position, 3, "camera position") if camera_position else np.array([0.0, 0.0, 5.0])
+        target = parse_floats(camera_look_at, 3, "camera look-at") if camera_look_at else np.zeros(3)
+        up = parse_floats(camera_up, 3, "camera up") if camera_up else np.array([0.0, 1.0, 0.0])
+        c2w = look_at(pos, target, up)
 
     print(f"Loading {splat}...")
     splats = load_ply(splat)

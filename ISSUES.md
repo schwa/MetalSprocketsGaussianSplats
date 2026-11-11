@@ -4094,6 +4094,7 @@ Found by splat-render (`~/Projects/Scratch/splat-render`), which renders the sam
 Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference.py --reference --backend metalsprockets -k sh-sphere`
 
 - `2026-11-11T00:35:06Z`: gaussiansplats-ios fixed this in `nxqqxxsv` (its #34): degree-1 y and x terms negated, signed `SH_C2`/`SH_C3` arrays as in INRIA, the INRIA polynomial forms, and C3 term 5 uses 1.4453 instead of 2.8906. Our `SparkSplatSupport.h` still has the old basis.
+- `2026-11-11T02:47:30Z`: Lead, not checked: the Rust/WGSL port of this renderer (splat-render-wgpu) scored exactly the same 15.27 dB on this scene. Its cause was SH constants with the signs dropped (all positive). Fixing the signs gives 37+ dB. The constants in `SparkSplatSupport.h` here have the correct signs, so the cause here is probably somewhere else with the same effect, for example a flipped view direction.
 
 ---
 
