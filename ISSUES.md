@@ -4301,11 +4301,13 @@ The Spark renderer was fixed in #191.
 ## 201: Depends on GeometryLite3D 0.2.x / SwiftMesh 0.0.x; the rest of the stack has moved to 0.3 / 0.1
 
 +++
-status: new
+status: closed
 priority: high
 kind: task
 labels: dependencies
 created: 2026-11-11T21:15:47Z
+updated: 2026-11-11T21:19:54Z
+closed: 2026-11-11T21:19:54Z
 +++
 
 This package still requires:

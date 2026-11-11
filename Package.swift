@@ -28,13 +28,13 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-collections", from: "1.7.4"),
+        .package(url: "https://github.com/apple/swift-collections", from: "1.7.6"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.8.2"),
         .package(url: "https://github.com/schwa/MetalCompilerPlugin", .upToNextMinor(from: "0.4.1")),
-        .package(url: "https://github.com/schwa/MetalSprockets", .upToNextMinor(from: "0.2.8")),
-        .package(url: "https://github.com/schwa/GeometryLite3D", .upToNextMinor(from: "0.2.6")),
-        .package(url: "https://github.com/schwa/SwiftZipReader", .upToNextMinor(from: "0.0.2")),
-        .package(url: "https://github.com/schwa/GoldenImage", .upToNextMinor(from: "0.1.6")),
+        .package(url: "https://github.com/schwa/MetalSprockets", .upToNextMinor(from: "0.2.9")),
+        .package(url: "https://github.com/schwa/GeometryLite3D", .upToNextMinor(from: "0.3.0")),
+        .package(url: "https://github.com/schwa/SwiftZipReader", .upToNextMinor(from: "0.0.3")),
+        .package(url: "https://github.com/schwa/GoldenImage", .upToNextMinor(from: "0.1.7")),
         .package(url: "https://github.com/schwa/MetalSupport", .upToNextMinor(from: "1.0.7")),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),
         .package(url: "https://github.com/facebook/zstd", from: "1.5.7"),
