@@ -4125,12 +4125,13 @@ Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference
 ## 195: Real captures render darker than gsplat
 
 +++
-status: open
+status: closed
 priority: high
 kind: bug
 labels: area:shaders, effort:m
 created: 2026-11-11T00:31:57Z
-updated: 2026-11-11T00:36:03Z
+updated: 2026-11-11T00:49:35Z
+closed: 2026-11-11T00:49:35Z
 +++
 
 Real captures render darker than gsplat and the other renderers.
@@ -4152,6 +4153,7 @@ Found by splat-render (`~/Projects/Scratch/splat-render`), which renders the sam
 Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference.py --reference --backend metalsprockets -k "cluster-fly or lion"`
 
 - `2026-11-11T00:36:06Z`: Related: #192 (opacity scale), #193 (SH mirrored), #196 (default blur/footprint). Re-measure after those land.
+- `2026-11-11T00:49:35Z`: Fixed by #193, #192 and #196. splat-render re-measured against gsplat at 128×96 with the metalsprockets backend pointed at this repo: cluster-fly.ply 27.99 → 38.03 dB, cluster-fly.sog 28.11 → 38.39 dB, lion.spz 20.43 → 35.62 dB (gaussiansplats-ios: 38.20 / 38.34 / 35.67). sh-sphere 15.27 → 47.98 dB, rainbow-ring → 40.9 dB. No regression test here: the check needs the external gsplat reference renders; SparkShadingTests cover the underlying causes.
 
 ---
 
