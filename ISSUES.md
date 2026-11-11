@@ -4240,11 +4240,12 @@ Flags that exist only here (`--renderer`, `--supersampling`, `--points-per-threa
 ## 198: CLI --statistics json output does not match the splat-render statistics schema
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
 labels: area:cli, effort:s
 created: 2026-11-11T02:35:21Z
+updated: 2026-11-11T04:24:21Z
 +++
 
 With `--statistics json`, `metalsprockets-gaussian-splat` writes its own report (`splats`, `shDegree`, `wall`, `sortGpu`, `renderGpu`, `vertex`, `fragment`, `culledSplats`, ...). The splat-render spec requires the schema in `~/Projects/Scratch/splat-render/docs/statistics.schema.json`: `backend`, `scene`, `splatCount`, `width`, `height`, `warmupFrames`, `measuredFrames`, `wallMilliseconds` and optional `gpuMilliseconds` and `passes`, each timing as `{median, min, max}`, with `additionalProperties: false`.
@@ -4258,11 +4259,12 @@ Left over from #197.
 ## 199: SOG model: antialiased is ignored
 
 +++
-status: new
+status: open
 priority: medium
 kind: bug
 labels: area:sog, area:shaders, effort:s
 created: 2026-11-11T02:42:40Z
+updated: 2026-11-11T04:24:21Z
 +++
 
 SOG meta.json can have `"model": "antialiased"` (v2 and v3). The sample `cluster-fly.sog` has it. Scenes trained in that mode expect the anti-aliasing opacity scale `sqrt(det Σ / det(Σ + filter))`, with a 0.1 px² filter instead of the 0.3 px² dilation (see the SOG v3 proposal, playcanvas/splat-transform#362, "Rendering opacity above 1").
@@ -4274,11 +4276,12 @@ The reader does not read `model`, and the Spark renderer uses the default tuning
 ## 200: Stochastic, tile and debug renderers convert sRGB to linear with pow 2.2
 
 +++
-status: new
+status: open
 priority: low
 kind: bug
 labels: area:shaders, effort:xs
 created: 2026-11-11T02:43:54Z
+updated: 2026-11-11T04:24:21Z
 +++
 
 With convertSRGBToLinear, these shaders still convert splat colors with `pow(rgba.rgb, float3(2.2))` instead of the exact sRGB curve. The difference is largest in dark tones.
