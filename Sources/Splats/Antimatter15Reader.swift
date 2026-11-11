@@ -39,7 +39,7 @@ public struct Antimatter15Reader: SplatReaderProtocol {
                     iy: (Float(bytes[offset + 30]) - 128) / 128,
                     iz: (Float(bytes[offset + 31]) - 128) / 128,
                     r: (Float(bytes[offset + 28]) - 128) / 128
-                )
+                ).normalized
                 try handler(index, ExtendedSplat(position: position, scale: scale, color: color, rotation: rotation))
             }
         }

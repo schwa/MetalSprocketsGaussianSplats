@@ -4096,12 +4096,13 @@ Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference
 ## 194: .splat loader makes rotated splats too large
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: area:io, effort:s
 created: 2026-11-11T00:31:57Z
-updated: 2026-11-11T00:36:03Z
+updated: 2026-11-11T02:15:50Z
+closed: 2026-11-11T02:15:50Z
 +++
 
 `Samples/test-splats/plane.splat` is a 21×21 grid of splats with rotation (-0.5, -0.5, -0.5, -0.5) and scale 0.1. Loaded from `.splat`, every splat is drawn much larger, so the grid becomes a solid square. `six-splats.splat` (identity rotation) is correct.
@@ -4119,6 +4120,8 @@ So the `.splat` path loses about 8 dB more than `.ply` and `.sog`. The remaining
 Found by splat-render (`~/Projects/Scratch/splat-render`), which renders the same scenes with several renderers and compares them with gsplat by PSNR. The samples are in `~/Projects/Scratch/splat-render/Samples`. Its metalsprockets backend pins commit `7829a8d` and uses `SplatLoader.read`, `GPUSplatSortComputePass`, and `SparkSplatRenderPipeline`.
 
 Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference.py --reference --backend metalsprockets -k plane`
+
+- `2026-11-11T02:15:50Z`: Cause: the .splat rotation bytes in plane.splat are 0, which decode to (-1, -1, -1, -1) (length 2), not (-0.5, ...). The reader did not normalize, so the shader scaled each splat by |q|² = 4. splat-render plane.splat: 21.63 → 60.44 dB.
 
 ---
 
