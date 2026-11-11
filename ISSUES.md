@@ -3991,12 +3991,13 @@ Found while closing #163. The interactive PointSplatRenderPipeline does evaluate
 ## 190: Support SOG format v3
 
 +++
-status: open
+status: closed
 priority: medium
 kind: feature
 labels: effort:l, area:sog
 created: 2026-11-11T00:12:47Z
-updated: 2026-11-11T00:36:03Z
+updated: 2026-11-11T02:42:40Z
+closed: 2026-11-11T02:42:40Z
 +++
 
 SOG reader only handles v2. PlayCanvas proposed SOG v3 (https://github.com/playcanvas/splat-transform/issues/362), which v2 readers must reject. v3 changes:
@@ -4009,6 +4010,8 @@ SOG reader only handles v2. PlayCanvas proposed SOG v3 (https://github.com/playc
 - Optional top-level extras and comments in meta (and Streamed SOG lod-meta.json)
 
 Expected: v3 .sog files load and render correctly. Actual: unsupported.
+
+- `2026-11-11T02:42:40Z`: Implemented per the final spec (splat-transform #362/#370, released in 3.11). Reads v3 rotations (24-bit exponential map in the alpha channels), opacity ((a/204)²), 24-bit SH labels, and 4 SH bands. Limits: opacity above 1 is clamped to 1 (the spec allows this for renderers without the opaque-core profile). The 4th SH band is dropped, since the renderer evaluates up to degree 3. Blind data, extras, and comments are ignored. 24-bit labels have no fixture: a palette above 65536 needs a scene with more than 65536 splats. Checked against gsplat by rendering splat-transform v2/v3 pairs of the same scenes: sh-sphere 48.01/48.08 dB, cluster-fly 37.87/37.85 dB, lion 35.62/35.64 dB.
 
 ---
 
@@ -4247,5 +4250,21 @@ With `--statistics json`, `metalsprockets-gaussian-splat` writes its own report 
 splat-render tests that fail against this CLI: `test_statistics.py::test_json_matches_schema`, `test_json_values`, `test_one_frame_has_one_value`.
 
 Left over from #197.
+
+---
+
+## 199: SOG model: antialiased is ignored
+
++++
+status: new
+priority: medium
+kind: bug
+labels: area:sog, area:shaders, effort:s
+created: 2026-11-11T02:42:40Z
++++
+
+SOG meta.json can have `"model": "antialiased"` (v2 and v3). The sample `cluster-fly.sog` has it. Scenes trained in that mode expect the anti-aliasing opacity scale `sqrt(det Σ / det(Σ + filter))`, with a 0.1 px² filter instead of the 0.3 px² dilation (see the SOG v3 proposal, playcanvas/splat-transform#362, "Rendering opacity above 1").
+
+The reader does not read `model`, and the Spark renderer uses the default tuning (0.3 px² dilation, no opacity scale, #196) for every scene. `SplatRenderTuning.antialiasOpacityScale` (#192) exists, but nothing sets it from the file.
 
 ---

@@ -70,6 +70,16 @@ public struct SOGReaderGPU {
 
         let metadataData = try Self.extractData(from: archive, filename: "meta.json")
         let metadata = try JSONDecoder().decode(SOGGPUMetadata.self, from: metadataData)
+        // Files from before the version field are v1, which decodes like v2.
+        let version = metadata.version ?? 2
+        guard version <= 3 else {
+            throw SplatsError.unsupportedVersion(UInt32(clamping: version))
+        }
+        // v2 has rotations in quats.webp. v3 has them in the alpha channels.
+        let quatsFile = metadata.quats?.files.first
+        if version < 3, quatsFile == nil {
+            throw SplatsError.missingTexture("quats.webp")
+        }
 
         // Gather the image filenames. WebP decode dominates the load time, and
         // each image is independent. Extract serially (cheap), then decode and
@@ -79,30 +89,41 @@ public struct SOGReaderGPU {
             metadata.means.files[0],
             metadata.means.files[1],
             metadata.scales.files[0],
-            metadata.quats.files[0],
             metadata.sh0.files[0]
         ]
         if hasSH, let shN = metadata.shN {
             filenames.append(shN.files[0])
             filenames.append(shN.files[1])
         }
+        if version < 3, let quatsFile {
+            filenames.append(quatsFile)
+        }
 
         let textures = try loadTextures(from: archive, filenames: filenames)
         let meansLow = textures[0]
         let meansHigh = textures[1]
         let scales = textures[2]
-        let quats = textures[3]
-        let sh0 = textures[4]
-        let shCentroidsTex: MTLTexture? = hasSH ? textures[5] : nil
-        let shLabelsTex: MTLTexture? = hasSH ? textures[6] : nil
+        let sh0 = textures[3]
+        let shCentroidsTex: MTLTexture? = hasSH ? textures[4] : nil
+        let shLabelsTex: MTLTexture? = hasSH ? textures[5] : nil
+        // v3 has no quats texture. Bind any texture; the kernel does not read it.
+        let quats = version < 3 ? textures[textures.count - 1] : sh0
 
         let splatTexWidth = meansLow.width
 
+        // v3 allows 4 bands. The renderer evaluates up to degree 3, so keep the
+        // first 15 coefficients of each palette entry.
+        let coefficientsPerBand = [3, 8, 15, 24]
         var shDegree = 0
         var shNumCoeffs = 0
+        var shFileCoeffs = 0
         if hasSH, let shN = metadata.shN {
-            shDegree = shN.bands
-            shNumCoeffs = [3, 8, 15][shN.bands - 1]
+            guard (1...4).contains(shN.bands), version >= 3 || shN.bands <= 3 else {
+                throw SplatsError.invalidSHDegree(UInt8(clamping: shN.bands))
+            }
+            shDegree = min(shN.bands, 3)
+            shNumCoeffs = coefficientsPerBand[shDegree - 1]
+            shFileCoeffs = coefficientsPerBand[shN.bands - 1]
         }
 
         let shFloatsPerSplat = shNumCoeffs * 3
@@ -127,8 +148,10 @@ public struct SOGReaderGPU {
             count: UInt32(count),
             meansMin: SIMD3<Float>(metadata.means.mins[0], metadata.means.mins[1], metadata.means.mins[2]),
             meansMax: SIMD3<Float>(metadata.means.maxs[0], metadata.means.maxs[1], metadata.means.maxs[2]),
+            version: UInt32(version),
             shDegree: UInt32(shDegree),
             shNumCoeffs: UInt32(shNumCoeffs),
+            shFileCoeffs: UInt32(shFileCoeffs),
             shFloatsPerSplat: UInt32(shFloatsPerSplat),
             shCentroidsWidth: UInt32(shCentroidsTex?.width ?? 0),
             shEntriesPerRow: 64,
@@ -297,11 +320,14 @@ final class RunnerCache: @unchecked Sendable {
 
 // MARK: - Metadata
 
+// v3 also has opacity.max, blind data, extras, and comments. The renderer does
+// not use them, so they are not decoded.
 private struct SOGGPUMetadata: Codable {
+    let version: Int?
     let count: Int
     let means: MeansMetadata
     let scales: CodebookMetadata
-    let quats: QuatsMetadata
+    let quats: QuatsMetadata?
     let sh0: CodebookMetadata
     let shN: SHNMetadata?
 

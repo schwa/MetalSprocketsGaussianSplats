@@ -60,7 +60,7 @@ namespace SOGDecodeShader {
         float logZ = params.meansMin.z + tz * (params.meansMax.z - params.meansMin.z);
         float3 position = float3(invLog(logX), invLog(logY), invLog(logZ));
 
-        // Scale: codebook lookup per channel, then exp.
+        // Scale: codebook lookup per channel, then exp. In v3, alpha holds rotation.
         uint4 s = scales.read(c);
         float3 scale = float3(
             exp(scalesCodebook[s.x]),
@@ -68,19 +68,30 @@ namespace SOGDecodeShader {
             exp(scalesCodebook[s.z])
         );
 
-        // Rotation: smallest-3 encoding.
-        uint4 q = quats.read(c);
-        float r0 = (float(q.x) / 255.0 - 0.5) * SQRT2;
-        float r1 = (float(q.y) / 255.0 - 0.5) * SQRT2;
-        float r2 = (float(q.z) / 255.0 - 0.5) * SQRT2;
-        float rr = sqrt(max(0.0, 1.0 - r0 * r0 - r1 * r1 - r2 * r2));
-        int rOrder = int(q.w) - 252;
+        float4 rot;
+        if (params.version >= 3) {
+            // v3: 24-bit exponential map in the alpha of means_l, means_u and scales.
+            // p = (2/π)·θ·v/|v| with θ the half angle; each byte is (b - 128) / 127.
+            float3 p = (float3(float(low.w), float(high.w), float(s.w)) - 128.0) / 127.0;
+            float r = length(p);
+            float theta = M_PI_2_F * r;
+            float k = r > 0.0 ? sin(theta) / r : 0.0;
+            rot = float4(p * k, cos(theta));
+        } else {
+            // v2: smallest-three in quats.webp.
+            uint4 q = quats.read(c);
+            float r0 = (float(q.x) / 255.0 - 0.5) * SQRT2;
+            float r1 = (float(q.y) / 255.0 - 0.5) * SQRT2;
+            float r2 = (float(q.z) / 255.0 - 0.5) * SQRT2;
+            float rr = sqrt(max(0.0, 1.0 - r0 * r0 - r1 * r1 - r2 * r2));
+            int rOrder = int(q.w) - 252;
 
-        float qx = rOrder == 0 ? r0 : (rOrder == 1 ? rr : r1);
-        float qy = rOrder <= 1 ? r1 : (rOrder == 2 ? rr : r2);
-        float qz = rOrder <= 2 ? r2 : rr;
-        float qw = rOrder == 0 ? rr : r0;
-        float4 rot = float4(qx, qy, qz, qw);
+            float qx = rOrder == 0 ? r0 : (rOrder == 1 ? rr : r1);
+            float qy = rOrder <= 1 ? r1 : (rOrder == 2 ? rr : r2);
+            float qz = rOrder <= 2 ? r2 : rr;
+            float qw = rOrder == 0 ? rr : r0;
+            rot = float4(qx, qy, qz, qw);
+        }
         rot = normalize(rot);
 
         // Color from SH0 codebook + DC term; alpha direct.
@@ -88,7 +99,9 @@ namespace SOGDecodeShader {
         float r = clamp(sh0Codebook[col.x] * SH_C0 + 0.5, 0.0, 1.0);
         float g = clamp(sh0Codebook[col.y] * SH_C0 + 0.5, 0.0, 1.0);
         float b = clamp(sh0Codebook[col.z] * SH_C0 + 0.5, 0.0, 1.0);
-        float a = float(col.w) / 255.0;
+        // v2: alpha / 255. v3: (alpha / 204)², up to 1.5625. The renderer has no
+        // opaque-core profile for opacity above 1, so clamp it, as the spec allows.
+        float a = params.version >= 3 ? min(1.0, pow(float(col.w) / 204.0, 2.0)) : float(col.w) / 255.0;
 
         SparkSplat splat;
         splat.position = half3(position);
@@ -99,13 +112,15 @@ namespace SOGDecodeShader {
             uchar(clamp(r, 0.0, 1.0) * 255.0),
             uchar(clamp(g, 0.0, 1.0) * 255.0),
             uchar(clamp(b, 0.0, 1.0) * 255.0),
-            uchar(clamp(a, 0.0, 1.0) * 255.0)
+            // Round: v3 alpha is not a multiple of 1/255, and truncation darkens it.
+            uchar(rint(clamp(a, 0.0, 1.0) * 255.0))
         );
         // Indexed SH: store the palette row index; the palette is decoded once
         // by decodePalette instead of being expanded per splat.
         if (params.shDegree > 0) {
             uint4 lbl = shLabels.read(c);
-            splat.shIndex = lbl.x + (lbl.y << 8);
+            // v3 labels are 24-bit: the blue channel holds bits 16-23.
+            splat.shIndex = lbl.x + (lbl.y << 8) + (params.version >= 3 ? (lbl.z << 16) : 0);
         } else {
             splat.shIndex = gid;
         }
@@ -123,7 +138,8 @@ namespace SOGDecodeShader {
         if (gid >= params.shPaletteCount || params.shDegree == 0) {
             return;
         }
-        uint paletteU = (gid % params.shEntriesPerRow) * params.shNumCoeffs;
+        // Entries are shFileCoeffs texels wide; only the first shNumCoeffs are kept.
+        uint paletteU = (gid % params.shEntriesPerRow) * params.shFileCoeffs;
         uint paletteV = gid / params.shEntriesPerRow;
         uint base = gid * params.shFloatsPerSplat;
         for (uint k = 0; k < params.shNumCoeffs; k++) {

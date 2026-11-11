@@ -11,8 +11,11 @@ struct SOGDecodeParams {
     simd_float3 meansMin;        // means mins (per axis)
     simd_float3 meansMax;        // means maxs (per axis)
 
-    unsigned int shDegree;       // 0 = no higher-order SH, else 1..3
+    unsigned int version;        // SOG format version (2 or 3)
+
+    unsigned int shDegree;       // 0 = no higher-order SH, else 1..3 (bands above 3 are dropped)
     unsigned int shNumCoeffs;    // coefficients per splat for shDegree (3, 8, or 15)
+    unsigned int shFileCoeffs;   // coefficients per palette entry in the file (3, 8, 15, or 24)
     unsigned int shFloatsPerSplat; // shNumCoeffs * 3
     unsigned int shCentroidsWidth; // width (in texels) of the centroids texture
     unsigned int shEntriesPerRow;  // palette entries per centroids row (64)
