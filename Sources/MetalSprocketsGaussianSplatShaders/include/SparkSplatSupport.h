@@ -14,14 +14,10 @@ namespace SparkSplatSupport {
     // MARK: - Spherical Harmonics Constants
 
     constant float SH_C0 = 0.28209479177387814;
+    // Real SH basis exactly as INRIA 3DGS / gsplat, signs included.
     constant float SH_C1 = 0.4886025119029199;
-    constant float SH_C2_0 = 1.0925484305920792;
-    constant float SH_C2_1 = 0.31539156525252005;
-    constant float SH_C2_2 = 0.5462742152960396;
-    constant float SH_C3_0 = 0.5900435899266435;
-    constant float SH_C3_1 = 2.890611442640554;
-    constant float SH_C3_2 = 0.4570457994644658;
-    constant float SH_C3_3 = 0.3731763325901154;
+    constant float SH_C2[5] = { 1.0925484305920792, -1.0925484305920792, 0.31539156525252005, -1.0925484305920792, 0.5462742152960396 };
+    constant float SH_C3[7] = { -0.5900435899266435, 2.890611442640554, -0.4570457994644658, 0.3731763325901154, -0.4570457994644658, 1.445305721320277, -0.5900435899266435 };
 
     // MARK: - Spherical Harmonics Evaluation
 
@@ -52,9 +48,9 @@ namespace SparkSplatSupport {
         uint offset = splatIndex * floatsPerSplat;
 
         // Degree 1: 3 basis functions
-        float basis1_0 = SH_C1 * y;
+        float basis1_0 = -SH_C1 * y;
         float basis1_1 = SH_C1 * z;
-        float basis1_2 = SH_C1 * x;
+        float basis1_2 = -SH_C1 * x;
 
         result += basis1_0 * float3(coefficients[offset + 0], coefficients[offset + 1], coefficients[offset + 2]);
         result += basis1_1 * float3(coefficients[offset + 3], coefficients[offset + 4], coefficients[offset + 5]);
@@ -66,11 +62,11 @@ namespace SparkSplatSupport {
         float xx = x * x, yy = y * y, zz = z * z;
         float xy = x * y, yz = y * z, xz = x * z;
 
-        float basis2_0 = SH_C2_0 * xy;
-        float basis2_1 = SH_C2_0 * yz;
-        float basis2_2 = SH_C2_1 * (3.0 * zz - 1.0);
-        float basis2_3 = SH_C2_0 * xz;
-        float basis2_4 = SH_C2_2 * (xx - yy);
+        float basis2_0 = SH_C2[0] * xy;
+        float basis2_1 = SH_C2[1] * yz;
+        float basis2_2 = SH_C2[2] * (2.0 * zz - xx - yy);
+        float basis2_3 = SH_C2[3] * xz;
+        float basis2_4 = SH_C2[4] * (xx - yy);
 
         result += basis2_0 * float3(coefficients[offset + 9], coefficients[offset + 10], coefficients[offset + 11]);
         result += basis2_1 * float3(coefficients[offset + 12], coefficients[offset + 13], coefficients[offset + 14]);
@@ -81,13 +77,13 @@ namespace SparkSplatSupport {
         if (shDegree < 3) return result;
 
         // Degree 3: 7 basis functions
-        float basis3_0 = SH_C3_0 * y * (3.0 * xx - yy);
-        float basis3_1 = SH_C3_1 * xy * z;
-        float basis3_2 = SH_C3_2 * y * (5.0 * zz - 1.0);
-        float basis3_3 = SH_C3_3 * z * (5.0 * zz - 3.0);
-        float basis3_4 = SH_C3_2 * x * (5.0 * zz - 1.0);
-        float basis3_5 = SH_C3_1 * z * (xx - yy);
-        float basis3_6 = SH_C3_0 * x * (xx - 3.0 * yy);
+        float basis3_0 = SH_C3[0] * y * (3.0 * xx - yy);
+        float basis3_1 = SH_C3[1] * xy * z;
+        float basis3_2 = SH_C3[2] * y * (4.0 * zz - xx - yy);
+        float basis3_3 = SH_C3[3] * z * (2.0 * zz - 3.0 * xx - 3.0 * yy);
+        float basis3_4 = SH_C3[4] * x * (4.0 * zz - xx - yy);
+        float basis3_5 = SH_C3[5] * z * (xx - yy);
+        float basis3_6 = SH_C3[6] * x * (xx - 3.0 * yy);
 
         result += basis3_0 * float3(coefficients[offset + 24], coefficients[offset + 25], coefficients[offset + 26]);
         result += basis3_1 * float3(coefficients[offset + 27], coefficients[offset + 28], coefficients[offset + 29]);

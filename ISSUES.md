@@ -4063,12 +4063,13 @@ Found by splat-render (`~/Projects/Scratch/splat-render`, issue #4). Its metalsp
 ## 193: Spark renderer SH colors are mirrored
 
 +++
-status: open
+status: closed
 priority: high
 kind: bug
 labels: area:shaders, effort:s
 created: 2026-11-11T00:31:57Z
-updated: 2026-11-11T00:36:03Z
+updated: 2026-11-11T00:44:01Z
+closed: 2026-11-11T00:44:01Z
 +++
 
 On a sphere with strong SH (`Samples/sh-sphere/sh-sphere.ply`, band 1 red, band 2 green, band 3 blue), the view-dependent colors are mirrored: the magenta and green halves are swapped. With SH degree 0 the sphere is gray, as expected.
