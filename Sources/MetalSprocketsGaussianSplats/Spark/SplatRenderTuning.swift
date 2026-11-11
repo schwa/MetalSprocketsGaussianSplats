@@ -1,8 +1,7 @@
 #if !arch(x86_64)
 import Foundation
 
-/// Runtime-tunable Spark render-quality parameters from the blur-reduction
-/// experiments. Applied as Metal function constants when the pipeline is built,
+/// Runtime-tunable Spark render-quality parameters. Applied as Metal function constants when the pipeline is built,
 /// so they are compile-time constants inside the shader but selectable per pipeline.
 public struct SplatRenderTuning: Equatable, Sendable {
     /// Gaussian cutoff radius in standard deviations. A smaller value gives
@@ -19,14 +18,15 @@ public struct SplatRenderTuning: Equatable, Sendable {
     /// gsplat's default "classic" mode.
     public var antialiasOpacityScale: Bool
 
-    public init(maxStdDev: Float = 2.5, minAlpha: Float = 2.0 / 255.0, blurAmount: Float = 0.05, antialiasOpacityScale: Bool = true) {
+    public init(maxStdDev: Float = 3.0, minAlpha: Float = 2.0 / 255.0, blurAmount: Float = 0.3, antialiasOpacityScale: Bool = false) {
         self.maxStdDev = maxStdDev
         self.minAlpha = minAlpha
         self.blurAmount = blurAmount
         self.antialiasOpacityScale = antialiasOpacityScale
     }
 
-    /// Tuned defaults from the blur-reduction experiments (sharp, cheaper).
+    /// Matches INRIA 3DGS / gsplat classic mode: 3σ footprint, 0.3 px²
+    /// dilation, no opacity scale.
     public static let `default` = Self()
 }
 #endif

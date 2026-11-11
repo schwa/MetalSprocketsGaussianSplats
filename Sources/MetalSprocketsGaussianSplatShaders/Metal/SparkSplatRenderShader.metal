@@ -30,18 +30,16 @@ namespace SparkSplatRenderShader {
     constant bool use_sh [[function_constant(1)]];
     constant bool use_bounding_box [[function_constant(2)]];
 
-    // Render tuning (blur reduction). SplatRenderTuning specializes these at
-    // pipeline build. If the build does not provide them, they default to the
-    // tuned values, so any pipeline gets the sharper and cheaper look without
-    // extra wiring.
+    // Render tuning. SplatRenderTuning specializes these at pipeline build.
+    // If the build does not provide them, they default to the INRIA/gsplat values.
     constant float fc_max_std_dev [[function_constant(3)]];
     constant float fc_min_alpha   [[function_constant(4)]];
     constant float fc_blur_amount [[function_constant(5)]];
     constant bool fc_aa_opacity_scale [[function_constant(6)]];
-    constant float MAX_STD_DEV = is_function_constant_defined(fc_max_std_dev) ? fc_max_std_dev : 2.5;
+    constant float MAX_STD_DEV = is_function_constant_defined(fc_max_std_dev) ? fc_max_std_dev : 3.0;
     constant float MIN_ALPHA   = is_function_constant_defined(fc_min_alpha)   ? fc_min_alpha   : (2.0 / 255.0);
-    constant float BLUR_AMOUNT = is_function_constant_defined(fc_blur_amount) ? fc_blur_amount : 0.05;
-    constant bool AA_OPACITY_SCALE = is_function_constant_defined(fc_aa_opacity_scale) ? fc_aa_opacity_scale : true;
+    constant float BLUR_AMOUNT = is_function_constant_defined(fc_blur_amount) ? fc_blur_amount : 0.3;
+    constant bool AA_OPACITY_SCALE = is_function_constant_defined(fc_aa_opacity_scale) ? fc_aa_opacity_scale : false;
 
     // MARK: - Vertex Shader
 

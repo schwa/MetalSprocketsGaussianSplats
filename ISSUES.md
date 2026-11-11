@@ -4158,13 +4158,14 @@ Repro: `cd ~/Projects/Scratch/splat-render/tests && uv run pytest test_reference
 ## 196: Default AA dilation and footprint cutoff differ from gsplat
 
 +++
-status: open
+status: closed
 priority: medium
 kind: bug
 labels: area:shaders, effort:xs
 depends: 192
 created: 2026-11-11T00:35:02Z
-updated: 2026-11-11T00:36:04Z
+updated: 2026-11-11T00:47:21Z
+closed: 2026-11-11T00:47:21Z
 +++
 
 The default `SplatRenderTuning` (`Sources/MetalSprocketsGaussianSplats/Spark/SplatRenderTuning.swift`) differs from INRIA 3DGS / gsplat:

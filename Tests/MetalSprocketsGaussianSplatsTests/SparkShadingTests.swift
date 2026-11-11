@@ -61,6 +61,15 @@ struct SparkShadingTests {
         #expect(antialiasedPixel.x < classicPixel.x / 3, "antialiased \(antialiasedPixel.x), classic \(classicPixel.x)")
     }
 
+    // INRIA 3DGS / gsplat classic: 3σ footprint, eps2d = 0.3 px², no opacity scale.
+    @Test
+    func defaultTuningMatchesGsplat() {
+        let tuning = SplatRenderTuning.default
+        #expect(tuning.maxStdDev == 3.0)
+        #expect(tuning.blurAmount == 0.3)
+        #expect(tuning.antialiasOpacityScale == false)
+    }
+
     // MARK: - Helpers
 
     @MainActor
